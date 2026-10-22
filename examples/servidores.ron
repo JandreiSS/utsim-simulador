@@ -1,0 +1,15 @@
+// Modelo base da otimização de servidores: chegadas rápidas, serviço lento.
+// O número de servidores e a capacidade da fila são as variáveis de decisão
+// de otimizacao_servidores.ron.
+Model(
+    name: "Servidores",
+    description: "Posto de atendimento com fila de capacidade limitada",
+    run: (stop_time: 5000.0, warmup: 200.0, seed: 7, replications: 5),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0))),
+        (name: "fila",    kind: Queue(capacity: 10)),
+        (name: "maquina", kind: Processor(capacity: 1, process: Exp(mean: 2.5))),
+        (name: "saida",   kind: Sink),
+    ],
+    connections: [("chegada", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+)

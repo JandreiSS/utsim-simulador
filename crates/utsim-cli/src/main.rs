@@ -1,6 +1,7 @@
 mod csv;
 mod experiment;
 mod fit;
+mod optimize;
 mod replay;
 
 use std::path::PathBuf;
@@ -69,6 +70,22 @@ enum Cmd {
         #[arg(long)]
         json: Option<PathBuf>,
     },
+    /// Otimiza parâmetros do modelo por simulação (busca com comparação pareada)
+    Otimizar {
+        problema: PathBuf,
+        /// Grava o relatório completo, com gráficos, em um HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Grava o resultado completo em JSON
+        #[arg(long)]
+        json: Option<PathBuf>,
+        /// Replicações por ponto (sobrescreve o arquivo do problema)
+        #[arg(long)]
+        reps: Option<u32>,
+        /// Máximo de pontos avaliados (sobrescreve o arquivo do problema)
+        #[arg(long)]
+        orcamento: Option<usize>,
+    },
     /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
     Fit {
         file: PathBuf,
@@ -125,6 +142,19 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             seed,
             html,
             json,
+        })?,
+        Cmd::Otimizar {
+            problema,
+            html,
+            json,
+            reps,
+            orcamento,
+        } => optimize::run(optimize::Args {
+            file: problema,
+            html,
+            json,
+            reps,
+            budget: orcamento,
         })?,
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
