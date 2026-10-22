@@ -1,0 +1,44 @@
+// Linha com turnos programados. Unidade de tempo: minutos.
+//
+// O relógio do modelo começa às 06h00 (t = 0) e cada dia tem 1440 minutos. As janelas
+// de turno se repetem a cada "period" = 1440, ou seja, todo dia:
+//   - [360, 420)    pausa para o almoço: das 12h às 13h;
+//   - [960, 1440)   fim do expediente: das 22h às 06h do dia seguinte.
+// Fora dessas janelas as máquinas trabalham, das 06h às 12h e das 13h às 22h.
+// Enquanto estão fora de turno, o estado mostrado é "off_shift" e o item em processamento
+// fica pausado, retomando quando o turno volta.
+//
+// As janelas não se encostam: uma janela que começa exatamente quando outra termina
+// ainda não é tratada corretamente pelo motor, então o exemplo evita esse caso.
+//
+// A fonte chega a cada 8 minutos em média, para a linha não ficar saturada. A fila entre
+// as duas estações guarda o que espera. Rodamos 3 dias (4320 minutos), descartando o primeiro dia como aquecimento.
+Model(
+    name: "Turnos com almoço e noite",
+    run: (stop_time: 4320.0, warmup: 1440.0, seed: 2026, replications: 5),
+    objects: [
+        (name: "entrada", kind: Source(interarrival: Exp(mean: 8.0))),
+        (name: "fila", kind: Queue(capacity: 20)),
+        // Corte: 2 a 5 minutos por peça, com turno.
+        (name: "corte", kind: Processor(process: Triangular(min: 2.0, mode: 3.0, max: 5.0)),
+         shifts: (period: 1440.0, off: [
+            (start: 360.0, duration: 60.0),
+            (start: 960.0, duration: 480.0),
+         ])),
+        (name: "fila_montagem", kind: Queue(capacity: 10)),
+        // Montagem: tempo médio de 4 minutos, mesmo turno.
+        (name: "montagem", kind: Processor(process: Exp(mean: 4.0)),
+         shifts: (period: 1440.0, off: [
+            (start: 360.0, duration: 60.0),
+            (start: 960.0, duration: 480.0),
+         ])),
+        (name: "expedicao", kind: Sink),
+    ],
+    connections: [
+        ("entrada", "fila"),
+        ("fila", "corte"),
+        ("corte", "fila_montagem"),
+        ("fila_montagem", "montagem"),
+        ("montagem", "expedicao"),
+    ],
+)
