@@ -1,0 +1,41 @@
+// Painel de propriedades sobre uma cópia de examples/mm1.ron (o modo roteirizado copia o
+// modelo para a pasta de capturas e edita a cópia).
+//   utsim-view examples/mm1.ron --roteiro crates/utsim-viewer/roteiros/propriedades.ron --capturas saida/propriedades
+// Seleciona "maquina", muda o tempo médio de processamento pelo painel, confere que o
+// modelo ficou alterado, salva (Ctrl+S) e desfaz.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ObjetosIgual(4)),
+    Afirmar(Sujo(false)),
+    Captura("01_nada_selecionado"),
+
+    MoverPara(Objeto("maquina")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("maquina"))),
+    Esperar(quadros: 3),
+    Captura("02_maquina_selecionada"),
+
+    // O campo "média" fica ao lado do rótulo.
+    MoverPara(Deslocado(Botao("média"), 50.0, 0.0)),
+    Captura("03_sobre_o_campo"),
+    Clicar(Esquerdo),
+    Atalho(["Ctrl", "A"]),
+    Digitar("1.5"),
+    Captura("04_digitando"),
+    Tecla("Enter"),
+    Esperar(quadros: 3),
+    Afirmar(Sujo(true)),
+    Captura("05_tempo_alterado"),
+
+    // Salvar e conferir o título e o estado.
+    Atalho(["Ctrl", "S"]),
+    Esperar(quadros: 3),
+    Afirmar(Sujo(false)),
+    Afirmar(StatusContem("Salvo")),
+    Captura("06_salvo"),
+
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(Sujo(true)),
+    Captura("07_desfeito"),
+]

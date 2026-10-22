@@ -1,0 +1,52 @@
+// Simulação do exemplo de montagem de paletes (o modelo é copiado para a pasta de capturas).
+//   utsim-view examples/montagem_paletes.ron --roteiro crates/utsim-viewer/roteiros/simular_paletes.ron --capturas saida/paletes
+// Simula, reproduz, captura em vários instantes, seleciona um bloco para ver as
+// estatísticas, avança por eventos e volta para Editar.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("01_editar"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 60.0),
+    Esperar(quadros: 5),
+    Captura("02_simulacao_t0"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(2.0),
+    Captura("03_reproduzindo_2s"),
+    EsperarSegundos(4.0),
+    Captura("04_reproduzindo_6s"),
+    EsperarSegundos(6.0),
+    Captura("05_reproduzindo_12s"),
+    Afirmar(TempoSimuladoMin(1.0)),
+
+    // Pausar e inspecionar um bloco pelo clique no 3D.
+    ClicarBotao("Pausar"),
+    MoverPara(Objeto("montagem")),
+    Clicar(Esquerdo),
+    Esperar(quadros: 3),
+    Captura("06_pausado_montagem_selecionada"),
+
+    // Avançar por eventos.
+    ClicarBotao("Evento >"),
+    ClicarBotao("Evento >"),
+    ClicarBotao("Evento >"),
+    Captura("07_tres_eventos_depois"),
+    ClicarBotao("Início"),
+    Captura("08_de_volta_ao_inicio"),
+
+    // Câmera: aproximar com a roda e girar com o botão direito.
+    Rolar(3.0),
+    Captura("09_zoom"),
+    MoverPara(Tela(700.0, 600.0)),
+    Pressionar(Direito),
+    MoverPara(Tela(760.0, 600.0)),
+    Soltar(Direito),
+    Captura("10_camera_girada"),
+
+    ClicarBotao("✎ Editar"),
+    Afirmar(Modo(Editar)),
+    Captura("11_de_volta_ao_editar"),
+]
