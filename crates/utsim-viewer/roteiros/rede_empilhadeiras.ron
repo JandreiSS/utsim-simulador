@@ -1,0 +1,32 @@
+// Fase 4: empilhadeiras andando pela rede de caminhos (o modelo é copiado para a pasta de capturas).
+//   utsim-view examples/rede_de_caminhos.ron --roteiro crates/utsim-viewer/roteiros/rede_empilhadeiras.ron --capturas saida/rede
+// Confere: rede desenhada no chão, veículos se movendo pelos caminhos e levando peças,
+// cores de estado dos veículos e o painel de propriedades de um transportador.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("01_editar_rede"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 60.0),
+    Esperar(quadros: 5),
+    Captura("02_simulacao_t0"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(1.5),
+    Captura("03_veiculos_1s"),
+    EsperarSegundos(1.5),
+    Captura("04_veiculos_3s"),
+    EsperarSegundos(3.0),
+    Captura("05_veiculos_6s"),
+    Afirmar(TempoSimuladoMin(1.0)),
+    ClicarBotao("Pausar"),
+    Captura("06_pausado"),
+
+    // De volta ao editor: propriedades de um transportador.
+    ClicarBotao("Editar"),
+    EsperarAte(Modo(Editar), 10.0),
+    Esperar(quadros: 5),
+    Captura("07_editar_de_volta"),
+]
