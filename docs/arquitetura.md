@@ -223,9 +223,22 @@ sequência é:
 mensagens (`on_message`), apanhar e entregar viram operações que o kernel executa logo
 depois do hook, na ordem em que foram pedidas. Isso mantém o determinismo.
 
-**Despachante.** Recebe tarefas e repassa a um membro livre da equipe. Se todos estão
+**Despachante.** Recebe tarefas e repassa a um membro livre da equipe. A escolha do
+membro segue a regra: `FirstAvailable` (primeiro livre na ordem da equipe), `RoundRobin`
+(rodízio) ou `Nearest` (o mais próximo de onde a tarefa começa). Se todos estão
 ocupados, guarda na fila, por prioridade e, entre iguais, por ordem de chegada. Cada
-membro avisa com `MSG_IDLE` quando fica livre.
+membro informa a posição atual e avisa com `MSG_IDLE` quando fica livre.
+
+**Transportador.**
+- **Capacidade > 1:** leva junto as tarefas da fila que saem da mesma origem, até a
+  capacidade. Carrega uma a uma e entrega na ordem, passando pelos destinos.
+- **Tarefas do mesmo instante:** a partida acontece num evento de atraso zero, para que
+  pedidos simultâneos (um lote liberado, por exemplo) possam dividir a viagem.
+- **Quebras e turnos:** pausam viagem, carga e descarga. A retomada continua do ponto
+  onde parou. O rastro registra o trecho restante, com posição linear no tempo, o que é
+  aproximado quando há aceleração.
+- **`home: true`:** ocioso, o transportador volta à sua posição de origem. Uma tarefa
+  nova interrompe a volta e parte do ponto alcançado.
 
 **Operadores.** Um processador com `operators: (team, count, setup, process)` pede
 `count` tarefas `Operate { station }` à equipe quando a fase que precisa deles vai
