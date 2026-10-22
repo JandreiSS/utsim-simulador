@@ -7,6 +7,7 @@
 //! never driven by the viewer.
 
 pub mod layout;
+pub mod properties;
 pub mod source;
 pub mod style;
 pub mod timeline;
