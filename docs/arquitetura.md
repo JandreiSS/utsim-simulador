@@ -350,6 +350,28 @@ rodada com uma mensagem.
 > dezenas de gatilhos. Aqui a lógica fica em dois lugares claros: o fluxo de tokens e
 > poucos ganchos de script, numa linguagem embutível e livre.
 
+## 4i. Otimização de parâmetros (fase 7)
+Um problema de otimização (`utsim-opt`) reúne:
+- **Modelo** e número de **replicações por ponto**.
+- **Variáveis de decisão,** com as mesmas chaves dos cenários (`objeto.campo`, `run.campo`).
+  Podem ser inteiras (com passo), contínuas (com um modelo de texto, ex.:
+  `"Exp(mean: {x})"`) ou uma escolha entre valores.
+- **Objetivo:** Σ peso·métrica + Σ custo·valor da variável, a minimizar ou maximizar.
+- **Restrições** sobre a média de métricas.
+
+**Números aleatórios comuns.** Todos os pontos usam as mesmas sementes. A diferença
+entre dois pontos vem da decisão, não da sorte, e por isso a comparação é **pareada**:
+o intervalo de 95% da diferença por replicação diz se o melhor ponto é de fato melhor
+que cada um dos outros. Pontos que não se distinguem do melhor aparecem como
+equivalentes, com a recomendação de mais replicações para separá-los.
+
+O algoritmo de referência é a busca exaustiva (`Grid`), limitada por `budget`. As
+metaheurísticas vêm de uma frente própria.
+
+> **Nosso jeito:** o simuladores comerciais usa o otimizador proprietário, que é proprietário e tem licença à parte.
+> Aqui o otimizador é aberto, e o relatório mostra a significância estatística das
+> diferenças em vez de entregar um "melhor" sem contexto.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
