@@ -1,0 +1,57 @@
+// Frota de 3 AGVs num anel com um trecho de pista única.
+// Os paletes chegam à doca de carga (em "a"), vão de AGV até uma de duas estações
+// (em "c" e "d") e, depois de processados, seguem de AGV até a expedição (em "f").
+//
+//   f(0,30) --- e(30,30) --- d(60,30)      estação_2 em d, expedição em f
+//     |                        |
+//   a(0,0) ---- b(30,0) ==== c(60,0)       doca em a, estação_1 em c
+//
+// O trecho b-c (===) é de pista única: capacity: Some(1) numa aresta de mão dupla vale
+// para os dois sentidos juntos. Um AGV que chega e encontra o trecho ocupado espera
+// parado (estado "blocked"), em fila por ordem de chegada, até o outro sair da aresta.
+// As demais arestas não têm capacidade: ali os veículos se cruzam sem restrição.
+//
+// Os AGVs (agv: true) seguem a rede aresta por aresta, com velocidade e aceleração
+// aplicadas ao percurso inteiro. O despachante repassa cada tarefa ao AGV livre mais
+// próximo de onde ela começa.
+Model(
+    name: "Frota de AGVs",
+    run: (stop_time: 2000.0, warmup: 200.0, seed: 11, replications: 5),
+    objects: [
+        (name: "chegada_paletes", kind: Source(interarrival: Exp(mean: 35.0)), position: (0.0, 0.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "frota", position: (0.0, 0.0, 0.0)),
+        (name: "estacao_1", kind: Processor(process: Triangular(min: 20.0, mode: 30.0, max: 40.0)), transport: "frota", position: (60.0, 0.0, 0.0)),
+        (name: "estacao_2", kind: Processor(process: Triangular(min: 20.0, mode: 30.0, max: 40.0)), transport: "frota", position: (60.0, 30.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (0.0, 30.0, 0.0)),
+
+        (name: "agv_1", kind: Transporter(speed: 2.0, acceleration: Some(1.0), deceleration: Some(1.0), load_time: Const(2.0), unload_time: Const(2.0), agv: true), position: (0.0, 0.0, 0.0)),
+        (name: "agv_2", kind: Transporter(speed: 2.0, acceleration: Some(1.0), deceleration: Some(1.0), load_time: Const(2.0), unload_time: Const(2.0), agv: true), position: (0.0, 0.0, 0.0)),
+        (name: "agv_3", kind: Transporter(speed: 2.0, acceleration: Some(1.0), deceleration: Some(1.0), load_time: Const(2.0), unload_time: Const(2.0), agv: true), position: (0.0, 0.0, 0.0)),
+        (name: "frota", kind: Dispatcher(team: ["agv_1", "agv_2", "agv_3"], rule: Nearest)),
+    ],
+    connections: [
+        ("chegada_paletes", "doca"),
+        ("doca", "estacao_1"),
+        ("doca", "estacao_2"),
+        ("estacao_1", "expedicao"),
+        ("estacao_2", "expedicao"),
+    ],
+    network: Some((
+        nodes: [
+            (name: "a", position: (0.0, 0.0, 0.0)),
+            (name: "b", position: (30.0, 0.0, 0.0)),
+            (name: "c", position: (60.0, 0.0, 0.0)),
+            (name: "d", position: (60.0, 30.0, 0.0)),
+            (name: "e", position: (30.0, 30.0, 0.0)),
+            (name: "f", position: (0.0, 30.0, 0.0)),
+        ],
+        edges: [
+            (from: "a", to: "b"),
+            (from: "b", to: "c", capacity: Some(1)),
+            (from: "c", to: "d"),
+            (from: "d", to: "e"),
+            (from: "e", to: "f"),
+            (from: "f", to: "a"),
+        ],
+    )),
+)
