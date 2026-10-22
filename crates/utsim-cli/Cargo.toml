@@ -15,6 +15,7 @@ utsim-core.workspace = true
 utsim-model.workspace = true
 utsim-fit.workspace = true
 utsim-opt.workspace = true
+utsim-emu.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
