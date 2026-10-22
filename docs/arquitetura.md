@@ -372,6 +372,23 @@ metaheurísticas vêm de uma frente própria.
 > Aqui o otimizador é aberto, e o relatório mostra a significância estatística das
 > diferenças em vez de entregar um "melhor" sem contexto.
 
+## 4j. UTSim no navegador (fase 7, WebAssembly)
+
+- As crates de biblioteca (`core`, `objects`, `script`, `flow`, `model`, `fit`) compilam para
+  `wasm32-unknown-unknown`. Nenhuma usa relógio, sistema de arquivos nem entropia do SO nas
+  rotas de simulação: só fluxos PCG com semente (`rand` sem `os_rng`/`thread_rng`).
+- `rayon` é opcional (`utsim-model`, feature `parallel`, ligada por padrão). Sem ela,
+  `run_replications` roda em sequência, com os mesmos resultados e a mesma ordem.
+- `crates/utsim-web` (cdylib + rlib) expõe `run_model`, `validate_model`, `fit_data`, `replay`
+  e `examples`, todas como texto em/texto out (JSON ou HTML). A lógica fica em `api.rs`
+  (Rust puro, testado nativamente); `lib.rs` só embrulha com `wasm-bindgen`. A crate compila
+  nativamente também e faz parte do `default-members`.
+- `web/` é a página (HTML+CSS+JS puros). `bash scripts/web.sh` (ou `web.ps1`) gera
+  `web/dist/` (ignorado pelo controle de versão) com `utsim.js`, `utsim_bg.wasm` e o
+  `utsim.html` autocontido (wasm em base64, ~5,5 MB). A simulação roda na thread principal.
+  Para abrir sem servidor, use `web/dist/utsim.html`; para `web/index.html`, sirva a pasta
+  `web/` (`python3 -m http.server -d web`).
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
