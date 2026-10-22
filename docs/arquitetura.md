@@ -288,6 +288,9 @@ A esteira é cinemática: nada de física, só eventos calculados.
   param encostados, um a cada s. Quando ele sai, o próximo percorre só o espaço s.
 - **Esteira sem acúmulo:** enquanto o item da frente espera no fim, a correia inteira
   para. Todos os itens atrasam exatamente o tempo parado.
+  A correia parada ainda recebe um item na entrada se houver espaço livre ali, como uma
+  peça colocada sobre uma esteira desligada. O item fica parado na posição 0 até a
+  correia voltar a andar.
 - **Estados:** `empty`, `releasing` (movendo) e `blocked` (frente esperando).
 - **Quebras e turnos:** a correia para e retoma do ponto onde estava.
 - **Junções e desvios:** usam os blocos que já existem (filas, regras de saída). Fotocélulas
