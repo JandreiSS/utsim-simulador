@@ -81,6 +81,14 @@ pub enum Condicao {
     TituloContem(String),
     /// Current simulated time (in `Simular`) is at least this.
     TempoSimuladoMin(f64),
+    /// Number of token flows in the model.
+    FluxosIgual(usize),
+    /// Number of activities of the named flow.
+    AtividadesIgual(String, usize),
+    /// Selected activity in the Fluxos panel.
+    AtividadeSelecionada(Option<String>),
+    /// Whether the Fluxos panel is open.
+    PainelFluxos(bool),
     Nao(Box<Condicao>),
 }
 
@@ -131,6 +139,11 @@ pub struct Estado {
     pub tempo: Option<f64>,
     /// Model positions by object name.
     pub posicoes: Vec<(String, [f64; 3])>,
+    /// Token flows: name and number of activities.
+    pub fluxos: Vec<(String, usize)>,
+    /// Activity selected in the Fluxos panel.
+    pub atividade: Option<String>,
+    pub painel_fluxos: bool,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -195,6 +208,24 @@ impl Estado {
                 Some(t) => Err(format!("tempo simulado {t:.3} < {min}")),
                 None => Err("fora do modo Simular".to_string()),
             },
+            Condicao::FluxosIgual(n) => igual("fluxos", self.fluxos.len(), *n),
+            Condicao::AtividadesIgual(fluxo, n) => {
+                match self.fluxos.iter().find(|(f, _)| f == fluxo) {
+                    Some((_, tem)) => igual(&format!("atividades de {fluxo}"), *tem, *n),
+                    None => Err(format!("fluxo \"{fluxo}\" não existe")),
+                }
+            }
+            Condicao::AtividadeSelecionada(a) => {
+                if &self.atividade == a {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "atividade selecionada: esperado {a:?}, encontrado {:?}",
+                        self.atividade
+                    ))
+                }
+            }
+            Condicao::PainelFluxos(b) => igual("painel de fluxos aberto", self.painel_fluxos, *b),
             Condicao::Nao(inner) => match self.verificar(inner) {
                 Ok(()) => Err(format!("a condição negada é verdadeira: {inner:?}")),
                 Err(_) => Ok(()),
@@ -294,7 +325,35 @@ mod tests {
             status: "Salvo em novo.ron".into(),
             tempo: None,
             posicoes: vec![("fila".into(), [2.0, 1.0, 0.0])],
+            fluxos: vec![("recebimento".into(), 7)],
+            atividade: Some("decide".into()),
+            painel_fluxos: true,
         }
+    }
+
+    #[test]
+    fn flow_assertions() {
+        let s = state();
+        assert!(s.verificar(&Condicao::FluxosIgual(1)).is_ok());
+        assert!(s.verificar(&Condicao::FluxosIgual(2)).is_err());
+        assert!(
+            s.verificar(&Condicao::AtividadesIgual("recebimento".into(), 7))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::AtividadesIgual("recebimento".into(), 8))
+                .is_err()
+        );
+        assert!(
+            s.verificar(&Condicao::AtividadesIgual("nada".into(), 1))
+                .is_err()
+        );
+        assert!(
+            s.verificar(&Condicao::AtividadeSelecionada(Some("decide".into())))
+                .is_ok()
+        );
+        assert!(s.verificar(&Condicao::AtividadeSelecionada(None)).is_err());
+        assert!(s.verificar(&Condicao::PainelFluxos(true)).is_ok());
     }
 
     #[test]

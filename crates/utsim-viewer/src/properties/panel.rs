@@ -13,27 +13,27 @@ use utsim_model::{ObjectDef, ObjectKind};
 use super::ron_text as ron;
 use super::spec::{self, FAMILIES};
 
-const RED: Color32 = Color32::from_rgb(225, 80, 80);
+pub(crate) const RED: Color32 = Color32::from_rgb(225, 80, 80);
 
 // ---------------------------------------------------------------------------
 // Transient widget state (egui memory)
 // ---------------------------------------------------------------------------
 
-fn temp<T: Clone + Send + Sync + 'static>(ui: &Ui, id: Id) -> Option<T> {
+pub(crate) fn temp<T: Clone + Send + Sync + 'static>(ui: &Ui, id: Id) -> Option<T> {
     ui.data(|d| d.get_temp::<T>(id))
 }
 
-fn set_temp<T: Clone + Send + Sync + 'static>(ui: &Ui, id: Id, value: T) {
+pub(crate) fn set_temp<T: Clone + Send + Sync + 'static>(ui: &Ui, id: Id, value: T) {
     ui.data_mut(|d| d.insert_temp(id, value));
 }
 
-fn clear_temp<T: Clone + Default + Send + Sync + 'static>(ui: &Ui, id: Id) {
+pub(crate) fn clear_temp<T: Clone + Default + Send + Sync + 'static>(ui: &Ui, id: Id) {
     ui.data_mut(|d| d.remove_temp::<T>(id));
 }
 
 /// A number box. Edits live in egui memory until committed (Enter, focus lost or
 /// drag released); returns true only at the commit, with `value` updated.
-fn num<N: Numeric + Default + PartialEq + Send + Sync + 'static>(
+pub(crate) fn num<N: Numeric + Default + PartialEq + Send + Sync + 'static>(
     ui: &mut Ui,
     id: Id,
     value: &mut N,
@@ -70,14 +70,14 @@ fn float(ui: &mut Ui, id: Id, value: &mut f64) -> bool {
     num(ui, id, value, float_speed(*value), f64::MIN)
 }
 
-fn labeled_float(ui: &mut Ui, id: Id, label: &str, value: &mut f64) -> bool {
+pub(crate) fn labeled_float(ui: &mut Ui, id: Id, label: &str, value: &mut f64) -> bool {
     ui.label(label);
     float(ui, id, value)
 }
 
 /// A text box committed on Enter / focus loss, only when `check` accepts it.
 /// The error of `check` is shown in red while the text is being edited.
-fn text_commit(
+pub(crate) fn text_commit(
     ui: &mut Ui,
     id: Id,
     current: &str,
@@ -118,6 +118,41 @@ fn text_commit(
     None
 }
 
+/// A multi-line text box for user code (scripts, expressions). The text is committed
+/// when the box loses focus, even if it does not compile: the compile error from
+/// `check` stays visible under the box (the model reports it among the issues), so
+/// the modeller can save work in progress. Returns the committed text.
+pub(crate) fn script_box(
+    ui: &mut Ui,
+    id: Id,
+    current: &str,
+    rows: usize,
+    check: &dyn Fn(&str) -> Result<(), String>,
+) -> Option<String> {
+    let editing = temp::<String>(ui, id);
+    let mut text = editing.unwrap_or_else(|| current.to_string());
+    let response = ui.add(
+        egui::TextEdit::multiline(&mut text)
+            .code_editor()
+            .desired_width(f32::INFINITY)
+            .desired_rows(rows),
+    );
+    if response.changed() {
+        set_temp(ui, id, text.clone());
+    }
+    if let Err(error) = check(&text) {
+        ui.colored_label(RED, error);
+    }
+    let pending = temp::<String>(ui, id).is_some();
+    if pending && response.lost_focus() {
+        clear_temp::<String>(ui, id);
+        if text != current {
+            return Some(text);
+        }
+    }
+    None
+}
+
 fn parse_numbers(text: &str) -> Result<Vec<f64>, String> {
     text.split(|c: char| c.is_whitespace() || c == ',' || c == ';')
         .filter(|s| !s.is_empty())
@@ -142,7 +177,7 @@ fn mean_text(m: f64) -> String {
 }
 
 /// Family combo plus the parameter boxes. Returns true when a change was committed.
-fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
+pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
     let mut changed = false;
     let mut index = spec::family_index(d);
     let before = index;
@@ -286,7 +321,7 @@ fn simple_params(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
 }
 
 /// Mean and validation error of a distribution.
-fn dist_info(ui: &mut Ui, d: &Dist) {
+pub(crate) fn dist_info(ui: &mut Ui, d: &Dist) {
     match d.validate() {
         Ok(()) => {
             ui.weak(format!("média = {}", mean_text(d.mean())));
@@ -892,7 +927,40 @@ impl Editor<'_> {
                     }
                 });
             }
+            OutputRule::Script(src) => {
+                ui.label("Script que devolve o número da porta (1, 2, ...)");
+                let check = |t: &str| utsim_script::compile_port_script(t).map(|_| ());
+                if let Some(text) = script_box(ui, id.with("script"), src, 4, &check) {
+                    self.set(field, ron::output(&OutputRule::Script(text)));
+                }
+            }
             _ => {}
+        }
+    }
+
+    /// `on_entry`: optional script run for every item entering the object.
+    fn on_entry_field(&mut self, ui: &mut Ui, field: &str, current: Option<&str>) {
+        let id = self.id(field);
+        let mut on = current.is_some();
+        if ui
+            .checkbox(&mut on, "Script ao entrar um item (on_entry)")
+            .changed()
+        {
+            self.set(
+                field,
+                if on {
+                    ron::string("")
+                } else {
+                    "None".to_string()
+                },
+            );
+        }
+        if let Some(src) = current {
+            ui.weak("Roda para cada item que entra, antes de qualquer outra regra.");
+            let check = |t: &str| utsim_script::compile_item_script(t).map(|_| ());
+            if let Some(text) = script_box(ui, id.with("script"), src, 5, &check) {
+                self.set(field, ron::string(&text));
+            }
         }
     }
 
@@ -1305,6 +1373,10 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
         editor.output_field(ui, obj);
         ui.separator();
         editor.transport_field(ui, "transport", obj.transport.as_deref());
+        ui.separator();
+    }
+    if !utsim_model::is_mobile(&obj.kind) {
+        editor.on_entry_field(ui, "on_entry", obj.on_entry.as_deref());
         ui.separator();
     }
     editor.downtime_field(ui, obj.downtime.as_ref());

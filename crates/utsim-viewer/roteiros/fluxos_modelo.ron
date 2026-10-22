@@ -1,0 +1,29 @@
+// Modelo pequeno com um fluxo de tokens, usado pelo roteiro fluxos.ron.
+// A lógica do recebimento está no fluxo "recebimento": cada chegada vira um token que
+// decide entre usar uma doca ou voltar para retrabalho.
+Model(
+    name: "fluxos",
+    run: (stop_time: 200.0),
+    objects: [
+        (name: "chegada", position: (0.0, 0.0, 0.0), kind: Source(interarrival: Exp(mean: 5.0))),
+        (name: "fila", position: (6.0, 0.0, 0.0), kind: Queue()),
+        (name: "doca", position: (12.0, 0.0, 0.0), kind: Processor(process: Const(3.0))),
+        (name: "saida", position: (18.0, 0.0, 0.0), kind: Sink),
+    ],
+    connections: [("chegada", "fila"), ("fila", "doca"), ("doca", "saida")],
+    flows: [
+        (
+            name: "recebimento",
+            resources: [(name: "docas", capacity: 2)],
+            activities: [
+                (name: "chega", kind: OnEvent(block: "chegada", event: Exit), next: ["decide"]),
+                (name: "decide", kind: Decide(rule: Probability([0.7, 0.3])), next: ["pega_doca", "retrabalho"]),
+                (name: "pega_doca", kind: Acquire(resource: "docas", count: 1), next: ["descarga"]),
+                (name: "descarga", kind: Delay(time: Uniform(min: 2.0, max: 4.0)), next: ["libera"]),
+                (name: "libera", kind: Release(resource: "docas", count: 1), next: ["fim"]),
+                (name: "retrabalho", kind: Delay(time: Const(10.0)), next: ["decide"]),
+                (name: "fim", kind: Sink),
+            ],
+        ),
+    ],
+)

@@ -293,6 +293,13 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
             .iter()
             .map(|o| (o.name.clone(), o.position))
             .collect(),
+        fluxos: model
+            .flows
+            .iter()
+            .map(|f| (f.name.clone(), f.activities.len()))
+            .collect(),
+        atividade: ed.flows.activity.clone(),
+        painel_fluxos: ed.flows.open,
     }
 }
 

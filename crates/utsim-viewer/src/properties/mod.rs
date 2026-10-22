@@ -7,7 +7,7 @@
 //! current value, distribution families) and [`ron_text`] (value to RON text), and
 //! is unit-tested without a GPU. [`panel`] only draws.
 
-mod panel;
+pub(crate) mod panel;
 pub mod ron_text;
 pub mod spec;
 
@@ -521,6 +521,30 @@ mod tests {
         };
         assert!(doc.apply(bad).is_err());
         assert_eq!(doc.model(), &before);
+    }
+
+    #[test]
+    fn on_entry_and_script_rules_draw_without_commands_and_round_trip() {
+        let mut doc = Document::new("s");
+        doc.apply(Command::Add(Box::new(
+            utsim_edit::template("Queue", "a", [0.0; 3]).unwrap(),
+        )))
+        .unwrap();
+        apply_set(&mut doc, "a.on_entry", "\"item.x = 1;\"");
+        apply_set(&mut doc, "a.output", "Script(\"2\")");
+        let commands = render(&doc, "a");
+        assert_eq!(commands, Vec::new());
+        let obj = &doc.model().objects[0];
+        assert_eq!(
+            spec::read_field(obj, "on_entry").as_deref(),
+            Some("\"item.x = 1;\"")
+        );
+        // Writing back what the panel reads changes nothing; "None" clears it.
+        let before = doc.model().clone();
+        apply_set(&mut doc, "a.on_entry", "\"item.x = 1;\"");
+        assert_eq!(doc.model(), &before);
+        apply_set(&mut doc, "a.on_entry", "None");
+        assert_eq!(doc.model().objects[0].on_entry, None);
     }
 
     fn render(doc: &Document, selected: &str) -> Vec<Command> {

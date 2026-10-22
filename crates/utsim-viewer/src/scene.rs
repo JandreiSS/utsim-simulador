@@ -282,6 +282,10 @@ pub fn sync_blocks(
                 material,
                 translation,
             );
+            if kinds[i] == "Flow" {
+                // Token flows live in the Fluxos panel, not in the 3D scene.
+                commands.entity(id).insert(Visibility::Hidden);
+            }
             mats.entities.push(id);
         }
         return;
@@ -671,7 +675,7 @@ pub fn pick(
         return;
     };
     let mut best: Option<(f32, usize)> = None;
-    for i in 0..data.replay.blocks.len() {
+    for i in (0..data.replay.blocks.len()).filter(|&i| !data.is_flow(i)) {
         let h = data.geoms[i].half;
         let center = block_base_at(&data, i, pb.t) + Vec3::Y * h[1];
         if let Some(d) = ray_box(

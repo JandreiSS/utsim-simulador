@@ -1,0 +1,118 @@
+// Fluxos de tokens e scripts no editor (fase 6). Abre um modelo com um fluxo, mostra o
+// diagrama, seleciona atividades, edita uma expressão inválida (erro em linha), cria um
+// fluxo novo e confere os campos de script do objeto.
+//   utsim-view crates/utsim-viewer/roteiros/fluxos_modelo.ron --roteiro crates/utsim-viewer/roteiros/fluxos.ron --capturas saida/fluxos
+// O modelo tem um fluxo; o 3D não desenha o fluxo (só os 4 objetos).
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ObjetosIgual(4)),
+    Afirmar(FluxosIgual(1)),
+    Afirmar(ProblemasIgual(0)),
+    Afirmar(PainelFluxos(false)),
+    Captura("01_modelo_com_fluxo"),
+
+    // Painel de Fluxos: lista, diagrama e campos da atividade.
+    ClicarBotao("Fluxos"),
+    Esperar(quadros: 6),
+    Afirmar(PainelFluxos(true)),
+    Captura("02_painel_fluxos"),
+
+    ClicarBotao("decide"),
+    Esperar(quadros: 4),
+    Afirmar(AtividadeSelecionada(Some("decide"))),
+    Captura("03_decidir_selecionada"),
+
+    ClicarBotao("pega_doca"),
+    Esperar(quadros: 4),
+    Afirmar(AtividadeSelecionada(Some("pega_doca"))),
+    Captura("04_adquirir_selecionada"),
+
+    // Adicionar uma atividade "Atribuir" (fica solta; a selecionada já tem próxima).
+    ClicarBotao("Gerar tokens"),
+    Esperar(quadros: 3),
+    Captura("05_tipos_de_atividade"),
+    ClicarBotao("Atribuir"),
+    Esperar(quadros: 3),
+    ClicarBotao("Adicionar atividade"),
+    Esperar(quadros: 4),
+    Afirmar(AtividadesIgual("recebimento", 8)),
+    Afirmar(AtividadeSelecionada(Some("atribuir"))),
+    Afirmar(Sujo(true)),
+    Captura("06_atribuir_adicionada"),
+
+    // Expressão inválida: o erro aparece em linha, já enquanto digita.
+    MoverPara(Deslocado(Botao("="), 70.0, 0.0)),
+    Clicar(Esquerdo),
+    Atalho(["Ctrl", "A"]),
+    Digitar("2+"),
+    Esperar(quadros: 3),
+    Captura("07_expressao_com_erro"),
+    Tecla("Enter"),
+    Esperar(quadros: 4),
+    Captura("08_expressao_gravada"),
+
+    // Expressão válida.
+    MoverPara(Deslocado(Botao("="), 70.0, 0.0)),
+    Clicar(Esquerdo),
+    Atalho(["Ctrl", "A"]),
+    Digitar("token.tipo"),
+    Tecla("Enter"),
+    Esperar(quadros: 4),
+    Captura("09_expressao_valida"),
+
+    // Ligar a nova atividade a outra pelo editor.
+    ClicarBotao("+ ligar a..."),
+    Esperar(quadros: 3),
+    Captura("10_escolhendo_proxima"),
+    ClicarBotao("fim"),
+    Esperar(quadros: 4),
+    Afirmar(ProblemasIgual(0)),
+    Captura("11_ligada"),
+
+    // Novo fluxo a partir do modelo.
+    ClicarBotao("Novo fluxo"),
+    Esperar(quadros: 5),
+    Afirmar(FluxosIgual(2)),
+    Afirmar(AtividadesIgual("fluxo", 3)),
+    Captura("12_fluxo_novo"),
+
+    // Desfazer remove o fluxo novo.
+    Atalho(["Ctrl", "Z"]),
+    Esperar(quadros: 4),
+    Afirmar(FluxosIgual(1)),
+    Captura("13_desfeito"),
+
+    // Campos de script do objeto.
+    MoverPara(Tela(611.0, 12.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 4),
+    Afirmar(PainelFluxos(false)),
+    MoverPara(Objeto("fila")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("fila"))),
+    Esperar(quadros: 3),
+    MoverPara(Tela(1100.0, 500.0)),
+    Rolar(-12.0),
+    Esperar(quadros: 3),
+    Captura("14_propriedades_rolada"),
+    ClicarBotao("Script ao entrar um item (on_entry)"),
+    Esperar(quadros: 4),
+    Captura("15_on_entry_ligado"),
+
+    // Digita o script e confirma clicando fora da caixa; o erro de compilação fica em linha.
+    MoverPara(Deslocado(Botao("Roda para cada item"), 0.0, 70.0)),
+    Clicar(Esquerdo),
+    Digitar("item.peso=1;"),
+    MoverPara(Botao("Disciplina")),
+    Clicar(Esquerdo),
+    Esperar(quadros: 4),
+    Captura("16_script_digitado"),
+
+    // Regra de saída por script.
+    ClicarBotao("Primeira livre"),
+    Esperar(quadros: 3),
+    ClicarBotao("Script"),
+    Esperar(quadros: 4),
+    Captura("17_saida_por_script"),
+]
