@@ -43,8 +43,8 @@ O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois ev
 3. **Liberar.** O bloco chama `ctx.release(item)`. Nesse instante a **regra de saída**
    escolhe a porta, uma única vez por item (o "send to port" do simuladores comerciais):
    - `FirstAvailable`: qualquer porta; vence a primeira aberta, em ordem de porta.
-   - `RoundRobin` / `Random` / `ByLabel`: uma porta específica. O item espera por
-     *aquela* porta, mesmo que outra esteja livre.
+   - `RoundRobin` / `Random` / `Weighted([pesos])` / `ByLabel`: uma porta específica.
+     O item espera por *aquela* porta, mesmo que outra esteja livre.
 4. **Transferir.** A conexão anda quando **os dois lados estão abertos**: há item
    liberado na saída e o destino aceita. A transferência é instantânea (transporte
    por operadores e empilhadeiras vem na fase 4).
@@ -55,9 +55,13 @@ e seus blocos de entrada são marcados como sujos **em ordem de porta de entrada
 ordem é a prioridade de *pull* padrão: com duas filas ligadas a uma máquina, a conectada
 primeiro tem preferência, como no simuladores comerciais. Tudo acontece no mesmo instante simulado.
 
+**Portas de entrada.** `accepts(item, conteúdo, porta)` e `on_entry(item, porta)`
+recebem o número da porta de entrada (0, 1, ..., na ordem das conexões). É assim que o
+Combiner distingue o contêiner (porta 0) dos componentes (portas 1..k).
+
 **Ordem dos ganchos numa transferência A → B:**
-`A.conteúdo -= 1` → `A.on_exit` → `B.conteúdo += 1` → `B.on_entry` → reavaliar quem
-alimenta A.
+`A.conteúdo -= 1` → `A.on_exit` → `B.conteúdo += 1` → `B.on_entry(porta)` → reavaliar
+quem alimenta A.
 
 > **Nosso jeito:** no simuladores comerciais o `OnExit` roda com o item ainda contado no conteúdo.
 > Aqui o conteúdo já foi atualizado quando `on_exit` roda, o que simplifica a lógica
@@ -89,6 +93,34 @@ alimenta A.
 
 ### Sink
 - Aceita tudo, registra `time_in_system` (agora − criação) e destrói o item.
+
+## 4b. Serviços do kernel (fase 1)
+
+### Eventos canceláveis
+`ctx.schedule(...)` devolve um `EventId`, e `ctx.cancel(id)` o descarta. O evento
+continua no heap, mas é ignorado ao sair. Cancelar um evento que já disparou não faz nada.
+
+### Quebras (MTBF/MTTR)
+Qualquer objeto pode ter `downtime: (mtbf: Dist, mttr: Dist)`, contado no relógio.
+- Na falha, o **kernel** fecha a entrada e a saída do bloco, mostra o estado `down` e
+  chama `on_stop`. Blocos com timers (Processor, Source) cancelam os eventos e guardam
+  o tempo restante.
+- No reparo, o kernel restaura o último estado pedido pelo bloco e chama `on_resume`,
+  que reagenda os timers com o tempo restante. Depois disso, os vizinhos são reavaliados.
+- Durante a quebra, `ctx.set_state(...)` não sobrescreve `down`: o pedido fica guardado
+  para o reparo.
+- As quebras usam um *stream* aleatório próprio por bloco. Ligar ou desligar quebras
+  não altera os tempos de chegada e de processo sorteados.
+
+> **Nosso jeito:** o simuladores comerciais espalha isso entre MTBF/MTTR, Time Tables e `stop()`/`resume()`.
+> Aqui o "estar quebrado" é responsabilidade única do kernel, e o bloco só pausa os
+> próprios relógios.
+
+### Itens contêiner
+`ctx.pack(contêiner, item)` tira o item do conteúdo do bloco e o coloca dentro do
+contêiner (`item.container`, `contêiner.contents`). `ctx.unpack(contêiner)` devolve os
+itens ao bloco atual. Um contêiner conta como **um** item no conteúdo. Destruir um
+contêiner destrói o que está dentro. `ctx.clone_item` copia rótulos e o instante de criação.
 
 ## 5. Estatísticas
 
