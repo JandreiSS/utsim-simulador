@@ -1,0 +1,45 @@
+// Docas de recebimento com fluxo de tokens.
+// Caminhões chegam (Source do fluxo), esperam uma de 2 docas (recurso "docas"),
+// descarregam e criam 3 paletes cada na fila "paletes", que alimenta a esteira de
+// conferência (Processor) até a saída. Só depois de criar os paletes o caminhão
+// libera a doca. Os caminhões são tokens, não itens: aparecem nos relatórios do
+// bloco "recebimento" (docas.ocupado, espera_doca.espera...) e não no 3D.
+Model(
+    name: "Docas de recebimento",
+    description: "Caminhões como tokens disputam 2 docas e geram paletes para uma linha física",
+    run: (
+        stop_time: 2000.0,
+        warmup: 100.0,
+        seed: 7,
+        replications: 5,
+    ),
+    objects: [
+        (name: "paletes",     kind: Queue(),                         position: (0.0, 0.0, 0.0)),
+        (name: "conferencia", kind: Processor(process: Const(3.0)),  position: (4.0, 0.0, 0.0)),
+        (name: "estoque",     kind: Sink,                            position: (8.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("paletes", "conferencia"),
+        ("conferencia", "estoque"),
+    ],
+    flows: [
+        (
+            name: "recebimento",
+            resources: [(name: "docas", capacity: 2)],
+            activities: [
+                // Um caminhão a cada 12 minutos, em média.
+                (name: "chegada", kind: Source(interarrival: Exp(mean: 12.0)), next: ["espera_doca"]),
+                // Espera uma doca livre (fila FIFO).
+                (name: "espera_doca", kind: Acquire(resource: "docas"), next: ["descarga"]),
+                // Descarga entre 15 e 25 minutos.
+                (name: "descarga", kind: Delay(time: Uniform(min: 15.0, max: 25.0)), next: ["palete_1"]),
+                // Cada caminhão entrega 3 paletes na fila física.
+                (name: "palete_1", kind: CreateItem(into: "paletes", labels: {"origem": "\"caminhao\""}), next: ["palete_2"]),
+                (name: "palete_2", kind: CreateItem(into: "paletes", labels: {"origem": "\"caminhao\""}), next: ["palete_3"]),
+                (name: "palete_3", kind: CreateItem(into: "paletes", labels: {"origem": "\"caminhao\""}), next: ["libera_doca"]),
+                (name: "libera_doca", kind: Release(resource: "docas"), next: ["partida"]),
+                (name: "partida", kind: Sink),
+            ],
+        ),
+    ],
+)
