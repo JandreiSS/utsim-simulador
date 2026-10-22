@@ -1,0 +1,358 @@
+//! Property editor for the selected object (phase 3). Pure egui: it reads the
+//! [`Document`](utsim_edit::Document) and returns [`Command`](utsim_edit::Command)s;
+//! it never mutates the model itself, so the editor applies them through the
+//! document (undo/redo, validation).
+//!
+//! The logic that does not need a UI lives in [`spec`] (which fields exist, their
+//! current value, distribution families) and [`ron_text`] (value to RON text), and
+//! is unit-tested without a GPU. [`panel`] only draws.
+
+mod panel;
+pub mod ron_text;
+pub mod spec;
+
+pub use panel::{properties_panel, run_panel};
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use bevy_egui::egui;
+    use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable};
+    use utsim_edit::{Command, Document};
+    use utsim_model::{Model, ObjectDef, ObjectKind};
+
+    use super::spec::{self, FAMILIES};
+    use super::*;
+
+    const KITCHEN_SINK: &str = r#"Model(
+        name: "tudo",
+        run: (stop_time: 500.0, warmup: 10.0, seed: 7, replications: 3),
+        objects: [
+            (name: "src", output: RoundRobin, kind: Source(
+                interarrival: Exp(mean: 2.0),
+                first_at_zero: true,
+                max_arrivals: 50,
+                on_blocked: Drop,
+                labels: {
+                    "tipo \"a\"": Gamma(shape: 2.0, scale: 1.5),
+                    "b": Empirical([1.0, 2.0, 5.0]),
+                },
+            )),
+            (name: "q", output: Random, kind: Queue(
+                capacity: 8,
+                discipline: Lifo,
+                batch: (size: 4, max_wait: 2.5, flush: true),
+            )),
+            (name: "maq", output: Weighted([1.0, 2.0, 0.5]),
+                kind: Processor(
+                    capacity: 3,
+                    setup: Uniform(min: 1.0, max: 2.0),
+                    process: Weibull(shape: 1.5, scale: 4.0),
+                ),
+                downtime: (mtbf: Exp(mean: 100.0), mttr: Triangular(min: 1.0, mode: 2.0, max: 5.0)),
+                shifts: (period: 1440.0, off: [
+                    (start: 360.0, duration: 60.0),
+                    (start: 960.0, duration: 480.0),
+                ])),
+            (name: "mont", output: ByLabel("porta \\ 2"), kind: Combiner(
+                components: [1, 3],
+                mode: Join,
+                setup: Const(0.5),
+                process: Normal(mean: 5.0, sd: 1.0),
+            )),
+            (name: "sep", kind: Separator(mode: Split(3), process: Poisson(mean: 2.0))),
+            (name: "fim", kind: Sink),
+        ],
+        connections: [],
+    )"#;
+
+    fn apply_set(doc: &mut Document, key: &str, value: &str) {
+        doc.apply(Command::Set {
+            key: key.into(),
+            value: value.into(),
+        })
+        .unwrap_or_else(|e| panic!("{key} = {value}: {e}"));
+    }
+
+    fn all_families() -> Vec<Dist> {
+        let mut dists: Vec<Dist> = (0..FAMILIES.len())
+            .map(|i| spec::family_default(i, 3.0))
+            .collect();
+        dists.push(Dist::Shifted {
+            offset: 1.5,
+            dist: Box::new(Dist::Shifted {
+                offset: -0.25,
+                dist: Box::new(Dist::Discrete(vec![(1.0, 2.0), (4.0, 1e-7)])),
+            }),
+        });
+        dists.push(Dist::Const(-1.0e21));
+        dists
+    }
+
+    fn kitchen_sink() -> Document {
+        let model = Model::parse(KITCHEN_SINK).unwrap();
+        let mut doc = Document::new("tudo");
+        for object in model.objects {
+            doc.apply(Command::Add(Box::new(object))).unwrap();
+        }
+        doc.apply(Command::Set {
+            key: "run.stop_time".into(),
+            value: "500.0".into(),
+        })
+        .unwrap();
+        doc
+    }
+
+    fn object(doc: &Document, name: &str) -> ObjectDef {
+        doc.model()
+            .objects
+            .iter()
+            .find(|o| o.name == name)
+            .unwrap()
+            .clone()
+    }
+
+    fn field(doc: &Document, name: &str, key: &str) -> String {
+        spec::read_field(&object(doc, name), key).unwrap()
+    }
+
+    fn documents() -> Vec<(String, Document)> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let mut docs = vec![("tudo".to_string(), kitchen_sink())];
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+            if path.extension().is_some_and(|e| e == "ron") && !stem.starts_with("experimento") {
+                docs.push((stem, Document::open(&path).unwrap()));
+            }
+        }
+        assert!(docs.len() > 5);
+        docs
+    }
+
+    #[test]
+    fn reading_a_field_and_writing_it_back_changes_nothing() {
+        for (name, mut doc) in documents() {
+            let objects: Vec<ObjectDef> = doc.model().objects.clone();
+            for obj in &objects {
+                for f in spec::all_fields(&obj.kind) {
+                    let value = spec::read_field(obj, f.key)
+                        .unwrap_or_else(|| panic!("{name}.{}: no value", f.key));
+                    let before = doc.model().clone();
+                    apply_set(&mut doc, &format!("{}.{}", obj.name, f.key), &value);
+                    assert_eq!(doc.model(), &before, "{name}.{}.{}", obj.name, f.key);
+                }
+            }
+            for f in spec::run_fields() {
+                let value = spec::read_run(&doc.model().run, f.key).unwrap();
+                let before = doc.model().clone();
+                apply_set(&mut doc, &format!("run.{}", f.key), &value);
+                assert_eq!(doc.model(), &before, "{name} run.{}", f.key);
+            }
+        }
+    }
+
+    #[test]
+    fn the_spec_lists_every_field_of_every_kind() {
+        // A field missing from the spec would never be editable.
+        let doc = kitchen_sink();
+        for obj in &doc.model().objects {
+            let keys: Vec<&str> = spec::all_fields(&obj.kind).iter().map(|f| f.key).collect();
+            let expected: &[&str] = match &obj.kind {
+                ObjectKind::Source { .. } => &[
+                    "interarrival",
+                    "first_at_zero",
+                    "max_arrivals",
+                    "labels",
+                    "on_blocked",
+                ],
+                ObjectKind::Queue { .. } => &["capacity", "discipline", "batch"],
+                ObjectKind::Processor { .. } => &["capacity", "setup", "process"],
+                ObjectKind::Combiner { .. } => &["components", "mode", "setup", "process"],
+                ObjectKind::Separator { .. } => &["mode", "process"],
+                ObjectKind::Sink => &[],
+            };
+            for k in expected.iter().chain(&["output", "downtime", "shifts"]) {
+                assert!(keys.contains(k), "{}: missing {k}", obj.name);
+            }
+            assert_eq!(keys.len(), expected.len() + 3, "{}", obj.name);
+        }
+    }
+
+    #[test]
+    fn every_distribution_family_survives_text_and_lands_in_the_model() {
+        let mut doc = kitchen_sink();
+        for d in all_families() {
+            for key in ["maq.process", "src.interarrival", "maq.setup"] {
+                apply_set(&mut doc, key, &ron_text::dist(&d));
+            }
+            let ObjectKind::Processor { process, setup, .. } = object(&doc, "maq").kind else {
+                unreachable!()
+            };
+            assert_eq!(process, d);
+            assert_eq!(setup, Some(d.clone()));
+            let ObjectKind::Source { interarrival, .. } = object(&doc, "src").kind else {
+                unreachable!()
+            };
+            assert_eq!(interarrival, d);
+        }
+    }
+
+    #[test]
+    fn edited_scalars_options_and_enums_land_in_the_model() {
+        let mut doc = kitchen_sink();
+        let edits = [
+            ("maq.capacity", "7"),
+            ("q.capacity", "None"),
+            ("q.discipline", "Fifo"),
+            ("src.max_arrivals", "None"),
+            ("src.first_at_zero", "false"),
+            ("src.on_blocked", "Wait"),
+            ("mont.mode", "Batch"),
+            ("mont.components", "[2]"),
+            ("mont.setup", "None"),
+            ("sep.mode", "Split(5)"),
+            ("sep.mode", "Unpack"),
+            ("sep.mode", "Split(6)"),
+        ];
+        for (key, value) in edits {
+            apply_set(&mut doc, key, value);
+            let (name, f) = key.split_once('.').unwrap();
+            assert_eq!(field(&doc, name, f), value, "{key}");
+        }
+        assert!(matches!(
+            object(&doc, "maq").kind,
+            ObjectKind::Processor { capacity: 7, .. }
+        ));
+        assert!(matches!(
+            object(&doc, "mont").kind,
+            ObjectKind::Combiner { setup: None, .. }
+        ));
+
+        apply_set(&mut doc, "run.stop_time", &ron_text::float(123.5));
+        apply_set(&mut doc, "run.warmup", "0.0");
+        apply_set(&mut doc, "run.seed", "99");
+        apply_set(&mut doc, "run.replications", "4");
+        let run = &doc.model().run;
+        assert_eq!(
+            (run.stop_time, run.warmup, run.seed, run.replications),
+            (123.5, 0.0, 99, 4)
+        );
+    }
+
+    #[test]
+    fn edited_sections_land_in_the_model() {
+        let mut doc = kitchen_sink();
+
+        apply_set(&mut doc, "q.batch", &ron_text::batch(9, 0.0, false));
+        match object(&doc, "q").kind {
+            ObjectKind::Queue { batch: Some(b), .. } => {
+                assert_eq!((b.size, b.max_wait, b.flush), (9, 0.0, false));
+            }
+            _ => unreachable!(),
+        }
+        apply_set(&mut doc, "q.batch", "None");
+        assert_eq!(field(&doc, "q", "batch"), "None");
+
+        let dt = Downtime {
+            mtbf: Dist::Const(50.0),
+            mttr: Dist::Erlang { k: 3, mean: 4.0 },
+        };
+        apply_set(&mut doc, "maq.downtime", &ron_text::downtime(&dt));
+        assert_eq!(object(&doc, "maq").downtime, Some(dt));
+        apply_set(&mut doc, "maq.downtime", "None");
+        assert_eq!(object(&doc, "maq").downtime, None);
+
+        let table = ShiftTable {
+            period: 100.0,
+            off: vec![OffWindow {
+                start: 10.0,
+                duration: 5.0,
+            }],
+        };
+        apply_set(&mut doc, "maq.shifts", &ron_text::shifts(&table));
+        assert_eq!(object(&doc, "maq").shifts, Some(table));
+        apply_set(&mut doc, "maq.shifts", "None");
+        assert_eq!(object(&doc, "maq").shifts, None);
+
+        let rules = [
+            OutputRule::FirstAvailable,
+            OutputRule::RoundRobin,
+            OutputRule::Random,
+            OutputRule::Weighted(vec![0.0, 1.0, 2.5]),
+            OutputRule::ByLabel("tipo \"x\" \\ y".into()),
+        ];
+        for rule in rules {
+            apply_set(&mut doc, "maq.output", &ron_text::output(&rule));
+            assert_eq!(object(&doc, "maq").output, rule);
+        }
+
+        let mut labels = std::collections::BTreeMap::new();
+        labels.insert("peso".to_string(), Dist::Const(2.0));
+        labels.insert("dois \"x\"".to_string(), Dist::Exp { mean: 0.5 });
+        apply_set(&mut doc, "src.labels", &ron_text::labels(&labels));
+        match object(&doc, "src").kind {
+            ObjectKind::Source { labels: l, .. } => assert_eq!(l, labels),
+            _ => unreachable!(),
+        }
+        apply_set(&mut doc, "src.labels", "{}");
+        assert_eq!(field(&doc, "src", "labels"), "{}");
+    }
+
+    #[test]
+    fn written_text_is_what_the_saved_file_parses_back_to() {
+        let doc = kitchen_sink();
+        assert_eq!(&Model::parse(&doc.to_text()).unwrap(), doc.model());
+    }
+
+    #[test]
+    fn rejected_text_leaves_the_document_alone() {
+        let mut doc = kitchen_sink();
+        let before = doc.model().clone();
+        let bad = Command::Set {
+            key: "maq.process".into(),
+            value: "Exp(mean:".into(),
+        };
+        assert!(doc.apply(bad).is_err());
+        assert_eq!(doc.model(), &before);
+    }
+
+    fn render(doc: &Document, selected: &str) -> Vec<Command> {
+        let ctx = egui::Context::default();
+        let mut commands = Vec::new();
+        // Two frames: the second one runs with the memory the first one left.
+        for _ in 0..2 {
+            ctx.run_ui(egui::RawInput::default(), |ui| {
+                commands = properties_panel(ui, doc, selected);
+            })
+            .drop_without_applying_deltas();
+        }
+        commands
+    }
+
+    #[test]
+    fn drawing_every_object_and_the_run_settings_emits_nothing() {
+        for (name, doc) in documents() {
+            for obj in &doc.model().objects {
+                let commands = render(&doc, &obj.name);
+                assert_eq!(commands, Vec::new(), "{name}.{}", obj.name);
+            }
+            assert_eq!(render(&doc, ""), Vec::new(), "{name} run");
+        }
+    }
+
+    #[test]
+    fn drawing_every_distribution_family_does_not_panic() {
+        let mut doc = kitchen_sink();
+        for d in all_families() {
+            apply_set(&mut doc, "maq.process", &ron_text::dist(&d));
+            apply_set(&mut doc, "src.interarrival", &ron_text::dist(&d));
+            assert_eq!(render(&doc, "maq"), Vec::new());
+            assert_eq!(render(&doc, "src"), Vec::new());
+        }
+        // Invalid parameters are shown, not rejected.
+        apply_set(&mut doc, "maq.process", "Uniform(min: 5.0, max: 1.0)");
+        assert_eq!(render(&doc, "maq"), Vec::new());
+    }
+}
