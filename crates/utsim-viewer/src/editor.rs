@@ -827,7 +827,6 @@ pub fn edit_panels(
                         None => {
                             ui.label("Selecione um bloco para editar suas propriedades.");
                             ui.separator();
-                            ui.strong("Simulação");
                             for command in run_panel(ui, &ed.doc) {
                                 acts.push(Act::Exec(command));
                             }
