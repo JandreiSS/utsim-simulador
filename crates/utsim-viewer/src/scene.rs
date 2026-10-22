@@ -10,7 +10,9 @@ use utsim_viewer::editing::NetworkView;
 use utsim_viewer::layout;
 use utsim_viewer::style::{self, Shape};
 use utsim_viewer::timeline::ItemPos;
+use utsim_viewer::view;
 
+use crate::dock::{Dock, pointer_over_ui};
 use crate::editor::{Editor, Mode};
 use crate::playback::{Data, Playback, Selection};
 
@@ -276,6 +278,10 @@ pub fn update_items(
         // Items inside a transporter ride on it (stacked on its body).
         let base = block_base_at(&data, *b, t);
         for (slot, &(_, i)) in list.iter().enumerate() {
+            // The stack is capped; the label shows how many items are not drawn.
+            if slot >= style::visible_slots(shape) {
+                break;
+            }
             let off = Vec3::from(style::slot_offset(shape, slot));
             placed.push((i, base + off, 1.0));
         }
@@ -349,6 +355,7 @@ pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, m
         &positions,
         &kinds,
         &data.replay.connections,
+        &data.logical,
         &outlines,
         None,
     );
@@ -384,6 +391,7 @@ pub fn draw_world(
     positions: &[[f32; 3]],
     kinds: &[&str],
     connections: &[(usize, usize)],
+    logical: &[bool],
     outlines: &[(usize, Color)],
     fixed_step: Option<f32>,
 ) {
@@ -428,8 +436,20 @@ pub fn draw_world(
     }
 
     let edge = Color::srgb(0.75, 0.80, 0.90);
-    for &(a, b) in connections {
-        if let Some((s, e)) = connection_line(positions, kinds, a, b) {
+    for (n, &(a, b)) in connections.iter().enumerate() {
+        let Some((s, e)) = connection_line(positions, kinds, a, b) else {
+            continue;
+        };
+        if logical.get(n).copied().unwrap_or(false) {
+            // Logical flow (a vehicle carries the item): dashed and dimmer, with a short head.
+            let dim = Color::srgb(0.45, 0.50, 0.60);
+            for (p, q) in view::dashes(s.to_array(), e.to_array(), 0.35, 0.25) {
+                gizmos.line(Vec3::from(p), Vec3::from(q), dim);
+            }
+            let dir = (e - s).normalize_or_zero();
+            let tail = (e - dir * 0.5).max(s.min(e)).clamp(s.min(e), s.max(e));
+            gizmos.arrow(tail, e, dim).with_tip_length(0.3);
+        } else {
             gizmos.arrow(s, e, edge).with_tip_length(0.35);
         }
     }
@@ -448,8 +468,9 @@ pub fn draw_world(
     }
 }
 
-/// Start and end of the arrow for connection `a -> b` (trimmed to the block
-/// borders), or `None` when the blocks overlap or the indices are invalid.
+/// Start and end of the arrow for connection `a -> b`, clipped to the block
+/// footprints (tail on the source surface, head on the target surface) at a fixed
+/// height above the ground; `None` when the blocks overlap or the indices are invalid.
 pub fn connection_line(
     positions: &[[f32; 3]],
     kinds: &[&str],
@@ -459,15 +480,15 @@ pub fn connection_line(
     if a >= positions.len() || b >= positions.len() || a == b {
         return None;
     }
-    let pa = Vec3::from(positions[a]) + Vec3::Y * 0.4;
-    let pb = Vec3::from(positions[b]) + Vec3::Y * 0.4;
-    let dir = (pb - pa).normalize_or_zero();
-    let reach = |blk: usize| {
-        let (h, _) = style::extents(style::shape_of(kinds[blk]));
-        h[0].max(h[2]) + 0.1
-    };
-    let (s, e) = (pa + dir * reach(a), pb - dir * reach(b));
-    ((e - s).dot(dir) > 0.1).then_some((s, e))
+    let half = |blk: usize| style::extents(style::shape_of(kinds[blk])).0;
+    view::connection_segment(
+        positions[a],
+        half(a),
+        positions[b],
+        half(b),
+        view::ARROW_HEIGHT,
+    )
+    .map(|(s, e)| (Vec3::from(s), Vec3::from(e)))
 }
 
 /// Click (without dragging) on a block selects it; click on empty ground clears.
@@ -480,11 +501,12 @@ pub fn pick(
     pb: Res<Playback>,
     mut selection: ResMut<Selection>,
     mut press: Local<Option<Vec2>>,
+    dock: Res<Dock>,
     mut contexts: EguiContexts,
 ) {
     let over_ui = contexts
         .ctx_mut()
-        .is_ok_and(|ctx| ctx.egui_wants_pointer_input() || ctx.is_pointer_over_egui());
+        .is_ok_and(|ctx| pointer_over_ui(ctx, &dock));
     let cursor = window.cursor_position();
     if buttons.just_pressed(MouseButton::Left) {
         *press = if over_ui { None } else { cursor };

@@ -18,6 +18,9 @@ pub struct Data {
     pub end: f64,
     /// Path network of the simulated model (empty when it has none or for a `.json` replay).
     pub network: NetworkView,
+    /// Per connection of the replay: a logical link (the source hands items to a
+    /// transporter), drawn dashed. Empty when unknown.
+    pub logical: Vec<bool>,
 }
 
 impl Data {
@@ -38,7 +41,14 @@ impl Data {
             positions,
             end,
             network: NetworkView::default(),
+            logical: Vec::new(),
         }
+    }
+
+    /// Marks which connections are logical flow carried by a transporter.
+    pub fn with_logical(mut self, logical: Vec<bool>) -> Self {
+        self.logical = logical;
+        self
     }
 
     /// Adds the model's path network to be drawn on the ground.

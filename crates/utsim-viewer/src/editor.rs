@@ -15,7 +15,8 @@ use utsim_edit::{Command, Document, Issue, LIBRARY, template};
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::{
     EditView, LINE_PICK_PIXELS, NetworkView, auto_layout_command, connect_blocked, default_stop,
-    ground_to_model, group_issues, name_base, nearest_segment, renamed, run_model,
+    ground_to_model, group_issues, logical_flags, name_base, nearest_segment, needs_layout,
+    renamed, run_model,
 };
 use utsim_viewer::layout;
 use utsim_viewer::properties::{properties_panel, run_panel};
@@ -23,6 +24,7 @@ use utsim_viewer::style;
 use utsim_viewer::timeline::TransitSetting;
 
 use crate::camera::CameraLock;
+use crate::dock::{Dock, pointer_over_ui};
 use crate::playback::{Data, Playback, Selection};
 use crate::scene;
 use crate::ui::{Label, draw_labels};
@@ -71,6 +73,8 @@ pub struct Editor {
     /// Snapped ground position under the cursor while placing.
     hover: Option<[f64; 3]>,
     pub status: String,
+    /// Set to ask the camera to frame the whole model (consumed by `camera::frame_scene`).
+    pub frame_request: bool,
     /// Text of the `stop_time` override used by quick simulation runs.
     pub stop_text: String,
     save_prompt: Option<String>,
@@ -85,6 +89,7 @@ enum Act {
     Redo,
     Save,
     New,
+    Frame,
     Simulate,
     Edit,
     Delete,
@@ -100,6 +105,11 @@ impl Editor {
         ed.stop_text = stop.to_string();
         if let Some(layout) = auto_layout_command(ed.doc.model()) {
             let _ = ed.doc.apply(layout);
+            ed.status = "Layout automático aplicado: salve para manter as posições".into();
+        } else if needs_layout(ed.doc.model()) && ed.doc.model().network.is_some() {
+            ed.status = "Modelo com rede de caminhos: posicione os objetos nos nós da rede \
+                         (o layout automático não foi aplicado)"
+                .into();
         }
         ed.refresh();
         ed
@@ -125,6 +135,7 @@ impl Editor {
             press: None,
             hover: None,
             status: String::new(),
+            frame_request: true,
             save_prompt: None,
             confirm_new: false,
             show_blocked: false,
@@ -235,6 +246,7 @@ impl Editor {
         self.confirm_new = false;
         self.stop_text = default_stop(self.doc.model().run.stop_time).to_string();
         self.status.clear();
+        self.frame_request = true;
         self.refresh();
     }
 
@@ -284,6 +296,7 @@ impl Editor {
             }
             Act::Save => self.save(),
             Act::New => self.request_new(),
+            Act::Frame => self.frame_request = true,
             Act::Simulate => self.simulate(),
             Act::Edit => self.mode = Mode::Edit,
             Act::Delete => self.delete_selected(),
@@ -329,12 +342,15 @@ pub fn poll_job(
     editor.job = None;
     match result {
         Ok(replay) => {
+            let logical = logical_flags(editor.doc.model(), &replay);
             *data = Data::from_replay(replay, editor.transit)
-                .with_network(NetworkView::of(editor.doc.model()));
+                .with_network(NetworkView::of(editor.doc.model()))
+                .with_logical(logical);
             *pb = Playback::new(data.end);
             *selection = Selection(None);
             editor.mode = Mode::Sim;
             editor.status.clear();
+            editor.frame_request = true;
         }
         Err(e) => editor.status = format!("Erro na simulação: {e}"),
     }
@@ -427,11 +443,12 @@ pub fn mouse(
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut editor: ResMut<Editor>,
     mut lock: ResMut<CameraLock>,
+    dock: Res<Dock>,
     mut contexts: EguiContexts,
 ) {
     let over_ui = contexts
         .ctx_mut()
-        .is_ok_and(|ctx| ctx.egui_wants_pointer_input() || ctx.is_pointer_over_egui());
+        .is_ok_and(|ctx| pointer_over_ui(ctx, &dock));
     let (cam, cam_tf) = *camera;
     let cursor = window.cursor_position();
     let ray = cursor.and_then(|c| cam.viewport_to_world(cam_tf, c).ok());
@@ -576,7 +593,7 @@ fn click(
                         from: from.clone(),
                         to: to.clone(),
                     });
-                    editor.status = format!("Ligação {from} → {to} removida (Ctrl+Z desfaz)");
+                    editor.status = format!("Ligação {from} -> {to} removida (Ctrl+Z desfaz)");
                 }
                 None => editor.selected = None,
             }
@@ -609,6 +626,7 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
         &view.positions,
         &kinds,
         &view.connections,
+        &view.logical,
         &outlines,
         Some(1.0),
     );
@@ -648,64 +666,75 @@ pub fn title(
 
 /// Top bar (both modes, only when the model is editable): mode switch, file and
 /// history buttons, simulation time limit, status; plus the small dialogs.
-pub fn toolbar(mut contexts: EguiContexts, mut editor: ResMut<Editor>) -> Result {
+pub fn toolbar(
+    mut contexts: EguiContexts,
+    mut editor: ResMut<Editor>,
+    mut dock: ResMut<Dock>,
+) -> Result {
     let ctx = contexts.ctx_mut()?;
     if !editor.editable {
         return Ok(());
     }
     let mut acts: Vec<Act> = Vec::new();
     let ed = &mut *editor;
-    egui::Window::new("barra")
-        .title_bar(false)
-        .resizable(false)
-        .anchor(egui::Align2::CENTER_TOP, [0.0, 8.0])
-        .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                let editing = ed.mode == Mode::Edit;
-                if ui.selectable_label(editing, "✎ Editar").clicked() && !editing {
-                    acts.push(Act::Edit);
+    let mut top = dock.ui(ctx, "topo");
+    egui::Panel::top("barra").show(&mut top, |ui| {
+        ui.horizontal(|ui| {
+            let editing = ed.mode == Mode::Edit;
+            if ui.selectable_label(editing, "Editar").clicked() && !editing {
+                acts.push(Act::Edit);
+            }
+            let running = ed.job.is_some();
+            if ui
+                .add_enabled(!running, egui::Button::new("▶ Simular").selected(!editing))
+                .clicked()
+                && editing
+            {
+                acts.push(Act::Simulate);
+            }
+            ui.label("até t =");
+            ui.add_enabled(
+                editing,
+                egui::TextEdit::singleline(&mut ed.stop_text).desired_width(56.0),
+            );
+            ui.separator();
+            // File and history buttons stay visible in `Simular`, only disabled.
+            ui.add_enabled_ui(editing, |ui| {
+                if ui.button("Novo").on_hover_text("Ctrl+N").clicked() {
+                    acts.push(Act::New);
                 }
-                let running = ed.job.is_some();
+                if ui.button("Salvar").on_hover_text("Ctrl+S").clicked() {
+                    acts.push(Act::Save);
+                }
                 if ui
-                    .add_enabled(!running, egui::Button::new("▶ Simular"))
+                    .add_enabled(ed.doc.can_undo(), egui::Button::new("Desfazer"))
+                    .on_hover_text("Ctrl+Z")
                     .clicked()
                 {
-                    acts.push(Act::Simulate);
+                    acts.push(Act::Undo);
                 }
-                ui.label("até t =");
-                ui.add(egui::TextEdit::singleline(&mut ed.stop_text).desired_width(56.0));
-                if editing {
-                    ui.separator();
-                    if ui.button("Novo").on_hover_text("Ctrl+N").clicked() {
-                        acts.push(Act::New);
-                    }
-                    if ui.button("Salvar").on_hover_text("Ctrl+S").clicked() {
-                        acts.push(Act::Save);
-                    }
-                    if ui
-                        .add_enabled(ed.doc.can_undo(), egui::Button::new("Desfazer"))
-                        .on_hover_text("Ctrl+Z")
-                        .clicked()
-                    {
-                        acts.push(Act::Undo);
-                    }
-                    if ui
-                        .add_enabled(ed.doc.can_redo(), egui::Button::new("Refazer"))
-                        .on_hover_text("Ctrl+Y")
-                        .clicked()
-                    {
-                        acts.push(Act::Redo);
-                    }
-                }
-                if running {
-                    ui.spinner();
-                }
-                if !ed.status.is_empty() {
-                    ui.separator();
-                    ui.label(&ed.status);
+                if ui
+                    .add_enabled(ed.doc.can_redo(), egui::Button::new("Refazer"))
+                    .on_hover_text("Ctrl+Y")
+                    .clicked()
+                {
+                    acts.push(Act::Redo);
                 }
             });
+            ui.separator();
+            if ui.button("Enquadrar (F)").clicked() {
+                acts.push(Act::Frame);
+            }
+            if running {
+                ui.spinner();
+            }
+            if !ed.status.is_empty() {
+                ui.separator();
+                ui.label(&ed.status);
+            }
         });
+    });
+    dock.free = top.available_rect_before_wrap();
 
     if ed.save_prompt.is_some() {
         let mut save = false;
@@ -792,7 +821,7 @@ fn issues_ui(ui: &mut egui::Ui, issues: &[Issue], selected: &mut Option<String>)
             }
         }
         for message in messages {
-            ui.colored_label(red, format!("• {message}"));
+            ui.colored_label(red, format!("- {message}"));
         }
     }
 }
@@ -801,28 +830,20 @@ fn issues_ui(ui: &mut egui::Ui, issues: &[Issue], selected: &mut Option<String>)
 pub fn edit_panels(
     mut contexts: EguiContexts,
     mut editor: ResMut<Editor>,
+    mut dock: ResMut<Dock>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let ed = &mut *editor;
     let (cam, cam_tf) = *camera;
-    let labels: Vec<Label> = (0..ed.view.names.len())
-        .map(|i| Label {
-            text: ed.view.names[i].clone(),
-            position: ed.view.positions[i],
-            kind: ed.view.kinds[i].to_string(),
-            selected: ed.selected.as_deref() == Some(ed.view.names[i].as_str()),
-        })
-        .collect();
-    draw_labels(ctx, cam, cam_tf, &labels);
-
     let mut acts: Vec<Act> = Vec::new();
 
-    egui::Window::new("Paleta")
-        .anchor(egui::Align2::LEFT_TOP, [10.0, 58.0])
+    let mut left = dock.ui(ctx, "paleta");
+    egui::Panel::left("paleta")
         .resizable(false)
-        .collapsible(false)
-        .show(ctx, |ui| {
+        .exact_size(150.0)
+        .show(&mut left, |ui| {
+            ui.heading("Paleta");
             for (kind, label) in LIBRARY {
                 let on = ed.tool == Tool::Place(kind);
                 if ui.selectable_label(on, label).clicked() {
@@ -833,14 +854,16 @@ pub fn edit_panels(
             ui.weak("Escolha um tipo e clique no chão.");
             ui.weak("Esc cancela.");
         });
+    dock.free = left.available_rect_before_wrap();
 
-    egui::Window::new("Propriedades")
-        .anchor(egui::Align2::RIGHT_TOP, [-10.0, 58.0])
-        .default_width(330.0)
-        .collapsible(false)
-        .show(ctx, |ui| {
+    let mut right = dock.ui(ctx, "propriedades");
+    egui::Panel::right("propriedades")
+        .default_size(330.0)
+        .size_range(260.0..=600.0)
+        .show(&mut right, |ui| {
+            ui.heading("Propriedades");
             egui::ScrollArea::vertical()
-                .max_height(ctx.content_rect().height() - 140.0)
+                .auto_shrink([false, false])
                 .show(ui, |ui| {
                     match ed.selected.clone() {
                         None => {
@@ -879,6 +902,17 @@ pub fn edit_panels(
                     issues_ui(ui, &ed.issues, &mut ed.selected);
                 });
         });
+    dock.free = right.available_rect_before_wrap();
+
+    let labels: Vec<Label> = (0..ed.view.names.len())
+        .map(|i| Label {
+            text: ed.view.names[i].clone(),
+            position: ed.view.positions[i],
+            height: style::top_of_stack(style::shape_of(ed.view.kinds[i]), 0),
+            selected: ed.selected.as_deref() == Some(ed.view.names[i].as_str()),
+        })
+        .collect();
+    draw_labels(ctx, cam, cam_tf, &labels, dock.free);
 
     // Commands from the property panel may rename the selected object.
     let property_commands: Vec<Command> = acts
@@ -917,9 +951,9 @@ fn connections_ui(ui: &mut egui::Ui, doc: &Document, name: &str, acts: &mut Vec<
     }
     for other in inputs {
         ui.horizontal(|ui| {
-            ui.label(format!("{other} → {name}"));
+            ui.label(format!("{other} -> {name}"));
             if ui
-                .small_button("✕")
+                .small_button("x")
                 .on_hover_text("Remover ligação")
                 .clicked()
             {
@@ -932,9 +966,9 @@ fn connections_ui(ui: &mut egui::Ui, doc: &Document, name: &str, acts: &mut Vec<
     }
     for other in outputs {
         ui.horizontal(|ui| {
-            ui.label(format!("{name} → {other}"));
+            ui.label(format!("{name} -> {other}"));
             if ui
-                .small_button("✕")
+                .small_button("x")
                 .on_hover_text("Remover ligação")
                 .clicked()
             {

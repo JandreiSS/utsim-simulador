@@ -13,3 +13,4 @@ pub mod roteiro;
 pub mod source;
 pub mod style;
 pub mod timeline;
+pub mod view;
