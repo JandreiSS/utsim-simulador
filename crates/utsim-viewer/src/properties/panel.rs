@@ -799,12 +799,13 @@ impl Editor<'_> {
     }
 
     fn output_field(&mut self, ui: &mut Ui, obj: &ObjectDef) {
-        const RULES: [&str; 5] = [
+        const RULES: [&str; 6] = [
             "Primeira livre",
             "Rodízio",
             "Aleatória",
             "Pesos",
             "Por rótulo",
+            "Script",
         ];
         let field = "output";
         let id = self.id(field);
@@ -822,6 +823,7 @@ impl Editor<'_> {
             OutputRule::Random => 2,
             OutputRule::Weighted(_) => 3,
             OutputRule::ByLabel(_) => 4,
+            OutputRule::Script(_) => 5,
         };
         let mut picked = index;
         ui.horizontal(|ui| {
@@ -840,7 +842,9 @@ impl Editor<'_> {
                 1 => OutputRule::RoundRobin,
                 2 => OutputRule::Random,
                 3 => OutputRule::Weighted(vec![1.0; n_out]),
-                _ => OutputRule::ByLabel(self.first_label()),
+                4 => OutputRule::ByLabel(self.first_label()),
+                // A script returning the first port; edited as text (phase 6 UI front).
+                _ => OutputRule::Script("1".into()),
             };
             self.set(field, ron::output(&rule));
         }

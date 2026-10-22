@@ -308,6 +308,48 @@ A esteira é cinemática: nada de física, só eventos calculados.
   desenha o item na posição certa da estrutura (`bay_width`, `level_height`).
 - **Estados:** `empty` e `releasing`.
 
+## 4h. Lógica do usuário (fase 6)
+
+### Fluxo de tokens (`flows`)
+Um fluxo é um grafo de atividades por onde passam **tokens**. Tokens não são itens:
+são "linhas de raciocínio" leves, que esperam, decidem, seguram recursos e podem
+carregar a referência de um item. Cada fluxo roda como um bloco da simulação. Ele não
+aparece no 3D, mas aparece nos relatórios e no rastro.
+
+| Atividade | O que faz |
+|---|---|
+| `Source` / `Schedule` | cria tokens por intervalo aleatório ou em horários fixos |
+| `OnEvent` | cria um token, carregando o item, a cada entrada ou saída num objeto |
+| `Delay` | segura o token por um tempo sorteado |
+| `Decide` | escolhe o próximo ramo: por probabilidade, pelo rótulo (1, 2, ...) ou pela primeira condição verdadeira |
+| `Assign` | atribui rótulos ao token (`nome`) ou ao item carregado (`item.nome`) a partir de expressões |
+| `Acquire` / `Release` | recursos de contagem compartilhados; quem espera forma fila FIFO |
+| `WaitFor` | espera o próximo evento de entrada ou saída num objeto; o token passa a carregar esse item |
+| `CreateItem` | cria um item dentro de um objeto (que precisa aceitá-lo) |
+| `Batch` | junta *n* tokens e segue com um |
+| `Sink` | encerra o token |
+
+**Como o fluxo enxerga os objetos.**
+- **Assinatura:** o fluxo pede para ser avisado (`Ctx::subscribe`) quando itens entram ou
+  saem de um objeto, e recebe as mensagens `MSG_ITEM_ENTERED` e `MSG_ITEM_EXITED` com a
+  chave do item.
+- **Criação de itens:** `Ctx::inject_item` cria um item e o entrega ao objeto logo depois
+  do hook. Se o objeto não aceitar, é erro de modelagem.
+- **Rastro:** o número de tokens em cada atividade vai para `TraceEvent::Tokens`, que a
+  visualização do fluxo usa.
+
+### Scripts (`on_entry`, `OutputRule::Script`, expressões)
+O kernel não conhece nenhuma linguagem. Ele só chama `ItemScript` (na entrada de um
+item, **antes** do `on_entry` do bloco) e `PortScript` (para escolher a porta de
+saída). O modelo compila os scripts, em Rhai, pelo crate `utsim-script`. Os scripts
+usam o stream aleatório do próprio bloco, então a simulação continua reprodutível.
+Erros de compilação aparecem na validação do modelo; erros durante a execução param a
+rodada com uma mensagem.
+
+> **Nosso jeito:** o simuladores comerciais usa linguagem de script própria, uma linguagem própria parecida com C++, em
+> dezenas de gatilhos. Aqui a lógica fica em dois lugares claros: o fluxo de tokens e
+> poucos ganchos de script, numa linguagem embutível e livre.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
