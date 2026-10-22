@@ -35,7 +35,6 @@ use bevy::window::{CursorMoved, PrimaryWindow, WindowEvent};
 use bevy_egui::{EguiFullOutput, EguiPostUpdateSet, egui};
 use utsim_viewer::layout;
 use utsim_viewer::roteiro::{Alvo, Botao, Estado, Passo};
-use utsim_viewer::style;
 
 use crate::editor::{Editor, Mode, Tool};
 use crate::playback::{Data, Playback};
@@ -328,13 +327,16 @@ fn resolve(target: &Alvo, world: &World3, window: &Window) -> Result<Vec2, Strin
             project(world, p, window)
         }
         Alvo::Objeto(name) => {
-            let (base, kind) = if world.editor.mode == Mode::Edit {
+            let (base, half) = if world.editor.mode == Mode::Edit {
                 let i = world
                     .editor
                     .view
                     .index_of(name)
                     .ok_or_else(|| format!("objeto \"{name}\" não existe"))?;
-                (world.editor.view.positions[i], world.editor.view.kinds[i])
+                (
+                    world.editor.view.positions[i],
+                    world.editor.view.geoms[i].half,
+                )
             } else {
                 let i = world
                     .data
@@ -343,12 +345,8 @@ fn resolve(target: &Alvo, world: &World3, window: &Window) -> Result<Vec2, Strin
                     .iter()
                     .position(|b| &b.name == name)
                     .ok_or_else(|| format!("bloco \"{name}\" não existe na simulação"))?;
-                (
-                    world.data.positions[i],
-                    world.data.replay.blocks[i].kind.as_str(),
-                )
+                (world.data.positions[i], world.data.geoms[i].half)
             };
-            let (half, _) = style::extents(style::shape_of(kind));
             project(world, Vec3::from(base) + Vec3::Y * half[1], window)
         }
     }

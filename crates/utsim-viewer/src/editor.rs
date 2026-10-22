@@ -344,6 +344,7 @@ pub fn poll_job(
         Ok(replay) => {
             let logical = logical_flags(editor.doc.model(), &replay);
             *data = Data::from_replay(replay, editor.transit)
+                .with_model(editor.doc.model())
                 .with_network(NetworkView::of(editor.doc.model()))
                 .with_logical(logical);
             *pb = Playback::new(data.end);
@@ -420,8 +421,8 @@ fn ray_ground(ray: Ray3d) -> Option<Vec2> {
 /// Nearest block hit by the ray.
 fn pick_block(view: &EditView, ray: Ray3d) -> Option<usize> {
     let mut best: Option<(f32, usize)> = None;
-    for (i, kind) in view.kinds.iter().enumerate() {
-        let (h, _) = style::extents(style::shape_of(kind));
+    for (i, geom) in view.geoms.iter().enumerate() {
+        let h = geom.half;
         let center = Vec3::from(view.positions[i]) + Vec3::Y * h[1];
         if let Some(d) = scene::ray_box(
             ray.origin,
@@ -571,11 +572,11 @@ fn click(
             if block.is_some() {
                 return;
             }
-            let kinds: Vec<&str> = editor.view.kinds.clone();
             let mut screen = Vec::new();
             let mut owners = Vec::new();
             for (n, &(a, b)) in editor.view.connections.iter().enumerate() {
-                if let Some((s, e)) = scene::connection_line(&editor.view.positions, &kinds, a, b)
+                if let Some((s, e)) =
+                    scene::connection_line(&editor.view.positions, &editor.view.geoms, a, b)
                     && let (Ok(ps), Ok(pe)) = (
                         cam.world_to_viewport(cam_tf, s),
                         cam.world_to_viewport(cam_tf, e),
@@ -620,11 +621,10 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
             outlines.push((i, Color::srgb(1.0, 0.25, 0.2)));
         }
     }
-    let kinds: Vec<&str> = view.kinds.clone();
     scene::draw_world(
         &mut gizmos,
         &view.positions,
-        &kinds,
+        &view.geoms,
         &view.connections,
         &view.logical,
         &outlines,
@@ -908,7 +908,7 @@ pub fn edit_panels(
         .map(|i| Label {
             text: ed.view.names[i].clone(),
             position: ed.view.positions[i],
-            height: style::top_of_stack(style::shape_of(ed.view.kinds[i]), 0),
+            height: ed.view.geoms[i].label_height(0),
             selected: ed.selected.as_deref() == Some(ed.view.names[i].as_str()),
         })
         .collect();

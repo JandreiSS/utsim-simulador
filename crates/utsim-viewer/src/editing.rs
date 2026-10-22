@@ -8,6 +8,8 @@ use utsim_edit::{Command, Issue};
 use utsim_model::Model;
 use utsim_model::replay::{Replay, kind_name};
 
+use crate::geometry::{self, Geom};
+use crate::handling::Handling;
 use crate::layout;
 
 /// Ground grid step, in model units.
@@ -139,6 +141,8 @@ pub struct EditView {
     /// Per connection: the source hands its items to a transporter (`transport` set), so
     /// the link is only logical flow and the vehicle carries the item.
     pub logical: Vec<bool>,
+    /// Footprint and orientation of each object (belts and racks take it from the model).
+    pub geoms: Vec<Geom>,
 }
 
 impl EditView {
@@ -152,16 +156,26 @@ impl EditView {
                 Some(((ia, index(b)?), model.objects[ia].transport.is_some()))
             })
             .collect();
+        let kinds: Vec<&'static str> = model.objects.iter().map(|o| kind_name(&o.kind)).collect();
+        let positions: Vec<[f32; 3]> = model
+            .objects
+            .iter()
+            .map(|o| layout::to_bevy(o.position))
+            .collect();
+        let connections: Vec<(usize, usize)> = links.iter().map(|l| l.0).collect();
+        let handlings: Vec<Option<Handling>> = model
+            .objects
+            .iter()
+            .map(|o| Handling::of(&o.kind))
+            .collect();
+        let geoms = geometry::build(&kinds, &handlings, &positions, &connections);
         EditView {
             names: model.objects.iter().map(|o| o.name.clone()).collect(),
-            kinds: model.objects.iter().map(|o| kind_name(&o.kind)).collect(),
-            positions: model
-                .objects
-                .iter()
-                .map(|o| layout::to_bevy(o.position))
-                .collect(),
-            connections: links.iter().map(|l| l.0).collect(),
+            kinds,
+            positions,
+            connections,
             logical: links.iter().map(|l| l.1).collect(),
+            geoms,
         }
     }
 

@@ -1,0 +1,49 @@
+// Esteiras e porta-paletes no 3D (fase 5). O mesmo roteiro serve aos dois modelos, que o modo
+// roteirizado copia para a pasta de capturas:
+//   utsim-view examples/linha_com_esteiras.ron --stop 120 --roteiro crates/utsim-viewer/roteiros/esteiras_e_armazem.ron --capturas saida/esteiras
+//   utsim-view examples/armazem.ron --stop 400 --roteiro crates/utsim-viewer/roteiros/esteiras_e_armazem.ron --capturas saida/armazem
+// Simula, reproduz e captura em vários instantes: as caixas andam sobre a correia, se
+// acumulam no fim quando a saída bloqueia, e enchem as posições do porta-paletes.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("01_editar"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 60.0),
+    Esperar(quadros: 5),
+    Captura("02_simulacao_t0"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(4.0),
+    Captura("03_reproduzindo_4s"),
+    EsperarSegundos(6.0),
+    Captura("04_reproduzindo_10s"),
+    EsperarSegundos(10.0),
+    Captura("05_reproduzindo_20s"),
+    EsperarSegundos(15.0),
+    Captura("06_reproduzindo_35s"),
+    Afirmar(TempoSimuladoMin(1.0)),
+
+    // Pausar e olhar de perto: a roda aproxima a câmera.
+    ClicarBotao("Pausar"),
+    Esperar(quadros: 3),
+    Captura("07_pausado"),
+    MoverPara(Tela(700.0, 420.0)),
+    Rolar(5.0),
+    Esperar(quadros: 3),
+    Captura("08_zoom"),
+
+    // Voltar ao início e avançar por eventos: itens entrando na esteira, um a um.
+    ClicarBotao("Início"),
+    ClicarBotao("Evento >"),
+    ClicarBotao("Evento >"),
+    ClicarBotao("Evento >"),
+    ClicarBotao("Evento >"),
+    Captura("09_quatro_eventos_depois"),
+
+    ClicarBotao("Editar"),
+    Afirmar(Modo(Editar)),
+    Captura("10_de_volta_ao_editar"),
+]

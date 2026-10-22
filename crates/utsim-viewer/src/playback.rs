@@ -2,8 +2,11 @@
 
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
+use utsim_model::Model;
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::NetworkView;
+use utsim_viewer::geometry::{self, Geom};
+use utsim_viewer::handling::{BeltParams, Handling, RackParams};
 use utsim_viewer::layout;
 use utsim_viewer::timeline::{Timeline, TransitSetting};
 
@@ -21,6 +24,9 @@ pub struct Data {
     /// Per connection of the replay: a logical link (the source hands items to a
     /// transporter), drawn dashed. Empty when unknown.
     pub logical: Vec<bool>,
+    /// Footprint and orientation of each block (conveyors and racks take their size
+    /// from the model, or from defaults when only a `.json` replay is available).
+    pub geoms: Vec<Geom>,
 }
 
 impl Data {
@@ -35,14 +41,60 @@ impl Data {
             timeline.last_event_time()
         }
         .max(timeline.last_event_time());
-        Data {
+        let handlings: Vec<Option<Handling>> = replay
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(b, block)| match block.kind.as_str() {
+                "Conveyor" => Some(Handling::Conveyor(BeltParams::default())),
+                "Rack" => Some(Handling::Rack(RackParams::guess(timeline.max_slot(b)))),
+                _ => None,
+            })
+            .collect();
+        let mut data = Data {
             replay,
             timeline,
             positions,
             end,
             network: NetworkView::default(),
             logical: Vec::new(),
+            geoms: Vec::new(),
+        };
+        data.set_handlings(&handlings);
+        data
+    }
+
+    fn set_handlings(&mut self, handlings: &[Option<Handling>]) {
+        let kinds: Vec<&str> = self.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
+        self.geoms = geometry::build(&kinds, handlings, &self.positions, &self.replay.connections);
+    }
+
+    /// Takes the conveyor and rack parameters (lengths, speeds, spacing) from `model`,
+    /// matching objects by name. Without it a `.json` replay uses defaults: belts of
+    /// 5 units at speed 1 with items of length 1, and racks guessed from the highest
+    /// slot used.
+    pub fn with_model(mut self, model: &Model) -> Self {
+        let handlings: Vec<Option<Handling>> = self
+            .replay
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(b, block)| {
+                model
+                    .objects
+                    .iter()
+                    .find(|o| o.name == block.name)
+                    .and_then(|o| Handling::of(&o.kind))
+                    .or_else(|| self.geoms.get(b).and_then(|g| g.handling))
+            })
+            .collect();
+        for (b, h) in handlings.iter().enumerate() {
+            if let Some(Handling::Conveyor(p)) = h {
+                self.timeline.set_belt_params(b, *p);
+            }
         }
+        self.set_handlings(&handlings);
+        self
     }
 
     /// Marks which connections are logical flow carried by a transporter.

@@ -105,8 +105,20 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("unload_time", "Tempo de descarga", Dist),
             spec("home", "Voltar à base quando ocioso", Bool),
         ],
-        // Phase 5 kinds: fields added by the phase 5 viewer front.
-        ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => Vec::new(),
+        ObjectKind::Conveyor { .. } => vec![
+            spec("length", "Comprimento", Float),
+            spec("speed", "Velocidade", Float),
+            spec("item_length", "Comprimento por item", Float),
+            spec("accumulating", "Acumula itens", Bool),
+        ],
+        ObjectKind::Rack { .. } => vec![
+            spec("bays", "Colunas", UInt),
+            spec("levels", "Níveis", UInt),
+            spec("dwell", "Permanência mínima", OptDist),
+            spec("placement", "Regra de ocupação", Choice),
+            spec("bay_width", "Largura da coluna", Float),
+            spec("level_height", "Altura do nível", Float),
+        ],
         ObjectKind::Dispatcher { .. } => vec![
             spec("team", "Equipe", Team),
             spec("rule", "Regra de escolha", Choice),
@@ -154,6 +166,10 @@ pub fn transporter_names(objects: &[ObjectDef]) -> Vec<&str> {
         .map(|o| o.name.as_str())
         .collect()
 }
+
+/// Rack placement rules as `(ron text, Portuguese label)`.
+pub const RACK_PLACEMENTS: [(&str, &str); 2] =
+    [("FirstFree", "Primeira livre"), ("Random", "Aleatória")];
 
 /// Dispatch rules as `(ron text, Portuguese label)`.
 pub const DISPATCH_RULES: [(&str, &str); 3] = [
@@ -206,6 +222,16 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Transporter { load_time, .. }, "load_time") => ron::dist(load_time),
         (ObjectKind::Transporter { unload_time, .. }, "unload_time") => ron::dist(unload_time),
         (ObjectKind::Transporter { home, .. }, "home") => home.to_string(),
+        (ObjectKind::Conveyor { length, .. }, "length") => ron::float(*length),
+        (ObjectKind::Conveyor { speed, .. }, "speed") => ron::float(*speed),
+        (ObjectKind::Conveyor { item_length, .. }, "item_length") => ron::float(*item_length),
+        (ObjectKind::Conveyor { accumulating, .. }, "accumulating") => accumulating.to_string(),
+        (ObjectKind::Rack { bays, .. }, "bays") => bays.to_string(),
+        (ObjectKind::Rack { levels, .. }, "levels") => levels.to_string(),
+        (ObjectKind::Rack { dwell, .. }, "dwell") => ron::option(dwell, ron::dist),
+        (ObjectKind::Rack { placement, .. }, "placement") => ron::debug(placement),
+        (ObjectKind::Rack { bay_width, .. }, "bay_width") => ron::float(*bay_width),
+        (ObjectKind::Rack { level_height, .. }, "level_height") => ron::float(*level_height),
         (ObjectKind::Dispatcher { team, .. }, "team") => ron::strings(team),
         (ObjectKind::Dispatcher { rule, .. }, "rule") => ron::debug(rule),
         (ObjectKind::Source { interarrival, .. }, "interarrival") => ron::dist(interarrival),

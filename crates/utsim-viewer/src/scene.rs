@@ -7,6 +7,8 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiContexts;
 use utsim_viewer::editing::NetworkView;
+use utsim_viewer::geometry::{self, Geom};
+use utsim_viewer::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH};
 use utsim_viewer::layout;
 use utsim_viewer::style::{self, Shape};
 use utsim_viewer::timeline::ItemPos;
@@ -30,6 +32,8 @@ pub struct BlockMaterials {
     handles: Vec<Handle<StandardMaterial>>,
     last: Vec<Option<Option<utsim_core::State>>>,
     kinds: Vec<String>,
+    /// Geometry the entities were built for (a change rebuilds them).
+    geoms: Vec<Geom>,
     entities: Vec<Entity>,
 }
 
@@ -72,6 +76,135 @@ fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
         Shape::Cylinder => meshes.add(Cylinder::new(0.85, 1.0)),
         Shape::Vehicle => meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0)),
         Shape::Flag => meshes.add(Cone::new(0.25, half[1] * 2.0)),
+        // Belts and racks are built by `spawn_block` from their real size.
+        Shape::Belt | Shape::Rack => {
+            meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0))
+        }
+    }
+}
+
+/// Spawns the visual of one block at `translation` (its base plus half its height).
+fn spawn_block(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    geom: &Geom,
+    material: Handle<StandardMaterial>,
+    translation: Vec3,
+) -> Entity {
+    let steel = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.27, 0.29, 0.34),
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    match (geom.shape, geom.belt_params(), geom.rack_params()) {
+        (Shape::Belt, Some(p), _) => {
+            let length = p.length as f32;
+            let id = commands
+                .spawn((
+                    Mesh3d(meshes.add(Cuboid::new(length, BELT_THICKNESS, BELT_WIDTH))),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation,
+                        rotation: Quat::from_rotation_y(geom.yaw),
+                        scale: Vec3::ONE,
+                    },
+                    BlockVisual,
+                ))
+                .id();
+            let rail = meshes.add(Cuboid::new(length, 0.14, 0.06));
+            let roller = meshes.add(Cuboid::new(0.05, 0.012, BELT_WIDTH - 0.14));
+            // Cross lines every item length (at most ~80 of them) show the belt scale.
+            let step = p.item_length.max(p.length / 80.0) as f32;
+            let count = (length / step).floor() as usize;
+            commands.entity(id).with_children(|parent| {
+                for side in [-1.0f32, 1.0] {
+                    parent.spawn((
+                        Mesh3d(rail.clone()),
+                        MeshMaterial3d(steel.clone()),
+                        Transform::from_xyz(
+                            0.0,
+                            BELT_THICKNESS / 2.0 + 0.07,
+                            side * (BELT_WIDTH / 2.0 - 0.03),
+                        ),
+                    ));
+                }
+                for k in 0..=count {
+                    parent.spawn((
+                        Mesh3d(roller.clone()),
+                        MeshMaterial3d(steel.clone()),
+                        Transform::from_xyz(
+                            -length / 2.0 + k as f32 * step,
+                            BELT_THICKNESS / 2.0 + 0.006,
+                            0.0,
+                        ),
+                    ));
+                }
+            });
+            id
+        }
+        (Shape::Rack, _, Some(p)) => {
+            let (uprights, beams) = geometry::rack_frame(&p);
+            let (total_h, half_h) = (p.total_height(), geom.half[1]);
+            let post = meshes.add(Cuboid::new(BEAM, total_h, BEAM));
+            let beam = meshes.add(Cuboid::new(p.total_width(), BEAM, BEAM * 1.6));
+            // The beams are the "deck" of each level: the items rest across both.
+            let lane = p.item_size() * 0.4;
+            let id = commands
+                .spawn((
+                    Transform::from_translation(translation),
+                    Visibility::default(),
+                    BlockVisual,
+                ))
+                .id();
+            commands.entity(id).with_children(|parent| {
+                for (x, z) in uprights {
+                    parent.spawn((
+                        Mesh3d(post.clone()),
+                        MeshMaterial3d(steel.clone()),
+                        Transform::from_xyz(x, 0.0, z),
+                    ));
+                }
+                for y in beams {
+                    for z in [-lane, lane] {
+                        parent.spawn((
+                            Mesh3d(beam.clone()),
+                            MeshMaterial3d(material.clone()),
+                            Transform::from_xyz(0.0, y - half_h, z),
+                        ));
+                    }
+                }
+            });
+            id
+        }
+        _ => {
+            let shape = geom.shape;
+            let mast = (shape == Shape::Vehicle)
+                .then(|| (meshes.add(Cuboid::new(0.12, 0.9, 0.12)), material.clone()));
+            let id = commands
+                .spawn((
+                    Mesh3d(block_mesh(shape, meshes)),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation,
+                        rotation: block_rotation(shape),
+                        scale: Vec3::ONE,
+                    },
+                    BlockVisual,
+                ))
+                .id();
+            if let Some((mesh, material)) = mast {
+                // The mast marks a transporter (a lift mast at the rear of the body).
+                commands.entity(id).with_children(|parent| {
+                    parent.spawn((
+                        Mesh3d(mesh),
+                        MeshMaterial3d(material),
+                        Transform::from_xyz(-0.3, 0.55, 0.0),
+                    ));
+                });
+            }
+            id
+        }
     }
 }
 
@@ -100,11 +233,16 @@ pub fn sync_blocks(
     mut transforms: Query<&mut Transform, With<BlockVisual>>,
     mut last_mode: Local<Option<Mode>>,
 ) {
-    let (kinds, positions): (Vec<&str>, &[[f32; 3]]) = match editor.mode {
-        Mode::Edit => (editor.view.kinds.clone(), &editor.view.positions),
+    let (kinds, positions, geoms): (Vec<&str>, &[[f32; 3]], &[Geom]) = match editor.mode {
+        Mode::Edit => (
+            editor.view.kinds.clone(),
+            &editor.view.positions,
+            &editor.view.geoms,
+        ),
         Mode::Sim => (
             data.replay.blocks.iter().map(|b| b.kind.as_str()).collect(),
             &data.positions,
+            &data.geoms,
         ),
     };
     let rebuild = *last_mode != Some(editor.mode)
@@ -113,7 +251,8 @@ pub fn sync_blocks(
             .kinds
             .iter()
             .map(String::as_str)
-            .ne(kinds.iter().copied());
+            .ne(kinds.iter().copied())
+        || mats.geoms.as_slice() != geoms;
     if rebuild {
         *last_mode = Some(editor.mode);
         for e in mats.entities.drain(..) {
@@ -125,9 +264,8 @@ pub fn sync_blocks(
         mats.handles.clear();
         mats.last.clear();
         mats.kinds = kinds.iter().map(|k| k.to_string()).collect();
-        for (i, kind) in kinds.iter().enumerate() {
-            let shape = style::shape_of(kind);
-            let (half, _) = style::extents(shape);
+        mats.geoms = geoms.to_vec();
+        for (i, geom) in geoms.iter().enumerate() {
             let material = materials.add(StandardMaterial {
                 base_color: color(style::state_color(None)),
                 perceptual_roughness: 0.6,
@@ -135,38 +273,22 @@ pub fn sync_blocks(
             });
             mats.handles.push(material.clone());
             mats.last.push(None);
-            let mast = (shape == Shape::Vehicle)
-                .then(|| (meshes.add(Cuboid::new(0.12, 0.9, 0.12)), material.clone()));
-            let id = commands
-                .spawn((
-                    Mesh3d(block_mesh(shape, &mut meshes)),
-                    MeshMaterial3d(material),
-                    Transform {
-                        translation: Vec3::from(positions[i]) + Vec3::Y * half[1],
-                        rotation: block_rotation(shape),
-                        scale: Vec3::ONE,
-                    },
-                    BlockVisual,
-                ))
-                .id();
-            if let Some((mesh, material)) = mast {
-                // The mast marks a transporter (a lift mast at the rear of the body).
-                commands.entity(id).with_children(|parent| {
-                    parent.spawn((
-                        Mesh3d(mesh),
-                        MeshMaterial3d(material),
-                        Transform::from_xyz(-0.3, 0.55, 0.0),
-                    ));
-                });
-            }
+            let translation = Vec3::from(positions[i]) + Vec3::Y * geom.half[1];
+            let id = spawn_block(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                geom,
+                material,
+                translation,
+            );
             mats.entities.push(id);
         }
         return;
     }
     for (i, &e) in mats.entities.iter().enumerate() {
         if let Ok(mut tr) = transforms.get_mut(e) {
-            let (half, _) = style::extents(style::shape_of(kinds[i]));
-            tr.translation = Vec3::from(positions[i]) + Vec3::Y * half[1];
+            tr.translation = Vec3::from(positions[i]) + Vec3::Y * geoms[i].half[1];
         }
     }
 }
@@ -228,8 +350,7 @@ pub fn update_carriers(
             continue;
         }
         if let Ok(mut tr) = transforms.get_mut(e) {
-            let (half, _) = style::extents(style::shape_of(&data.replay.blocks[i].kind));
-            tr.translation = block_base_at(&data, i, pb.t) + Vec3::Y * half[1];
+            tr.translation = block_base_at(&data, i, pb.t) + Vec3::Y * data.geoms[i].half[1];
         }
     }
 }
@@ -274,16 +395,34 @@ pub fn update_items(
     }
     for (b, list) in &mut resting {
         list.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)));
-        let shape = style::shape_of(&data.replay.blocks[*b].kind);
+        let geom = &data.geoms[*b];
         // Items inside a transporter ride on it (stacked on its body).
         let base = block_base_at(&data, *b, t);
-        for (slot, &(_, i)) in list.iter().enumerate() {
-            // The stack is capped; the label shows how many items are not drawn.
-            if slot >= style::visible_slots(shape) {
-                break;
+        match geom.shape {
+            // Belts and racks put every item where the trace says it is.
+            Shape::Belt | Shape::Rack => {
+                for &(_, i) in list.iter() {
+                    let spot = if geom.shape == Shape::Belt {
+                        tl.belt_position(*b, i, t)
+                            .and_then(|distance| geom.belt_item(distance))
+                    } else {
+                        tl.rack_slot(*b, i, t).and_then(|slot| geom.rack_item(slot))
+                    };
+                    if let Some((offset, size)) = spot {
+                        placed.push((i, base + Vec3::from(offset), size / ITEM_SIZE));
+                    }
+                }
             }
-            let off = Vec3::from(style::slot_offset(shape, slot));
-            placed.push((i, base + off, 1.0));
+            shape => {
+                for (slot, &(_, i)) in list.iter().enumerate() {
+                    // The stack is capped; the label shows how many items are not drawn.
+                    if slot >= style::visible_slots(shape) {
+                        break;
+                    }
+                    let off = Vec3::from(style::slot_offset(shape, slot));
+                    placed.push((i, base + off, 1.0));
+                }
+            }
         }
     }
     for (i, p) in transit {
@@ -339,7 +478,6 @@ pub fn update_items(
 
 /// Connections, ground grid and selection outline in `Simular`.
 pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, mut gizmos: Gizmos) {
-    let kinds: Vec<&str> = data.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
     // Mobile resources are outlined where they are now.
     let positions: Vec<[f32; 3]> = (0..data.positions.len())
         .map(|b| block_base_at(&data, b, pb.t).to_array())
@@ -353,7 +491,7 @@ pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, m
     draw_world(
         &mut gizmos,
         &positions,
-        &kinds,
+        &data.geoms,
         &data.replay.connections,
         &data.logical,
         &outlines,
@@ -389,7 +527,7 @@ pub fn draw_network(gizmos: &mut Gizmos, network: &NetworkView) {
 pub fn draw_world(
     gizmos: &mut Gizmos,
     positions: &[[f32; 3]],
-    kinds: &[&str],
+    geoms: &[Geom],
     connections: &[(usize, usize)],
     logical: &[bool],
     outlines: &[(usize, Color)],
@@ -437,7 +575,7 @@ pub fn draw_world(
 
     let edge = Color::srgb(0.75, 0.80, 0.90);
     for (n, &(a, b)) in connections.iter().enumerate() {
-        let Some((s, e)) = connection_line(positions, kinds, a, b) else {
+        let Some((s, e)) = connection_line(positions, geoms, a, b) else {
             continue;
         };
         if logical.get(n).copied().unwrap_or(false) {
@@ -455,14 +593,22 @@ pub fn draw_world(
     }
 
     for &(i, color) in outlines {
-        let (h, _) = style::extents(style::shape_of(kinds[i]));
-        let center = Vec3::from(positions[i]) + Vec3::Y * h[1];
+        let geom = &geoms[i];
+        let center = Vec3::from(positions[i]) + Vec3::Y * geom.half[1];
+        // A belt is outlined along its own axis, the rest by their bounding box.
+        let (size, rotation) = match geom.belt_params() {
+            Some(p) => (
+                Vec3::new(p.length as f32, BELT_THICKNESS, BELT_WIDTH),
+                Quat::from_rotation_y(geom.yaw),
+            ),
+            None => (Vec3::from(geom.half) * 2.0, Quat::IDENTITY),
+        };
         gizmos.cube(
-            Transform::from_translation(center).with_scale(Vec3::new(
-                h[0] * 2.0 + 0.3,
-                h[1] * 2.0 + 0.3,
-                h[2] * 2.0 + 0.3,
-            )),
+            Transform {
+                translation: center,
+                rotation,
+                scale: size + Vec3::splat(0.3),
+            },
             color,
         );
     }
@@ -473,14 +619,14 @@ pub fn draw_world(
 /// height above the ground; `None` when the blocks overlap or the indices are invalid.
 pub fn connection_line(
     positions: &[[f32; 3]],
-    kinds: &[&str],
+    geoms: &[Geom],
     a: usize,
     b: usize,
 ) -> Option<(Vec3, Vec3)> {
     if a >= positions.len() || b >= positions.len() || a == b {
         return None;
     }
-    let half = |blk: usize| style::extents(style::shape_of(kinds[blk])).0;
+    let half = |blk: usize| geoms[blk].half;
     view::connection_segment(
         positions[a],
         half(a),
@@ -525,8 +671,8 @@ pub fn pick(
         return;
     };
     let mut best: Option<(f32, usize)> = None;
-    for (i, block) in data.replay.blocks.iter().enumerate() {
-        let (h, _) = style::extents(style::shape_of(&block.kind));
+    for i in 0..data.replay.blocks.len() {
+        let h = data.geoms[i].half;
         let center = block_base_at(&data, i, pb.t) + Vec3::Y * h[1];
         if let Some(d) = ray_box(
             ray.origin,
