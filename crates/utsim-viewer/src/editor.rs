@@ -18,6 +18,7 @@ use utsim_viewer::editing::{
     ground_to_model, group_issues, logical_flags, name_base, nearest_segment, needs_layout,
     renamed, run_model,
 };
+use utsim_viewer::flows_ui::{self, FlowsState};
 use utsim_viewer::layout;
 use utsim_viewer::properties::{properties_panel, run_panel};
 use utsim_viewer::style;
@@ -82,6 +83,8 @@ pub struct Editor {
     show_blocked: bool,
     job: Option<Mutex<Receiver<RunResult>>>,
     transit: TransitSetting,
+    /// The "Fluxos" panel (token flows): open flag and selection.
+    pub flows: FlowsState,
 }
 
 enum Act {
@@ -141,6 +144,7 @@ impl Editor {
             show_blocked: false,
             job: None,
             transit: TransitSetting::Auto,
+            flows: FlowsState::default(),
         }
     }
 
@@ -725,6 +729,13 @@ pub fn toolbar(
             if ui.button("Enquadrar (F)").clicked() {
                 acts.push(Act::Frame);
             }
+            if ui
+                .selectable_label(ed.flows.open, "Fluxos")
+                .on_hover_text("Lógica do usuário: fluxos de tokens")
+                .clicked()
+            {
+                ed.flows.open = !ed.flows.open;
+            }
             if running {
                 ui.spinner();
             }
@@ -798,6 +809,44 @@ pub fn toolbar(
 
     for act in acts {
         editor.run(act);
+    }
+    Ok(())
+}
+
+pub fn flows_open(editor: Res<Editor>) -> bool {
+    editor.editable && editor.flows.open
+}
+
+/// The docked "Fluxos" panel (bottom, both modes). In `Editar` its edits are applied to
+/// the document; in `Simular` the diagram shows the live token counts of the replay.
+pub fn flows_panel(
+    mut contexts: EguiContexts,
+    mut editor: ResMut<Editor>,
+    mut dock: ResMut<Dock>,
+    data: Res<Data>,
+    pb: Res<Playback>,
+) -> Result {
+    let ctx = contexts.ctx_mut()?;
+    let ed = &mut *editor;
+    let editing = ed.mode == Mode::Edit;
+    let lookup = |name: &str| data.flow_block(name);
+    let live = (!editing).then(|| flows_ui::Live {
+        timeline: &data.timeline,
+        flow_block: &lookup,
+        t: pb.t,
+    });
+    let mut ui = dock.ui(ctx, "fluxos");
+    let mut commands: Vec<Command> = Vec::new();
+    egui::Panel::bottom("fluxos")
+        .resizable(true)
+        .default_size(340.0)
+        .size_range(180.0..=620.0)
+        .show(&mut ui, |ui| {
+            commands = flows_ui::panel_body(ui, &mut ed.flows, &ed.doc, live, editing);
+        });
+    dock.free = ui.available_rect_before_wrap();
+    for command in commands {
+        editor.exec(command);
     }
     Ok(())
 }

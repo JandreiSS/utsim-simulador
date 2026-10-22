@@ -130,6 +130,7 @@ pub fn panel(
         .blocks
         .iter()
         .enumerate()
+        .filter(|(i, _)| !data.is_flow(*i))
         .map(|(i, block)| {
             let geom = &data.geoms[i];
             let content = tl.block_content(i, pb.t);
@@ -222,6 +223,9 @@ fn sim_controls(
         .max_height(170.0)
         .show(ui, |ui| {
             for (i, block) in data.replay.blocks.iter().enumerate() {
+                if data.is_flow(i) {
+                    continue;
+                }
                 let state = tl.block_state(i, pb.t);
                 let text = format!(
                     "{} [{}]  {}  ({})",

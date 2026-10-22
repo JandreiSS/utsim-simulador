@@ -282,6 +282,7 @@ fn main() -> ExitCode {
             (
                 dock::begin,
                 editor::toolbar,
+                editor::flows_panel.run_if(editor::flows_open),
                 editor::edit_panels.run_if(editor::in_edit),
                 ui::panel.run_if(editor::in_sim),
                 dock::apply_viewport,

@@ -1,0 +1,37 @@
+// Contagem de tokens ao vivo no diagrama do fluxo, em Simular.
+//   utsim-view examples/fluxo_docas.ron --roteiro crates/utsim-viewer/roteiros/fluxos_simular.ron --capturas saida/fluxos_simular
+// Roda o modelo, abre o painel Fluxos e deixa a simulação correr: cada caixa mostra a
+// quantidade de tokens naquela atividade; as ocupadas ficam destacadas. O 3D mostra só
+// os objetos físicos (o fluxo não é desenhado).
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(FluxosIgual(1)),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 60.0),
+    Esperar(quadros: 10),
+    Captura("01_simular_sem_painel"),
+
+    // Botão "Fluxos" da barra de cima.
+    MoverPara(Tela(611.0, 12.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 6),
+    Afirmar(PainelFluxos(true)),
+    Captura("02_fluxo_em_t0"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarAte(TempoSimuladoMin(300.0), 60.0),
+    ClicarBotao("Pausar"),
+    Esperar(quadros: 4),
+    Captura("03_tokens_em_t300"),
+
+    ClicarBotao("espera_doca"),
+    Esperar(quadros: 4),
+    Captura("04_atividade_selecionada"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarAte(TempoSimuladoMin(1200.0), 60.0),
+    ClicarBotao("Pausar"),
+    Esperar(quadros: 4),
+    Captura("05_tokens_em_t1200"),
+]

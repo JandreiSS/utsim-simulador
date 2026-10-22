@@ -205,6 +205,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         "downtime" => return Some(ron::option(&obj.downtime, ron::downtime)),
         "shifts" => return Some(ron::option(&obj.shifts, ron::shifts)),
         "transport" => return Some(ron::option(&obj.transport, |t| ron::string(t))),
+        "on_entry" => return Some(ron::option(&obj.on_entry, |s| ron::string(s))),
         _ => {}
     }
     Some(match (&obj.kind, key) {

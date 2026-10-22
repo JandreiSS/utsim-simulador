@@ -33,8 +33,24 @@ impl Data {
     /// Indexes a replay and places its blocks (model positions or automatic layout).
     pub fn from_replay(replay: Replay, setting: TransitSetting) -> Self {
         let timeline = Timeline::build(&replay, setting);
-        let raw: Vec<[f64; 3]> = replay.blocks.iter().map(|b| b.position).collect();
-        let positions = layout::place(&raw, &replay.connections);
+        // Token flows are blocks of the replay (after the objects) but have no place in
+        // the 3D scene: they are left out of the layout and parked on the first object.
+        let objects = replay.blocks.iter().filter(|b| b.kind != "Flow").count();
+        let raw: Vec<[f64; 3]> = replay
+            .blocks
+            .iter()
+            .filter(|b| b.kind != "Flow")
+            .map(|b| b.position)
+            .collect();
+        let object_links: Vec<(usize, usize)> = replay
+            .connections
+            .iter()
+            .copied()
+            .filter(|&(a, b)| a < objects && b < objects)
+            .collect();
+        let mut positions = layout::place(&raw, &object_links);
+        let anchor = positions.first().copied().unwrap_or_default();
+        positions.resize(replay.blocks.len(), anchor);
         let end = if replay.stop_time.is_finite() {
             replay.stop_time
         } else {
@@ -67,6 +83,24 @@ impl Data {
     fn set_handlings(&mut self, handlings: &[Option<Handling>]) {
         let kinds: Vec<&str> = self.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
         self.geoms = geometry::build(&kinds, handlings, &self.positions, &self.replay.connections);
+        for (geom, kind) in self.geoms.iter_mut().zip(&kinds) {
+            if *kind == "Flow" {
+                geom.half = [0.0; 3];
+            }
+        }
+    }
+
+    /// Whether replay block `b` is a token flow (not drawn, picked or labelled in 3D).
+    pub fn is_flow(&self, b: usize) -> bool {
+        self.replay.blocks.get(b).is_some_and(|x| x.kind == "Flow")
+    }
+
+    /// Replay block index of the token flow called `name`.
+    pub fn flow_block(&self, name: &str) -> Option<usize> {
+        self.replay
+            .blocks
+            .iter()
+            .position(|b| b.kind == "Flow" && b.name == name)
     }
 
     /// Takes the conveyor and rack parameters (lengths, speeds, spacing) from `model`,
