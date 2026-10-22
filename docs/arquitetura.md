@@ -404,6 +404,55 @@ também guarda o histórico de convergência (`history`).
   Para abrir sem servidor, use `web/dist/utsim.html`; para `web/index.html`, sirva a pasta
   `web/` (`python3 -m http.server -d web`).
 
+## 4k. Execução passo a passo, comandos externos e decisões (fase 7)
+`run()` é apenas um laço sobre a API passo a passo. Os resultados são idênticos, e os
+snapshots golden comprovam isso.
+- `run_until(t)` processa eventos até `t` e devolve `Paused(t)`, `Decision(d)` ou
+  `Finished`. `finish()` fecha a rodada e devolve o relatório.
+- **Comandos externos** (emulação): `stop_block` e `resume_block` usam o mesmo mecanismo
+  de motivos de parada das quebras e dos turnos. O estado mostrado é `stopped`.
+  `block_status()` dá a visão ao vivo de cada bloco.
+- **Decisões:** um bloco chama `Ctx::request_decision(opções, observação)`. A rodada pausa
+  depois do evento corrente. O agente responde com `decide(escolha)`, e a resposta chega
+  ao bloco como `MSG_DECISION`. No fluxo de tokens, isso é o `Decide` com regra `Agent`.
+  Um modelo que pede decisões não roda com `run()`: dá erro, porque precisa de um agente.
+- **Métricas próprias:** um bloco pode expor métricas (`custom_metrics`) e reiniciá-las no
+  fim do aquecimento (`on_warmup`).
+
+## 4l. Fluidos (fase 7)
+Uma rede de fluidos (`fluids`) é um bloco só: tanques, tubos, fontes, sumidouros e
+conversores de/para itens discretos, ligados num grafo **acíclico**.
+
+- **Taxas constantes entre eventos.** Os níveis variam linearmente, então o próximo
+  instante relevante é calculado exatamente: tanque esvaziando ou enchendo, conversor
+  completando um volume. O kernel agenda esse instante, e nele todas as taxas são
+  recalculadas.
+- **Cálculo das taxas.**
+  1. Cada fonte oferece até a sua taxa.
+  2. Um tanque com nível > 0 oferece até `max_out`. Um tanque cheio só aceita o que
+     consegue escoar.
+  3. Tubos e sumidouros limitam a vazão.
+  4. Várias saídas de um nó dividem igualmente o que ele oferece; o que uma saída
+     recusar volta para as outras.
+  5. Conservação: o que sai de um nó é igual ao que entra, menos a variação do nível.
+- **Itens → fluido** (`FromItems`): cada item que entra no objeto discreto vira um
+  volume, entregue de uma vez ao tanque seguinte.
+- **Fluido → itens** (`ToItems`): o nó acumula o que recebe e, a cada volume completo,
+  cria um item no objeto discreto.
+- **Rastro:** `TraceEvent::Fluid { node, level, rate }`, para o 3D.
+- **Métricas:** `custom_metrics` traz o nível médio e máximo de cada tanque e o volume
+  total de cada nó.
+
+## 4m. Tráfego de AGVs (fase 7)
+Uma aresta da rede pode ter `capacity` (veículos ao mesmo tempo). Um transportador com
+`agv: true` segue a rede aresta por aresta:
+1. Reserva a próxima aresta antes de entrar nela.
+2. Se a aresta está cheia, espera parado, em fila FIFO por aresta, com estado `blocked`.
+3. Libera a aresta ao sair dela.
+
+Se todos os veículos estão esperando uns pelos outros (impasse), a rodada para com uma
+mensagem que lista o ciclo de espera.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:

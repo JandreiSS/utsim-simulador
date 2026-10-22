@@ -287,6 +287,7 @@ pub fn empty_replay() -> Replay {
             events: 0,
             blocks: Vec::new(),
         },
+        fluids: None,
     }
 }
 

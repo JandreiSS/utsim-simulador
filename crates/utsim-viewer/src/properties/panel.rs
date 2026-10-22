@@ -1234,6 +1234,7 @@ impl Editor<'_> {
                 load_time,
                 unload_time,
                 home,
+                agv,
             } => {
                 self.float_field(ui, "Velocidade máxima", "speed", *speed);
                 self.opt_float_field(ui, "Aceleração", "acceleration", *acceleration, 1.0);
@@ -1242,6 +1243,7 @@ impl Editor<'_> {
                 self.dist_field(ui, "Tempo de carga", "load_time", load_time);
                 self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
                 self.bool_field(ui, "Voltar à base quando ocioso", "home", *home);
+                self.bool_field(ui, "AGV (controle de tráfego na rede)", "agv", *agv);
             }
             ObjectKind::Conveyor {
                 length,

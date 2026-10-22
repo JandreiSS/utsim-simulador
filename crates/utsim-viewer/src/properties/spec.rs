@@ -104,6 +104,7 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("load_time", "Tempo de carga", Dist),
             spec("unload_time", "Tempo de descarga", Dist),
             spec("home", "Voltar à base quando ocioso", Bool),
+            spec("agv", "AGV (controle de tráfego na rede)", Bool),
         ],
         ObjectKind::Conveyor { .. } => vec![
             spec("length", "Comprimento", Float),
@@ -223,6 +224,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Transporter { load_time, .. }, "load_time") => ron::dist(load_time),
         (ObjectKind::Transporter { unload_time, .. }, "unload_time") => ron::dist(unload_time),
         (ObjectKind::Transporter { home, .. }, "home") => home.to_string(),
+        (ObjectKind::Transporter { agv, .. }, "agv") => agv.to_string(),
         (ObjectKind::Conveyor { length, .. }, "length") => ron::float(*length),
         (ObjectKind::Conveyor { speed, .. }, "speed") => ron::float(*speed),
         (ObjectKind::Conveyor { item_length, .. }, "item_length") => ron::float(*item_length),

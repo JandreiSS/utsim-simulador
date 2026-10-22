@@ -809,7 +809,7 @@ fn next_editor(ui: &mut Ui, id: Id, a: &mut ActivityDef, names: &[String]) -> bo
                         });
                     }
                 }
-                DecideRule::ByLabel(_) => {}
+                DecideRule::ByLabel(_) | DecideRule::Agent { .. } => {}
             }
         }
     }
@@ -940,11 +940,17 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
             changed |= dist_editor(ui, id.with("t"), time);
         }
         Activity::Decide { rule } => {
-            const RULES: [&str; 3] = ["Probabilidade", "Pelo rótulo", "Condições"];
+            const RULES: [&str; 4] = [
+                "Probabilidade",
+                "Pelo rótulo",
+                "Condições",
+                "Agente externo",
+            ];
             let index = match rule {
                 DecideRule::Probability(_) => 0,
                 DecideRule::ByLabel(_) => 1,
                 DecideRule::Condition(_) => 2,
+                DecideRule::Agent { .. } => 3,
             };
             let mut picked = index;
             ui.horizontal(|ui| {
@@ -962,7 +968,10 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
                 *rule = match picked {
                     0 => DecideRule::Probability(vec![1.0; n]),
                     1 => DecideRule::ByLabel("tipo".to_string()),
-                    _ => DecideRule::Condition(vec!["true".to_string(); n]),
+                    2 => DecideRule::Condition(vec!["true".to_string(); n]),
+                    _ => DecideRule::Agent {
+                        observation: vec!["now".to_string()],
+                    },
                 };
                 changed = true;
             }
@@ -984,6 +993,19 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
                 }
                 DecideRule::Probability(_) => {
                     ui.weak("Pesos relativos, um por ramo.");
+                }
+                DecideRule::Agent { observation } => {
+                    ui.weak("Um agente externo escolhe o ramo; a simulação pausa e mostra estas observações:");
+                    for (i, obs) in observation.iter_mut().enumerate() {
+                        if let Some(t) = expr_box(ui, id.with(("obs", i)), obs, 180.0) {
+                            *obs = t;
+                            changed = true;
+                        }
+                    }
+                    if ui.small_button("+ observação").clicked() {
+                        observation.push("now".to_string());
+                        changed = true;
+                    }
                 }
             }
         }

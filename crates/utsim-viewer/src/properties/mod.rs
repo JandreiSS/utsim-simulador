@@ -208,6 +208,7 @@ mod tests {
                     "load_time",
                     "unload_time",
                     "home",
+                    "agv",
                 ],
                 ObjectKind::Dispatcher { .. } => &["team", "rule"],
                 ObjectKind::Conveyor { .. } => &["length", "speed", "item_length", "accumulating"],

@@ -205,7 +205,7 @@ pub fn sync_rule(a: &mut ActivityDef) {
         match rule {
             DecideRule::Probability(w) => w.resize(n, 1.0),
             DecideRule::Condition(c) => c.resize(n, "true".to_string()),
-            DecideRule::ByLabel(_) => {}
+            DecideRule::ByLabel(_) | DecideRule::Agent { .. } => {}
         }
     }
 }
