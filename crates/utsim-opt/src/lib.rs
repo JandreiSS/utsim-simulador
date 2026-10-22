@@ -10,6 +10,10 @@
 //! The search algorithms front implements [`Algorithm::Annealing`] and
 //! [`Algorithm::Genetic`]; [`Algorithm::Grid`] is the reference.
 
+mod search;
+#[cfg(test)]
+mod search_tests;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -38,6 +42,20 @@ pub struct OptProblem {
     /// Seed of the search itself (not of the simulations).
     #[serde(default = "one_u64")]
     pub seed: u64,
+    /// Optional refinement: after the search, re-simulate the best points with more
+    /// replications (same seeds for all of them) and compare those.
+    #[serde(default)]
+    pub refine: Option<Refine>,
+}
+
+/// Final refinement step, available for every algorithm.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Refine {
+    /// How many of the best distinct feasible points to re-simulate.
+    pub top: usize,
+    /// Replications for each refined point (replaces `OptProblem::replications`;
+    /// the first ones reuse the seeds of the search, so they are a superset).
+    pub replications: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -157,12 +175,39 @@ pub struct OptResult {
     pub problem: String,
     /// Every simulated point, in the order it was evaluated.
     pub evaluations: Vec<Evaluation>,
-    /// Index of the best feasible evaluation.
+    /// Index of the best feasible evaluation. When `refined` is not empty it indexes
+    /// `refined`; otherwise it indexes `evaluations` (see [`OptResult::final_evaluations`]).
     pub best: Option<usize>,
-    /// Points not significantly different from the best (paired test, 95%).
+    /// Points not significantly different from the best (paired test, 95%). Indexes
+    /// the same list as `best`.
     pub equivalent: Vec<usize>,
     /// Portuguese explanation of the outcome.
     pub explanation: Vec<String>,
+    /// Re-simulation of the best search points with more replications (empty when
+    /// the problem has no `refine`). The final comparison (`best`, `equivalent`)
+    /// is made on these.
+    #[serde(default)]
+    pub refined: Vec<Evaluation>,
+    /// Convergence: `(evaluations so far, best feasible objective so far)`, one
+    /// entry per simulated point once a feasible point exists.
+    #[serde(default)]
+    pub history: Vec<(usize, f64)>,
+}
+
+impl OptResult {
+    /// The list `best` and `equivalent` index into: `refined` if present, else
+    /// `evaluations`.
+    pub fn final_evaluations(&self) -> &[Evaluation] {
+        if self.refined.is_empty() {
+            &self.evaluations
+        } else {
+            &self.refined
+        }
+    }
+
+    pub fn best_evaluation(&self) -> Option<&Evaluation> {
+        self.best.map(|i| &self.final_evaluations()[i])
+    }
 }
 
 impl OptProblem {
@@ -187,6 +232,11 @@ impl OptProblem {
         }
         if self.replications < 2 {
             errors.push("use pelo menos 2 replicações por ponto (para o teste pareado)".into());
+        }
+        if let Some(r) = &self.refine
+            && (r.top == 0 || r.replications < 2)
+        {
+            errors.push("refinamento: use top ≥ 1 e pelo menos 2 replicações".into());
         }
         for v in &self.variables {
             let ok = match &v.domain {
@@ -279,8 +329,18 @@ pub fn evaluate(
     problem: &OptProblem,
     point: &Point,
 ) -> Result<Evaluation, ModelError> {
+    evaluate_with(base, problem, point, problem.replications)
+}
+
+/// Like [`evaluate`], with an explicit number of replications.
+pub fn evaluate_with(
+    base: &Model,
+    problem: &OptProblem,
+    point: &Point,
+    replications: u32,
+) -> Result<Evaluation, ModelError> {
     let mut model = apply_patches(base, point)?;
-    model.run.replications = problem.replications;
+    model.run.replications = replications;
     let reports = model.run_replications()?;
     let metric = |r: &utsim_core::RunReport, key: &str| -> Result<f64, ModelError> {
         r.metrics().get(key).copied().ok_or_else(|| {
@@ -382,6 +442,8 @@ pub fn compare(problem: &OptProblem, evaluations: Vec<Evaluation>) -> OptResult 
         best,
         equivalent,
         explanation,
+        refined: Vec::new(),
+        history: Vec::new(),
     }
 }
 
@@ -399,36 +461,13 @@ pub fn optimize(problem: &OptProblem, base: &Model) -> Result<OptResult, ModelEr
     if !errors.is_empty() {
         return Err(ModelError::Invalid(errors));
     }
-    let evaluations = match &problem.algorithm {
-        Algorithm::Grid => grid(problem, base)?,
-        Algorithm::Annealing { .. } | Algorithm::Genetic { .. } => {
-            return Err(ModelError::Invalid(vec![
-                "algoritmo de busca ainda em construção (fase 7); use Grid".into(),
-            ]));
-        }
-    };
-    Ok(compare(problem, evaluations))
-}
-
-/// Exhaustive search, up to `budget` points (in lexicographic order of the variables).
-fn grid(problem: &OptProblem, base: &Model) -> Result<Vec<Evaluation>, ModelError> {
-    let domains: Vec<(String, Vec<String>)> = problem
-        .variables
-        .iter()
-        .map(|v| (v.key.clone(), values(&v.domain)))
-        .collect();
-    let total: usize = domains.iter().map(|(_, vs)| vs.len()).product();
-    let mut out = Vec::new();
-    for index in 0..total.min(problem.budget) {
-        let mut rest = index;
-        let mut point = Point::new();
-        for (key, vs) in domains.iter().rev() {
-            point.insert(key.clone(), vs[rest % vs.len()].clone());
-            rest /= vs.len();
-        }
-        out.push(evaluate(base, problem, &point)?);
+    let (evaluations, history) = search::run(problem, base)?;
+    let mut result = compare(problem, evaluations);
+    result.history = history;
+    if let Some(refine) = &problem.refine {
+        search::apply_refinement(problem, base, refine, &mut result)?;
     }
-    Ok(out)
+    Ok(result)
 }
 
 #[cfg(test)]
