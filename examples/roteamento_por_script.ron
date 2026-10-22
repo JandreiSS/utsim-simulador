@@ -1,0 +1,26 @@
+// Roteamento por script (Rhai): a fila de triagem sorteia a prioridade de cada item
+// ao recebê-lo (on_entry) e uma regra de saída por script decide a porta.
+// Cerca de 20% dos itens são urgentes e vão para a linha rápida; o resto, para a comum.
+Model(
+    name: "Roteamento por script",
+    description: "on_entry sorteia item.prioridade; a regra Script manda urgentes à linha rápida",
+    run: (stop_time: 20000.0, warmup: 500.0, seed: 7, replications: 5),
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 1.0))),
+        (name: "triagem", kind: Queue(),
+            // Estas instruções rodam quando o item entra na fila.
+            on_entry: Some("item.prioridade = if random() < 0.2 { 1 } else { 2 };"),
+            // O script devolve a porta de saída, contando a partir de 1.
+            output: Script("if item.prioridade == 1 { 1 } else { 2 }")),
+        (name: "linha_rapida", kind: Processor(process: Exp(mean: 0.6))),
+        (name: "linha_comum", kind: Processor(process: Exp(mean: 0.7))),
+        (name: "saida", kind: Sink),
+    ],
+    connections: [
+        ("pedidos", "triagem"),
+        ("triagem", "linha_rapida"),   // porta 1 -> urgentes
+        ("triagem", "linha_comum"),    // porta 2 -> comuns
+        ("linha_rapida", "saida"),
+        ("linha_comum", "saida"),
+    ],
+)
