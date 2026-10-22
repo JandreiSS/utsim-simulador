@@ -1,0 +1,23 @@
+// Linha com duas estações e buffers pequenos: mostra os estados "blocked"
+// quando o buffer seguinte está cheio.
+Model(
+    name: "Linha com bloqueio",
+    run: (stop_time: 50000.0, warmup: 1000.0, seed: 7, replications: 5),
+    objects: [
+        (name: "entrada",  kind: Source(interarrival: Exp(mean: 1.0))),
+        (name: "buffer1",  kind: Queue(capacity: 5)),
+        (name: "torno",    kind: Processor(
+                                setup: Uniform(min: 0.05, max: 0.15),
+                                process: Triangular(min: 0.4, mode: 0.6, max: 1.0))),
+        (name: "buffer2",  kind: Queue(capacity: 2)),
+        (name: "fresa",    kind: Processor(process: Exp(mean: 0.85))),
+        (name: "expedicao", kind: Sink),
+    ],
+    connections: [
+        ("entrada", "buffer1"),
+        ("buffer1", "torno"),
+        ("torno", "buffer2"),
+        ("buffer2", "fresa"),
+        ("fresa", "expedicao"),
+    ],
+)

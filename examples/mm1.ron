@@ -1,0 +1,23 @@
+// Fila M/M/1: chegadas de Poisson (taxa 1) e serviço exponencial (taxa 1,25).
+// Teoria: rho = 0,8 | Lq = 3,2 | Wq = 3,2 | W = 4,0
+Model(
+    name: "M/M/1",
+    description: "Fila clássica para validar o motor contra a teoria das filas",
+    run: (
+        stop_time: 100000.0,
+        warmup: 2000.0,
+        seed: 42,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0)), position: (0.0, 0.0, 0.0)),
+        (name: "fila",    kind: Queue(),                                position: (3.0, 0.0, 0.0)),
+        (name: "maquina", kind: Processor(process: Exp(mean: 0.8)),     position: (6.0, 0.0, 0.0)),
+        (name: "saida",   kind: Sink,                                   position: (9.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "maquina"),
+        ("maquina", "saida"),
+    ],
+)

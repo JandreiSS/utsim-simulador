@@ -1,0 +1,22 @@
+// Dois tipos de peça: o rótulo "tipo" (1 ou 2) escolhe a porta de saída da fila.
+Model(
+    name: "Roteamento por tipo",
+    run: (stop_time: 20000.0, warmup: 500.0, replications: 5),
+    objects: [
+        (name: "pedidos", kind: Source(
+            interarrival: Exp(mean: 1.0),
+            labels: { "tipo": Discrete([(1.0, 0.6), (2.0, 0.4)]) },
+        )),
+        (name: "triagem", kind: Queue(), output: ByLabel("tipo")),
+        (name: "celula_a", kind: Processor(process: Exp(mean: 1.2))),
+        (name: "celula_b", kind: Processor(capacity: 2, process: Erlang(k: 3, mean: 3.0))),
+        (name: "saida", kind: Sink),
+    ],
+    connections: [
+        ("pedidos", "triagem"),
+        ("triagem", "celula_a"),   // porta 1 -> tipo 1
+        ("triagem", "celula_b"),   // porta 2 -> tipo 2
+        ("celula_a", "saida"),
+        ("celula_b", "saida"),
+    ],
+)
