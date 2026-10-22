@@ -6,6 +6,7 @@
 //! binary and only ever *reads* a [`utsim_model::replay::Replay`]: the simulation is
 //! never driven by the viewer.
 
+pub mod editing;
 pub mod layout;
 pub mod properties;
 pub mod source;

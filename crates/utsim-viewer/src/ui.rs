@@ -18,6 +18,41 @@ fn fmt_tally(t: &TallySummary) -> String {
     }
 }
 
+/// A block name drawn above the block.
+pub struct Label {
+    pub text: String,
+    /// Bevy-space base position of the block.
+    pub position: [f32; 3],
+    pub kind: String,
+    pub selected: bool,
+}
+
+/// Block names above the blocks (shared by both modes).
+pub fn draw_labels(ctx: &egui::Context, cam: &Camera, cam_tf: &GlobalTransform, labels: &[Label]) {
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Background,
+        egui::Id::new("rotulos"),
+    ));
+    for label in labels {
+        let (half, _) = style::extents(style::shape_of(&label.kind));
+        let world = Vec3::from(label.position) + Vec3::Y * (half[1] * 2.0 + 0.9);
+        if let Ok(p) = cam.world_to_viewport(cam_tf, world) {
+            let fg = if label.selected {
+                egui::Color32::WHITE
+            } else {
+                egui::Color32::from_gray(190)
+            };
+            painter.text(
+                egui::pos2(p.x, p.y),
+                egui::Align2::CENTER_BOTTOM,
+                &label.text,
+                egui::FontId::proportional(13.0),
+                fg,
+            );
+        }
+    }
+}
+
 pub fn panel(
     mut contexts: EguiContexts,
     data: Res<Data>,
@@ -28,36 +63,27 @@ pub fn panel(
     let ctx = contexts.ctx_mut()?;
     let tl = &data.timeline;
 
-    // Block names above the blocks.
     let (cam, cam_tf) = *camera;
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Background,
-        egui::Id::new("rotulos"),
-    ));
-    for (i, block) in data.replay.blocks.iter().enumerate() {
-        let (half, _) = style::extents(style::shape_of(&block.kind));
-        let world = Vec3::from(data.positions[i]) + Vec3::Y * (half[1] * 2.0 + 0.9);
-        if let Ok(p) = cam.world_to_viewport(cam_tf, world) {
+    let labels: Vec<Label> = data
+        .replay
+        .blocks
+        .iter()
+        .enumerate()
+        .map(|(i, block)| {
             let content = tl.block_content(i, pb.t);
-            let text = if content > 0 {
-                format!("{} ({content})", block.name)
-            } else {
-                block.name.clone()
-            };
-            let fg = if selection.0 == Some(i) {
-                egui::Color32::WHITE
-            } else {
-                egui::Color32::from_gray(190)
-            };
-            painter.text(
-                egui::pos2(p.x, p.y),
-                egui::Align2::CENTER_BOTTOM,
-                text,
-                egui::FontId::proportional(13.0),
-                fg,
-            );
-        }
-    }
+            Label {
+                text: if content > 0 {
+                    format!("{} ({content})", block.name)
+                } else {
+                    block.name.clone()
+                },
+                position: data.positions[i],
+                kind: block.kind.clone(),
+                selected: selection.0 == Some(i),
+            }
+        })
+        .collect();
+    draw_labels(ctx, cam, cam_tf, &labels);
 
     egui::Window::new("UTSim - visualizador")
         .default_pos(egui::pos2(10.0, 10.0))
