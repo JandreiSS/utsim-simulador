@@ -137,6 +137,15 @@ fn summary(data: &Data) {
     println!("itens: {}", tl.item_count());
     println!("eventos de rastro: {}", tl.record_count());
     println!(
+        "transportadores: {}",
+        data.replay
+            .blocks
+            .iter()
+            .filter(|b| b.kind == "Transporter")
+            .count()
+    );
+    println!("viagens: {}", tl.travel_count());
+    println!(
         "intervalo de tempo: 0 a {} (último evento em {})",
         data.end,
         tl.last_event_time()
@@ -226,7 +235,11 @@ fn main() -> ExitCode {
                 camera::control,
                 scene::pick.run_if(editor::in_sim),
                 scene::sync_blocks,
-                (scene::update_block_colors, scene::update_items)
+                (
+                    scene::update_carriers,
+                    scene::update_block_colors,
+                    scene::update_items,
+                )
                     .chain()
                     .run_if(editor::in_sim),
                 scene::draw_sim.run_if(editor::in_sim),

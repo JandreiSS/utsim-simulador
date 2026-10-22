@@ -14,8 +14,8 @@ use bevy_egui::{EguiContexts, egui};
 use utsim_edit::{Command, Document, Issue, LIBRARY, template};
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::{
-    EditView, LINE_PICK_PIXELS, auto_layout_command, default_stop, ground_to_model, group_issues,
-    name_base, nearest_segment, renamed, run_model,
+    EditView, LINE_PICK_PIXELS, NetworkView, auto_layout_command, connect_blocked, default_stop,
+    ground_to_model, group_issues, name_base, nearest_segment, renamed, run_model,
 };
 use utsim_viewer::layout;
 use utsim_viewer::properties::{properties_panel, run_panel};
@@ -174,6 +174,18 @@ impl Editor {
         self.refresh();
     }
 
+    /// Starts a connection from `name`, unless it is a mobile resource (no ports):
+    /// then explains, in Portuguese, which fields to use instead.
+    fn start_connect(&mut self, name: String) {
+        let kind = self.view.index_of(&name).map(|i| self.view.kinds[i]);
+        if let Some(msg) = kind.and_then(connect_blocked) {
+            self.status = msg.into();
+            self.tool = Tool::Select;
+        } else {
+            self.tool = Tool::Connect(name);
+        }
+    }
+
     fn delete_selected(&mut self) {
         if let Some(name) = self.selected.take() {
             self.exec(Command::Remove { name });
@@ -317,7 +329,8 @@ pub fn poll_job(
     editor.job = None;
     match result {
         Ok(replay) => {
-            *data = Data::from_replay(replay, editor.transit);
+            *data = Data::from_replay(replay, editor.transit)
+                .with_network(NetworkView::of(editor.doc.model()));
             *pb = Playback::new(data.end);
             *selection = Selection(None);
             editor.mode = Mode::Sim;
@@ -365,7 +378,7 @@ pub fn keys(
     if pressed(KeyCode::KeyC)
         && let Some(sel) = editor.selected.clone()
     {
-        editor.tool = Tool::Connect(sel);
+        editor.start_connect(sel);
     }
     if pressed(KeyCode::Escape) {
         editor.tool = Tool::Select;
@@ -524,6 +537,11 @@ fn click(
                     editor.status = "Escolha outro bloco como destino".into();
                     return;
                 }
+                if let Some(msg) = connect_blocked(editor.view.kinds[i]) {
+                    editor.status = msg.into();
+                    editor.tool = Tool::Select;
+                    return;
+                }
                 editor.exec(Command::Connect {
                     from: from.clone(),
                     to,
@@ -594,6 +612,7 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
         &outlines,
         Some(1.0),
     );
+    scene::draw_network(&mut gizmos, &NetworkView::of(editor.doc.model()));
     if let (Some(at), Tool::Place(kind)) = (editor.hover, &editor.tool) {
         let (h, _) = style::extents(style::shape_of(kind));
         let base = Vec3::from(layout::to_bevy(at));
@@ -836,7 +855,7 @@ pub fn edit_panels(
                             ui.horizontal(|ui| {
                                 ui.strong(&name);
                                 if ui.button("Ligar (C)").clicked() {
-                                    ed.tool = Tool::Connect(name.clone());
+                                    ed.start_connect(name.clone());
                                 }
                                 if ui.button("Excluir (Del)").clicked() {
                                     acts.push(Act::Delete);

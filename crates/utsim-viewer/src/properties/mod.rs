@@ -29,7 +29,17 @@ mod tests {
         name: "tudo",
         run: (stop_time: 500.0, warmup: 10.0, seed: 7, replications: 3),
         objects: [
-            (name: "src", output: RoundRobin, kind: Source(
+            (name: "emp1", position: (1.0, 2.0, 0.0), kind: Transporter(
+                speed: 2.5,
+                acceleration: 1.0,
+                deceleration: 1.5,
+                capacity: 2,
+                load_time: Const(0.5),
+                unload_time: Uniform(min: 0.1, max: 0.3),
+            )),
+            (name: "emp2", kind: Transporter(speed: 1.0)),
+            (name: "equipe", kind: Dispatcher(team: ["emp1", "emp2"], rule: Nearest)),
+            (name: "src", output: RoundRobin, transport: "equipe", kind: Source(
                 interarrival: Exp(mean: 2.0),
                 first_at_zero: true,
                 max_arrivals: 50,
@@ -49,6 +59,7 @@ mod tests {
                     capacity: 3,
                     setup: Uniform(min: 1.0, max: 2.0),
                     process: Weibull(shape: 1.5, scale: 4.0),
+                    operators: (team: "emp1", count: 2, setup: false, process: true),
                 ),
                 downtime: (mtbf: Exp(mean: 100.0), mttr: Triangular(min: 1.0, mode: 2.0, max: 5.0)),
                 shifts: (period: 1440.0, off: [
@@ -168,17 +179,30 @@ mod tests {
                     "on_blocked",
                 ],
                 ObjectKind::Queue { .. } => &["capacity", "discipline", "batch"],
-                ObjectKind::Processor { .. } => &["capacity", "setup", "process"],
+                ObjectKind::Processor { .. } => &["capacity", "setup", "process", "operators"],
                 ObjectKind::Combiner { .. } => &["components", "mode", "setup", "process"],
                 ObjectKind::Separator { .. } => &["mode", "process"],
                 ObjectKind::Sink => &[],
-                // Phase 4 kinds: fields added by the phase 4 UI front.
-                ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => &[],
+                ObjectKind::Transporter { .. } => &[
+                    "speed",
+                    "acceleration",
+                    "deceleration",
+                    "capacity",
+                    "load_time",
+                    "unload_time",
+                ],
+                ObjectKind::Dispatcher { .. } => &["team", "rule"],
             };
-            for k in expected.iter().chain(&["output", "downtime", "shifts"]) {
+            // Mobile resources have no ports: no output rule and no `transport`.
+            let common: &[&str] = if utsim_model::is_mobile(&obj.kind) {
+                &["downtime", "shifts"]
+            } else {
+                &["output", "downtime", "shifts", "transport"]
+            };
+            for k in expected.iter().chain(common) {
                 assert!(keys.contains(k), "{}: missing {k}", obj.name);
             }
-            assert_eq!(keys.len(), expected.len() + 3, "{}", obj.name);
+            assert_eq!(keys.len(), expected.len() + common.len(), "{}", obj.name);
         }
     }
 
@@ -241,6 +265,80 @@ mod tests {
             (run.stop_time, run.warmup, run.seed, run.replications),
             (123.5, 0.0, 99, 4)
         );
+    }
+
+    #[test]
+    fn mobile_resource_fields_land_in_the_model() {
+        let mut doc = kitchen_sink();
+        for (key, value) in [
+            ("emp1.speed", ron_text::float(3.5)),
+            ("emp1.acceleration", "None".to_string()),
+            ("emp1.deceleration", ron_text::float(0.75)),
+            ("emp1.capacity", "4".to_string()),
+            ("emp1.load_time", ron_text::dist(&Dist::Exp { mean: 2.0 })),
+            ("emp1.unload_time", ron_text::dist(&Dist::Const(0.0))),
+            ("equipe.team", ron_text::strings(&["emp2".to_string()])),
+            ("equipe.rule", "RoundRobin".to_string()),
+            (
+                "maq.operators",
+                ron_text::operators("equipe", 1, true, false),
+            ),
+            ("src.transport", ron_text::string("emp2")),
+        ] {
+            apply_set(&mut doc, key, &value);
+            let (name, f) = key.split_once('.').unwrap();
+            assert_eq!(field(&doc, name, f), value, "{key}");
+        }
+        let ObjectKind::Transporter {
+            speed,
+            acceleration,
+            deceleration,
+            capacity,
+            load_time,
+            unload_time,
+        } = object(&doc, "emp1").kind
+        else {
+            unreachable!()
+        };
+        assert_eq!(
+            (speed, acceleration, deceleration, capacity),
+            (3.5, None, Some(0.75), 4)
+        );
+        assert_eq!(load_time, Dist::Exp { mean: 2.0 });
+        assert_eq!(unload_time, Dist::Const(0.0));
+        let ObjectKind::Dispatcher { team, rule } = object(&doc, "equipe").kind else {
+            unreachable!()
+        };
+        assert_eq!(team, vec!["emp2".to_string()]);
+        assert_eq!(format!("{rule:?}"), "RoundRobin");
+        let ObjectKind::Processor { operators, .. } = object(&doc, "maq").kind else {
+            unreachable!()
+        };
+        let op = operators.unwrap();
+        assert_eq!(
+            (op.team.as_str(), op.count, op.setup, op.process),
+            ("equipe", 1, true, false)
+        );
+        assert_eq!(object(&doc, "src").transport.as_deref(), Some("emp2"));
+    }
+
+    #[test]
+    fn mobile_resources_are_listed_for_the_pickers() {
+        let doc = kitchen_sink();
+        let objects = &doc.model().objects;
+        assert_eq!(spec::mobile_names(objects), vec!["emp1", "emp2", "equipe"]);
+        assert_eq!(spec::transporter_names(objects), vec!["emp1", "emp2"]);
+        for (text, _) in spec::DISPATCH_RULES {
+            let mut d = kitchen_sink();
+            apply_set(&mut d, "equipe.rule", text);
+            assert_eq!(field(&d, "equipe", "rule"), text);
+        }
+        // Optional sections switch off with `None`.
+        let mut d = kitchen_sink();
+        apply_set(&mut d, "maq.operators", "None");
+        apply_set(&mut d, "src.transport", "None");
+        assert_eq!(field(&d, "maq", "operators"), "None");
+        assert_eq!(field(&d, "src", "transport"), "None");
     }
 
     #[test]

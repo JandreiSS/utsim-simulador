@@ -77,7 +77,7 @@ pub fn panel(
                 } else {
                     block.name.clone()
                 },
-                position: data.positions[i],
+                position: crate::scene::block_base_at(&data, i, pb.t).to_array(),
                 kind: block.kind.clone(),
                 selected: selection.0 == Some(i),
             }

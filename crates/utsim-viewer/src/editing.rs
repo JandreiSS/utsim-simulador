@@ -43,6 +43,66 @@ pub fn name_base(kind: &str) -> &'static str {
     }
 }
 
+/// Mobile resources are not wired by ports: the message shown when the user tries to
+/// connect one (`None` for ordinary blocks).
+pub fn connect_blocked(kind: &str) -> Option<&'static str> {
+    match kind {
+        "Transporter" | "Dispatcher" => Some(
+            "Transportadores e despachantes não usam ligações. Use o campo \"transport\" \
+             (nos objetos que enviam itens) ou \"operators\" (nos processos).",
+        ),
+        _ => None,
+    }
+}
+
+/// One edge of the path network, in Bevy space.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NetSeg {
+    pub a: [f32; 3],
+    pub b: [f32; 3],
+    pub two_way: bool,
+}
+
+/// The model's path network (nodes and edges) ready to draw on the ground.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct NetworkView {
+    pub nodes: Vec<[f32; 3]>,
+    pub segments: Vec<NetSeg>,
+}
+
+impl NetworkView {
+    /// Edges naming a missing node are skipped.
+    pub fn of(model: &Model) -> Self {
+        let Some(net) = &model.network else {
+            return Self::default();
+        };
+        let at = |name: &str| {
+            net.nodes
+                .iter()
+                .find(|n| n.name == name)
+                .map(|n| layout::to_bevy(n.position))
+        };
+        NetworkView {
+            nodes: net
+                .nodes
+                .iter()
+                .map(|n| layout::to_bevy(n.position))
+                .collect(),
+            segments: net
+                .edges
+                .iter()
+                .filter_map(|e| {
+                    Some(NetSeg {
+                        a: at(&e.from)?,
+                        b: at(&e.to)?,
+                        two_way: e.two_way,
+                    })
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Distance from point `p` to the segment `a`-`b`.
 pub fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     let (abx, aby) = (b[0] - a[0], b[1] - a[1]);
@@ -350,6 +410,34 @@ mod tests {
         );
         assert_eq!(tl.block_count(), 0);
         assert_eq!(tl.item_count(), 0);
+    }
+
+    #[test]
+    fn mobile_resources_refuse_port_connections_in_portuguese() {
+        for kind in ["Transporter", "Dispatcher"] {
+            let msg = connect_blocked(kind).unwrap();
+            assert!(msg.contains("transport") && msg.contains("operators"));
+        }
+        assert!(connect_blocked("Queue").is_none());
+    }
+
+    #[test]
+    fn network_view_maps_nodes_and_edges_to_bevy_space() {
+        let text = r#"Model(
+            name: "n",
+            run: (stop_time: 10.0),
+            objects: [(name: "s", kind: Sink)],
+            network: Some((
+                nodes: [(name: "a", position: (1.0, 2.0, 0.0)), (name: "b", position: (5.0, 2.0, 0.0))],
+                edges: [(from: "a", to: "b", two_way: false), (from: "a", to: "b")],
+            )),
+        )"#;
+        let view = NetworkView::of(&Model::parse(text).unwrap());
+        assert_eq!(view.nodes, vec![[1.0, 0.0, -2.0], [5.0, 0.0, -2.0]]);
+        assert_eq!(view.segments.len(), 2);
+        assert!(!view.segments[0].two_way && view.segments[1].two_way);
+        assert_eq!(view.segments[0].b, [5.0, 0.0, -2.0]);
+        assert_eq!(NetworkView::of(chain(true).model()), NetworkView::default());
     }
 
     #[test]
