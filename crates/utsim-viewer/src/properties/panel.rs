@@ -1171,8 +1171,57 @@ impl Editor<'_> {
                 self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
                 self.bool_field(ui, "Voltar à base quando ocioso", "home", *home);
             }
-            ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => {
-                ui.weak("Edição deste tipo no painel: em construção (fase 5).");
+            ObjectKind::Conveyor {
+                length,
+                speed,
+                item_length,
+                accumulating,
+            } => {
+                self.float_field(ui, "Comprimento", "length", *length);
+                self.float_field(ui, "Velocidade", "speed", *speed);
+                self.float_field(ui, "Comprimento por item", "item_length", *item_length);
+                self.bool_field(
+                    ui,
+                    "Acumula itens quando a saída bloqueia",
+                    "accumulating",
+                    *accumulating,
+                );
+                ui.weak(format!(
+                    "Capacidade: {} itens",
+                    if item_length.is_finite() && *item_length > 0.0 && length.is_finite() {
+                        (length / item_length).floor().max(0.0) as u64
+                    } else {
+                        0
+                    }
+                ));
+            }
+            ObjectKind::Rack {
+                bays,
+                levels,
+                dwell,
+                placement,
+                bay_width,
+                level_height,
+            } => {
+                self.uint_field(ui, "Colunas", "bays", *bays, 1);
+                self.uint_field(ui, "Níveis", "levels", *levels, 1);
+                self.opt_dist_field(
+                    ui,
+                    "Permanência mínima",
+                    "dwell",
+                    dwell.as_ref(),
+                    Dist::Const(10.0),
+                );
+                self.choice_field(
+                    ui,
+                    "Regra de ocupação",
+                    "placement",
+                    &ron::debug(placement),
+                    &spec::RACK_PLACEMENTS,
+                );
+                self.float_field(ui, "Largura da coluna", "bay_width", *bay_width);
+                self.float_field(ui, "Altura do nível", "level_height", *level_height);
+                ui.weak(format!("Capacidade: {} posições", bays * levels));
             }
             ObjectKind::Dispatcher { team, rule } => {
                 self.team_field(ui, "team", team);

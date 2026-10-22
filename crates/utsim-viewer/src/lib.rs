@@ -7,6 +7,8 @@
 //! never driven by the viewer.
 
 pub mod editing;
+pub mod geometry;
+pub mod handling;
 pub mod layout;
 pub mod properties;
 pub mod roteiro;

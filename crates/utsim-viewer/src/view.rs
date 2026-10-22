@@ -2,8 +2,6 @@
 //! decluttering in screen space, connection clipping against block footprints and
 //! dashed segments. Vectors are plain `[f32; 3]` in Bevy space (Y up).
 
-use crate::style;
-
 pub type V3 = [f32; 3];
 
 /// Height above the ground at which connection arrows are drawn.
@@ -25,7 +23,7 @@ fn cross(a: V3, b: V3) -> V3 {
 
 /// Axis-aligned bounds of the blocks (base position plus footprint and height) and of
 /// extra points (path network nodes). `None` when there is nothing to frame.
-pub fn scene_bounds(positions: &[V3], kinds: &[&str], points: &[V3]) -> Option<(V3, V3)> {
+pub fn scene_bounds(positions: &[V3], halves: &[V3], points: &[V3]) -> Option<(V3, V3)> {
     let mut min = [f32::MAX; 3];
     let mut max = [f32::MIN; 3];
     let mut any = false;
@@ -36,8 +34,7 @@ pub fn scene_bounds(positions: &[V3], kinds: &[&str], points: &[V3]) -> Option<(
             max[k] = max[k].max(p[k]);
         }
     };
-    for (p, kind) in positions.iter().zip(kinds) {
-        let (h, _) = style::extents(style::shape_of(kind));
+    for (p, h) in positions.iter().zip(halves) {
         add([p[0] - h[0], p[1], p[2] - h[2]]);
         add([p[0] + h[0], p[1] + 2.0 * h[1], p[2] + h[2]]);
     }
@@ -208,14 +205,20 @@ pub fn dashes(start: V3, end: V3, dash: f32, gap: f32) -> Vec<(V3, V3)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::style;
 
     #[test]
     fn bounds_include_block_extents_and_extra_points() {
-        let (min, max) =
-            scene_bounds(&[[0.0; 3], [10.0, 0.0, 0.0]], &["Processor", "Sink"], &[]).unwrap();
+        let half = |kind: &str| style::extents(style::shape_of(kind)).0;
+        let (min, max) = scene_bounds(
+            &[[0.0; 3], [10.0, 0.0, 0.0]],
+            &[half("Processor"), half("Sink")],
+            &[],
+        )
+        .unwrap();
         assert!(min[0] < 0.0 && max[0] > 10.0);
         assert!(max[1] > 0.0);
-        let (min, max) = scene_bounds(&[[0.0; 3]], &["Sink"], &[[0.0, 0.0, -30.0]]).unwrap();
+        let (min, max) = scene_bounds(&[[0.0; 3]], &[half("Sink")], &[[0.0, 0.0, -30.0]]).unwrap();
         assert_eq!(min[2], -30.0);
         assert!(max[2] > 0.0);
         assert!(scene_bounds(&[], &[], &[]).is_none());

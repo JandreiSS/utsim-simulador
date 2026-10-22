@@ -131,14 +131,14 @@ pub fn panel(
         .iter()
         .enumerate()
         .map(|(i, block)| {
-            let shape = style::shape_of(&block.kind);
+            let geom = &data.geoms[i];
             let content = tl.block_content(i, pb.t);
-            let hidden = style::hidden_items(shape, content);
+            let hidden = geom.hidden_items(content);
             let received = (block.kind == "Sink").then(|| tl.block_received(i, pb.t));
             Label {
                 text: style::label_text(&block.name, content, hidden, received),
                 position: crate::scene::block_base_at(&data, i, pb.t).to_array(),
-                height: style::top_of_stack(shape, content),
+                height: geom.label_height(content),
                 selected: selection.0 == Some(i),
             }
         })

@@ -73,6 +73,20 @@ mod tests {
                 process: Normal(mean: 5.0, sd: 1.0),
             )),
             (name: "sep", kind: Separator(mode: Split(3), process: Poisson(mean: 2.0))),
+            (name: "esteira", kind: Conveyor(
+                length: 12.5,
+                speed: 0.75,
+                item_length: 0.5,
+                accumulating: false,
+            )),
+            (name: "estante", kind: Rack(
+                bays: 5,
+                levels: 3,
+                dwell: Uniform(min: 1.0, max: 2.0),
+                placement: Random,
+                bay_width: 1.2,
+                level_height: 1.5,
+            )),
             (name: "fim", kind: Sink),
         ],
         connections: [],
@@ -193,8 +207,15 @@ mod tests {
                     "home",
                 ],
                 ObjectKind::Dispatcher { .. } => &["team", "rule"],
-                // Phase 5 kinds: fields added by the phase 5 viewer front.
-                ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => &[],
+                ObjectKind::Conveyor { .. } => &["length", "speed", "item_length", "accumulating"],
+                ObjectKind::Rack { .. } => &[
+                    "bays",
+                    "levels",
+                    "dwell",
+                    "placement",
+                    "bay_width",
+                    "level_height",
+                ],
             };
             // Mobile resources have no ports: no output rule and no `transport`.
             let common: &[&str] = if utsim_model::is_mobile(&obj.kind) {
@@ -324,6 +345,86 @@ mod tests {
             ("equipe", 1, true, false)
         );
         assert_eq!(object(&doc, "src").transport.as_deref(), Some("emp2"));
+    }
+
+    #[test]
+    fn conveyor_and_rack_fields_land_in_the_model() {
+        let mut doc = kitchen_sink();
+        for (key, value) in [
+            ("esteira.length", ron_text::float(20.0)),
+            ("esteira.speed", ron_text::float(1.25)),
+            ("esteira.item_length", ron_text::float(0.8)),
+            ("esteira.accumulating", "true".to_string()),
+            ("estante.bays", "8".to_string()),
+            ("estante.levels", "2".to_string()),
+            ("estante.dwell", "None".to_string()),
+            ("estante.placement", "FirstFree".to_string()),
+            ("estante.bay_width", ron_text::float(2.5)),
+            ("estante.level_height", ron_text::float(0.75)),
+        ] {
+            apply_set(&mut doc, key, &value);
+            let (name, f) = key.split_once('.').unwrap();
+            assert_eq!(field(&doc, name, f), value, "{key}");
+        }
+        let ObjectKind::Conveyor {
+            length,
+            speed,
+            item_length,
+            accumulating,
+        } = object(&doc, "esteira").kind
+        else {
+            unreachable!()
+        };
+        assert_eq!(
+            (length, speed, item_length, accumulating),
+            (20.0, 1.25, 0.8, true)
+        );
+        let ObjectKind::Rack {
+            bays,
+            levels,
+            dwell,
+            placement,
+            bay_width,
+            level_height,
+        } = object(&doc, "estante").kind
+        else {
+            unreachable!()
+        };
+        assert_eq!((bays, levels, dwell), (8, 2, None));
+        assert_eq!(format!("{placement:?}"), "FirstFree");
+        assert_eq!((bay_width, level_height), (2.5, 0.75));
+        // The dwell switches back on with a distribution.
+        let d = Dist::Exp { mean: 5.0 };
+        apply_set(
+            &mut doc,
+            "estante.dwell",
+            &ron_text::option(&Some(d.clone()), ron_text::dist),
+        );
+        assert_eq!(
+            field(&doc, "estante", "dwell"),
+            ron_text::option(&Some(d), ron_text::dist)
+        );
+        for (text, _) in spec::RACK_PLACEMENTS {
+            apply_set(&mut doc, "estante.placement", text);
+            assert_eq!(field(&doc, "estante", "placement"), text);
+        }
+        // Values the model rejects are reported, not applied.
+        let before = doc.model().clone();
+        assert!(
+            doc.apply(Command::Set {
+                key: "estante.bays".into(),
+                value: "-3".into(),
+            })
+            .is_err()
+        );
+        assert_eq!(doc.model(), &before);
+    }
+
+    #[test]
+    fn drawing_a_conveyor_and_a_rack_emits_nothing() {
+        let doc = kitchen_sink();
+        assert_eq!(render(&doc, "esteira"), Vec::new());
+        assert_eq!(render(&doc, "estante"), Vec::new());
     }
 
     #[test]

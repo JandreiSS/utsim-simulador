@@ -117,12 +117,12 @@ pub fn frame_scene(
     let (min, max) = match editor.mode {
         Mode::Edit => {
             let net = NetworkView::of(editor.doc.model());
-            let kinds: Vec<&str> = editor.view.kinds.clone();
-            view::scene_bounds(&editor.view.positions, &kinds, &net.nodes)
+            let halves: Vec<[f32; 3]> = editor.view.geoms.iter().map(|g| g.half).collect();
+            view::scene_bounds(&editor.view.positions, &halves, &net.nodes)
         }
         Mode::Sim => {
-            let kinds: Vec<&str> = data.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
-            view::scene_bounds(&data.positions, &kinds, &data.network.nodes)
+            let halves: Vec<[f32; 3]> = data.geoms.iter().map(|g| g.half).collect();
+            view::scene_bounds(&data.positions, &halves, &data.network.nodes)
         }
     }
     .unwrap_or(([0.0; 3], [0.0; 3]));
