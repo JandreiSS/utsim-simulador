@@ -6,6 +6,8 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiContexts;
+use utsim_viewer::editing::NetworkView;
+use utsim_viewer::layout;
 use utsim_viewer::style::{self, Shape};
 use utsim_viewer::timeline::ItemPos;
 
@@ -44,6 +46,14 @@ fn block_base(data: &Data, b: usize) -> Vec3 {
     Vec3::from(data.positions[b])
 }
 
+/// Base position of block `b` at time `t`: its layout position, or, for a mobile
+/// resource that has started travelling, where the trace says it is.
+pub fn block_base_at(data: &Data, b: usize, t: f64) -> Vec3 {
+    data.timeline
+        .carrier_pos(b, t)
+        .map_or_else(|| block_base(data, b), |p| Vec3::from(layout::to_bevy(p)))
+}
+
 fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
     let (half, _) = style::extents(shape);
     match shape {
@@ -58,6 +68,8 @@ fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
             height: 1.0,
         }),
         Shape::Cylinder => meshes.add(Cylinder::new(0.85, 1.0)),
+        Shape::Vehicle => meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0)),
+        Shape::Flag => meshes.add(Cone::new(0.25, half[1] * 2.0)),
     }
 }
 
@@ -121,6 +133,8 @@ pub fn sync_blocks(
             });
             mats.handles.push(material.clone());
             mats.last.push(None);
+            let mast = (shape == Shape::Vehicle)
+                .then(|| (meshes.add(Cuboid::new(0.12, 0.9, 0.12)), material.clone()));
             let id = commands
                 .spawn((
                     Mesh3d(block_mesh(shape, &mut meshes)),
@@ -133,6 +147,16 @@ pub fn sync_blocks(
                     BlockVisual,
                 ))
                 .id();
+            if let Some((mesh, material)) = mast {
+                // The mast marks a transporter (a lift mast at the rear of the body).
+                commands.entity(id).with_children(|parent| {
+                    parent.spawn((
+                        Mesh3d(mesh),
+                        MeshMaterial3d(material),
+                        Transform::from_xyz(-0.3, 0.55, 0.0),
+                    ));
+                });
+            }
             mats.entities.push(id);
         }
         return;
@@ -189,6 +213,25 @@ pub fn update_block_colors(
     }
 }
 
+/// Moves the mobile resources to where the trace says they are at the current time
+/// (runs after `sync_blocks`, which resets every block to its layout position).
+pub fn update_carriers(
+    data: Res<Data>,
+    pb: Res<Playback>,
+    mats: Res<BlockMaterials>,
+    mut transforms: Query<&mut Transform, With<BlockVisual>>,
+) {
+    for (i, &e) in mats.entities.iter().enumerate() {
+        if i >= data.replay.blocks.len() || !data.timeline.is_mobile(i) {
+            continue;
+        }
+        if let Ok(mut tr) = transforms.get_mut(e) {
+            let (half, _) = style::extents(style::shape_of(&data.replay.blocks[i].kind));
+            tr.translation = block_base_at(&data, i, pb.t) + Vec3::Y * half[1];
+        }
+    }
+}
+
 pub fn update_items(
     mut commands: Commands,
     data: Res<Data>,
@@ -218,8 +261,8 @@ pub fn update_items(
             {
                 let s = progress as f32;
                 let s = s * s * (3.0 - 2.0 * s);
-                let a = block_base(&data, from) + Vec3::Y * 1.2;
-                let b = block_base(&data, to) + Vec3::Y * 1.2;
+                let a = block_base_at(&data, from, t) + Vec3::Y * 1.2;
+                let b = block_base_at(&data, to, t) + Vec3::Y * 1.2;
                 let arc = Vec3::Y * (PI * s).sin() * 0.7;
                 transit.push((i, a.lerp(b, s) + arc));
             }
@@ -230,7 +273,8 @@ pub fn update_items(
     for (b, list) in &mut resting {
         list.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)));
         let shape = style::shape_of(&data.replay.blocks[*b].kind);
-        let base = block_base(&data, *b);
+        // Items inside a transporter ride on it (stacked on its body).
+        let base = block_base_at(&data, *b, t);
         for (slot, &(_, i)) in list.iter().enumerate() {
             let off = Vec3::from(style::slot_offset(shape, slot));
             placed.push((i, base + off, 1.0));
@@ -288,8 +332,12 @@ pub fn update_items(
 }
 
 /// Connections, ground grid and selection outline in `Simular`.
-pub fn draw_sim(data: Res<Data>, selection: Res<Selection>, mut gizmos: Gizmos) {
+pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, mut gizmos: Gizmos) {
     let kinds: Vec<&str> = data.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
+    // Mobile resources are outlined where they are now.
+    let positions: Vec<[f32; 3]> = (0..data.positions.len())
+        .map(|b| block_base_at(&data, b, pb.t).to_array())
+        .collect();
     let outlines: Vec<(usize, Color)> = selection
         .0
         .filter(|s| *s < data.positions.len())
@@ -298,12 +346,35 @@ pub fn draw_sim(data: Res<Data>, selection: Res<Selection>, mut gizmos: Gizmos) 
         .collect();
     draw_world(
         &mut gizmos,
-        &data.positions,
+        &positions,
         &kinds,
         &data.replay.connections,
         &outlines,
         None,
     );
+    draw_network(&mut gizmos, &data.network);
+}
+
+/// The path network on the ground: nodes as small markers, edges as thin lines
+/// (arrows for one-way edges).
+pub fn draw_network(gizmos: &mut Gizmos, network: &NetworkView) {
+    let color = Color::srgb(0.95, 0.75, 0.25);
+    let lift = Vec3::Y * 0.03;
+    for seg in &network.segments {
+        let (a, b) = (Vec3::from(seg.a) + lift, Vec3::from(seg.b) + lift);
+        if seg.two_way {
+            gizmos.line(a, b, color);
+        } else {
+            gizmos.arrow(a, b, color).with_tip_length(0.4);
+        }
+    }
+    for n in &network.nodes {
+        gizmos.sphere(
+            Isometry3d::from_translation(Vec3::from(*n) + lift),
+            0.12,
+            color,
+        );
+    }
 }
 
 /// Draws the ground grid (`fixed_step` forces its spacing, else it adapts to the
@@ -400,11 +471,13 @@ pub fn connection_line(
 }
 
 /// Click (without dragging) on a block selects it; click on empty ground clears.
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
 pub fn pick(
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
     data: Res<Data>,
+    pb: Res<Playback>,
     mut selection: ResMut<Selection>,
     mut press: Local<Option<Vec2>>,
     mut contexts: EguiContexts,
@@ -432,7 +505,7 @@ pub fn pick(
     let mut best: Option<(f32, usize)> = None;
     for (i, block) in data.replay.blocks.iter().enumerate() {
         let (h, _) = style::extents(style::shape_of(&block.kind));
-        let center = block_base(&data, i) + Vec3::Y * h[1];
+        let center = block_base_at(&data, i, pb.t) + Vec3::Y * h[1];
         if let Some(d) = ray_box(
             ray.origin,
             *ray.direction,

@@ -412,6 +412,186 @@ impl Editor<'_> {
         }
     }
 
+    /// A number that can be switched off (`None`).
+    fn opt_float_field(
+        &mut self,
+        ui: &mut Ui,
+        label: &str,
+        field: &str,
+        current: Option<f64>,
+        default: f64,
+    ) {
+        ui.horizontal(|ui| {
+            let mut on = current.is_some();
+            if ui.checkbox(&mut on, label).changed() {
+                self.set(
+                    field,
+                    if on {
+                        ron::float(default)
+                    } else {
+                        "None".into()
+                    },
+                );
+            }
+            if let Some(mut v) = current {
+                if float(ui, self.id(field), &mut v) {
+                    self.set(field, ron::float(v));
+                }
+            } else {
+                ui.weak("sem limite (velocidade constante)");
+            }
+        });
+    }
+
+    /// Dispatcher team: one checkbox per transporter of the model. Members that no
+    /// longer exist are listed in red so they can be removed.
+    fn team_field(&mut self, ui: &mut Ui, field: &str, current: &[String]) {
+        let objects = &self.doc.model().objects;
+        let candidates: Vec<String> = spec::transporter_names(objects)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let mut team = current.to_vec();
+        let mut changed = false;
+        ui.label("Equipe (transportadores do modelo):");
+        if candidates.is_empty() {
+            ui.weak("Nenhum transportador no modelo. Crie um na paleta.");
+        }
+        for name in &candidates {
+            let mut on = team.contains(name);
+            if ui.checkbox(&mut on, name).changed() {
+                if on {
+                    team.push(name.clone());
+                } else {
+                    team.retain(|m| m != name);
+                }
+                changed = true;
+            }
+        }
+        for missing in current.iter().filter(|m| !candidates.contains(m)) {
+            ui.horizontal(|ui| {
+                ui.colored_label(RED, format!("\"{missing}\" não é um transportador"));
+                if ui.small_button("remover").clicked() {
+                    team.retain(|m| m != missing);
+                    changed = true;
+                }
+            });
+        }
+        if team.is_empty() {
+            ui.colored_label(RED, "A equipe não pode ficar vazia.");
+        }
+        if changed {
+            self.set(field, ron::strings(&team));
+        }
+    }
+
+    /// Processor `operators`: team (transporter or dispatcher), count and phases.
+    fn operators_field(
+        &mut self,
+        ui: &mut Ui,
+        field: &str,
+        current: Option<(String, usize, bool, bool)>,
+    ) {
+        let id = self.id(field);
+        let candidates: Vec<String> = spec::mobile_names(&self.doc.model().objects)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let mut on = current.is_some();
+        if ui
+            .add_enabled(
+                on || !candidates.is_empty(),
+                egui::Checkbox::new(&mut on, "Precisa de operadores"),
+            )
+            .changed()
+        {
+            let text = if on {
+                ron::operators(&candidates[0], 1, true, true)
+            } else {
+                "None".into()
+            };
+            self.set(field, text);
+        }
+        let Some((team, mut count, mut setup, mut process)) = current else {
+            if candidates.is_empty() {
+                ui.weak("Crie um Transportador ou Despachante para usar como equipe.");
+            }
+            return;
+        };
+        let mut new_team = team.clone();
+        let mut changed = false;
+        ui.indent(id, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("equipe");
+                egui::ComboBox::from_id_salt(id.with("team"))
+                    .selected_text(if team.is_empty() { "(nenhuma)" } else { &team })
+                    .show_ui(ui, |ui| {
+                        for name in &candidates {
+                            if ui.selectable_label(*name == team, name).clicked() {
+                                new_team = name.clone();
+                                changed = true;
+                            }
+                        }
+                    });
+            });
+            if !candidates.contains(&team) {
+                ui.colored_label(
+                    RED,
+                    format!("\"{team}\" não é um transportador nem despachante"),
+                );
+            }
+            ui.horizontal(|ui| {
+                ui.label("quantidade");
+                changed |= num(ui, id.with("count"), &mut count, 0.1, 1);
+            });
+            changed |= ui.checkbox(&mut setup, "durante a preparação").changed();
+            changed |= ui
+                .checkbox(&mut process, "durante o processamento")
+                .changed();
+        });
+        if changed {
+            self.set(field, ron::operators(&new_team, count, setup, process));
+        }
+    }
+
+    /// `transport`: which transporter/dispatcher carries items out of this object.
+    fn transport_field(&mut self, ui: &mut Ui, field: &str, current: Option<&str>) {
+        let candidates: Vec<String> = spec::mobile_names(&self.doc.model().objects)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        ui.horizontal(|ui| {
+            ui.label("Transporte de saída");
+            egui::ComboBox::from_id_salt(self.id(field))
+                .selected_text(current.unwrap_or("nenhum"))
+                .show_ui(ui, |ui| {
+                    if ui.selectable_label(current.is_none(), "nenhum").clicked() {
+                        self.set(field, "None".into());
+                    }
+                    for name in &candidates {
+                        if ui
+                            .selectable_label(current == Some(name.as_str()), name)
+                            .clicked()
+                        {
+                            self.set(field, ron::string(name));
+                        }
+                    }
+                });
+        });
+        match current {
+            None => {
+                ui.weak("Os itens passam direto ao próximo bloco.");
+            }
+            Some(t) if !candidates.iter().any(|c| c == t) => {
+                ui.colored_label(
+                    RED,
+                    format!("\"{t}\" não é um transportador nem despachante"),
+                );
+            }
+            Some(_) => {}
+        }
+    }
+
     /// Combo over `(ron text, label)` options; `current` is the RON text of the value.
     fn choice_field(
         &mut self,
@@ -883,7 +1063,7 @@ impl Editor<'_> {
                 capacity,
                 setup,
                 process,
-                ..
+                operators,
             } => {
                 self.uint_field(ui, "Capacidade", "capacity", *capacity, 1);
                 self.opt_dist_field(
@@ -894,6 +1074,15 @@ impl Editor<'_> {
                     Dist::Const(1.0),
                 );
                 self.dist_field(ui, "Tempo de processamento", "process", process);
+                ui.separator();
+                ui.strong("Operadores");
+                self.operators_field(
+                    ui,
+                    "operators",
+                    operators
+                        .as_ref()
+                        .map(|o| (o.team.clone(), o.count, o.setup, o.process)),
+                );
             }
             ObjectKind::Combiner {
                 components,
@@ -965,8 +1154,30 @@ impl Editor<'_> {
             ObjectKind::Sink => {
                 ui.weak("A saída não tem parâmetros.");
             }
-            ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => {
-                ui.weak("Edição deste tipo no painel: em construção (fase 4).");
+            ObjectKind::Transporter {
+                speed,
+                acceleration,
+                deceleration,
+                capacity,
+                load_time,
+                unload_time,
+            } => {
+                self.float_field(ui, "Velocidade máxima", "speed", *speed);
+                self.opt_float_field(ui, "Aceleração", "acceleration", *acceleration, 1.0);
+                self.opt_float_field(ui, "Desaceleração", "deceleration", *deceleration, 1.0);
+                self.uint_field(ui, "Capacidade (itens)", "capacity", *capacity, 1);
+                self.dist_field(ui, "Tempo de carga", "load_time", load_time);
+                self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
+            }
+            ObjectKind::Dispatcher { team, rule } => {
+                self.team_field(ui, "team", team);
+                self.choice_field(
+                    ui,
+                    "Regra de escolha",
+                    "rule",
+                    &ron::debug(rule),
+                    &spec::DISPATCH_RULES,
+                );
             }
         }
     }
@@ -1032,8 +1243,12 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
     };
     editor.kind_fields(ui, &obj.kind);
     ui.separator();
-    editor.output_field(ui, obj);
-    ui.separator();
+    if !utsim_model::is_mobile(&obj.kind) {
+        editor.output_field(ui, obj);
+        ui.separator();
+        editor.transport_field(ui, "transport", obj.transport.as_deref());
+        ui.separator();
+    }
     editor.downtime_field(ui, obj.downtime.as_ref());
     editor.shifts_field(ui, obj.shifts.as_ref());
     editor.out

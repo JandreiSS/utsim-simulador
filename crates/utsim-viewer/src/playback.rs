@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 use utsim_model::replay::Replay;
+use utsim_viewer::editing::NetworkView;
 use utsim_viewer::layout;
 use utsim_viewer::timeline::{Timeline, TransitSetting};
 
@@ -15,6 +16,8 @@ pub struct Data {
     pub positions: Vec<[f32; 3]>,
     /// End of the animation, in simulation time.
     pub end: f64,
+    /// Path network of the simulated model (empty when it has none or for a `.json` replay).
+    pub network: NetworkView,
 }
 
 impl Data {
@@ -34,7 +37,14 @@ impl Data {
             timeline,
             positions,
             end,
+            network: NetworkView::default(),
         }
+    }
+
+    /// Adds the model's path network to be drawn on the ground.
+    pub fn with_network(mut self, network: NetworkView) -> Self {
+        self.network = network;
+        self
     }
 }
 

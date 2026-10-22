@@ -26,6 +26,14 @@ pub enum Widget {
     Downtime,
     Shifts,
     Batch,
+    /// Number that can be switched off (`None`).
+    OptFloat,
+    /// Names of the transporters in a dispatcher's team.
+    Team,
+    /// Processor operators section (`None` or a team, count and phases).
+    Operators,
+    /// Transporter/dispatcher that carries items out of the object (`None` = instant).
+    TransportRef,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +81,7 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("capacity", "Capacidade", UInt),
             spec("setup", "Preparação (setup)", OptDist),
             spec("process", "Tempo de processamento", Dist),
+            spec("operators", "Operadores", Operators),
         ],
         ObjectKind::Combiner { .. } => vec![
             spec("components", "Componentes por entrada", Components),
@@ -85,26 +94,68 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("process", "Tempo de processamento", Dist),
         ],
         ObjectKind::Sink => Vec::new(),
-        // Phase 4 kinds: edited by the phase 4 UI front.
-        ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => Vec::new(),
+        ObjectKind::Transporter { .. } => vec![
+            spec("speed", "Velocidade máxima", Float),
+            spec("acceleration", "Aceleração", OptFloat),
+            spec("deceleration", "Desaceleração", OptFloat),
+            spec("capacity", "Capacidade (itens)", UInt),
+            spec("load_time", "Tempo de carga", Dist),
+            spec("unload_time", "Tempo de descarga", Dist),
+        ],
+        ObjectKind::Dispatcher { .. } => vec![
+            spec("team", "Equipe", Team),
+            spec("rule", "Regra de escolha", Choice),
+        ],
     }
 }
 
-/// Fields every object has.
-pub fn common_fields() -> Vec<FieldSpec> {
-    vec![
-        spec("output", "Regra de saída", Widget::Output),
-        spec("downtime", "Quebras", Widget::Downtime),
-        spec("shifts", "Turnos", Widget::Shifts),
-    ]
+/// Fields every object has. Mobile resources (transporters, dispatchers) are not
+/// wired by ports, so they have no output rule and no `transport`.
+pub fn common_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
+    let mut fields = Vec::new();
+    if !utsim_model::is_mobile(kind) {
+        fields.push(spec("output", "Regra de saída", Widget::Output));
+    }
+    fields.push(spec("downtime", "Quebras", Widget::Downtime));
+    fields.push(spec("shifts", "Turnos", Widget::Shifts));
+    if !utsim_model::is_mobile(kind) {
+        fields.push(spec("transport", "Transporte", Widget::TransportRef));
+    }
+    fields
 }
 
 /// Every editable field of an object, kind-specific first.
 pub fn all_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
     let mut fields = kind_fields(kind);
-    fields.extend(common_fields());
+    fields.extend(common_fields(kind));
     fields
 }
+
+/// Names of the objects an object can point to with `transport`/`operators.team`:
+/// every Transporter or Dispatcher of the model, in model order.
+pub fn mobile_names(objects: &[ObjectDef]) -> Vec<&str> {
+    objects
+        .iter()
+        .filter(|o| utsim_model::is_mobile(&o.kind))
+        .map(|o| o.name.as_str())
+        .collect()
+}
+
+/// Names of the Transporters of the model (candidates for a dispatcher's team).
+pub fn transporter_names(objects: &[ObjectDef]) -> Vec<&str> {
+    objects
+        .iter()
+        .filter(|o| matches!(o.kind, ObjectKind::Transporter { .. }))
+        .map(|o| o.name.as_str())
+        .collect()
+}
+
+/// Dispatch rules as `(ron text, Portuguese label)`.
+pub const DISPATCH_RULES: [(&str, &str); 3] = [
+    ("FirstAvailable", "Primeiro livre"),
+    ("RoundRobin", "Rodízio"),
+    ("Nearest", "Mais próximo"),
+];
 
 /// Fields of the `run` section that scenario patches (and thus `Set`) understand.
 pub fn run_fields() -> Vec<FieldSpec> {
@@ -132,9 +183,25 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         "output" => return Some(ron::output(&obj.output)),
         "downtime" => return Some(ron::option(&obj.downtime, ron::downtime)),
         "shifts" => return Some(ron::option(&obj.shifts, ron::shifts)),
+        "transport" => return Some(ron::option(&obj.transport, |t| ron::string(t))),
         _ => {}
     }
     Some(match (&obj.kind, key) {
+        (ObjectKind::Processor { operators, .. }, "operators") => ron::option(operators, |o| {
+            ron::operators(&o.team, o.count, o.setup, o.process)
+        }),
+        (ObjectKind::Transporter { speed, .. }, "speed") => ron::float(*speed),
+        (ObjectKind::Transporter { acceleration, .. }, "acceleration") => {
+            ron::option(acceleration, |v| ron::float(*v))
+        }
+        (ObjectKind::Transporter { deceleration, .. }, "deceleration") => {
+            ron::option(deceleration, |v| ron::float(*v))
+        }
+        (ObjectKind::Transporter { capacity, .. }, "capacity") => capacity.to_string(),
+        (ObjectKind::Transporter { load_time, .. }, "load_time") => ron::dist(load_time),
+        (ObjectKind::Transporter { unload_time, .. }, "unload_time") => ron::dist(unload_time),
+        (ObjectKind::Dispatcher { team, .. }, "team") => ron::strings(team),
+        (ObjectKind::Dispatcher { rule, .. }, "rule") => ron::debug(rule),
         (ObjectKind::Source { interarrival, .. }, "interarrival") => ron::dist(interarrival),
         (ObjectKind::Source { first_at_zero, .. }, "first_at_zero") => first_at_zero.to_string(),
         (ObjectKind::Source { max_arrivals, .. }, "max_arrivals") => {
