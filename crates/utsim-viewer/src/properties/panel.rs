@@ -1161,6 +1161,7 @@ impl Editor<'_> {
                 capacity,
                 load_time,
                 unload_time,
+                home,
             } => {
                 self.float_field(ui, "Velocidade máxima", "speed", *speed);
                 self.opt_float_field(ui, "Aceleração", "acceleration", *acceleration, 1.0);
@@ -1168,6 +1169,7 @@ impl Editor<'_> {
                 self.uint_field(ui, "Capacidade (itens)", "capacity", *capacity, 1);
                 self.dist_field(ui, "Tempo de carga", "load_time", load_time);
                 self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
+                self.bool_field(ui, "Voltar à base quando ocioso", "home", *home);
             }
             ObjectKind::Dispatcher { team, rule } => {
                 self.team_field(ui, "team", team);

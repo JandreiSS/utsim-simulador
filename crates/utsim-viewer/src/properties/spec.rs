@@ -101,6 +101,7 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("capacity", "Capacidade (itens)", UInt),
             spec("load_time", "Tempo de carga", Dist),
             spec("unload_time", "Tempo de descarga", Dist),
+            spec("home", "Voltar à base quando ocioso", Bool),
         ],
         ObjectKind::Dispatcher { .. } => vec![
             spec("team", "Equipe", Team),
@@ -200,6 +201,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Transporter { capacity, .. }, "capacity") => capacity.to_string(),
         (ObjectKind::Transporter { load_time, .. }, "load_time") => ron::dist(load_time),
         (ObjectKind::Transporter { unload_time, .. }, "unload_time") => ron::dist(unload_time),
+        (ObjectKind::Transporter { home, .. }, "home") => home.to_string(),
         (ObjectKind::Dispatcher { team, .. }, "team") => ron::strings(team),
         (ObjectKind::Dispatcher { rule, .. }, "rule") => ron::debug(rule),
         (ObjectKind::Source { interarrival, .. }, "interarrival") => ron::dist(interarrival),

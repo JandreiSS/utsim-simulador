@@ -190,6 +190,7 @@ mod tests {
                     "capacity",
                     "load_time",
                     "unload_time",
+                    "home",
                 ],
                 ObjectKind::Dispatcher { .. } => &["team", "rule"],
             };
@@ -296,6 +297,7 @@ mod tests {
             capacity,
             load_time,
             unload_time,
+            ..
         } = object(&doc, "emp1").kind
         else {
             unreachable!()
