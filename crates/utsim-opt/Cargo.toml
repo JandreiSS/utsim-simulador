@@ -11,3 +11,4 @@ utsim-core.workspace = true
 utsim-model.workspace = true
 serde.workspace = true
 ron.workspace = true
+rand.workspace = true
