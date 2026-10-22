@@ -148,7 +148,10 @@ mod tests {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let stem = path.file_stem().unwrap().to_string_lossy().to_string();
-            if path.extension().is_some_and(|e| e == "ron") && !stem.starts_with("experimento") {
+            if path.extension().is_some_and(|e| e == "ron")
+                && !stem.starts_with("experimento")
+                && !stem.starts_with("otimizacao")
+            {
                 docs.push((stem, Document::open(&path).unwrap()));
             }
         }

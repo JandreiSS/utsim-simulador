@@ -1,0 +1,25 @@
+// Problema de otimização: quantos servidores e qual capacidade de fila?
+// Uso: utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
+// Todos os pontos usam as mesmas sementes (números aleatórios comuns), então a
+// comparação entre eles é pareada.
+OptProblem(
+    name: "Dimensionamento de servidores",
+    model: "servidores.ron",     // caminho relativo a este arquivo
+    replications: 5,
+    variables: [
+        (key: "maquina.capacity", domain: Integer(min: 2, max: 6)),
+        (key: "fila.capacity",    domain: Integer(min: 2, max: 10, step: 4)),
+    ],
+    objective: (
+        sense: Minimize,
+        // 40 por unidade de tempo no sistema; 10 por servidor e 0,5 por vaga na fila
+        terms: [("saida.time_in_system.mean", 40.0)],
+        costs: [("maquina.capacity", 10.0), ("fila.capacity", 0.5)],
+    ),
+    constraints: [
+        // média da fração de tempo ocupado não pode passar de 95%
+        (metric: "maquina.state.processing", max: 0.95),
+    ],
+    algorithm: Grid,
+    budget: 50,
+)
