@@ -18,7 +18,7 @@ use utsim_viewer::editing::{
     name_base, nearest_segment, renamed, run_model,
 };
 use utsim_viewer::layout;
-use utsim_viewer::properties::properties_panel;
+use utsim_viewer::properties::{properties_panel, run_panel};
 use utsim_viewer::style;
 use utsim_viewer::timeline::TransitSetting;
 
@@ -826,6 +826,11 @@ pub fn edit_panels(
                     match ed.selected.clone() {
                         None => {
                             ui.label("Selecione um bloco para editar suas propriedades.");
+                            ui.separator();
+                            ui.strong("Simulação");
+                            for command in run_panel(ui, &ed.doc) {
+                                acts.push(Act::Exec(command));
+                            }
                         }
                         Some(name) => {
                             ui.horizontal(|ui| {
