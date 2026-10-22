@@ -1,0 +1,23 @@
+[package]
+name = "utsim-viewer"
+description = "Read-only 3D viewer that animates a recorded UTSim replay"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.97.1"
+license.workspace = true
+
+[lib]
+name = "utsim_viewer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "utsim-view"
+path = "src/main.rs"
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+bevy = { version = "=0.20.0", default-features = false, features = ["3d"] }
+bevy_egui = { version = "=0.43.1", default-features = false, features = ["render", "default_fonts"] }
