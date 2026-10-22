@@ -1,0 +1,23 @@
+[package]
+name = "utsim-py"
+description = "Python bindings (PyO3) for the UTSim reinforcement-learning environment"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+
+# Not part of the main workspace (it needs a Python toolchain): build it on its own,
+# from this folder, with `maturin develop --release` or the steps in the README.
+[workspace]
+
+[lib]
+name = "utsim"
+crate-type = ["cdylib"]
+
+[dependencies]
+utsim-env = { path = "../utsim-env" }
+utsim-model = { path = "../utsim-model" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+
+[profile.release]
+debug = "line-tables-only"

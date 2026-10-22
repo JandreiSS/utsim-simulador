@@ -419,6 +419,30 @@ snapshots golden comprovam isso.
 - **Métricas próprias:** um bloco pode expor métricas (`custom_metrics`) e reiniciá-las no
   fim do aquecimento (`on_warmup`).
 
+## 4n. Aprendizado por reforço (fase 7)
+- **Agente no fluxo.** `Decide` com regra `Agent { observation }` avalia as expressões de
+  `observation` (números), chama `Ctx::request_decision(ramos, observação)` e **estaciona**
+  o token numa fila FIFO do bloco de fluxo. A resposta (`MSG_DECISION`, payload = ramo)
+  libera o token mais antigo para o ramo escolhido. O kernel responde às decisões na
+  ordem em que foram pedidas, então várias decisões no mesmo instante também casam.
+  A decisão leva tempo zero de simulação. Para que o agente mande um item para um lado,
+  o fluxo costuma **criar** o item depois da escolha (`CreateItem` em cada ramo).
+- **Ambiente** (`utsim-env`, `Env`): `reset(semente)` roda até a primeira decisão e
+  `step(ação)` responde e roda até a próxima ou até o fim do episódio
+  (`(observação, recompensa, done, info)`). O aquecimento é zerado, e `episode_length`
+  substitui o tempo de parada.
+- **Observação:** o vetor da decisão, seguido do conteúdo de blocos (`observe_blocks`;
+  `"a+b"` soma os conteúdos) e de métricas ao vivo (`observe_metrics`). As expressões do
+  fluxo só veem rótulos e `now`, por isso o estado físico vem do ambiente.
+- **Recompensa:** Σ peso·Δmétrica entre decisões consecutivas, menos `decision_cost`. As
+  métricas vêm de `Simulation::report()` (chaves de `RunReport::metrics`, ~20 µs por passo
+  num modelo de 7 blocos). Um termo `time_weighted` multiplica a média no tempo pelo tempo
+  decorrido, ou seja, usa a integral. Com peso −1 nos conteúdos dos blocos, o retorno do
+  episódio é −Σ(tempos no sistema) (lei de Little): minimizar o atraso total.
+- **Linha de base:** Q-learning tabular (`utsim_env::qlearning`) com faixas configuráveis,
+  ε-guloso e taxa de aprendizado que decai com as visitas. `examples/roteamento_rl.ron`
+  (linha rápida de 1 máquina × linha lenta de 2) mostra o ganho sobre a política aleatória.
+
 ## 4l. Fluidos (fase 7)
 Uma rede de fluidos (`fluids`) é um bloco só: tanques, tubos, fontes, sumidouros e
 conversores de/para itens discretos, ligados num grafo **acíclico**.
