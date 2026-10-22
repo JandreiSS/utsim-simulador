@@ -123,11 +123,64 @@ Qualquer objeto pode ter `downtime: (mtbf: Dist, mttr: Dist)`, contado no relóg
 > Aqui o "estar quebrado" é responsabilidade única do kernel, e o bloco só pausa os
 > próprios relógios.
 
+### Turnos programados e motivos de parada
+Um objeto pode ter `shifts: (period: P, off: [(start, duration), ...])`. As janelas se
+repetem a cada `P`, a partir de t=0, e precisam estar em ordem, dentro do período e sem
+sobreposição.
+
+O kernel guarda **motivos de parada** (quebra, fora de turno). O bloco só volta a rodar
+quando nenhum motivo está ativo. Na exibição, a quebra vence: o estado é `down` se há
+quebra, senão `off_shift`. Os relógios do bloco pausam uma vez só, na primeira parada,
+e retomam quando a última termina.
+
+Janelas que se encostam (uma termina no instante em que a próxima começa, inclusive na
+virada do período) são tratadas por **contagem de janelas abertas**, e não por um
+sinalizador. Assim a ordem dos dois eventos simultâneos não importa.
+
+> **Nosso jeito:** o MTBF das quebras corre no relógio também fora do turno. Uma opção
+> "só conta tempo trabalhado" fica para depois.
+
 ### Itens contêiner
 `ctx.pack(contêiner, item)` tira o item do conteúdo do bloco e o coloca dentro do
 contêiner (`item.container`, `contêiner.contents`). `ctx.unpack(contêiner)` devolve os
 itens ao bloco atual. Um contêiner conta como **um** item no conteúdo. Destruir um
 contêiner destrói o que está dentro. `ctx.clone_item` copia rótulos e o instante de criação.
+
+## 4c. Rastro e replay (fase 2)
+Com `enable_trace`, o kernel registra um `TraceEvent` para cada criação, movimento,
+empacotamento, desempacotamento, destruição e mudança de estado, com o instante e na
+ordem em que ocorrem. Um `Observer` recebe os mesmos eventos ao vivo.
+
+- **Só leitura.** Observadores não alteram nada: rodar com ou sem rastro dá exatamente
+  o mesmo resultado (há teste para isso).
+- **Replay.** `utsim replay modelo.ron -o replay.json` grava uma replicação com o layout
+  (posições e conexões) e o relatório. É a entrada do visualizador 3D.
+- **Movimentos instantâneos.** As transferências não levam tempo na simulação. A animação
+  de "andar" entre objetos é do visualizador, e transporte de verdade (operadores,
+  esteiras) vem nas fases 4 e 5.
+
+## 4d. Modelagem de dados de entrada (fase 1b)
+`utsim fit dados.csv` faz, em ordem:
+1. **Leitura**: CSV/TXT, com `;` e vírgula decimal, escolha de coluna e conversão de horários em intervalos.
+2. **Diagnóstico**: estatística descritiva, teste de sequências, Ljung-Box, Mann-Kendall,
+   valores atípicos (1,5·IQR) e empates, com avisos práticos.
+3. **Ajuste**: 20 famílias por máxima verossimilhança. São 16 contínuas (4 delas com
+   deslocamento) e 4 discretas. Família que não se aplica fica listada com o motivo.
+4. **Aderência**: KS e Anderson-Darling com p-valor por **bootstrap paramétrico**
+   (reajustando em cada réplica, porque os parâmetros vêm dos próprios dados), e
+   qui-quadrado com classes equiprováveis.
+5. **Escolha**: regra publicada em `rank.rs` e impressa em todo relatório.
+   1. Rejeita quem tiver p < α em qualquer teste.
+   2. Entre as aceitas, vence o menor AIC.
+   3. Entre as equivalentes (ΔAIC < 2), vence a de menos parâmetros.
+   4. Se todas forem rejeitadas, recomenda a distribuição empírica e gera a linha `.ron` dela.
+6. **Relatório**: texto, HTML com gráficos (histograma com densidades, Q-Q, P-P, ECDF,
+   dispersão x[i]×x[i+1]) e JSON. Cada candidata recebe uma frase que explica a sua
+   posição no ranking.
+
+> **Nosso jeito:** a parcimônia entre equivalentes é explícita. Nos dados de exemplo
+> (Gama verdadeira), a Weibull deslocada, com 3 parâmetros, tinha AIC 0,3 menor. A regra
+> escolhe a Gama, com 2, e diz por quê.
 
 ## 5. Estatísticas
 
