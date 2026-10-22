@@ -1,0 +1,110 @@
+// Centro de distribuição pequeno: caminhões chegam com paletes, são descarregados,
+// inspecionados, levados por empilhadeiras até um porta-paletes e, depois, separados
+// para a expedição. Tempos em segundos.
+//
+// Fluxo:
+//   chegada_caminhoes (Source) -> descarga (Separator, Split(6): cada caminhão vira 6 paletes)
+//   -> recebimento (Queue) -> esteira_entrada (Conveyor com acúmulo) -> inspecao (Processor)
+//   -> [empilhadeiras] -> porta_paletes (Rack 6 colunas x 6 níveis) -> fila_saida (Queue)
+//   -> separacao (Processor, com pausa) -> esteira_saida (Conveyor sem acúmulo) -> expedicao (Sink)
+//
+// Chegadas: um caminhão a cada 1200 s (20 min) em média, com 6 paletes cada: 18 paletes por hora.
+// Utilização esperada: inspeção ~0,4 de processo e setup (~0,6 contando a espera pela
+// empilhadeira), separação ~0,4, empilhadeiras ~0,27 cada.
+//
+// Equipe de inspeção: duas pessoas (ana e bruno) fazem o setup da inspeção. O setup usa
+// um operador só; durante o processamento ele já está livre.
+//
+// Empilhadeiras: um despachante RoundRobin reparte os paletes entre as duas. Elas seguem
+// os corredores da rede (mão dupla, em forma de "T"): garagem (40, 20) -> meio (40, 0),
+// com o corredor da inspeção em (20, 0) e o do porta-paletes em (60, 0). Voltam à garagem
+// quando ficam ociosas.
+//
+//   insp(20,0) --- meio(40,0) --- rack(60,0)
+//                    |
+//                garagem(40,20)
+Model(
+    name: "Centro de distribuição",
+    description: "Recebimento com inspeção e equipe de duas pessoas, empilhadeiras e porta-paletes",
+    run: (stop_time: 28800.0, warmup: 3600.0, seed: 2026, replications: 5),
+    objects: [
+        // Caminhões: um item por caminhão, a cada 1200 s em média.
+        (name: "chegada_caminhoes", kind: Source(interarrival: Exp(mean: 1200.0)), position: (0.0, 0.0, 0.0)),
+        // Descarga: 6 paletes saem de cada caminhão, com 3 a 5 minutos de descarga.
+        (name: "descarga", kind: Separator(mode: Split(6), process: Uniform(min: 180.0, max: 300.0)),
+            position: (6.0, 0.0, 0.0)),
+        (name: "recebimento", kind: Queue(), position: (12.0, 0.0, 0.0)),
+        // Esteira de entrada: 8 m a 0,5 m/s, acumula quando a inspeção está ocupada.
+        (name: "esteira_entrada", kind: Conveyor(length: 8.0, speed: 0.5, item_length: 1.0, accumulating: true),
+            position: (16.0, 0.0, 0.0)),
+        // Inspeção: o setup (~20 s) precisa de um operador; o processo (40 a 80 s) não.
+        // O item sai com a empilhadeira, até o porta-paletes.
+        (name: "inspecao", kind: Processor(
+            setup: Some(Exp(mean: 20.0)),
+            process: Uniform(min: 40.0, max: 80.0),
+            operators: Some(OperatorUse(team: "equipe_inspecao", count: 1, setup: true, process: false)),
+        ), transport: "frota", position: (20.0, 0.0, 0.0)),
+        // Equipe de inspeção: duas pessoas, caminhando a 1,2 m/s.
+        (name: "ana", kind: Transporter(speed: 1.2), position: (40.0, 0.0, 0.0)),
+        (name: "bruno", kind: Transporter(speed: 1.2), position: (40.0, 20.0, 0.0)),
+        // As duas pessoas se revezam nos setups (RoundRobin), em vez de uma fazer tudo.
+        (name: "equipe_inspecao", kind: Dispatcher(team: ["ana", "bruno"], rule: RoundRobin), position: (40.0, 0.0, 0.0)),
+        // Empilhadeiras: 1,5 m/s, aceleram e freiam a 0,5 m/s²; carga e descarga levam 8 a 12 s.
+        // Voltam à garagem quando ficam ociosas.
+        (name: "empilhadeira_1", kind: Transporter(
+            speed: 1.5, acceleration: Some(0.5), deceleration: Some(0.5),
+            load_time: Uniform(min: 8.0, max: 12.0), unload_time: Uniform(min: 8.0, max: 12.0),
+            home: true,
+        ), position: (40.0, 20.0, 0.0)),
+        (name: "empilhadeira_2", kind: Transporter(
+            speed: 1.5, acceleration: Some(0.5), deceleration: Some(0.5),
+            load_time: Uniform(min: 8.0, max: 12.0), unload_time: Uniform(min: 8.0, max: 12.0),
+            home: true,
+        ), position: (40.0, 20.0, 0.0)),
+        (name: "frota", kind: Dispatcher(team: ["empilhadeira_1", "empilhadeira_2"], rule: RoundRobin),
+            position: (40.0, 20.0, 0.0)),
+        // Porta-paletes: 6 colunas x 6 níveis (36 posições). Cada palete fica de 30 a 60 min.
+        (name: "porta_paletes", kind: Rack(
+            bays: 6,
+            levels: 6,
+            dwell: Some(Uniform(min: 1800.0, max: 3600.0)),
+            placement: FirstFree,
+            bay_width: 1.2,
+            level_height: 1.5,
+        ), position: (60.0, 0.0, 0.0)),
+        (name: "fila_saida", kind: Queue(), position: (66.0, 0.0, 0.0)),
+        // Separação de pedidos: 80 s por palete, com pausa de 15 min a cada 4 h.
+        (name: "separacao", kind: Processor(
+            process: Exp(mean: 80.0),
+            shifts: Some((period: 14400.0, off: [(start: 9000.0, duration: 900.0)])),
+        ), position: (72.0, 0.0, 0.0)),
+        // Esteira de saída sem acúmulo: quando a expedição trava, a esteira inteira para.
+        (name: "esteira_saida", kind: Conveyor(length: 10.0, speed: 0.5, item_length: 1.0, accumulating: false),
+            position: (78.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (88.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada_caminhoes", "descarga"),
+        ("descarga", "recebimento"),
+        ("recebimento", "esteira_entrada"),
+        ("esteira_entrada", "inspecao"),
+        ("inspecao", "porta_paletes"),
+        ("porta_paletes", "fila_saida"),
+        ("fila_saida", "separacao"),
+        ("separacao", "esteira_saida"),
+        ("esteira_saida", "expedicao"),
+    ],
+    network: Some((
+        nodes: [
+            (name: "garagem", position: (40.0, 20.0, 0.0)),
+            (name: "meio", position: (40.0, 0.0, 0.0)),
+            (name: "insp", position: (20.0, 0.0, 0.0)),
+            (name: "rack", position: (60.0, 0.0, 0.0)),
+        ],
+        edges: [
+            (from: "garagem", to: "meio", two_way: true),
+            (from: "meio", to: "insp", two_way: true),
+            (from: "meio", to: "rack", two_way: true),
+        ],
+    )),
+)
