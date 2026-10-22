@@ -1,6 +1,6 @@
 // Esteiras e porta-paletes no 3D (fase 5). O mesmo roteiro serve aos dois modelos, que o modo
 // roteirizado copia para a pasta de capturas:
-//   utsim-view examples/linha_com_esteiras.ron --stop 120 --roteiro crates/utsim-viewer/roteiros/esteiras_e_armazem.ron --capturas saida/esteiras
+//   utsim-view examples/linha_com_esteiras.ron --stop 700 --roteiro crates/utsim-viewer/roteiros/esteiras_e_armazem.ron --capturas saida/esteiras
 //   utsim-view examples/armazem.ron --stop 400 --roteiro crates/utsim-viewer/roteiros/esteiras_e_armazem.ron --capturas saida/armazem
 // Simula, reproduz e captura em vários instantes: as caixas andam sobre a correia, se
 // acumulam no fim quando a saída bloqueia, e enchem as posições do porta-paletes.
@@ -22,8 +22,8 @@
     Captura("04_reproduzindo_10s"),
     EsperarSegundos(10.0),
     Captura("05_reproduzindo_20s"),
-    EsperarSegundos(15.0),
-    Captura("06_reproduzindo_35s"),
+    EsperarSegundos(8.0), // curto o bastante para a reprodução ainda estar rodando no "Pausar"
+    Captura("06_reproduzindo_28s"),
     Afirmar(TempoSimuladoMin(1.0)),
 
     // Pausar e olhar de perto: a roda aproxima a câmera.
