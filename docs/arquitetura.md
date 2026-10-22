@@ -453,6 +453,20 @@ Uma aresta da rede pode ter `capacity` (veículos ao mesmo tempo). Um transporta
 Se todos os veículos estão esperando uns pelos outros (impasse), a rodada para com uma
 mensagem que lista o ciclo de espera.
 
+Regras adotadas:
+- **Arestas controladas:** só as que têm `capacity`. Uma aresta de mão dupla é um recurso
+  só, com a capacidade dividida entre os dois sentidos.
+- **Posse da aresta:** o veículo segura a aresta atual até conseguir a próxima, e é isso
+  que gera bloqueios realistas. As ligações entre um bloco e a rede não são controladas.
+- **Fila por aresta:** a espera é FIFO, em ordem de chegada. Ao liberar, o primeiro da
+  fila já vira o dono da aresta, de modo que ninguém fura a fila.
+- **Velocidade:** o perfil de velocidade é o da rota inteira, dividido entre as arestas.
+  A espera congela o perfil (aproximação: não há custo extra de parar e arrancar).
+- **Quebra:** pausa o trecho atual e mantém a aresta.
+- **Impasse:** é detectado quando um veículo é barrado. O sistema procura o maior grupo
+  de veículos parados em que os donos das arestas desejadas também estão parados
+  (funciona com capacidade > 1). É reportado uma única vez.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
