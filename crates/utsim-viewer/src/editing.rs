@@ -39,6 +39,8 @@ pub fn name_base(kind: &str) -> &'static str {
         "Sink" => "saida",
         "Transporter" => "transportador",
         "Dispatcher" => "despachante",
+        "Conveyor" => "esteira",
+        "Rack" => "porta_paletes",
         _ => "objeto",
     }
 }

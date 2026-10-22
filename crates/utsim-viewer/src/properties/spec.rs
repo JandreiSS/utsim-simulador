@@ -58,6 +58,8 @@ pub fn kind_name(kind: &ObjectKind) -> &'static str {
         ObjectKind::Sink => "Saída",
         ObjectKind::Transporter { .. } => "Transportador",
         ObjectKind::Dispatcher { .. } => "Despachante",
+        ObjectKind::Conveyor { .. } => "Esteira",
+        ObjectKind::Rack { .. } => "Porta-paletes",
     }
 }
 
@@ -103,6 +105,8 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("unload_time", "Tempo de descarga", Dist),
             spec("home", "Voltar à base quando ocioso", Bool),
         ],
+        // Phase 5 kinds: fields added by the phase 5 viewer front.
+        ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => Vec::new(),
         ObjectKind::Dispatcher { .. } => vec![
             spec("team", "Equipe", Team),
             spec("rule", "Regra de escolha", Choice),

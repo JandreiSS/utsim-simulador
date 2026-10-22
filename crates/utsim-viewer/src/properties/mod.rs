@@ -193,6 +193,8 @@ mod tests {
                     "home",
                 ],
                 ObjectKind::Dispatcher { .. } => &["team", "rule"],
+                // Phase 5 kinds: fields added by the phase 5 viewer front.
+                ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => &[],
             };
             // Mobile resources have no ports: no output rule and no `transport`.
             let common: &[&str] = if utsim_model::is_mobile(&obj.kind) {

@@ -271,6 +271,40 @@ trajeto (Dijkstra pré-calculado para todos os pares; arestas de mão única ou 
 > nível, `Transport` e `Operate`, e decide os passos sozinho. É mais simples de
 > modelar e de testar. Sequências genéricas podem vir com o fluxo de tokens (fase 6).
 
+## 4g. Manuseio de materiais (fase 5)
+
+### Esteira (`Conveyor`)
+`length` L, `speed` v, `item_length` s (espaço que cada item ocupa) e `accumulating`.
+A esteira é cinemática: nada de física, só eventos calculados.
+
+- **Capacidade:** C = ⌊L / s⌋. A validação exige L ≥ s.
+- **Entrada:** aceita um item se tem menos de C itens **e** o último que entrou já
+  andou pelo menos s, ou seja, passou s/v desde a entrada dele. Quando a entrada fecha só
+  pelo espaçamento, a esteira agenda a reabertura e avisa os vizinhos de entrada
+  (`Ctx::wake_inputs`).
+- **Esteira com acúmulo** (padrão): o item i chega ao fim em
+  `e_i = max(t_entrada_i + L/v, s_{i-1} + s/v)`, onde `s_{i-1}` é o instante em que o
+  item da frente saiu. Se a saída está bloqueada, o da frente espera no fim e os de trás
+  param encostados, um a cada s. Quando ele sai, o próximo percorre só o espaço s.
+- **Esteira sem acúmulo:** enquanto o item da frente espera no fim, a correia inteira
+  para. Todos os itens atrasam exatamente o tempo parado.
+- **Estados:** `empty`, `releasing` (movendo) e `blocked` (frente esperando).
+- **Quebras e turnos:** a correia para e retoma do ponto onde estava.
+- **Junções e desvios:** usam os blocos que já existem (filas, regras de saída). Fotocélulas
+  e transferências dedicadas ficam para depois.
+
+### Porta-paletes (`Rack`)
+`bays` (colunas) × `levels` (níveis). A capacidade é bays·levels.
+
+- **Posição:** cada item recebe uma posição (`slot`) pela regra `placement`.
+  `FirstFree` preenche nível por nível, coluna por coluna. `Random` sorteia entre as
+  livres, com o stream do bloco.
+- **Saída:** o item fica pelo menos `dwell` (opcional) e depois é liberado, por ordem de
+  prontidão (FIFO).
+- **Rastro:** a posição vai para `TraceEvent::Slot { item, block, slot }`, e o 3D
+  desenha o item na posição certa da estrutura (`bay_width`, `level_height`).
+- **Estados:** `empty` e `releasing`.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:

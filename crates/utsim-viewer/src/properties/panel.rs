@@ -1171,6 +1171,9 @@ impl Editor<'_> {
                 self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
                 self.bool_field(ui, "Voltar à base quando ocioso", "home", *home);
             }
+            ObjectKind::Conveyor { .. } | ObjectKind::Rack { .. } => {
+                ui.weak("Edição deste tipo no painel: em construção (fase 5).");
+            }
             ObjectKind::Dispatcher { team, rule } => {
                 self.team_field(ui, "team", team);
                 self.choice_field(
