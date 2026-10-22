@@ -22,4 +22,6 @@ OptProblem(
     ],
     algorithm: Grid,
     budget: 50,
+    // re-simula os 4 melhores com mais replicações antes da comparação final
+    refine: (top: 4, replications: 15),
 )

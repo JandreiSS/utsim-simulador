@@ -31,7 +31,7 @@ fn optimize_example_prints_report_and_writes_files() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     for part in [
         "Melhor ponto",
-        "Pontos avaliados",
+        "Pontos refinados",
         "set: {",
         "Explicação",
         "4 ponto(s) avaliado(s)",
@@ -42,10 +42,12 @@ fn optimize_example_prints_report_and_writes_files() {
     assert!(stderr.contains("[4/4]"), "{stderr}");
 
     let html_text = std::fs::read_to_string(&html).unwrap();
-    assert!(html_text.contains("<svg") && html_text.contains("Pontos avaliados"));
+    assert!(html_text.contains("<svg") && html_text.contains("Pontos refinados"));
     let value: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert_eq!(value["evaluations"].as_array().unwrap().len(), 4);
+    assert!(!value["refined"].as_array().unwrap().is_empty());
+    assert!(stdout.contains("Pontos refinados") && stdout.contains("Pontos da busca"));
     std::fs::remove_dir_all(dir).ok();
 }
 

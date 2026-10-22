@@ -5,10 +5,7 @@ use std::path::{Path, PathBuf};
 
 use utsim_core::stats::Summary;
 use utsim_model::{Model, ModelError};
-use utsim_opt::{
-    Algorithm, Evaluation, OptProblem, OptResult, Point, Sense, compare, evaluate,
-    paired_difference, values,
-};
+use utsim_opt::{Evaluation, OptProblem, OptResult, Point, Sense, paired_difference};
 
 pub struct Args {
     pub file: PathBuf,
@@ -66,46 +63,15 @@ fn write(path: &Path, text: &str) -> Result<(), String> {
         .map_err(|e| format!("não foi possível gravar '{}': {e}", path.display()))
 }
 
-/// Runs the search, reporting progress on stderr. The exhaustive search is driven here
-/// point by point so progress is live; other algorithms go through `utsim_opt::optimize`
-/// and their progress is replayed from the evaluation order.
+/// Runs the search and replays the progress on stderr from the evaluation order.
 fn search(problem: &OptProblem, base: &Model) -> Result<OptResult, ModelError> {
-    if !matches!(problem.algorithm, Algorithm::Grid) {
-        let result = utsim_opt::optimize(problem, base)?;
-        let mut best: Option<f64> = None;
-        for (i, e) in result.evaluations.iter().enumerate() {
-            best = update_best(problem.objective.sense, best, e);
-            eprintln!("{}", progress_line(i + 1, result.evaluations.len(), best));
-        }
-        return Ok(result);
+    let result = utsim_opt::optimize(problem, base)?;
+    let mut best: Option<f64> = None;
+    for (i, e) in result.evaluations.iter().enumerate() {
+        best = update_best(problem.objective.sense, best, e);
+        eprintln!("{}", progress_line(i + 1, result.evaluations.len(), best));
     }
-    let domains: Vec<(String, Vec<String>)> = problem
-        .variables
-        .iter()
-        .map(|v| (v.key.clone(), values(&v.domain)))
-        .collect();
-    let total: usize = domains.iter().map(|(_, vs)| vs.len()).product();
-    let count = total.min(problem.budget);
-    if count < total {
-        eprintln!(
-            "aviso: orçamento de {count} ponto(s) menor que o espaço de {total}; a busca será parcial"
-        );
-    }
-    let mut evaluations = Vec::with_capacity(count);
-    let mut best = None;
-    for index in 0..count {
-        let mut rest = index;
-        let mut point = Point::new();
-        for (key, vs) in domains.iter().rev() {
-            point.insert(key.clone(), vs[rest % vs.len()].clone());
-            rest /= vs.len();
-        }
-        let e = evaluate(base, problem, &point)?;
-        best = update_best(problem.objective.sense, best, &e);
-        eprintln!("{}", progress_line(index + 1, count, best));
-        evaluations.push(e);
-    }
-    Ok(compare(problem, evaluations))
+    Ok(result)
 }
 
 fn update_best(sense: Sense, best: Option<f64>, e: &Evaluation) -> Option<f64> {
@@ -150,10 +116,31 @@ pub struct Row {
 
 /// Rows sorted by objective (according to the sense), feasible points first.
 pub fn build_rows(problem: &OptProblem, result: &OptResult) -> Vec<Row> {
-    let sense = problem.objective.sense;
-    let best = result.best.map(|b| &result.evaluations[b]);
-    let mut rows: Vec<Row> = result
-        .evaluations
+    rows_of(
+        problem.objective.sense,
+        result.final_evaluations(),
+        result.best,
+        &result.equivalent,
+    )
+}
+
+/// Rows of the search phase when a refinement exists (no comparison with the best,
+/// which was measured with other replications).
+pub fn build_search_rows(problem: &OptProblem, result: &OptResult) -> Vec<Row> {
+    if result.refined.is_empty() {
+        return Vec::new();
+    }
+    rows_of(problem.objective.sense, &result.evaluations, None, &[])
+}
+
+fn rows_of(
+    sense: Sense,
+    evals: &[Evaluation],
+    best_index: Option<usize>,
+    equivalent: &[usize],
+) -> Vec<Row> {
+    let best = best_index.map(|b| &evals[b]);
+    let mut rows: Vec<Row> = evals
         .iter()
         .enumerate()
         .map(|(i, e)| Row {
@@ -161,10 +148,10 @@ pub fn build_rows(problem: &OptProblem, result: &OptResult) -> Vec<Row> {
             point: e.point.clone(),
             objective: e.objective,
             feasible: e.feasible,
-            is_best: result.best == Some(i),
-            equivalent: result.equivalent.contains(&i),
+            is_best: best_index == Some(i),
+            equivalent: equivalent.contains(&i),
             delta: match best {
-                Some(b) if result.best != Some(i) => Some(paired_difference(e, b)),
+                Some(b) if best_index != Some(i) => Some(paired_difference(e, b)),
                 _ => None,
             },
         })
@@ -288,7 +275,7 @@ pub fn text_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
     );
     match result.best {
         Some(b) => {
-            let e = &result.evaluations[b];
+            let e = &result.final_evaluations()[b];
             let _ = writeln!(out, "Melhor ponto");
             for (k, v) in &e.point {
                 let _ = writeln!(out, "  {k} = {v}");
@@ -303,7 +290,7 @@ pub fn text_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
             if !result.equivalent.is_empty() {
                 let _ = writeln!(out, "\nPontos equivalentes ao melhor (95%, teste pareado)");
                 for &i in &result.equivalent {
-                    let ev = &result.evaluations[i];
+                    let ev = &result.final_evaluations()[i];
                     let _ = writeln!(
                         out,
                         "  {}  (objetivo {})",
@@ -320,10 +307,28 @@ pub fn text_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
         }
     }
 
-    let _ = writeln!(
-        out,
-        "\nPontos avaliados (viáveis primeiro, melhor objetivo no topo)"
-    );
+    let search_rows = build_search_rows(problem, result);
+    let title = if search_rows.is_empty() {
+        "Pontos avaliados"
+    } else {
+        "Pontos refinados"
+    };
+    let _ = writeln!(out, "\n{title} (viáveis primeiro, melhor objetivo no topo)");
+    out.push_str(&text_table(rows));
+    if !search_rows.is_empty() {
+        let _ = writeln!(out, "\nPontos da busca (antes do refinamento)");
+        out.push_str(&text_table(&search_rows));
+    }
+
+    let _ = writeln!(out, "\nExplicação");
+    for line in &result.explanation {
+        let _ = writeln!(out, "  {line}");
+    }
+    out
+}
+
+fn text_table(rows: &[Row]) -> String {
+    let mut out = String::new();
     let _ = writeln!(
         out,
         "  {:>3}  {:<4} {:<40} {:<22} viável / Δ vs melhor (≈ = sem diferença)",
@@ -347,12 +352,41 @@ pub fn text_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
             mark
         );
     }
-
-    let _ = writeln!(out, "\nExplicação");
-    for line in &result.explanation {
-        let _ = writeln!(out, "  {line}");
-    }
     out
+}
+
+fn html_table(rows: &[Row]) -> String {
+    let mut h = String::from(
+        "<table><tr><th>#</th><th>Ord.</th><th>Ponto</th>\
+         <th>Objetivo</th><th>Viável</th><th>Δ vs melhor</th></tr>",
+    );
+    for (rank, r) in rows.iter().enumerate() {
+        let delta = if r.is_best {
+            "melhor".to_string()
+        } else {
+            row_mark(r)
+        };
+        let (class, mark) = if r.feasible {
+            ("ok", "✓")
+        } else {
+            ("no", "✗")
+        };
+        let _ = write!(
+            h,
+            "<tr{}><td>{}</td><td>{}</td><td><code>{}</code></td><td>{}</td>\
+             <td class=\"{class}\">{mark}</td><td>{}</td></tr>",
+            if r.is_best { " class=\"best\"" } else { "" },
+            rank + 1,
+            r.order,
+            esc(&point_text(&r.point)),
+            esc(&mean_hw(&r.objective)),
+            esc(&delta)
+        );
+    }
+    h.push_str(
+        "</table><p class=\"muted\">≈ indica que o intervalo de 95% da diferença pareada contém zero.</p>",
+    );
+    h
 }
 
 fn esc(s: &str) -> String {
@@ -407,7 +441,7 @@ pub fn html_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
     h.push_str("<h2>Melhor ponto</h2>");
     match result.best {
         Some(b) => {
-            let e = &result.evaluations[b];
+            let e = &result.final_evaluations()[b];
             h.push_str("<ul>");
             for (k, v) in &e.point {
                 let _ = write!(h, "<li><code>{} = {}</code></li>", esc(k), esc(v));
@@ -435,7 +469,7 @@ pub fn html_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
                      significativa (95%, teste pareado).</p><ul>",
                 );
                 for &i in &result.equivalent {
-                    let ev = &result.evaluations[i];
+                    let ev = &result.final_evaluations()[i];
                     let _ = write!(
                         h,
                         "<li><code>{}</code> (objetivo {})</li>",
@@ -460,36 +494,17 @@ pub fn html_report(problem: &OptProblem, result: &OptResult, rows: &[Row]) -> St
     h.push_str("<h2>Os 10 melhores pontos (intervalo de 95%)</h2>");
     h.push_str(&top_chart(rows));
 
-    h.push_str(
-        "<h2>Pontos avaliados</h2><table><tr><th>#</th><th>Ord.</th><th>Ponto</th>\
-         <th>Objetivo</th><th>Viável</th><th>Δ vs melhor</th></tr>",
-    );
-    for (rank, r) in rows.iter().enumerate() {
-        let delta = if r.is_best {
-            "melhor".to_string()
-        } else {
-            row_mark(r)
-        };
-        let (class, mark) = if r.feasible {
-            ("ok", "✓")
-        } else {
-            ("no", "✗")
-        };
-        let _ = write!(
-            h,
-            "<tr{}><td>{}</td><td>{}</td><td><code>{}</code></td><td>{}</td>\
-             <td class=\"{class}\">{mark}</td><td>{}</td></tr>",
-            if r.is_best { " class=\"best\"" } else { "" },
-            rank + 1,
-            r.order,
-            esc(&point_text(&r.point)),
-            esc(&mean_hw(&r.objective)),
-            esc(&delta)
-        );
+    let search_rows = build_search_rows(problem, result);
+    if search_rows.is_empty() {
+        h.push_str("<h2>Pontos avaliados</h2>");
+    } else {
+        h.push_str("<h2>Pontos refinados</h2>");
     }
-    h.push_str(
-        "</table><p class=\"muted\">≈ indica que o intervalo de 95% da diferença pareada contém zero.</p>",
-    );
+    h.push_str(&html_table(rows));
+    if !search_rows.is_empty() {
+        h.push_str("<h2>Pontos da busca (antes do refinamento)</h2>");
+        h.push_str(&html_table(&search_rows));
+    }
 
     h.push_str("<h2>Explicação</h2><ul>");
     for line in &result.explanation {
@@ -565,21 +580,32 @@ fn order_chart(problem: &OptProblem, result: &OptResult) -> String {
         hgt - 6.0,
         by = hgt - bottom
     );
-    // Running best of the feasible points.
-    let mut best: Option<f64> = None;
-    let mut path = String::new();
-    for (i, e) in result.evaluations.iter().enumerate() {
-        best = update_best(problem.objective.sense, best, e);
-        if let Some(b) = best {
-            let _ = write!(
-                path,
-                "{}{:.1},{:.1} ",
-                if path.is_empty() { "M" } else { "L" },
-                x(i),
-                y(b)
-            );
+    // Convergence: the search's own history when available, else the running best.
+    let mut curve: Vec<(usize, f64)> = result
+        .history
+        .iter()
+        .map(|&(count, v)| (count.saturating_sub(1), v))
+        .collect();
+    if curve.is_empty() {
+        let mut best: Option<f64> = None;
+        for (i, e) in result.evaluations.iter().enumerate() {
+            best = update_best(problem.objective.sense, best, e);
+            if let Some(b) = best {
+                curve.push((i, b));
+            }
         }
     }
+    let mut path = String::new();
+    for (i, b) in curve {
+        let _ = write!(
+            path,
+            "{}{:.1},{:.1} ",
+            if path.is_empty() { "M" } else { "L" },
+            x(i),
+            y(b)
+        );
+    }
+    let best_point = result.best_evaluation().map(|e| &e.point);
     if !path.is_empty() {
         let _ = write!(s, "<path class=\"line\" d=\"{path}\"/>");
     }
@@ -593,14 +619,15 @@ fn order_chart(problem: &OptProblem, result: &OptResult) -> String {
                 y(e.objective.mean + e.objective.half_width)
             );
         }
-        let class = if result.best == Some(i) {
+        let is_best = best_point == Some(&e.point);
+        let class = if is_best {
             "bestpt"
         } else if e.feasible {
             "pt"
         } else {
             "ptx"
         };
-        let r = if result.best == Some(i) { 5 } else { 3 };
+        let r = if is_best { 5 } else { 3 };
         let _ = write!(
             s,
             "<circle class=\"{class}\" cx=\"{cx:.1}\" cy=\"{cy:.1}\" r=\"{r}\"><title>{}</title></circle>",
@@ -677,6 +704,7 @@ fn top_chart(rows: &[Row]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use utsim_opt::compare;
 
     fn summary(mean: f64, hw: f64) -> Summary {
         Summary {
