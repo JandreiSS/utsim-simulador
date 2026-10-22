@@ -1,0 +1,56 @@
+// Armazém com corredor em anel (mão única) e uma frota de duas empilhadeiras.
+// Os paletes chegam à fila de recebimento, vão de empilhadeira até uma de duas
+// estações de processamento e, depois, até a expedição (sink).
+//
+// As empilhadeiras não andam em linha reta: seguem os corredores da rede abaixo.
+// O anel tem sentido único (doca -> a -> b -> c -> d -> e -> doca), então voltar de
+// uma estação à doca pode ser bem mais longo do que a distância em linha reta.
+//
+//   e(0,20) <- d(20,20) <- c(40,20)      proc_2 fica em c, expedição em e
+//     |                       ^
+//     v                       |
+//   doca(0,0) -> a(20,0) -> b(40,0)      recebimento fica na doca, proc_1 em a
+//
+// Regra do despachante: FirstAvailable (a primeira empilhadeira livre da equipe).
+Model(
+    name: "Rede de caminhos",
+    run: (stop_time: 5000.0, warmup: 200.0, seed: 7, replications: 5),
+    objects: [
+        (name: "chegada_paletes", kind: Source(interarrival: Exp(mean: 12.0)), position: (0.0, 0.0, 0.0)),
+        (name: "recebimento", kind: Queue(), transport: "frota", position: (0.0, 0.0, 0.0)),
+        (name: "proc_1", kind: Processor(capacity: 2, process: Triangular(min: 15.0, mode: 20.0, max: 30.0)), transport: "frota", position: (20.0, 0.0, 0.0)),
+        (name: "proc_2", kind: Processor(capacity: 2, process: Triangular(min: 15.0, mode: 20.0, max: 30.0)), transport: "frota", position: (40.0, 20.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (0.0, 20.0, 0.0)),
+
+        // Velocidade em unidades de comprimento por unidade de tempo.
+        (name: "empilhadeira_1", kind: Transporter(speed: 2.0, acceleration: Some(1.0), deceleration: Some(1.0), load_time: Const(1.0), unload_time: Const(1.0)), position: (0.0, 0.0, 0.0)),
+        (name: "empilhadeira_2", kind: Transporter(speed: 2.0, acceleration: Some(1.0), deceleration: Some(1.0), load_time: Const(1.0), unload_time: Const(1.0)), position: (0.0, 0.0, 0.0)),
+        (name: "frota", kind: Dispatcher(team: ["empilhadeira_1", "empilhadeira_2"], rule: FirstAvailable)),
+    ],
+    connections: [
+        ("chegada_paletes", "recebimento"),
+        ("recebimento", "proc_1"),
+        ("recebimento", "proc_2"),
+        ("proc_1", "expedicao"),
+        ("proc_2", "expedicao"),
+    ],
+    network: Some((
+        nodes: [
+            (name: "doca", position: (0.0, 0.0, 0.0)),
+            (name: "a", position: (20.0, 0.0, 0.0)),
+            (name: "b", position: (40.0, 0.0, 0.0)),
+            (name: "c", position: (40.0, 20.0, 0.0)),
+            (name: "d", position: (20.0, 20.0, 0.0)),
+            (name: "e", position: (0.0, 20.0, 0.0)),
+        ],
+        // two_way: false = mão única (de "from" para "to").
+        edges: [
+            (from: "doca", to: "a", two_way: false),
+            (from: "a", to: "b", two_way: false),
+            (from: "b", to: "c", two_way: false),
+            (from: "c", to: "d", two_way: false),
+            (from: "d", to: "e", two_way: false),
+            (from: "e", to: "doca", two_way: false),
+        ],
+    )),
+)
