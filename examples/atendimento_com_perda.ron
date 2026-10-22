@@ -1,0 +1,19 @@
+// Atendimento com capacidade finita (M/M/1/K com K = 5): a sala de espera comporta
+// 4 clientes e o guichê atende 1. Com `on_blocked: Drop`, quem chega e encontra o
+// sistema cheio vai embora e é contado em "chegada.lost" (o campo "count" do relatório).
+// Teoria (rho = 0.8): cerca de 8,9% das chegadas são perdidas.
+Model(
+    name: "Atendimento com perda",
+    run: (stop_time: 20000.0, warmup: 1000.0, seed: 5, replications: 5),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0), on_blocked: Drop)),
+        (name: "sala_de_espera", kind: Queue(capacity: 4)),
+        (name: "guiche", kind: Processor(process: Exp(mean: 0.8))),
+        (name: "saida", kind: Sink),
+    ],
+    connections: [
+        ("chegada", "sala_de_espera"),
+        ("sala_de_espera", "guiche"),
+        ("guiche", "saida"),
+    ],
+)

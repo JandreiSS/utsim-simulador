@@ -78,6 +78,13 @@ quem alimenta A.
   bloqueada, ela para de gerar (estado `blocked`). Para ter chegadas de Poisson "puras",
   coloque uma fila depois dela.
 - `first_at_zero`: o primeiro item nasce em t=0, e não depois do primeiro intervalo.
+- `on_blocked` (o que fazer com um item que não consegue sair no instante em que nasce):
+  - `Wait` (padrão): o comportamento acima, a Source espera e para de gerar.
+  - `Drop` (**nosso jeito**, o simuladores comerciais não tem): o item é destruído e o próximo intervalo
+    começa na hora, então as chegadas formam um processo de renovação independente do
+    bloqueio. Cada perda registra `lost` na Source (use o campo `count` da tally, aparece
+    em `RunReport`); itens perdidos não contam em `output`. Serve para M/M/1/K e Erlang
+    de perda.
 - Estados: `generating`, `blocked`, `idle` (quando atinge `max_arrivals`).
 
 ### Queue
