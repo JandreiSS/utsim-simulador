@@ -365,8 +365,23 @@ o intervalo de 95% da diferença por replicação diz se o melhor ponto é de fa
 que cada um dos outros. Pontos que não se distinguem do melhor aparecem como
 equivalentes, com a recomendação de mais replicações para separá-los.
 
-O algoritmo de referência é a busca exaustiva (`Grid`), limitada por `budget`. As
-metaheurísticas vêm de uma frente própria.
+**Algoritmos.** Todos usam um cache, então nenhum ponto é simulado duas vezes, e o
+`budget` conta pontos distintos.
+- `Grid`: todas as combinações.
+- `Annealing { iterations }`: recozimento simulado. Começa no meio de cada domínio; o
+  vizinho muda uma variável em um passo; aceitação de Metropolis. A temperatura inicial
+  vem da variação entre os primeiros vizinhos e cai geometricamente até 1/1000 dela.
+- `Genetic { population, generations }`: os genes são índices nos valores de cada
+  variável; seleção por torneio de 2, cruzamento uniforme, mutação de 1/n por gene, um
+  elite por geração.
+
+Pontos que violam restrições recebem uma penalidade que os deixa piores que qualquer
+ponto viável já visto. Entre dois pontos inviáveis, o mais próximo da viabilidade vence.
+
+**Refinamento (`refine: (top, replications)`).** Depois da busca, os `top` melhores pontos
+viáveis são simulados de novo com mais replicações e com as mesmas sementes entre si. A
+comparação final (`best`, `equivalent`) usa essas avaliações refinadas. O resultado
+também guarda o histórico de convergência (`history`).
 
 > **Nosso jeito:** o simuladores comerciais usa o otimizador proprietário, que é proprietário e tem licença à parte.
 > Aqui o otimizador é aberto, e o relatório mostra a significância estatística das
