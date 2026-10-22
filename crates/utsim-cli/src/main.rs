@@ -1,3 +1,5 @@
+mod csv;
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -32,6 +34,15 @@ enum Cmd {
         /// Grava os relatórios completos em JSON
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Grava resumo, replicações, séries e histogramas em CSV neste diretório
+        #[arg(long)]
+        csv: Option<PathBuf>,
+        /// Intervalo de amostragem das séries temporais (sobrescreve run.sample_interval)
+        #[arg(long)]
+        sample: Option<f64>,
+        /// Número de classes dos histogramas (sobrescreve run.histogram_bins)
+        #[arg(long)]
+        bins: Option<usize>,
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
@@ -54,7 +65,7 @@ fn run(cli: Cli) -> Result<(), ModelError> {
             m.validate()?;
             println!("{}: ok ({} objetos, {} conexões)", m.name, m.objects.len(), m.connections.len());
         }
-        Cmd::Run { model, reps, seed, stop, warmup, json } => {
+        Cmd::Run { model, reps, seed, stop, warmup, json, csv, sample, bins } => {
             let mut m = Model::load(&model)?;
             if let Some(v) = reps {
                 m.run.replications = v;
@@ -68,12 +79,22 @@ fn run(cli: Cli) -> Result<(), ModelError> {
             if let Some(v) = warmup {
                 m.run.warmup = v;
             }
+            if let Some(v) = sample {
+                m.run.sample_interval = Some(v);
+            }
+            if let Some(v) = bins {
+                m.run.histogram_bins = Some(v);
+            }
             let started = std::time::Instant::now();
             let reports = m.run_replications()?;
             let elapsed = started.elapsed();
             print_summary(&m, &reports);
             let events: u64 = reports.iter().map(|r| r.events).sum();
             println!("\n{events} eventos em {:.2?}", elapsed);
+            if let Some(dir) = csv {
+                let files = csv::export(&dir, &reports)?;
+                println!("CSV gravado em {}: {}", dir.display(), files.join(", "));
+            }
             if let Some(path) = json {
                 let out = serde_json::json!({ "model": m.name, "summary": summarize(&reports), "replications": reports });
                 std::fs::write(&path, serde_json::to_string_pretty(&out).expect("report serializes"))?;
