@@ -1,5 +1,6 @@
 mod csv;
 mod experiment;
+mod fit;
 mod replay;
 
 use std::path::PathBuf;
@@ -8,7 +9,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use utsim_core::stats::Summary;
 use utsim_core::{RunReport, summarize};
-use utsim_model::{Model, ModelError};
+use utsim_model::Model;
 
 #[derive(Parser)]
 #[command(
@@ -68,6 +69,30 @@ enum Cmd {
         #[arg(long)]
         json: Option<PathBuf>,
     },
+    /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
+    Fit {
+        file: PathBuf,
+        /// Coluna: nome do cabeçalho ou posição (a partir de 1); padrão: primeira numérica
+        #[arg(long)]
+        coluna: Option<String>,
+        /// A coluna traz instantes crescentes; ajusta os intervalos entre eles
+        #[arg(long)]
+        timestamps: bool,
+        /// Nível de significância dos testes
+        #[arg(long, default_value_t = 0.05)]
+        alpha: f64,
+        /// Réplicas do bootstrap paramétrico (p-valores de KS e Anderson-Darling)
+        #[arg(long, default_value_t = 300)]
+        bootstrap: usize,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Grava o relatório completo, com gráficos, em um HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Grava o relatório em JSON
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -80,8 +105,27 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(cli: Cli) -> Result<(), ModelError> {
+fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
+        Cmd::Fit {
+            file,
+            coluna,
+            timestamps,
+            alpha,
+            bootstrap,
+            seed,
+            html,
+            json,
+        } => fit::run(fit::Args {
+            file,
+            column: coluna,
+            timestamps,
+            alpha,
+            bootstrap,
+            seed,
+            html,
+            json,
+        })?,
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
             m.validate()?;
