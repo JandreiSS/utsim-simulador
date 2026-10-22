@@ -182,6 +182,26 @@ ordem em que ocorrem. Um `Observer` recebe os mesmos eventos ao vivo.
 > (Gama verdadeira), a Weibull deslocada, com 3 parâmetros, tinha AIC 0,3 menor. A regra
 > escolhe a Gama, com 2, e diz por quê.
 
+## 4e. Editor (fase 3)
+O editor não altera o modelo diretamente: toda ação vira um `Command` (adicionar,
+remover, renomear, mover, alterar campo, ligar, desligar, lote) aplicado por um
+`Document` (`utsim-edit`, sem dependência de interface gráfica).
+
+- **Desfazer/refazer** por instantâneo do modelo, que é pequeno. Gestos contínuos, como
+  arrastar um objeto, usam uma chave de agrupamento e viram um passo só.
+- **Comando inválido não deixa rastro.** O documento continua igual, inclusive o
+  histórico.
+- **Validação ao vivo.** Os problemas aparecem enquanto o modelo é montado, cada um
+  atribuído ao objeto correspondente. O modelo só roda quando não sobra nenhum.
+- **Alterar campo** usa as mesmas chaves dos cenários (`objeto.campo`, `run.campo`).
+  Editor, cenários e scripts falam a mesma língua.
+- **Salvamento estável.** RON formatado de forma determinística e com os comentários do
+  cabeçalho preservados. Comentários no meio do modelo se perdem ao salvar.
+
+> **Nosso jeito:** no simuladores comerciais o modelo é uma árvore binária editada só pela interface.
+> Aqui o modelo continua sendo um texto legível, e o editor é só uma forma confortável de
+> produzir esse texto.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
