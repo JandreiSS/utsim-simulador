@@ -1,0 +1,23 @@
+// Linha com duas esteiras: a primeira acumula itens quando a máquina está ocupada,
+// a segunda para inteira quando a saída bloqueia (sem acúmulo).
+// Esteira 1: 10 m a 0.5 m/u, 1 m por item -> capacidade 10 e vazão máxima 0.5 itens/u.
+// Esteira 2: 6 m a 1 m/u, 1 m por item -> capacidade 6.
+Model(
+    name: "Linha com esteiras",
+    run: (stop_time: 20000.0, warmup: 500.0, seed: 11, replications: 5),
+    objects: [
+        (name: "entrada",   kind: Source(interarrival: Exp(mean: 1.8)), position: (0.0, 0.0, 0.0)),
+        (name: "esteira1",  kind: Conveyor(length: 10.0, speed: 0.5, item_length: 1.0, accumulating: true),
+                            position: (7.0, 0.0, 0.0)),
+        (name: "maquina",   kind: Processor(process: Exp(mean: 1.6)), position: (14.0, 0.0, 0.0)),
+        (name: "esteira2",  kind: Conveyor(length: 6.0, speed: 1.0, item_length: 1.0, accumulating: false),
+                            position: (18.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (22.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("entrada", "esteira1"),
+        ("esteira1", "maquina"),
+        ("maquina", "esteira2"),
+        ("esteira2", "expedicao"),
+    ],
+)
