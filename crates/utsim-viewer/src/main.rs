@@ -6,6 +6,7 @@ mod camera;
 mod editor;
 mod playback;
 mod scene;
+mod script;
 mod ui;
 
 use std::path::{Path, PathBuf};
@@ -48,6 +49,13 @@ struct Cli {
     /// Carrega, valida, monta a linha do tempo e o layout, imprime um resumo e sai (sem janela)
     #[arg(long)]
     headless_check: bool,
+    /// Roteiro .ron de passos com entrada sintética (ver docs/testes.md); exige --capturas.
+    /// Um modelo .ron existente é copiado para a pasta de capturas e a cópia é a editada.
+    #[arg(long, requires = "capturas")]
+    roteiro: Option<PathBuf>,
+    /// Pasta onde o modo roteirizado grava capturas de tela (.png) e log.txt
+    #[arg(long)]
+    capturas: Option<PathBuf>,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -155,7 +163,14 @@ fn summary(data: &Data) {
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    let steps = match scripted_steps(&mut cli) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("erro: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     let transit = cli
         .transit
         .map_or(TransitSetting::Auto, TransitSetting::Fixed);
@@ -197,14 +212,24 @@ fn main() -> ExitCode {
         (min, max) = (Vec3::ZERO, Vec3::ZERO);
     }
 
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "UTSim".to_string(),
-                ..default()
-            }),
-            ..default()
-        }))
+    let mut window = Window {
+        title: "UTSim".to_string(),
+        ..default()
+    };
+    if steps.is_some() {
+        // Predictable captures: fixed size, one pixel per logical pixel.
+        window.resolution =
+            bevy::window::WindowResolution::new(1280, 800).with_scale_factor_override(1.0);
+    }
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(window),
+        ..default()
+    }));
+    if let (Some(steps), Some(dir)) = (steps, cli.capturas.clone()) {
+        app.add_plugins(script::ScriptPlugin { steps, dir });
+    }
+    let exit = app
         .add_plugins(EguiPlugin::default())
         .insert_resource(camera::OrbitCam::framing(min, max))
         .insert_resource(camera::CameraLock::default())
@@ -245,5 +270,30 @@ fn main() -> ExitCode {
                 .chain(),
         )
         .run();
-    ExitCode::SUCCESS
+    match exit {
+        AppExit::Success => ExitCode::SUCCESS,
+        AppExit::Error(_) => ExitCode::FAILURE,
+    }
+}
+
+/// Parses the script, if any, and redirects an existing `.ron` input to a copy in the
+/// captures directory, so scripts never modify the original.
+fn scripted_steps(cli: &mut Cli) -> Result<Option<Vec<utsim_viewer::roteiro::Passo>>, String> {
+    let Some(script) = &cli.roteiro else {
+        return Ok(None);
+    };
+    let text = std::fs::read_to_string(script).map_err(|e| format!("{}: {e}", script.display()))?;
+    let steps = utsim_viewer::roteiro::parse(&text)?;
+    let dir = cli.capturas.clone().ok_or("--roteiro exige --capturas")?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    if let Some(input) = cli.input.clone()
+        && !is_json(&input)
+        && input.exists()
+    {
+        let name = input.file_name().ok_or("entrada sem nome de arquivo")?;
+        let copy = dir.join(name);
+        std::fs::copy(&input, &copy).map_err(|e| format!("copiando {}: {e}", input.display()))?;
+        cli.input = Some(copy);
+    }
+    Ok(Some(steps))
 }

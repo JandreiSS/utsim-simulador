@@ -9,6 +9,7 @@
 pub mod editing;
 pub mod layout;
 pub mod properties;
+pub mod roteiro;
 pub mod source;
 pub mod style;
 pub mod timeline;

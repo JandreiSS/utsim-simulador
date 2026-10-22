@@ -1,0 +1,79 @@
+// Roteiro do editor, a partir de um modelo vazio.
+//   utsim-view --novo --roteiro crates/utsim-viewer/roteiros/editor_basico.ron --capturas saida/editor_basico
+// Coloca Chegada, Fila, Processo e Saída pela paleta, liga os quatro, move um bloco
+// arrastando, desfaz com Ctrl+Z, simula e volta para Editar.
+[
+    Esperar(quadros: 20),
+    Captura("01_vazio"),
+    Afirmar(Modo(Editar)),
+    Afirmar(ObjetosIgual(0)),
+
+    // Fase 1: colocar os quatro blocos.
+    ClicarBotao("Chegada"),
+    Afirmar(Ferramenta("Colocar:Source")),
+    MoverPara(Mundo(-5.0, -2.0)),
+    Captura("02_fantasma_de_colocacao"),
+    Clicar(Esquerdo),
+    Afirmar(ObjetosIgual(1)),
+    Afirmar(Selecionado(Some("chegada"))),
+
+    ClicarBotao("Fila"),
+    MoverPara(Mundo(-2.5, -2.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Processo"),
+    MoverPara(Mundo(0.0, -2.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Saída"),
+    MoverPara(Mundo(2.5, -2.0)),
+    Clicar(Esquerdo),
+    Afirmar(ObjetosIgual(4)),
+    Afirmar(LigacoesIgual(0)),
+    Afirmar(Sujo(true)),
+    Captura("03_quatro_blocos"),
+
+    // Fase 2: ligar com C + clique no destino.
+    MoverPara(Objeto("chegada")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("chegada"))),
+    Tecla("C"),
+    Afirmar(Ferramenta("Ligar:chegada")),
+    MoverPara(Objeto("fila")),
+    Captura("04_ligando"),
+    Clicar(Esquerdo),
+    Afirmar(LigacoesIgual(1)),
+
+    MoverPara(Objeto("fila")),
+    Clicar(Esquerdo),
+    Tecla("C"),
+    MoverPara(Objeto("processo")),
+    Clicar(Esquerdo),
+
+    MoverPara(Objeto("processo")),
+    Clicar(Esquerdo),
+    Tecla("C"),
+    MoverPara(Objeto("saida")),
+    Clicar(Esquerdo),
+    Afirmar(LigacoesIgual(3)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("05_ligados"),
+
+    // Fase 3: mover o Processo arrastando e desfazer.
+    Arrastar(de: Mundo(0.0, -2.0), para: Mundo(0.0, 1.0)),
+    Afirmar(PosicaoDe("processo", (0.0, 1.0))),
+    Captura("06_processo_movido"),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(PosicaoDe("processo", (0.0, -2.0))),
+    Captura("07_desfeito"),
+
+    // Fase 4: simular, deixar rodar um pouco e voltar.
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 30.0),
+    Captura("08_simulacao_inicio"),
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(3.0),
+    Captura("09_simulacao_rodando"),
+    Afirmar(TempoSimuladoMin(0.5)),
+    ClicarBotao("✎ Editar"),
+    Afirmar(Modo(Editar)),
+    Captura("10_de_volta_ao_editar"),
+]
