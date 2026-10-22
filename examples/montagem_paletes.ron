@@ -1,0 +1,35 @@
+// Montagem e desmontagem de paletes.
+// A estação "montagem" (Combiner) recebe o palete na porta 0 e 4 caixas na porta 1;
+// o modo Pack coloca as caixas dentro do palete. Depois do transporte, o "desmontagem"
+// (Separator) tira as caixas. Os rótulos "tipo" (1 = palete, 2 = caixa) escolhem a
+// porta de saída do Separator, já que o contêiner e o conteúdo saem em sequência.
+Model(
+    name: "Montagem de paletes",
+    run: (stop_time: 20000.0, warmup: 500.0, seed: 11, replications: 5),
+    objects: [
+        (name: "paletes", kind: Source(interarrival: Exp(mean: 6.0), labels: { "tipo": Const(1.0) })),
+        (name: "caixas", kind: Source(interarrival: Exp(mean: 1.2), labels: { "tipo": Const(2.0) })),
+        (name: "fila_paletes", kind: Queue(capacity: Some(20))),
+        (name: "fila_caixas", kind: Queue(capacity: Some(50))),
+        (name: "montagem", kind: Combiner(
+            components: [4],
+            mode: Pack,
+            setup: Some(Uniform(min: 0.2, max: 0.5)),
+            process: Triangular(min: 1.0, mode: 1.5, max: 2.5),
+        )),
+        (name: "transporte", kind: Processor(capacity: 2, process: Const(3.0))),
+        (name: "desmontagem", kind: Separator(mode: Unpack, process: Const(1.0)), output: ByLabel("tipo")),
+        (name: "saida_paletes", kind: Sink),
+        (name: "saida_caixas", kind: Sink),
+    ],
+    connections: [
+        ("paletes", "fila_paletes"),
+        ("caixas", "fila_caixas"),
+        ("fila_paletes", "montagem"),
+        ("fila_caixas", "montagem"),
+        ("montagem", "transporte"),
+        ("transporte", "desmontagem"),
+        ("desmontagem", "saida_paletes"),
+        ("desmontagem", "saida_caixas"),
+    ],
+)
