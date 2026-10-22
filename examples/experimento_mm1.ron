@@ -1,0 +1,15 @@
+// Experimento: compara cenários sobre o modelo M/M/1.
+// Cada cenário altera campos do modelo base (chave "objeto.campo" ou "run.campo");
+// o valor é escrito em RON. Todos usam a mesma semente por replicação,
+// então as diferenças vêm do cenário e não do acaso.
+Experiment(
+    name: "Capacidade da máquina",
+    model: "mm1.ron",            // caminho relativo a este arquivo
+    replications: 10,            // opcional: sobrescreve run.replications
+    scenarios: [
+        (name: "base"),
+        (name: "maquina rapida", set: { "maquina.process": "Exp(mean: 0.7)" }),
+        (name: "duas maquinas",  set: { "maquina.capacity": "2", "run.stop_time": "50000.0" }),
+    ],
+    measures: ["fila.content.mean", "maquina.state.processing", "saida.time_in_system.mean"],
+)

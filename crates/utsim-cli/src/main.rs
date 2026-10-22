@@ -1,3 +1,5 @@
+mod experiment;
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -35,6 +37,13 @@ enum Cmd {
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
+    /// Compara cenários de um arquivo de experimento
+    Experiment {
+        file: PathBuf,
+        /// Grava o resultado completo em JSON
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -54,6 +63,7 @@ fn run(cli: Cli) -> Result<(), ModelError> {
             m.validate()?;
             println!("{}: ok ({} objetos, {} conexões)", m.name, m.objects.len(), m.connections.len());
         }
+        Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::Run { model, reps, seed, stop, warmup, json } => {
             let mut m = Model::load(&model)?;
             if let Some(v) = reps {
