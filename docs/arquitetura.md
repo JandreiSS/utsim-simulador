@@ -227,9 +227,31 @@ depois do hook, na ordem em que foram pedidas. Isso mantém o determinismo.
 ocupados, guarda na fila, por prioridade e, entre iguais, por ordem de chegada. Cada
 membro avisa com `MSG_IDLE` quando fica livre.
 
-**Operadores (contrato).** O processador pede `Operate { station }` à equipe. O
-operador viaja até o posto, avisa `MSG_ARRIVED` e fica em `utilize` até receber
-`MSG_RELEASE`.
+**Operadores.** Um processador com `operators: (team, count, setup, process)` pede
+`count` tarefas `Operate { station }` à equipe quando a fase que precisa deles vai
+começar. A fase só inicia quando todos chegam (`MSG_ARRIVED`). Liberação:
+
+- Se setup e processo usam operadores, a mesma equipe é mantida do setup até o fim do
+  processo, como no "same as setup" do simuladores comerciais.
+- Se só o setup usa, eles são liberados ao fim do setup.
+- A liberação acontece ao fim do processo, antes de a peça sair. Uma saída bloqueada
+  não prende o operador.
+- Cada peça tem seus próprios pedidos, então capacidade > 1 funciona, coisa que o
+  simuladores comerciais não suporta bem.
+- Numa quebra, os operadores ficam no posto e os tempos pausam.
+
+Prioridade de estado: processando > setup > aguardando operador > aguardando
+transporte/bloqueado > ocioso.
+
+**Rede de caminhos.** Com `network: (nodes, edges)`, as viagens seguem o menor
+trajeto (Dijkstra pré-calculado para todos os pares; arestas de mão única ou dupla).
+- Um ponto fora da rede entra e sai pelo **nó mais próximo**, em linha reta. Empates vão
+  para o nó listado primeiro.
+- Entre caminhos de mesmo comprimento vence o que passa pelos nós listados primeiro, o
+  que mantém o resultado determinístico.
+- A validação recusa redes em que algum nó não alcança todos os outros (beco sem saída
+  de mão única, rede partida). Laços de mão única são permitidos.
+- O transportador só parte quando a tarefa existe. Ele não espera de antemão na origem.
 
 > **Nosso jeito:** no simuladores comerciais as sequências de tarefas são listas genéricas (travel,
 > load, unload, utilize, break...). Aqui o transportador recebe só duas tarefas de alto
