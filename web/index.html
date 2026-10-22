@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UTSim no navegador</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>UTSim <small>simulação de eventos discretos no navegador</small></h1>
+  <nav role="tablist">
+    <button role="tab" id="tab-sim" aria-selected="true" aria-controls="painel-sim">Simular</button>
+    <button role="tab" id="tab-fit" aria-selected="false" aria-controls="painel-fit">Ajustar distribuição</button>
+  </nav>
+</header>
+
+<p id="status" class="status" role="status">Carregando o motor (WebAssembly)…</p>
+
+<main>
+  <section id="painel-sim" role="tabpanel" aria-labelledby="tab-sim">
+    <div class="barra">
+      <label>Exemplo
+        <select id="exemplos"></select>
+      </label>
+      <label>Replicações
+        <input id="replicacoes" type="number" min="1" max="1000" value="10">
+      </label>
+      <button id="validar" disabled>Validar</button>
+      <button id="simular" class="primario" disabled>Simular</button>
+    </div>
+    <div class="duas-colunas">
+      <div>
+        <label for="modelo" class="rotulo">Modelo (formato RON)</label>
+        <textarea id="modelo" spellcheck="false" rows="24"></textarea>
+        <ul id="erros" class="erros" hidden></ul>
+      </div>
+      <div>
+        <h2 id="titulo-resultado">Resultados</h2>
+        <p id="resumo" class="resumo">Clique em <strong>Simular</strong> para ver as métricas por objeto (média ± meia-largura do IC de 95%).</p>
+        <div id="resultado" class="tabela-rolavel"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="painel-fit" role="tabpanel" aria-labelledby="tab-fit" hidden>
+    <p>Cole os dados (uma coluna de números, ou um CSV com cabeçalho) ou envie um arquivo. O UTSim ajusta as distribuições candidatas, testa a aderência e explica a escolha.</p>
+    <div class="barra">
+      <label>Arquivo
+        <input id="arquivo" type="file" accept=".csv,.txt,.tsv,text/plain,text/csv">
+      </label>
+      <label>Coluna
+        <input id="coluna" type="text" placeholder="nome ou número (opcional)" size="18">
+      </label>
+      <label class="inline"><input id="instantes" type="checkbox"> a coluna são instantes (usar as diferenças)</label>
+      <label>Bootstrap
+        <input id="bootstrap" type="number" min="0" max="2000" value="200">
+      </label>
+      <button id="ajustar" class="primario" disabled>Ajustar</button>
+    </div>
+    <textarea id="dados" spellcheck="false" rows="10" placeholder="tempo&#10;1,2&#10;0,8&#10;2,5&#10;…"></textarea>
+    <p id="fit-erro" class="erro" hidden></p>
+    <iframe id="relatorio" title="Relatório de ajuste" hidden></iframe>
+  </section>
+</main>
+
+<footer>
+  UTSim é software livre (GPL-3.0-or-later). Tudo roda no seu navegador; nenhum dado sai do seu computador.
+</footer>
+
+<script src="dist/utsim.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
