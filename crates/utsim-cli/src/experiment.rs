@@ -11,7 +11,11 @@ pub fn run(file: &Path, json: Option<&Path>) -> Result<(), ModelError> {
     let started = std::time::Instant::now();
     let result = experiment.run()?;
     print_table(&result);
-    println!("\n{} cenário(s) em {:.2?}", result.scenarios.len(), started.elapsed());
+    println!(
+        "\n{} cenário(s) em {:.2?}",
+        result.scenarios.len(),
+        started.elapsed()
+    );
     if let Some(path) = json {
         let text = serde_json::to_string_pretty(&result).expect("result serializes");
         std::fs::write(path, text)?;
@@ -30,8 +34,11 @@ fn cell(s: Option<&Summary>) -> String {
 
 fn print_table(result: &ExperimentResult) {
     let measures: Vec<String> = if result.measures.is_empty() {
-        let mut all: Vec<String> =
-            result.scenarios.iter().flat_map(|s| s.summary.keys().cloned()).collect();
+        let mut all: Vec<String> = result
+            .scenarios
+            .iter()
+            .flat_map(|s| s.summary.keys().cloned())
+            .collect();
         all.sort();
         all.dedup();
         all
@@ -40,17 +47,37 @@ fn print_table(result: &ExperimentResult) {
     };
     let rows: Vec<Vec<String>> = measures
         .iter()
-        .map(|m| result.scenarios.iter().map(|s| cell(s.summary.get(m))).collect())
+        .map(|m| {
+            result
+                .scenarios
+                .iter()
+                .map(|s| cell(s.summary.get(m)))
+                .collect()
+        })
         .collect();
-    let first = measures.iter().map(String::len).max().unwrap_or(0).max("medida".len());
+    let first = measures
+        .iter()
+        .map(String::len)
+        .max()
+        .unwrap_or(0)
+        .max("medida".len());
     let widths: Vec<usize> = result
         .scenarios
         .iter()
         .enumerate()
-        .map(|(i, s)| rows.iter().map(|r| r[i].chars().count()).max().unwrap_or(0).max(s.name.chars().count()))
+        .map(|(i, s)| {
+            rows.iter()
+                .map(|r| r[i].chars().count())
+                .max()
+                .unwrap_or(0)
+                .max(s.name.chars().count())
+        })
         .collect();
 
-    println!("{}: média ± meia-amplitude do IC de 95% entre replicações\n", result.name);
+    println!(
+        "{}: média ± meia-amplitude do IC de 95% entre replicações\n",
+        result.name
+    );
     print!("{:<first$}", "medida");
     for (s, w) in result.scenarios.iter().zip(&widths) {
         print!("  {:>w$}", s.name);

@@ -10,7 +10,11 @@ use utsim_core::{RunReport, summarize};
 use utsim_model::{Model, ModelError};
 
 #[derive(Parser)]
-#[command(name = "utsim", version, about = "UTSim: simulador de eventos discretos")]
+#[command(
+    name = "utsim",
+    version,
+    about = "UTSim: simulador de eventos discretos"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -71,10 +75,25 @@ fn run(cli: Cli) -> Result<(), ModelError> {
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
             m.validate()?;
-            println!("{}: ok ({} objetos, {} conexões)", m.name, m.objects.len(), m.connections.len());
+            println!(
+                "{}: ok ({} objetos, {} conexões)",
+                m.name,
+                m.objects.len(),
+                m.connections.len()
+            );
         }
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
-        Cmd::Run { model, reps, seed, stop, warmup, json, csv, sample, bins } => {
+        Cmd::Run {
+            model,
+            reps,
+            seed,
+            stop,
+            warmup,
+            json,
+            csv,
+            sample,
+            bins,
+        } => {
             let mut m = Model::load(&model)?;
             if let Some(v) = reps {
                 m.run.replications = v;
@@ -106,7 +125,10 @@ fn run(cli: Cli) -> Result<(), ModelError> {
             }
             if let Some(path) = json {
                 let out = serde_json::json!({ "model": m.name, "summary": summarize(&reports), "replications": reports });
-                std::fs::write(&path, serde_json::to_string_pretty(&out).expect("report serializes"))?;
+                std::fs::write(
+                    &path,
+                    serde_json::to_string_pretty(&out).expect("report serializes"),
+                )?;
                 println!("relatório gravado em {}", path.display());
             }
         }
@@ -158,13 +180,24 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
             .map(|k| format!("{k} {}", cell(format!("{n}.{k}.mean"))))
             .collect();
         if !states.is_empty() || !extras.is_empty() {
-            println!("{n:<14} {}", states.into_iter().chain(extras).collect::<Vec<_>>().join(" | "));
+            println!(
+                "{n:<14} {}",
+                states
+                    .into_iter()
+                    .chain(extras)
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            );
         }
     }
 }
 
 fn fmt(s: &Summary) -> String {
-    if s.half_width.is_nan() { format!("{:.4}", s.mean) } else { format!("{:.4} ± {:.4}", s.mean, s.half_width) }
+    if s.half_width.is_nan() {
+        format!("{:.4}", s.mean)
+    } else {
+        format!("{:.4} ± {:.4}", s.mean, s.half_width)
+    }
 }
 
 fn fmt_pct(s: &Summary) -> String {
