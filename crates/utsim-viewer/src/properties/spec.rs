@@ -48,6 +48,8 @@ pub fn kind_name(kind: &ObjectKind) -> &'static str {
         ObjectKind::Combiner { .. } => "Montagem",
         ObjectKind::Separator { .. } => "Desmontagem",
         ObjectKind::Sink => "Saída",
+        ObjectKind::Transporter { .. } => "Transportador",
+        ObjectKind::Dispatcher { .. } => "Despachante",
     }
 }
 
@@ -83,6 +85,8 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("process", "Tempo de processamento", Dist),
         ],
         ObjectKind::Sink => Vec::new(),
+        // Phase 4 kinds: edited by the phase 4 UI front.
+        ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => Vec::new(),
     }
 }
 

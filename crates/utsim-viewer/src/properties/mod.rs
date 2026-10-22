@@ -172,6 +172,8 @@ mod tests {
                 ObjectKind::Combiner { .. } => &["components", "mode", "setup", "process"],
                 ObjectKind::Separator { .. } => &["mode", "process"],
                 ObjectKind::Sink => &[],
+                // Phase 4 kinds: fields added by the phase 4 UI front.
+                ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => &[],
             };
             for k in expected.iter().chain(&["output", "downtime", "shifts"]) {
                 assert!(keys.contains(k), "{}: missing {k}", obj.name);

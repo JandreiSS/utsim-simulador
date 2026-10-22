@@ -883,6 +883,7 @@ impl Editor<'_> {
                 capacity,
                 setup,
                 process,
+                ..
             } => {
                 self.uint_field(ui, "Capacidade", "capacity", *capacity, 1);
                 self.opt_dist_field(
@@ -963,6 +964,9 @@ impl Editor<'_> {
             }
             ObjectKind::Sink => {
                 ui.weak("A saída não tem parâmetros.");
+            }
+            ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. } => {
+                ui.weak("Edição deste tipo no painel: em construção (fase 4).");
             }
         }
     }

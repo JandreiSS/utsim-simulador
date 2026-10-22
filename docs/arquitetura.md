@@ -202,6 +202,40 @@ remover, renomear, mover, alterar campo, ligar, desligar, lote) aplicado por um
 > Aqui o modelo continua sendo um texto legível, e o editor é só uma forma confortável de
 > produzir esse texto.
 
+## 4f. Recursos móveis (fase 4)
+Um objeto com `transport: "empilhadeira"` não entrega o item direto ao próximo. A
+sequência é:
+
+1. Quando o destino aceita o item, o kernel **reserva o lugar** no destino. Itens a
+   caminho contam como conteúdo, então um processador de capacidade 1 com uma peça
+   chegando não aceita outra.
+2. O item fica **no objeto de origem**, marcado como aguardando transporte (o
+   Processor mostra `waiting_transport`).
+3. O kernel envia uma tarefa `Transport` ao transportador ou ao despachante.
+4. O transportador viaja até a origem (`travel_empty`), carrega (`loading`), apanha o
+   item com `pick_up`, viaja (`travel_loaded`), descarrega (`unloading`) e entrega com
+   `drop_off` na porta reservada.
+5. As viagens seguem `Ctx::route` (linha reta, ou a rede de caminhos quando existir),
+   com perfil de velocidade trapezoidal (aceleração e desaceleração opcionais). Cada
+   trecho gera um `TraceEvent::Travel` para o 3D.
+
+**Mensagens entre blocos.** Um hook só altera o próprio bloco. Tarefas (`on_task`),
+mensagens (`on_message`), apanhar e entregar viram operações que o kernel executa logo
+depois do hook, na ordem em que foram pedidas. Isso mantém o determinismo.
+
+**Despachante.** Recebe tarefas e repassa a um membro livre da equipe. Se todos estão
+ocupados, guarda na fila, por prioridade e, entre iguais, por ordem de chegada. Cada
+membro avisa com `MSG_IDLE` quando fica livre.
+
+**Operadores (contrato).** O processador pede `Operate { station }` à equipe. O
+operador viaja até o posto, avisa `MSG_ARRIVED` e fica em `utilize` até receber
+`MSG_RELEASE`.
+
+> **Nosso jeito:** no simuladores comerciais as sequências de tarefas são listas genéricas (travel,
+> load, unload, utilize, break...). Aqui o transportador recebe só duas tarefas de alto
+> nível, `Transport` e `Operate`, e decide os passos sozinho. É mais simples de
+> modelar e de testar. Sequências genéricas podem vir com o fluxo de tokens (fase 6).
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
