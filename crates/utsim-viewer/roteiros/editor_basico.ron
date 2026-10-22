@@ -73,7 +73,7 @@
     EsperarSegundos(3.0),
     Captura("09_simulacao_rodando"),
     Afirmar(TempoSimuladoMin(0.5)),
-    ClicarBotao("✎ Editar"),
+    ClicarBotao("Editar"),
     Afirmar(Modo(Editar)),
     Captura("10_de_volta_ao_editar"),
 ]

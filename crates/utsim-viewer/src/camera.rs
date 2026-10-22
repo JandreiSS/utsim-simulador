@@ -1,11 +1,18 @@
 //! Orbit / pan / zoom camera.
 //!
 //! Left drag: pan. Right drag: orbit. Wheel: zoom. A left click without dragging
-//! selects the block under the cursor (see `scene::pick`).
+//! selects the block under the cursor (see `scene::pick`). `F` (or the "Enquadrar"
+//! button) frames the whole model inside the free area left by the docked panels.
 
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
+use utsim_viewer::editing::NetworkView;
+use utsim_viewer::view;
+
+use crate::dock::{Dock, pointer_over_ui};
+use crate::editor::{Editor, Mode};
+use crate::playback::Data;
 
 /// Set by the editor while a left-button gesture belongs to a block (dragging it),
 /// so the camera does not pan at the same time.
@@ -40,18 +47,20 @@ impl OrbitCam {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
 pub fn control(
     mut cam: ResMut<OrbitCam>,
     lock: Res<CameraLock>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
+    dock: Res<Dock>,
     mut contexts: EguiContexts,
     mut transform: Single<&mut Transform, With<Camera3d>>,
 ) {
     let over_ui = contexts
         .ctx_mut()
-        .is_ok_and(|ctx| ctx.egui_wants_pointer_input() || ctx.is_pointer_over_egui());
+        .is_ok_and(|ctx| pointer_over_ui(ctx, &dock));
     if !over_ui {
         let d = motion.delta;
         if buttons.pressed(MouseButton::Right) {
@@ -74,4 +83,66 @@ pub fn control(
         }
     }
     **transform = cam.transform();
+}
+
+/// Frames still to spend re-fitting the model after a request (the panels need a frame
+/// or two to settle on their size before the free area is final).
+#[derive(Resource, Default)]
+pub struct FrameRequest(pub u32);
+
+/// Fits the whole model (blocks and path network) in the free area: on open, when
+/// entering `Simular`, after a new document, and on `F` / "Enquadrar".
+pub fn frame_scene(
+    mut request: ResMut<FrameRequest>,
+    mut editor: ResMut<Editor>,
+    data: Res<Data>,
+    keys: Res<ButtonInput<KeyCode>>,
+    dock: Res<Dock>,
+    mut cam: ResMut<OrbitCam>,
+    mut contexts: EguiContexts,
+) {
+    let typing = contexts
+        .ctx_mut()
+        .is_ok_and(|ctx| ctx.egui_wants_keyboard_input());
+    let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    if (keys.just_pressed(KeyCode::KeyF) && !typing && !ctrl) || editor.frame_request {
+        editor.frame_request = false;
+        request.0 = 6;
+    }
+    if request.0 == 0 || !dock.ready {
+        return;
+    }
+    let size = dock.free.size();
+    request.0 -= 1;
+    let (min, max) = match editor.mode {
+        Mode::Edit => {
+            let net = NetworkView::of(editor.doc.model());
+            let kinds: Vec<&str> = editor.view.kinds.clone();
+            view::scene_bounds(&editor.view.positions, &kinds, &net.nodes)
+        }
+        Mode::Sim => {
+            let kinds: Vec<&str> = data.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
+            view::scene_bounds(&data.positions, &kinds, &data.network.nodes)
+        }
+    }
+    .unwrap_or(([0.0; 3], [0.0; 3]));
+    // An empty or tiny model still gets a ground area to work on (16 x 16 at least).
+    let (mut min, mut max) = (min, max);
+    for k in [0, 2] {
+        let mid = (min[k] + max[k]) / 2.0;
+        if max[k] - min[k] < 16.0 {
+            (min[k], max[k]) = (mid - 8.0, mid + 8.0);
+        }
+    }
+    let f = view::frame_box(
+        min,
+        max,
+        cam.yaw,
+        cam.pitch,
+        size.x / size.y.max(1.0),
+        crate::dock::FOV_Y,
+        0.08,
+    );
+    cam.target = Vec3::from(f.target);
+    cam.dist = f.dist.clamp(1.5, 5000.0);
 }

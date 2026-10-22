@@ -3,6 +3,7 @@
 //! produces a `Replay` that the viewer only reads.
 
 mod camera;
+mod dock;
 mod editor;
 mod playback;
 mod scene;
@@ -242,6 +243,8 @@ fn main() -> ExitCode {
         .add_plugins(EguiPlugin::default())
         .insert_resource(camera::OrbitCam::framing(min, max))
         .insert_resource(camera::CameraLock::default())
+        .insert_resource(camera::FrameRequest(8))
+        .insert_resource(dock::Dock::default())
         .insert_resource(playback::Playback::new(data.end))
         .insert_resource(playback::Selection::default())
         .insert_resource(data)
@@ -257,6 +260,7 @@ fn main() -> ExitCode {
                     .run_if(editor::in_edit),
                 playback::keyboard.run_if(editor::in_sim),
                 playback::advance_clock.run_if(editor::in_sim),
+                camera::frame_scene,
                 camera::control,
                 scene::pick.run_if(editor::in_sim),
                 scene::sync_blocks,
@@ -276,9 +280,11 @@ fn main() -> ExitCode {
         .add_systems(
             EguiPrimaryContextPass,
             (
+                dock::begin,
                 editor::toolbar,
                 editor::edit_panels.run_if(editor::in_edit),
                 ui::panel.run_if(editor::in_sim),
+                dock::apply_viewport,
             )
                 .chain(),
         )

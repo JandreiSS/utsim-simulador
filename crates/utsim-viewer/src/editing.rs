@@ -136,11 +136,22 @@ pub struct EditView {
     pub kinds: Vec<&'static str>,
     pub positions: Vec<[f32; 3]>,
     pub connections: Vec<(usize, usize)>,
+    /// Per connection: the source hands its items to a transporter (`transport` set), so
+    /// the link is only logical flow and the vehicle carries the item.
+    pub logical: Vec<bool>,
 }
 
 impl EditView {
     pub fn of(model: &Model) -> Self {
         let index = |name: &str| model.objects.iter().position(|o| o.name == name);
+        let links: Vec<((usize, usize), bool)> = model
+            .connections
+            .iter()
+            .filter_map(|(a, b)| {
+                let ia = index(a)?;
+                Some(((ia, index(b)?), model.objects[ia].transport.is_some()))
+            })
+            .collect();
         EditView {
             names: model.objects.iter().map(|o| o.name.clone()).collect(),
             kinds: model.objects.iter().map(|o| kind_name(&o.kind)).collect(),
@@ -149,11 +160,8 @@ impl EditView {
                 .iter()
                 .map(|o| layout::to_bevy(o.position))
                 .collect(),
-            connections: model
-                .connections
-                .iter()
-                .filter_map(|(a, b)| Some((index(a)?, index(b)?)))
-                .collect(),
+            connections: links.iter().map(|l| l.0).collect(),
+            logical: links.iter().map(|l| l.1).collect(),
         }
     }
 
@@ -162,14 +170,21 @@ impl EditView {
     }
 }
 
+/// Whether the model has several objects and every one sits at (0,0,0).
+pub fn needs_layout(model: &Model) -> bool {
+    let raw: Vec<[f64; 3]> = model.objects.iter().map(|o| o.position).collect();
+    raw.len() >= 2 && layout::all_at_origin(&raw)
+}
+
 /// The automatic layout as a single undoable `Batch` of `Move` commands, only when
 /// the model has several objects and every one sits at (0,0,0). Positions are
-/// snapped to the grid.
+/// snapped to the grid. Models with a path network are left alone: the network has
+/// its own coordinates and the blocks must be placed at its nodes.
 pub fn auto_layout_command(model: &Model) -> Option<Command> {
-    let raw: Vec<[f64; 3]> = model.objects.iter().map(|o| o.position).collect();
-    if raw.len() < 2 || !layout::all_at_origin(&raw) {
+    if !needs_layout(model) || model.network.is_some() {
         return None;
     }
+    let raw: Vec<[f64; 3]> = model.objects.iter().map(|o| o.position).collect();
     let view = EditView::of(model);
     let bevy = layout::auto_layout(raw.len(), &view.connections);
     let moves = model
@@ -182,6 +197,23 @@ pub fn auto_layout_command(model: &Model) -> Option<Command> {
         })
         .collect();
     Some(Command::Batch(moves))
+}
+
+/// For each connection of `replay`, whether its source object hands items to a
+/// transporter in `model` (a logical link, see [`EditView::logical`]).
+pub fn logical_flags(model: &Model, replay: &Replay) -> Vec<bool> {
+    replay
+        .connections
+        .iter()
+        .map(|&(a, _)| {
+            replay.blocks.get(a).is_some_and(|block| {
+                model
+                    .objects
+                    .iter()
+                    .any(|o| o.name == block.name && o.transport.is_some())
+            })
+        })
+        .collect()
 }
 
 /// Default `stop_time` of a quick simulation run.
@@ -343,6 +375,45 @@ mod tests {
         assert!(auto_layout_command(doc.model()).is_none(), "only once");
         assert!(doc.undo());
         assert_eq!(doc.model(), &before);
+    }
+
+    #[test]
+    fn auto_layout_is_not_applied_to_models_with_a_network() {
+        let text = r#"Model(
+            name: "n", run: (stop_time: 10.0),
+            objects: [(name: "s", kind: Source(interarrival: Const(1.0))), (name: "k", kind: Sink)],
+            connections: [("s", "k")],
+            network: Some((
+                nodes: [(name: "a", position: (1.0, 2.0, 0.0)), (name: "b", position: (5.0, 2.0, 0.0))],
+                edges: [(from: "a", to: "b")],
+            )),
+        )"#;
+        let model = Model::parse(text).unwrap();
+        assert!(needs_layout(&model), "still needs positions");
+        assert!(auto_layout_command(&model).is_none());
+        assert!(auto_layout_command(chain(false).model()).is_some());
+    }
+
+    #[test]
+    fn transported_sources_make_logical_connections() {
+        let text = r#"Model(
+            name: "n", run: (stop_time: 10.0),
+            objects: [
+                (name: "q", kind: Queue(), transport: "d", position: (0.0, 0.0, 0.0)),
+                (name: "s", kind: Sink, position: (5.0, 0.0, 0.0)),
+                (name: "v", kind: Transporter(speed: 1.0), position: (0.0, 0.0, 0.0)),
+                (name: "d", kind: Dispatcher(team: ["v"]), position: (0.0, 0.0, 0.0)),
+            ],
+            connections: [("q", "s")],
+        )"#;
+        let model = Model::parse(text).unwrap();
+        assert_eq!(EditView::of(&model).logical, vec![true]);
+        let replay = model.replay(0).unwrap();
+        assert_eq!(logical_flags(&model, &replay), vec![true]);
+        assert_eq!(
+            EditView::of(chain(true).model()).logical,
+            vec![false, false]
+        );
     }
 
     #[test]

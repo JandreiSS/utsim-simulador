@@ -6,6 +6,9 @@
     Esperar(quadros: 20),
     Afirmar(Modo(Editar)),
     Afirmar(ProblemasIgual(0)),
+    // Posições todas zero: o layout automático entra, mas o status explica o asterisco.
+    Afirmar(StatusContem("Layout automático aplicado: salve para manter as posições")),
+    Afirmar(Sujo(true)),
     Captura("01_editar"),
 
     ClicarBotao("▶ Simular"),
@@ -45,8 +48,12 @@
     MoverPara(Tela(760.0, 600.0)),
     Soltar(Direito),
     Captura("10_camera_girada"),
+    // "F" enquadra o modelo de novo na área livre.
+    Tecla("F"),
+    Esperar(quadros: 12),
+    Captura("10b_enquadrado"),
 
-    ClicarBotao("✎ Editar"),
+    ClicarBotao("Editar"),
     Afirmar(Modo(Editar)),
     Captura("11_de_volta_ao_editar"),
 ]

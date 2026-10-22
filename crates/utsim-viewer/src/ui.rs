@@ -3,8 +3,10 @@
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use utsim_core::TallySummary;
-use utsim_viewer::style;
+use utsim_viewer::{style, view};
 
+use crate::dock::Dock;
+use crate::editor::Editor;
 use crate::playback::{Data, Playback, SPEEDS, Selection};
 
 fn fmt_tally(t: &TallySummary) -> String {
@@ -23,45 +25,104 @@ pub struct Label {
     pub text: String,
     /// Bevy-space base position of the block.
     pub position: [f32; 3],
-    pub kind: String,
+    /// Height above the base where the block (and the items on it) ends.
+    pub height: f32,
     pub selected: bool,
 }
 
-/// Block names above the blocks (shared by both modes).
-pub fn draw_labels(ctx: &egui::Context, cam: &Camera, cam_tf: &GlobalTransform, labels: &[Label]) {
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Background,
-        egui::Id::new("rotulos"),
-    ));
+/// Block names above the blocks (shared by both modes), decluttered in screen space:
+/// a label that would cover another is pushed up and tied to its block by a thin line.
+/// `free` is the part of the window not covered by panels; labels are clipped to it.
+pub fn draw_labels(
+    ctx: &egui::Context,
+    cam: &Camera,
+    cam_tf: &GlobalTransform,
+    labels: &[Label],
+    free: egui::Rect,
+) {
+    let painter = ctx
+        .layer_painter(egui::LayerId::new(
+            egui::Order::Background,
+            egui::Id::new("rotulos"),
+        ))
+        .with_clip_rect(free);
+    let font = egui::FontId::proportional(13.0);
+    let pad = egui::vec2(3.0, 1.0);
+    let mut anchors: Vec<egui::Pos2> = Vec::new();
+    let mut galleys = Vec::new();
+    let mut boxes: Vec<view::LabelBox> = Vec::new();
     for label in labels {
-        let (half, _) = style::extents(style::shape_of(&label.kind));
-        let world = Vec3::from(label.position) + Vec3::Y * (half[1] * 2.0 + 0.9);
-        if let Ok(p) = cam.world_to_viewport(cam_tf, world) {
-            let fg = if label.selected {
-                egui::Color32::WHITE
-            } else {
-                egui::Color32::from_gray(190)
-            };
-            painter.text(
-                egui::pos2(p.x, p.y),
-                egui::Align2::CENTER_BOTTOM,
-                &label.text,
-                egui::FontId::proportional(13.0),
-                fg,
-            );
+        let world = Vec3::from(label.position) + Vec3::Y * (label.height + 0.5);
+        let Ok(p) = cam.world_to_viewport(cam_tf, world) else {
+            continue;
+        };
+        let anchor = egui::pos2(p.x, p.y);
+        let fg = if label.selected {
+            egui::Color32::WHITE
+        } else {
+            egui::Color32::from_gray(205)
+        };
+        let galley = painter.layout_no_wrap(label.text.clone(), font.clone(), fg);
+        let size = galley.size() + pad * 2.0;
+        boxes.push(view::LabelBox {
+            anchor: [anchor.x, anchor.y],
+            size: [size.x, size.y],
+            first: label.selected,
+        });
+        anchors.push(anchor);
+        galleys.push(galley);
+    }
+    let placed = view::declutter(&boxes, 2.0);
+    for ((place, anchor), galley) in placed.iter().zip(&anchors).zip(galleys) {
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(place.min[0], place.min[1]),
+            egui::vec2(place.size[0], place.size[1]),
+        );
+        if place.displaced {
+            let line = egui::Stroke::new(1.0, egui::Color32::from_white_alpha(110));
+            painter.line_segment([*anchor, rect.center_bottom()], line);
+            painter.circle_filled(*anchor, 2.0, egui::Color32::from_white_alpha(160));
         }
+        painter.rect_filled(rect, 3.0, egui::Color32::from_black_alpha(170));
+        painter.galley(rect.min + pad, galley, egui::Color32::WHITE);
     }
 }
 
+/// What the "state" column of a block shows: the state name, or for sinks (which never
+/// change state) how many items they received so far.
+fn state_text(kind: &str, state: Option<utsim_core::State>, received: usize) -> String {
+    if kind == "Sink" {
+        format!("recebidos: {received}")
+    } else {
+        style::state_label(state).to_string()
+    }
+}
+
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
 pub fn panel(
     mut contexts: EguiContexts,
     data: Res<Data>,
     mut pb: ResMut<Playback>,
     mut selection: ResMut<Selection>,
+    mut dock: ResMut<Dock>,
+    mut editor: ResMut<Editor>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let tl = &data.timeline;
+
+    let mut ui = dock.ui(ctx, "esquerda");
+    egui::Panel::left("painel_simulacao")
+        .default_size(350.0)
+        .size_range(260.0..=560.0)
+        .show(&mut ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    sim_controls(ui, &data, &mut pb, &mut selection, &mut editor)
+                });
+        });
+    dock.free = ui.available_rect_before_wrap();
 
     let (cam, cam_tf) = *camera;
     let labels: Vec<Label> = data
@@ -70,116 +131,119 @@ pub fn panel(
         .iter()
         .enumerate()
         .map(|(i, block)| {
+            let shape = style::shape_of(&block.kind);
             let content = tl.block_content(i, pb.t);
+            let hidden = style::hidden_items(shape, content);
+            let received = (block.kind == "Sink").then(|| tl.block_received(i, pb.t));
             Label {
-                text: if content > 0 {
-                    format!("{} ({content})", block.name)
-                } else {
-                    block.name.clone()
-                },
+                text: style::label_text(&block.name, content, hidden, received),
                 position: crate::scene::block_base_at(&data, i, pb.t).to_array(),
-                kind: block.kind.clone(),
+                height: style::top_of_stack(shape, content),
                 selected: selection.0 == Some(i),
             }
         })
         .collect();
-    draw_labels(ctx, cam, cam_tf, &labels);
+    draw_labels(ctx, cam, cam_tf, &labels, dock.free);
+    Ok(())
+}
 
-    egui::Window::new("UTSim - visualizador")
-        .default_pos(egui::pos2(10.0, 10.0))
-        .default_width(330.0)
-        .show(ctx, |ui| {
-            ui.label(format!(
-                "{} - replicação {}",
-                data.replay.model, data.replay.replication
-            ));
-            ui.label(format!(
-                "{} blocos, {} itens, {} eventos de rastro",
-                tl.block_count(),
-                tl.item_count(),
-                tl.record_count()
-            ));
-            ui.separator();
+fn sim_controls(
+    ui: &mut egui::Ui,
+    data: &Data,
+    pb: &mut Playback,
+    selection: &mut Selection,
+    editor: &mut Editor,
+) {
+    let tl = &data.timeline;
+    ui.heading("Simulação");
+    ui.label(format!(
+        "{} - replicação {}",
+        data.replay.model, data.replay.replication
+    ));
+    ui.label(format!(
+        "{} blocos, {} itens, {} eventos de rastro",
+        tl.block_count(),
+        tl.item_count(),
+        tl.record_count()
+    ));
+    ui.separator();
 
-            ui.horizontal(|ui| {
-                let label = if pb.playing { "Pausar" } else { "Reproduzir" };
-                if ui.button(label).clicked() {
-                    if pb.t >= data.end {
-                        pb.t = 0.0;
-                    }
-                    pb.playing = !pb.playing;
-                }
-                if ui.button("< Evento").clicked() {
-                    pb.playing = false;
-                    let t = pb.t;
-                    pb.t = tl.prev_event_time(t).unwrap_or(0.0);
-                }
-                if ui.button("Evento >").clicked() {
-                    pb.playing = false;
-                    let t = pb.t;
-                    pb.t = tl.next_event_time(t).unwrap_or(data.end).min(data.end);
-                }
-                if ui.button("Início").clicked() {
-                    pb.t = 0.0;
-                }
-            });
-            ui.horizontal(|ui| {
-                if ui.button("-").clicked() {
-                    pb.slower();
-                }
-                ui.label(format!(
-                    "velocidade x{} (unidades de tempo por segundo)",
-                    SPEEDS[pb.speed_idx]
-                ));
-                if ui.button("+").clicked() {
-                    pb.faster();
-                }
-            });
-            let mut t = pb.t;
-            let slider = egui::Slider::new(&mut t, 0.0..=data.end.max(f64::MIN_POSITIVE))
-                .text("tempo")
-                .smart_aim(false);
-            if ui.add(slider).changed() {
-                pb.t = t;
-                pb.playing = false;
+    ui.horizontal_wrapped(|ui| {
+        let label = if pb.playing { "Pausar" } else { "Reproduzir" };
+        if ui.button(label).clicked() {
+            if pb.t >= data.end {
+                pb.t = 0.0;
             }
-            ui.label(format!("tempo simulado: {:.4} de {:.4}", pb.t, data.end));
-            ui.weak("Espaço: reproduzir/pausar | +/-: velocidade | setas: evento anterior/próximo");
-            ui.weak(
-                "Mouse: esquerdo arrasta (move) e clica (seleciona), direito gira, roda aproxima",
-            );
-            ui.separator();
+            pb.playing = !pb.playing;
+        }
+        if ui.button("< Evento").clicked() {
+            pb.playing = false;
+            let t = pb.t;
+            pb.t = tl.prev_event_time(t).unwrap_or(0.0);
+        }
+        if ui.button("Evento >").clicked() {
+            pb.playing = false;
+            let t = pb.t;
+            pb.t = tl.next_event_time(t).unwrap_or(data.end).min(data.end);
+        }
+        if ui.button("Início").clicked() {
+            pb.t = 0.0;
+        }
+        if ui.button("Enquadrar (F)").clicked() {
+            editor.frame_request = true;
+        }
+    });
+    ui.horizontal(|ui| {
+        if ui.button("-").clicked() {
+            pb.slower();
+        }
+        ui.label(format!("velocidade x{}", SPEEDS[pb.speed_idx]));
+        if ui.button("+").clicked() {
+            pb.faster();
+        }
+    });
+    ui.weak("unidades de tempo simulado por segundo");
+    let mut t = pb.t;
+    let slider = egui::Slider::new(&mut t, 0.0..=data.end.max(f64::MIN_POSITIVE))
+        .text("tempo")
+        .smart_aim(false);
+    if ui.add(slider).changed() {
+        pb.t = t;
+        pb.playing = false;
+    }
+    ui.label(format!("tempo simulado: {:.4} de {:.4}", pb.t, data.end));
+    ui.weak("Espaço: reproduzir/pausar | +/-: velocidade | setas: evento anterior/próximo | F: enquadrar");
+    ui.weak("Mouse: esquerdo arrasta (move) e clica (seleciona), direito gira, roda aproxima");
+    ui.separator();
 
-            ui.strong("Blocos");
-            egui::ScrollArea::vertical()
-                .id_salt("lista_blocos")
-                .max_height(150.0)
-                .show(ui, |ui| {
-                    for (i, block) in data.replay.blocks.iter().enumerate() {
-                        let state = tl.block_state(i, pb.t);
-                        let text = format!(
-                            "{} [{}]  {}  ({})",
-                            block.name,
-                            block.kind,
-                            style::state_label(state),
-                            tl.block_content(i, pb.t)
-                        );
-                        let on = selection.0 == Some(i);
-                        if ui.selectable_label(on, text).clicked() {
-                            selection.0 = if on { None } else { Some(i) };
-                        }
-                    }
-                });
-            ui.separator();
-
-            match selection.0.filter(|s| *s < data.replay.blocks.len()) {
-                None => {
-                    ui.label("Clique em um bloco para ver suas estatísticas.");
+    ui.strong("Blocos");
+    egui::ScrollArea::vertical()
+        .id_salt("lista_blocos")
+        .max_height(170.0)
+        .show(ui, |ui| {
+            for (i, block) in data.replay.blocks.iter().enumerate() {
+                let state = tl.block_state(i, pb.t);
+                let text = format!(
+                    "{} [{}]  {}  ({})",
+                    block.name,
+                    block.kind,
+                    state_text(&block.kind, state, tl.block_received(i, pb.t)),
+                    tl.block_content(i, pb.t)
+                );
+                let on = selection.0 == Some(i);
+                if ui.selectable_label(on, text).clicked() {
+                    selection.0 = if on { None } else { Some(i) };
                 }
-                Some(sel) => block_stats(ui, &data, sel, pb.t),
             }
         });
-    Ok(())
+    ui.separator();
+
+    match selection.0.filter(|s| *s < data.replay.blocks.len()) {
+        None => {
+            ui.label("Clique em um bloco para ver suas estatísticas.");
+        }
+        Some(sel) => block_stats(ui, data, sel, pb.t),
+    }
 }
 
 fn block_stats(ui: &mut egui::Ui, data: &Data, sel: usize, t: f64) {
@@ -197,8 +261,13 @@ fn block_stats(ui: &mut egui::Ui, data: &Data, sel: usize, t: f64) {
         .striped(true)
         .show(ui, |ui| {
             let state = tl.block_state(sel, t);
-            ui.label("estado agora");
-            ui.label(style::state_label(state));
+            if block.kind == "Sink" {
+                ui.label("recebidos até agora");
+                ui.label(tl.block_received(sel, t).to_string());
+            } else {
+                ui.label("estado agora");
+                ui.label(style::state_label(state));
+            }
             ui.end_row();
             ui.label("conteúdo agora");
             ui.label(tl.block_content(sel, t).to_string());
