@@ -7,6 +7,11 @@ use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseSc
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 
+/// Set by the editor while a left-button gesture belongs to a block (dragging it),
+/// so the camera does not pan at the same time.
+#[derive(Resource, Default)]
+pub struct CameraLock(pub bool);
+
 #[derive(Resource, Clone, Copy)]
 pub struct OrbitCam {
     pub target: Vec3,
@@ -37,6 +42,7 @@ impl OrbitCam {
 
 pub fn control(
     mut cam: ResMut<OrbitCam>,
+    lock: Res<CameraLock>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -51,7 +57,7 @@ pub fn control(
         if buttons.pressed(MouseButton::Right) {
             cam.yaw -= d.x * 0.006;
             cam.pitch = (cam.pitch + d.y * 0.006).clamp(0.05, 1.55);
-        } else if buttons.pressed(MouseButton::Left) && d != Vec2::ZERO {
+        } else if buttons.pressed(MouseButton::Left) && d != Vec2::ZERO && !lock.0 {
             // Pan on the ground plane, relative to where the camera looks.
             let rot = Quat::from_rotation_y(cam.yaw);
             let right = rot * Vec3::X;

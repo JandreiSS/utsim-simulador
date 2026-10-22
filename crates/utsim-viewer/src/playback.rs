@@ -3,7 +3,8 @@
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 use utsim_model::replay::Replay;
-use utsim_viewer::timeline::Timeline;
+use utsim_viewer::layout;
+use utsim_viewer::timeline::{Timeline, TransitSetting};
 
 /// Read-only replay data. Nothing here is ever fed back into a simulation.
 #[derive(Resource)]
@@ -14,6 +15,27 @@ pub struct Data {
     pub positions: Vec<[f32; 3]>,
     /// End of the animation, in simulation time.
     pub end: f64,
+}
+
+impl Data {
+    /// Indexes a replay and places its blocks (model positions or automatic layout).
+    pub fn from_replay(replay: Replay, setting: TransitSetting) -> Self {
+        let timeline = Timeline::build(&replay, setting);
+        let raw: Vec<[f64; 3]> = replay.blocks.iter().map(|b| b.position).collect();
+        let positions = layout::place(&raw, &replay.connections);
+        let end = if replay.stop_time.is_finite() {
+            replay.stop_time
+        } else {
+            timeline.last_event_time()
+        }
+        .max(timeline.last_event_time());
+        Data {
+            replay,
+            timeline,
+            positions,
+            end,
+        }
+    }
 }
 
 /// Simulation-time units that pass per real second at speed x1.

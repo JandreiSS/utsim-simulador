@@ -9,6 +9,7 @@ use bevy_egui::EguiContexts;
 use utsim_viewer::style::{self, Shape};
 use utsim_viewer::timeline::ItemPos;
 
+use crate::editor::{Editor, Mode};
 use crate::playback::{Data, Playback, Selection};
 
 #[derive(Component)]
@@ -19,10 +20,13 @@ pub struct ItemVisual;
 
 const ITEM_SIZE: f32 = 0.3;
 
-#[derive(Resource)]
+/// Visuals of the blocks currently shown (rebuilt by [`sync_blocks`]).
+#[derive(Resource, Default)]
 pub struct BlockMaterials {
     handles: Vec<Handle<StandardMaterial>>,
     last: Vec<Option<Option<utsim_core::State>>>,
+    kinds: Vec<String>,
+    entities: Vec<Entity>,
 }
 
 #[derive(Resource)]
@@ -40,12 +44,108 @@ fn block_base(data: &Data, b: usize) -> Vec3 {
     Vec3::from(data.positions[b])
 }
 
-pub fn setup(
+fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
+    let (half, _) = style::extents(shape);
+    match shape {
+        Shape::LongBox | Shape::Box => {
+            meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0))
+        }
+        Shape::Cone => meshes.add(Cone::new(0.7, 1.0)),
+        Shape::Funnel => meshes.add(Cone::new(1.0, 1.0)),
+        Shape::Frustum => meshes.add(ConicalFrustum {
+            radius_top: 0.45,
+            radius_bottom: 1.0,
+            height: 1.0,
+        }),
+        Shape::Cylinder => meshes.add(Cylinder::new(0.85, 1.0)),
+    }
+}
+
+/// Cones point along +Y; the Source arrow points along the flow (+X), the Combiner
+/// funnel points down so its flat top carries the items.
+fn block_rotation(shape: Shape) -> Quat {
+    match shape {
+        Shape::Cone => Quat::from_rotation_z(-FRAC_PI_2),
+        Shape::Funnel => Quat::from_rotation_x(PI),
+        _ => Quat::IDENTITY,
+    }
+}
+
+/// Keeps the block entities in line with what is shown: the document in `Editar`,
+/// the replay in `Simular`. Entities are rebuilt when the list of kinds, the mode
+/// or the replay changes; otherwise only the positions are updated.
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
+pub fn sync_blocks(
     mut commands: Commands,
+    editor: Res<Editor>,
     data: Res<Data>,
+    mut mats: ResMut<BlockMaterials>,
+    mut pool: ResMut<ItemPool>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut transforms: Query<&mut Transform, With<BlockVisual>>,
+    mut last_mode: Local<Option<Mode>>,
 ) {
+    let (kinds, positions): (Vec<&str>, &[[f32; 3]]) = match editor.mode {
+        Mode::Edit => (editor.view.kinds.clone(), &editor.view.positions),
+        Mode::Sim => (
+            data.replay.blocks.iter().map(|b| b.kind.as_str()).collect(),
+            &data.positions,
+        ),
+    };
+    let rebuild = *last_mode != Some(editor.mode)
+        || (editor.mode == Mode::Sim && data.is_changed())
+        || mats
+            .kinds
+            .iter()
+            .map(String::as_str)
+            .ne(kinds.iter().copied());
+    if rebuild {
+        *last_mode = Some(editor.mode);
+        for e in mats.entities.drain(..) {
+            commands.entity(e).despawn();
+        }
+        for (_, e) in pool.entities.drain() {
+            commands.entity(e).despawn();
+        }
+        mats.handles.clear();
+        mats.last.clear();
+        mats.kinds = kinds.iter().map(|k| k.to_string()).collect();
+        for (i, kind) in kinds.iter().enumerate() {
+            let shape = style::shape_of(kind);
+            let (half, _) = style::extents(shape);
+            let material = materials.add(StandardMaterial {
+                base_color: color(style::state_color(None)),
+                perceptual_roughness: 0.6,
+                ..default()
+            });
+            mats.handles.push(material.clone());
+            mats.last.push(None);
+            let id = commands
+                .spawn((
+                    Mesh3d(block_mesh(shape, &mut meshes)),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation: Vec3::from(positions[i]) + Vec3::Y * half[1],
+                        rotation: block_rotation(shape),
+                        scale: Vec3::ONE,
+                    },
+                    BlockVisual,
+                ))
+                .id();
+            mats.entities.push(id);
+        }
+        return;
+    }
+    for (i, &e) in mats.entities.iter().enumerate() {
+        if let Ok(mut tr) = transforms.get_mut(e) {
+            let (half, _) = style::extents(style::shape_of(kinds[i]));
+            tr.translation = Vec3::from(positions[i]) + Vec3::Y * half[1];
+        }
+    }
+}
+
+pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     commands.insert_resource(ClearColor(Color::srgb(0.10, 0.11, 0.14)));
     commands.spawn((
         DirectionalLight {
@@ -63,52 +163,7 @@ pub fn setup(
         },
     ));
 
-    let mut handles = Vec::new();
-    for (i, block) in data.replay.blocks.iter().enumerate() {
-        let shape = style::shape_of(&block.kind);
-        let (half, _) = style::extents(shape);
-        let mesh = match shape {
-            Shape::LongBox => meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0)),
-            Shape::Box => meshes.add(Cuboid::new(half[0] * 2.0, half[1] * 2.0, half[2] * 2.0)),
-            Shape::Cone => meshes.add(Cone::new(0.7, 1.0)),
-            Shape::Funnel => meshes.add(Cone::new(1.0, 1.0)),
-            Shape::Frustum => meshes.add(ConicalFrustum {
-                radius_top: 0.45,
-                radius_bottom: 1.0,
-                height: 1.0,
-            }),
-            Shape::Cylinder => meshes.add(Cylinder::new(0.85, 1.0)),
-        };
-        let material = materials.add(StandardMaterial {
-            base_color: color(style::state_color(None)),
-            perceptual_roughness: 0.6,
-            ..default()
-        });
-        handles.push(material.clone());
-        // Cones point along +Y; the Source arrow points along the flow (+X), the
-        // Combiner funnel points down so its flat top carries the items.
-        let rotation = match shape {
-            Shape::Cone => Quat::from_rotation_z(-FRAC_PI_2),
-            Shape::Funnel => Quat::from_rotation_x(PI),
-            _ => Quat::IDENTITY,
-        };
-        let base = block_base(&data, i);
-        commands.spawn((
-            Mesh3d(mesh),
-            MeshMaterial3d(material),
-            Transform {
-                translation: base + Vec3::Y * half[1],
-                rotation,
-                scale: Vec3::ONE,
-            },
-            BlockVisual,
-        ));
-    }
-    let n = handles.len();
-    commands.insert_resource(BlockMaterials {
-        handles,
-        last: vec![None; n],
-    });
+    commands.insert_resource(BlockMaterials::default());
     commands.insert_resource(ItemPool {
         entities: HashMap::new(),
         mesh: meshes.add(Cuboid::new(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)),
@@ -232,22 +287,55 @@ pub fn update_items(
     });
 }
 
-/// Connections, ground grid and selection outline (immediate-mode gizmos).
-pub fn draw_gizmos(data: Res<Data>, selection: Res<Selection>, mut gizmos: Gizmos) {
+/// Connections, ground grid and selection outline in `Simular`.
+pub fn draw_sim(data: Res<Data>, selection: Res<Selection>, mut gizmos: Gizmos) {
+    let kinds: Vec<&str> = data.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
+    let outlines: Vec<(usize, Color)> = selection
+        .0
+        .filter(|s| *s < data.positions.len())
+        .map(|s| (s, Color::srgb(1.0, 1.0, 1.0)))
+        .into_iter()
+        .collect();
+    draw_world(
+        &mut gizmos,
+        &data.positions,
+        &kinds,
+        &data.replay.connections,
+        &outlines,
+        None,
+    );
+}
+
+/// Draws the ground grid (`fixed_step` forces its spacing, else it adapts to the
+/// scene), the connections as arrows and an outline around the listed blocks.
+pub fn draw_world(
+    gizmos: &mut Gizmos,
+    positions: &[[f32; 3]],
+    kinds: &[&str],
+    connections: &[(usize, usize)],
+    outlines: &[(usize, Color)],
+    fixed_step: Option<f32>,
+) {
     let (mut min, mut max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
-    for p in &data.positions {
+    for p in positions {
         min = min.min(Vec3::from(*p));
         max = max.max(Vec3::from(*p));
     }
+    if positions.is_empty() {
+        (min, max) = (Vec3::ZERO, Vec3::ZERO);
+    }
     // Grid: about 40 cells across the scene, spacing rounded to 1, 2 or 5 x 10^k.
-    let span = (max - min).max_element().max(10.0) + 16.0;
+    let min_span = if fixed_step.is_some() { 24.0 } else { 10.0 };
+    let span = (max - min).max_element().max(min_span) + 16.0;
     let raw = span / 40.0;
     let mag = 10f32.powf(raw.log10().floor());
-    let step = [1.0, 2.0, 5.0, 10.0]
-        .iter()
-        .map(|m| m * mag)
-        .find(|s| *s >= raw)
-        .unwrap_or(raw);
+    let step = fixed_step.unwrap_or_else(|| {
+        [1.0, 2.0, 5.0, 10.0]
+            .iter()
+            .map(|m| m * mag)
+            .find(|s| *s >= raw)
+            .unwrap_or(raw)
+    });
     let center = (min + max) / 2.0;
     let half = (span / step / 2.0).ceil() as i32;
     let cx = (center.x / step).round() * step;
@@ -269,35 +357,46 @@ pub fn draw_gizmos(data: Res<Data>, selection: Res<Selection>, mut gizmos: Gizmo
     }
 
     let edge = Color::srgb(0.75, 0.80, 0.90);
-    for &(a, b) in &data.replay.connections {
-        if a >= data.positions.len() || b >= data.positions.len() || a == b {
-            continue;
-        }
-        let pa = block_base(&data, a) + Vec3::Y * 0.4;
-        let pb = block_base(&data, b) + Vec3::Y * 0.4;
-        let dir = (pb - pa).normalize_or_zero();
-        let reach = |blk: usize| {
-            let (h, _) = style::extents(style::shape_of(&data.replay.blocks[blk].kind));
-            h[0].max(h[2]) + 0.1
-        };
-        let (s, e) = (pa + dir * reach(a), pb - dir * reach(b));
-        if (e - s).dot(dir) > 0.1 {
+    for &(a, b) in connections {
+        if let Some((s, e)) = connection_line(positions, kinds, a, b) {
             gizmos.arrow(s, e, edge).with_tip_length(0.35);
         }
     }
 
-    if let Some(sel) = selection.0.filter(|s| *s < data.positions.len()) {
-        let (h, _) = style::extents(style::shape_of(&data.replay.blocks[sel].kind));
-        let center = block_base(&data, sel) + Vec3::Y * h[1];
+    for &(i, color) in outlines {
+        let (h, _) = style::extents(style::shape_of(kinds[i]));
+        let center = Vec3::from(positions[i]) + Vec3::Y * h[1];
         gizmos.cube(
             Transform::from_translation(center).with_scale(Vec3::new(
                 h[0] * 2.0 + 0.3,
                 h[1] * 2.0 + 0.3,
                 h[2] * 2.0 + 0.3,
             )),
-            Color::srgb(1.0, 1.0, 1.0),
+            color,
         );
     }
+}
+
+/// Start and end of the arrow for connection `a -> b` (trimmed to the block
+/// borders), or `None` when the blocks overlap or the indices are invalid.
+pub fn connection_line(
+    positions: &[[f32; 3]],
+    kinds: &[&str],
+    a: usize,
+    b: usize,
+) -> Option<(Vec3, Vec3)> {
+    if a >= positions.len() || b >= positions.len() || a == b {
+        return None;
+    }
+    let pa = Vec3::from(positions[a]) + Vec3::Y * 0.4;
+    let pb = Vec3::from(positions[b]) + Vec3::Y * 0.4;
+    let dir = (pb - pa).normalize_or_zero();
+    let reach = |blk: usize| {
+        let (h, _) = style::extents(style::shape_of(kinds[blk]));
+        h[0].max(h[2]) + 0.1
+    };
+    let (s, e) = (pa + dir * reach(a), pb - dir * reach(b));
+    ((e - s).dot(dir) > 0.1).then_some((s, e))
 }
 
 /// Click (without dragging) on a block selects it; click on empty ground clears.
@@ -348,7 +447,7 @@ pub fn pick(
 }
 
 /// Slab test: distance along the ray to the box, if hit.
-fn ray_box(origin: Vec3, dir: Vec3, min: Vec3, max: Vec3) -> Option<f32> {
+pub fn ray_box(origin: Vec3, dir: Vec3, min: Vec3, max: Vec3) -> Option<f32> {
     let inv = Vec3::ONE / dir;
     let t1 = (min - origin) * inv;
     let t2 = (max - origin) * inv;
