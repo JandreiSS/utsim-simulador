@@ -1,0 +1,49 @@
+// Célula com 3 máquinas e uma equipe de 2 operadores (pessoas).
+// As pessoas são Transporters (velocidade 1,2 m/s, caminhada normal) agrupados por um
+// Dispatcher. Cada máquina precisa de UM operador só durante o setup (a troca de
+// ferramenta); depois disso o operador é liberado e vai atender outra máquina,
+// enquanto a peça é processada sozinha.
+// Tempo em segundos. Chegadas: 1 peça a cada 40 s em média. Setup ~ 15 s, processo ~ 80 s,
+// 3 máquinas -> utilização das máquinas em torno de 0,7. Caminhadas de 5 a 10 m (4 a 8 s).
+Model(
+    name: "Célula com operadores",
+    description: "Três máquinas que dependem de uma equipe de dois operadores para o setup",
+    run: (
+        stop_time: 100000.0,
+        warmup: 2000.0,
+        seed: 7,
+        replications: 5,
+    ),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 40.0)), position: (0.0, 5.0, 0.0)),
+        (name: "fila", kind: Queue(), position: (5.0, 5.0, 0.0)),
+        (name: "maq1", kind: Processor(
+            setup: Some(Exp(mean: 15.0)),
+            process: Exp(mean: 80.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 0.0, 0.0)),
+        (name: "maq2", kind: Processor(
+            setup: Some(Exp(mean: 15.0)),
+            process: Exp(mean: 80.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 5.0, 0.0)),
+        (name: "maq3", kind: Processor(
+            setup: Some(Exp(mean: 15.0)),
+            process: Exp(mean: 80.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 10.0, 0.0)),
+        (name: "saida", kind: Sink, position: (25.0, 5.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.2), position: (10.0, 2.0, 0.0)),
+        (name: "bruno", kind: Transporter(speed: 1.2), position: (10.0, 8.0, 0.0)),
+        (name: "equipe", kind: Dispatcher(team: ["ana", "bruno"]), position: (10.0, 5.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "maq1"),
+        ("fila", "maq2"),
+        ("fila", "maq3"),
+        ("maq1", "saida"),
+        ("maq2", "saida"),
+        ("maq3", "saida"),
+    ],
+)
