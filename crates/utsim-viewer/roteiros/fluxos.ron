@@ -103,7 +103,7 @@
     // Digita o script e confirma clicando fora da caixa; o erro de compilação fica em linha.
     MoverPara(Deslocado(Botao("Roda para cada item"), 0.0, 70.0)),
     Clicar(Esquerdo),
-    Digitar("item.peso=1;"),
+    Digitar("item.peso=;"),
     MoverPara(Botao("Disciplina")),
     Clicar(Esquerdo),
     Esperar(quadros: 4),
