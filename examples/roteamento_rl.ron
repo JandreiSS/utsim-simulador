@@ -14,7 +14,8 @@
 Model(
     name: "Roteamento por aprendizado por reforço",
     description: "Um agente escolhe entre uma linha rápida (1 máquina) e uma lenta (2 máquinas)",
-    run: (stop_time: 200.0, seed: 11, replications: 5),
+    // Sem agente (utsim run, replay, 3D) a decisão padrão é a linha rápida (opção 0).
+    run: (stop_time: 200.0, seed: 11, replications: 5, default_decision: Some(0)),
     objects: [
         // Cada linha é uma fila seguida de máquinas; os itens são criados pelo fluxo.
         (name: "fila_rapida",    kind: Queue(),                                  position: (0.0, 0.0, 0.0)),
