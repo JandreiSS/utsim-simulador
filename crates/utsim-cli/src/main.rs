@@ -1,5 +1,6 @@
 mod csv;
 mod experiment;
+mod replay;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -52,6 +53,15 @@ enum Cmd {
     /// Valida um modelo sem executar
     Check { model: PathBuf },
     /// Compara cenários de um arquivo de experimento
+    /// Grava o rastro completo de uma replicação para o visualizador 3D
+    Replay {
+        model: PathBuf,
+        /// Arquivo JSON de saída
+        #[arg(short, long, default_value = "replay.json")]
+        out: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        rep: u32,
+    },
     Experiment {
         file: PathBuf,
         /// Grava o resultado completo em JSON
@@ -83,6 +93,7 @@ fn run(cli: Cli) -> Result<(), ModelError> {
             );
         }
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
+        Cmd::Replay { model, out, rep } => replay::run(&model, rep, &out)?,
         Cmd::Run {
             model,
             reps,
