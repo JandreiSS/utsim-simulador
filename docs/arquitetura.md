@@ -481,6 +481,23 @@ conversores de/para itens discretos, ligados num grafo **acíclico**.
 - **Rastro:** `TraceEvent::Fluid { node, level, rate }`, para o 3D.
 - **Métricas:** `custom_metrics` traz o nível médio e máximo de cada tanque e o volume
   total de cada nó.
+- **No visualizador 3D** (`utsim-view`, só reprodução, os nós de fluido não são editáveis).
+  O `Replay` carrega o `FluidDef`; o bloco "Fluid" não vira caixa, e a rede é desenhada
+  por `fluids.rs` (layout, formas) e `fluid_scene.rs` (cena).
+  - **Layout:** as posições dos nós vêm do modelo. Se todas forem zero, os nós são
+    dispostos em camadas ao longo das ligações, numa faixa abaixo dos blocos discretos.
+  - **Tanque:** cilindro translúcido com o líquido (azul) dentro. A altura do líquido é
+    `nível / capacidade`. O nível no tempo `t` vem de `Timeline::fluid_at`, que
+    interpola `nível + taxa · (t − t_evento)`, limitado a `[0, capacidade]`, a partir do
+    último `TraceEvent::Fluid` do nó.
+  - **Outros nós:** fonte (cone verde), sumidouro (cilindro vermelho), tubulação
+    (cilindro laranja deitado) e conversor (cubo roxo).
+  - **Ligações:** setas em ciano quando há vazão no instante (a dos nós que não são
+    tanque, ou a variação dos tanques), cinza-azulado quando parada. Cada conversor tem
+    uma linha tracejada roxa até o seu objeto discreto.
+  - **Seleção:** clicar num tanque ou escolhê-lo na lista "Fluidos" mostra nível,
+    capacidade, ocupação e taxa no tempo atual. Roteiro de conferência:
+    `crates/utsim-viewer/roteiros/fluidos_tanques.ron`.
 
 ## 4m. Tráfego de AGVs (fase 7)
 Uma aresta da rede pode ter `capacity` (veículos ao mesmo tempo). Um transportador com
@@ -505,6 +522,12 @@ Regras adotadas:
 - **Impasse:** é detectado quando um veículo é barrado. O sistema procura o maior grupo
   de veículos parados em que os donos das arestas desejadas também estão parados
   (funciona com capacidade > 1). É reportado uma única vez.
+
+No visualizador 3D, os AGVs usam o mesmo caminho dos demais transportadores: andam pelos
+eventos `Travel` e, quando esperam numa aresta cheia, ficam parados na última posição com a
+cor do estado `blocked` (laranja). As arestas controladas (`capacity`) aparecem em vermelho,
+como linha dupla, com o rótulo "capacidade N" no meio, tanto em `Editar` quanto em `Simular`.
+Roteiro de conferência: `crates/utsim-viewer/roteiros/agvs.ron`.
 
 ## 4o. Emulação com OPC UA (fase 7)
 Comissionamento virtual: o modelo roda contra o relógio de parede e conversa com um CLP

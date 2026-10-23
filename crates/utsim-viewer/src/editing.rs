@@ -65,6 +65,8 @@ pub struct NetSeg {
     pub a: [f32; 3],
     pub b: [f32; 3],
     pub two_way: bool,
+    /// Vehicles allowed on the edge at once (AGV traffic control); `None` = unlimited.
+    pub capacity: Option<usize>,
 }
 
 /// The model's path network (nodes and edges) ready to draw on the ground.
@@ -100,6 +102,7 @@ impl NetworkView {
                         a: at(&e.from)?,
                         b: at(&e.to)?,
                         two_way: e.two_way,
+                        capacity: e.capacity,
                     })
                 })
                 .collect(),
@@ -517,13 +520,15 @@ mod tests {
             objects: [(name: "s", kind: Sink)],
             network: Some((
                 nodes: [(name: "a", position: (1.0, 2.0, 0.0)), (name: "b", position: (5.0, 2.0, 0.0))],
-                edges: [(from: "a", to: "b", two_way: false), (from: "a", to: "b")],
+                edges: [(from: "a", to: "b", two_way: false), (from: "a", to: "b", capacity: Some(2))],
             )),
         )"#;
         let view = NetworkView::of(&Model::parse(text).unwrap());
         assert_eq!(view.nodes, vec![[1.0, 0.0, -2.0], [5.0, 0.0, -2.0]]);
         assert_eq!(view.segments.len(), 2);
         assert!(!view.segments[0].two_way && view.segments[1].two_way);
+        assert_eq!(view.segments[0].capacity, None);
+        assert_eq!(view.segments[1].capacity, Some(2));
         assert_eq!(view.segments[0].b, [5.0, 0.0, -2.0]);
         assert_eq!(NetworkView::of(chain(true).model()), NetworkView::default());
     }

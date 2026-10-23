@@ -16,7 +16,7 @@ use utsim_viewer::view;
 
 use crate::dock::{Dock, pointer_over_ui};
 use crate::editor::{Editor, Mode};
-use crate::playback::{Data, Playback, Selection};
+use crate::playback::{Data, FluidSelection, Playback, Selection};
 
 #[derive(Component)]
 pub struct BlockVisual;
@@ -282,7 +282,7 @@ pub fn sync_blocks(
                 material,
                 translation,
             );
-            if kinds[i] == "Flow" {
+            if kinds[i] == "Flow" || kinds[i] == "Fluid" {
                 // Token flows live in the Fluxos panel, not in the 3D scene.
                 commands.entity(id).insert(Visibility::Hidden);
             }
@@ -483,9 +483,12 @@ pub fn update_items(
 /// Connections, ground grid and selection outline in `Simular`.
 pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, mut gizmos: Gizmos) {
     // Mobile resources are outlined where they are now.
-    let positions: Vec<[f32; 3]> = (0..data.positions.len())
+    let mut positions: Vec<[f32; 3]> = (0..data.positions.len())
         .map(|b| block_base_at(&data, b, pb.t).to_array())
         .collect();
+    // Fluid nodes only widen the ground grid (they come after every block, so the
+    // block indices of the connections and outlines are unchanged).
+    positions.extend(data.fluid.nodes.iter().map(|n| n.pos));
     let outlines: Vec<(usize, Color)> = selection
         .0
         .filter(|s| *s < data.positions.len())
@@ -508,13 +511,25 @@ pub fn draw_sim(data: Res<Data>, pb: Res<Playback>, selection: Res<Selection>, m
 /// (arrows for one-way edges).
 pub fn draw_network(gizmos: &mut Gizmos, network: &NetworkView) {
     let color = Color::srgb(0.95, 0.75, 0.25);
+    // Controlled edges (AGV capacity) are red and drawn as a double line.
+    let controlled = Color::srgb(1.0, 0.30, 0.25);
     let lift = Vec3::Y * 0.03;
     for seg in &network.segments {
         let (a, b) = (Vec3::from(seg.a) + lift, Vec3::from(seg.b) + lift);
+        let color = if seg.capacity.is_some() {
+            controlled
+        } else {
+            color
+        };
         if seg.two_way {
             gizmos.line(a, b, color);
         } else {
             gizmos.arrow(a, b, color).with_tip_length(0.4);
+        }
+        if seg.capacity.is_some() {
+            let side = (b - a).cross(Vec3::Y).normalize_or_zero() * 0.12;
+            gizmos.line(a + side, b + side, color);
+            gizmos.line(a - side, b - side, color);
         }
     }
     for n in &network.nodes {
@@ -650,6 +665,7 @@ pub fn pick(
     data: Res<Data>,
     pb: Res<Playback>,
     mut selection: ResMut<Selection>,
+    mut fluid_sel: ResMut<FluidSelection>,
     mut press: Local<Option<Vec2>>,
     dock: Res<Dock>,
     mut contexts: EguiContexts,
@@ -675,7 +691,7 @@ pub fn pick(
         return;
     };
     let mut best: Option<(f32, usize)> = None;
-    for i in (0..data.replay.blocks.len()).filter(|&i| !data.is_flow(i)) {
+    for i in (0..data.replay.blocks.len()).filter(|&i| !data.is_hidden(i)) {
         let h = data.geoms[i].half;
         let center = block_base_at(&data, i, pb.t) + Vec3::Y * h[1];
         if let Some(d) = ray_box(
@@ -688,7 +704,33 @@ pub fn pick(
             best = Some((d, i));
         }
     }
-    selection.0 = best.map(|(_, i)| i);
+    let mut best_fluid: Option<(f32, usize)> = None;
+    for (i, node) in data.fluid.nodes.iter().enumerate() {
+        let h = utsim_viewer::fluids::node_half(node);
+        let center = Vec3::from(node.pos) + Vec3::Y * h[1];
+        if let Some(d) = ray_box(
+            ray.origin,
+            *ray.direction,
+            center - Vec3::from(h),
+            center + Vec3::from(h),
+        ) && best_fluid.is_none_or(|(bd, _)| d < bd)
+        {
+            best_fluid = Some((d, i));
+        }
+    }
+    // The closest hit wins; a click selects either a block or a fluid node.
+    let fluid_wins = match (best, best_fluid) {
+        (Some((d, _)), Some((fd, _))) => fd < d,
+        (None, Some(_)) => true,
+        _ => false,
+    };
+    if fluid_wins {
+        selection.0 = None;
+        fluid_sel.0 = best_fluid.map(|(_, i)| i);
+    } else {
+        selection.0 = best.map(|(_, i)| i);
+        fluid_sel.0 = None;
+    }
 }
 
 /// Slab test: distance along the ray to the box, if hit.

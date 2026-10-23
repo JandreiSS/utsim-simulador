@@ -1,0 +1,40 @@
+// Fase 7: rede de fluidos no 3D (tanques que enchem e esvaziam, bomba, envase e conversores).
+//   utsim-view examples/tanques.ron --roteiro crates/utsim-viewer/roteiros/fluidos_tanques.ron --capturas saida/tanques
+// Confere: tanques com o líquido na altura do nível, o nível mudando ao longo do tempo,
+// ligações em ciano quando há vazão, linhas tracejadas dos conversores até os objetos
+// discretos e o painel "Fluidos" com o nível, a capacidade e a taxa do tanque.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Captura("01_editar"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    // O tanque translúcido leva alguns segundos para aparecer na primeira vez (compilação do pipeline).
+    Esperar(quadros: 40),
+    EsperarSegundos(6.0),
+    Captura("02_t0"),
+
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(1.5),
+    Captura("03_t_1s"),
+    EsperarSegundos(2.0),
+    Captura("04_t_3s"),
+    EsperarSegundos(2.5),
+    Captura("05_t_6s"),
+    EsperarSegundos(4.0),
+    Captura("06_t_10s"),
+    Afirmar(TempoSimuladoMin(100.0)),
+    ClicarBotao("Pausar"),
+
+    // Seleciona um tanque pela lista da aba Fluidos: o painel mostra nível, capacidade e taxa.
+    ClicarBotao("armazenamento [tanque]"),
+    Esperar(quadros: 5),
+    Captura("07_tanque_selecionado"),
+
+    // Clique direto no tanque de processo na cena 3D: troca a seleção.
+    MoverPara(Tela(1010.0, 548.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 5),
+    Captura("08_clique_no_tanque"),
+]

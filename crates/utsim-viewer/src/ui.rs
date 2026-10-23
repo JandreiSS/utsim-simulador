@@ -3,11 +3,13 @@
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use utsim_core::TallySummary;
-use utsim_viewer::{style, view};
+use utsim_fluid::FluidKind;
+use utsim_viewer::editing::NetworkView;
+use utsim_viewer::{fluids, style, view};
 
 use crate::dock::Dock;
 use crate::editor::Editor;
-use crate::playback::{Data, Playback, SPEEDS, Selection};
+use crate::playback::{Data, FluidSelection, Playback, SPEEDS, Selection};
 
 fn fmt_tally(t: &TallySummary) -> String {
     if t.count == 0 {
@@ -104,6 +106,7 @@ pub fn panel(
     data: Res<Data>,
     mut pb: ResMut<Playback>,
     mut selection: ResMut<Selection>,
+    mut fluid_sel: ResMut<FluidSelection>,
     mut dock: ResMut<Dock>,
     mut editor: ResMut<Editor>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
@@ -119,7 +122,14 @@ pub fn panel(
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    sim_controls(ui, &data, &mut pb, &mut selection, &mut editor)
+                    sim_controls(
+                        ui,
+                        &data,
+                        &mut pb,
+                        &mut selection,
+                        &mut fluid_sel,
+                        &mut editor,
+                    )
                 });
         });
     dock.free = ui.available_rect_before_wrap();
@@ -130,7 +140,7 @@ pub fn panel(
         .blocks
         .iter()
         .enumerate()
-        .filter(|(i, _)| !data.is_flow(*i))
+        .filter(|(i, _)| !data.is_hidden(*i))
         .map(|(i, block)| {
             let geom = &data.geoms[i];
             let content = tl.block_content(i, pb.t);
@@ -144,6 +154,9 @@ pub fn panel(
             }
         })
         .collect();
+    let mut labels = labels;
+    labels.extend(fluid_labels(&data, pb.t, fluid_sel.0));
+    labels.extend(capacity_labels(&data.network));
     draw_labels(ctx, cam, cam_tf, &labels, dock.free);
     Ok(())
 }
@@ -153,6 +166,7 @@ fn sim_controls(
     data: &Data,
     pb: &mut Playback,
     selection: &mut Selection,
+    fluid_sel: &mut FluidSelection,
     editor: &mut Editor,
 ) {
     let tl = &data.timeline;
@@ -223,7 +237,7 @@ fn sim_controls(
         .max_height(170.0)
         .show(ui, |ui| {
             for (i, block) in data.replay.blocks.iter().enumerate() {
-                if data.is_flow(i) {
+                if data.is_hidden(i) {
                     continue;
                 }
                 let state = tl.block_state(i, pb.t);
@@ -237,17 +251,194 @@ fn sim_controls(
                 let on = selection.0 == Some(i);
                 if ui.selectable_label(on, text).clicked() {
                     selection.0 = if on { None } else { Some(i) };
+                    fluid_sel.0 = None;
                 }
             }
         });
     ui.separator();
 
+    if !data.fluid.is_empty() {
+        ui.strong("Fluidos");
+        egui::ScrollArea::vertical()
+            .id_salt("lista_fluidos")
+            .max_height(130.0)
+            .show(ui, |ui| {
+                for (i, node) in data.fluid.nodes.iter().enumerate() {
+                    let sample = data.fluid_sample(i, pb.t);
+                    let text = if node.shape == fluids::NodeShape::Tank {
+                        format!(
+                            "{} [{}]  {} de {}  ({})",
+                            node.name,
+                            node.kind_label,
+                            fmt_num(sample.level),
+                            fmt_num(node.capacity),
+                            fluids::percent_text(sample.level, node.capacity)
+                        )
+                    } else {
+                        format!("{} [{}]", node.name, node.kind_label)
+                    };
+                    let on = fluid_sel.0 == Some(i);
+                    if ui.selectable_label(on, text).clicked() {
+                        fluid_sel.0 = if on { None } else { Some(i) };
+                        selection.0 = None;
+                    }
+                }
+            });
+        ui.separator();
+    }
+
+    if let Some(node) = fluid_sel.0.filter(|i| *i < data.fluid.nodes.len()) {
+        fluid_stats(ui, data, node, pb.t);
+        return;
+    }
     match selection.0.filter(|s| *s < data.replay.blocks.len()) {
         None => {
             ui.label("Clique em um bloco para ver suas estatísticas.");
         }
         Some(sel) => block_stats(ui, data, sel, pb.t),
     }
+}
+
+/// A number with up to 3 decimals and no trailing zeros ("20", "2.5", "0.125").
+fn fmt_num(v: f64) -> String {
+    let s = format!("{v:.3}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+/// Labels of the fluid nodes: name, and for tanks the level against the capacity.
+fn fluid_labels(data: &Data, t: f64, selected: Option<usize>) -> Vec<Label> {
+    data.fluid
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, node)| {
+            let text = if node.shape == fluids::NodeShape::Tank {
+                let level = data.fluid_sample(i, t).level;
+                format!(
+                    "{}  {}/{}",
+                    node.name,
+                    fmt_num(level),
+                    fmt_num(node.capacity)
+                )
+            } else {
+                node.name.clone()
+            };
+            Label {
+                text,
+                position: node.pos,
+                height: fluids::node_half(node)[1] * 2.0,
+                selected: selected == Some(i),
+            }
+        })
+        .collect()
+}
+
+/// A "cap. N" label at the middle of every controlled edge of the path network.
+pub fn capacity_labels(network: &NetworkView) -> Vec<Label> {
+    network
+        .segments
+        .iter()
+        .filter_map(|seg| {
+            let capacity = seg.capacity?;
+            let mid = [
+                (seg.a[0] + seg.b[0]) / 2.0,
+                (seg.a[1] + seg.b[1]) / 2.0,
+                (seg.a[2] + seg.b[2]) / 2.0,
+            ];
+            Some(Label {
+                text: format!("capacidade {capacity}"),
+                position: mid,
+                height: -0.2,
+                selected: false,
+            })
+        })
+        .collect()
+}
+
+fn fluid_stats(ui: &mut egui::Ui, data: &Data, node: usize, t: f64) {
+    let view = &data.fluid.nodes[node];
+    let sample = data.fluid_sample(node, t);
+    ui.strong(format!("{} ({})", view.name, view.kind_label));
+    let kind = data
+        .replay
+        .fluids
+        .as_ref()
+        .and_then(|d| d.nodes.get(node))
+        .map(|n| &n.kind);
+    egui::Grid::new("estatisticas_fluido")
+        .striped(true)
+        .show(ui, |ui| {
+            let row = |ui: &mut egui::Ui, name: &str, value: String| {
+                ui.label(name);
+                ui.label(value);
+                ui.end_row();
+            };
+            match kind {
+                Some(FluidKind::Tank {
+                    capacity,
+                    initial,
+                    max_in,
+                    max_out,
+                }) => {
+                    row(ui, "nível agora", fmt_num(sample.level));
+                    row(ui, "capacidade", fmt_num(*capacity));
+                    row(
+                        ui,
+                        "ocupação",
+                        fluids::percent_text(sample.level, *capacity),
+                    );
+                    row(
+                        ui,
+                        "taxa agora",
+                        format!(
+                            "{} por unidade de tempo ({})",
+                            fmt_num(sample.rate),
+                            fluids::rate_label(sample.rate)
+                        ),
+                    );
+                    row(ui, "nível inicial", fmt_num(*initial));
+                    if let Some(r) = max_in {
+                        row(ui, "entrada máxima", fmt_num(*r));
+                    }
+                    if let Some(r) = max_out {
+                        row(ui, "saída máxima", fmt_num(*r));
+                    }
+                }
+                Some(FluidKind::Source { rate }) => {
+                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    row(ui, "vazão da fonte", fmt_num(*rate));
+                }
+                Some(FluidKind::Pipe { max_rate }) => {
+                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    row(ui, "vazão máxima", fmt_num(*max_rate));
+                }
+                Some(FluidKind::Sink { max_rate }) => {
+                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    if let Some(r) = max_rate {
+                        row(ui, "vazão máxima", fmt_num(*r));
+                    }
+                }
+                Some(FluidKind::FromItems { object, volume }) => {
+                    row(ui, "objeto", object.clone());
+                    row(ui, "volume por item", fmt_num(*volume));
+                }
+                Some(FluidKind::ToItems {
+                    object,
+                    volume,
+                    max_rate,
+                }) => {
+                    row(ui, "objeto", object.clone());
+                    row(ui, "volume por item", fmt_num(*volume));
+                    row(ui, "acumulado para o próximo item", fmt_num(sample.level));
+                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    if let Some(r) = max_rate {
+                        row(ui, "vazão máxima", fmt_num(*r));
+                    }
+                }
+                None => {}
+            }
+        });
+    ui.weak("Nível e taxa interpolados a partir do rastro da rede de fluidos.");
 }
 
 fn block_stats(ui: &mut egui::Ui, data: &Data, sel: usize, t: f64) {
