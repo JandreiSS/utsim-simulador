@@ -545,6 +545,49 @@ Comissionamento virtual: o modelo roda contra o relógio de parede e conversa co
   `stop_block` (motivo `EXTERNAL`, estado `stopped`). Endpoint sem segurança: só em rede
   confiável.
 
+## 4p. Cena 3D independente de motor e preparo para realidade virtual
+A simulação gera um rastro. A crate `utsim-scene` transforma esse rastro no que um motor
+gráfico precisa desenhar em cada instante. Todos os clientes consomem a mesma cena, então
+nunca discordam sobre onde as coisas estão:
+- o visualizador Bevy;
+- a página web;
+- um modo de realidade virtual;
+- motores externos (Unreal, Unity, Godot).
+
+- **Cena estática** (`StaticScene`), enviada uma vez: blocos, recursos móveis, nós de
+  fluido, trechos da rede e o `visual` de cada objeto.
+- **Quadros** (`Frame`): para cada instante, a pose (`Pose`) de cada entidade, com
+  posição, direção, altura da carga (`lift`, por exemplo os garfos da empilhadeira),
+  objeto onde está apoiada (`parent`), estado e nível dos tanques.
+- **Movimento semântico** (`Motion`): parado, andando (com velocidade), carregando,
+  descarregando, trabalhando, bloqueado ou parado por quebra. Cada motor associa o
+  movimento aos seus próprios clipes de animação. Uma pessoa andando a 1,2 m/s toca o
+  ciclo de caminhada nessa velocidade.
+- **Papéis dos móveis** (`MobileRole`): pessoa, empilhadeira, AGV ou veículo genérico.
+  O papel escolhe a família de animações.
+- **Convenções:**
+  - metros, eixo Z para cima, as coordenadas de planta do próprio modelo;
+  - escala real, para uma câmera de realidade virtual na altura dos olhos (~1,6 m) ver a
+    planta no tamanho certo;
+  - Bevy converte `(x, y, z)` em `(x, z, -y)`;
+  - Unreal converte em `(100x, -100y, 100z)`, em cm.
+- **Fluxo de cena** (protocolo `utsim-scene/1`):
+  - formato JSON em linhas: um cabeçalho (`Header`) e depois um quadro por linha;
+  - `SceneSink` abstrai o destino: arquivo, socket, runtime de realidade virtual ou teste;
+  - `utsim cena` grava o fluxo de uma rodada, e um socket ao vivo (emulação) é o passo
+    seguinte.
+- **Aparência** (`visual` no objeto): um item da biblioteca embutida ou um `.glb`, com
+  escala, giro e cor. É só apresentação: a simulação nunca lê esse campo.
+
+As esperas para a realidade virtual:
+1. Todo o cálculo de posição sai do código Bevy e fica puro e testável em `utsim-scene`.
+2. A escala é real.
+3. O protocolo é versionado.
+4. Há um ponto de saída único (`SceneSink`).
+
+Com isso, um cliente de realidade virtual (OpenXR no Bevy, ou o Unreal com o OpenXR
+nativo) só precisa ler a cena e desenhar.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
