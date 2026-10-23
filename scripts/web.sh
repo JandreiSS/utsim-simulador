@@ -27,6 +27,15 @@ rm -rf web/dist
 wasm-bindgen target/wasm32-unknown-unknown/web/utsim_web.wasm \
     --target no-modules --no-typescript --out-dir web/dist --out-name utsim
 
+# The 3D viewer (Bevy + WebGL2) is large: it goes to web/dist/viewer/ and is NOT inlined
+# in utsim.html. Pass --sem-3d to skip it (fast builds). web/viewer.html loads it.
+if [ "${1:-}" != "--sem-3d" ]; then
+    echo "==> compilando utsim-viewer (perfil web, wasm32; demora)"
+    cargo build --profile web --target wasm32-unknown-unknown -p utsim-viewer
+    echo "==> wasm-bindgen (visualizador)"
+    wasm-bindgen target/wasm32-unknown-unknown/web/utsim-view.wasm         --target web --no-typescript --out-dir web/dist/viewer --out-name utsim_viewer
+fi
+
 echo "==> gerando web/dist/utsim.html (autocontido)"
 B64=$(base64 < web/dist/utsim_bg.wasm | tr -d '\n\r')
 OUT=web/dist/utsim.html
@@ -44,5 +53,5 @@ while IFS= read -r line || [ -n "$line" ]; do
     esac
 done < web/index.html
 
-ls -l web/dist/utsim_bg.wasm web/dist/utsim.html | awk '{printf "%10d bytes  %s\n", $5, $9}'
-echo "Pronto. Abra web/dist/utsim.html no navegador (ou sirva a pasta web/: python3 -m http.server -d web)."
+ls -l web/dist/utsim_bg.wasm web/dist/utsim.html web/dist/viewer/utsim_viewer_bg.wasm 2>/dev/null | awk '{printf "%10d bytes  %s\n", $5, $9}'
+echo "Pronto. Abra web/dist/utsim.html no navegador (ou sirva a pasta web/: python3 -m http.server -d web; o 3D só funciona servido)."

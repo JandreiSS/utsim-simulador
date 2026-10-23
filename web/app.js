@@ -167,17 +167,113 @@
 
   // ---- Abas ---------------------------------------------------------------
 
+  const TABS = [["tab-sim", "painel-sim"], ["tab-fit", "painel-fit"], ["tab-3d", "painel-3d"]];
+
   function selectTab(which) {
-    for (const [tab, panel] of [["tab-sim", "painel-sim"], ["tab-fit", "painel-fit"]]) {
+    for (const [tab, panel] of TABS) {
       const on = tab === which;
       $(tab).setAttribute("aria-selected", String(on));
       $(panel).hidden = !on;
+    }
+    // A Bevy app cannot be restarted and keeps rendering while hidden: drop the 3D frame
+    // when leaving the tab (it is created again by "Gerar visualização 3D").
+    if (which !== "tab-3d") close3d();
+  }
+
+  // ---- 3D ---------------------------------------------------------------------
+  // The viewer (Bevy, WebGL2) is a separate, large wasm built into dist/viewer/ and shown
+  // in an iframe (viewer.html), one fresh instance per run. The self-contained utsim.html
+  // does not carry it: there the tab only explains how to get it.
+
+  let viewerAvailable = null; // null = not checked yet
+
+  async function checkViewer() {
+    if (viewerAvailable !== null) return viewerAvailable;
+    try {
+      const r = await fetch("dist/viewer/utsim_viewer_bg.wasm", { method: "HEAD" });
+      viewerAvailable = r.ok;
+    } catch (e) {
+      viewerAvailable = false;
+    }
+    return viewerAvailable;
+  }
+
+  function close3d() {
+    const frame = $("quadro3d");
+    if (!frame.hidden) {
+      frame.src = "about:blank";
+      frame.hidden = true;
+    }
+  }
+
+  function note3d(text) {
+    $("nota3d").textContent = text;
+    $("nota3d").hidden = !text;
+  }
+
+  function stop3d(ron) {
+    const typed = parseFloat($("parada3d").value);
+    if (typed > 0) return typed;
+    const m = /stop_time\s*:\s*([0-9.eE+-]+)/.exec(ron);
+    const model = m ? parseFloat(m[1]) : NaN;
+    return Math.min(model > 0 ? model : 2000, 2000);
+  }
+
+  function generate3d() {
+    const ron = $("modelo").value;
+    const stop = stop3d(ron);
+    $("gerar3d").disabled = true;
+    note3d("");
+    setStatus("Gravando a replicação para o 3D…");
+    setTimeout(() => {
+      let text;
+      try {
+        text = api.replay(ron, stop);
+        const r = JSON.parse(text);
+        if (!r.ok) {
+          note3d("O modelo tem problemas: " + r.errors.join("; "));
+          setStatus("Corrija o modelo na aba Simular.");
+          $("gerar3d").disabled = false;
+          return;
+        }
+      } catch (e) {
+        note3d("Erro ao gravar a replicação: " + e);
+        $("gerar3d").disabled = false;
+        return;
+      }
+      const frame = $("quadro3d");
+      const onMessage = (ev) => {
+        if (ev.source !== frame.contentWindow || !ev.data || ev.data.type !== "utsim-viewer-ready") return;
+        window.removeEventListener("message", onMessage);
+        frame.contentWindow.postMessage({ type: "utsim-replay", text }, "*");
+        setStatus(`Visualizador 3D iniciado (t até ${fmt.format(stop)}).`);
+        $("gerar3d").disabled = false;
+      };
+      window.addEventListener("message", onMessage);
+      frame.hidden = false;
+      frame.src = "viewer.html";
+      setStatus("Carregando o visualizador 3D…");
+    }, 30);
+  }
+
+  async function prepare3d() {
+    if (await checkViewer()) {
+      $("gerar3d").disabled = false;
+    } else {
+      note3d(
+        "O visualizador 3D (WebAssembly com Bevy, vários MB) não está nesta página. " +
+          "Ele só funciona servido por HTTP: rode scripts/web.sh (ou web.ps1) e sirva a pasta web/ " +
+          "(python3 -m http.server -d web), depois abra http://localhost:8000/. " +
+          "A versão autocontida utsim.html não inclui o 3D."
+      );
     }
   }
 
   async function main() {
     $("tab-sim").addEventListener("click", () => selectTab("tab-sim"));
     $("tab-fit").addEventListener("click", () => selectTab("tab-fit"));
+    $("tab-3d").addEventListener("click", () => selectTab("tab-3d"));
+    $("gerar3d").addEventListener("click", generate3d);
     $("arquivo").addEventListener("change", async (ev) => {
       const file = ev.target.files[0];
       if (file) $("dados").value = await file.text();
@@ -204,6 +300,7 @@
     $("simular").addEventListener("click", simulate);
     $("ajustar").addEventListener("click", fitData);
     loadExample();
+    prepare3d();
     for (const id of ["validar", "simular", "ajustar"]) $(id).disabled = false;
     setStatus("Pronto. Tudo roda localmente, sem enviar nada para servidores.");
   }

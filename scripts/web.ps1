@@ -1,5 +1,6 @@
 # Builds UTSim for the browser (PowerShell version of scripts/web.sh).
 # Output: web/dist/utsim.js + utsim_bg.wasm and the self-contained web/dist/utsim.html.
+param([switch]$Sem3d)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -28,6 +29,16 @@ if (Test-Path web/dist) { Remove-Item -Recurse -Force web/dist }
 Run wasm-bindgen @("target/wasm32-unknown-unknown/web/utsim_web.wasm", "--target", "no-modules",
     "--no-typescript", "--out-dir", "web/dist", "--out-name", "utsim")
 
+# The 3D viewer (Bevy + WebGL2) is large: it goes to web/dist/viewer/ and is NOT inlined
+# in utsim.html. Pass -Sem3d to skip it. web/viewer.html loads it.
+if (-not $Sem3d) {
+    Write-Host "==> compilando utsim-viewer (perfil web, wasm32; demora)"
+    Run cargo @("build", "--profile", "web", "--target", "wasm32-unknown-unknown", "-p", "utsim-viewer")
+    Write-Host "==> wasm-bindgen (visualizador)"
+    Run wasm-bindgen @("target/wasm32-unknown-unknown/web/utsim-view.wasm", "--target", "web",
+        "--no-typescript", "--out-dir", "web/dist/viewer", "--out-name", "utsim_viewer")
+}
+
 Write-Host "==> gerando web/dist/utsim.html (autocontido)"
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("web/dist/utsim_bg.wasm"))
@@ -48,5 +59,5 @@ foreach ($line in [IO.File]::ReadAllLines("web/index.html")) {
 }
 [IO.File]::WriteAllText((Join-Path (Get-Location) "web/dist/utsim.html"), $out.ToString(), $utf8)
 
-Get-ChildItem web/dist/utsim_bg.wasm, web/dist/utsim.html | ForEach-Object { "{0,10} bytes  {1}" -f $_.Length, $_.Name }
+Get-ChildItem web/dist/utsim_bg.wasm, web/dist/utsim.html, web/dist/viewer/utsim_viewer_bg.wasm -ErrorAction SilentlyContinue | ForEach-Object { "{0,10} bytes  {1}" -f $_.Length, $_.Name }
 Write-Host "Pronto. Abra web/dist/utsim.html no navegador."
