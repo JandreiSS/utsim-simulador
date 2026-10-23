@@ -415,7 +415,9 @@ snapshots golden comprovam isso.
 - **Decisões:** um bloco chama `Ctx::request_decision(opções, observação)`. A rodada pausa
   depois do evento corrente. O agente responde com `decide(escolha)`, e a resposta chega
   ao bloco como `MSG_DECISION`. No fluxo de tokens, isso é o `Decide` com regra `Agent`.
-  Um modelo que pede decisões não roda com `run()`: dá erro, porque precisa de um agente.
+  Sem agente, um modelo que pede decisões dá erro em `run()`. Com `run.default_decision`
+  (ex.: `Some(0)`), `Model::drive` responde sempre essa opção (limitada ao número de
+  opções), e o modelo roda em `utsim run`, no replay e no 3D.
 - **Métricas próprias:** um bloco pode expor métricas (`custom_metrics`) e reiniciá-las no
   fim do aquecimento (`on_warmup`).
 
@@ -490,6 +492,22 @@ Regras adotadas:
 - **Impasse:** é detectado quando um veículo é barrado. O sistema procura o maior grupo
   de veículos parados em que os donos das arestas desejadas também estão parados
   (funciona com capacidade > 1). É reportado uma única vez.
+
+## 4o. Emulação com OPC UA (fase 7)
+Comissionamento virtual: o modelo roda contra o relógio de parede e conversa com um CLP
+(real ou simulado) por OPC UA (`utsim-emu`, `utsim emular`).
+- **Ritmo:** a cada tick (50 ms) o `Pacer` avança a simulação com `run_until` até o tempo
+  que corresponde ao relógio × velocidade. Uma unidade de tempo do modelo vale 1 s na
+  velocidade 1.0.
+- **Um só thread:** tudo o que vem de fora é um `Input` (parar/retomar bloco, mudar a
+  velocidade), aplicado entre dois `run_until`, no tempo simulado corrente. Por isso a
+  rodada é determinística para a mesma sequência de comandos.
+- **Log de comandos:** gravar `(tempo, variável, valor)` basta para reproduzir a rodada
+  sem rede e sem esperar o relógio (`--reproduzir`): o relatório sai igual.
+- **Servidor:** `async-opcua`, namespace `urn:utsim:emulacao`, nós por bloco (`Conteudo`,
+  `Estado`, `Entradas`, `Saidas`, `Parar`) atualizados a cada tick. Parar usa
+  `stop_block` (motivo `EXTERNAL`, estado `stopped`). Endpoint sem segurança: só em rede
+  confiável.
 
 ## 5. Estatísticas
 
