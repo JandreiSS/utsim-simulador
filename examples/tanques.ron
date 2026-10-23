@@ -1,0 +1,42 @@
+// Envase de líquido: caminhões-tanque descarregam num tanque de armazenamento,
+// uma bomba leva o líquido para o tanque de processo e o envase transforma o
+// líquido em garrafas, que passam por uma rotuladora. A unidade de tempo é a hora
+// e a de volume, o litro.
+Model(
+    name: "Tanques",
+    description: "Descarga de caminhões, armazenamento, bombeamento e envase de garrafas",
+    run: (stop_time: 2000.0, warmup: 100.0, seed: 11, replications: 3),
+    objects: [
+        // Um caminhão chega, em média, a cada 4 horas.
+        (name: "caminhoes", kind: Source(interarrival: Exp(mean: 4.0))),
+        // Cada item que entra em "descarga" vira 6 litros no tanque de armazenamento.
+        (name: "descarga", kind: Sink),
+        // Garrafas criadas pelo envase (0,5 litro cada) esperam a rotuladora.
+        (name: "fila_garrafas", kind: Queue()),
+        (name: "rotuladora", kind: Processor(capacity: 1, process: Const(0.2))),
+        (name: "expedicao", kind: Sink),
+    ],
+    connections: [
+        ("caminhoes", "descarga"),
+        ("fila_garrafas", "rotuladora"),
+        ("rotuladora", "expedicao"),
+    ],
+    fluids: Some((
+        name: "fluidos",
+        nodes: [
+            (name: "caminhao_para_fluido", kind: FromItems(object: "descarga", volume: 6.0)),
+            (name: "armazenamento", kind: Tank(capacity: 100.0, initial: 20.0)),
+            // A bomba limita a vazão entre os tanques.
+            (name: "bomba", kind: Pipe(max_rate: 3.0)),
+            (name: "processo", kind: Tank(capacity: 30.0, initial: 5.0, max_out: Some(2.5))),
+            // O envase pega até 2 litros por hora: uma garrafa a cada 0,25 hora.
+            (name: "envase", kind: ToItems(object: "fila_garrafas", volume: 0.5, max_rate: Some(2.0))),
+        ],
+        links: [
+            ("caminhao_para_fluido", "armazenamento"),
+            ("armazenamento", "bomba"),
+            ("bomba", "processo"),
+            ("processo", "envase"),
+        ],
+    )),
+)

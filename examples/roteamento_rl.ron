@@ -1,0 +1,49 @@
+// Roteamento por aprendizado por reforço (fase 7, RF-104 e RF-108).
+// Os clientes chegam como tokens do fluxo "triagem". Em cada chegada, a atividade
+// "escolhe_linha" (Decide com regra Agent) PAUSA a simulação e pergunta a um agente
+// externo qual linha usar:
+//   opção 0 -> linha rápida: UMA máquina, atendimento médio de 0,8;
+//   opção 1 -> linha lenta: DUAS máquinas em paralelo, atendimento médio de 2,0 cada.
+// A carga (chegada média a cada 0,5) passa da capacidade da linha lenta sozinha, então
+// mandar tudo para a mesma linha, ou sortear, não funciona: é preciso olhar as filas.
+//
+// Este modelo precisa de um agente: `utsim check` valida, mas `utsim run` recusa (o
+// motor avisa que a decisão é externa). Use a crate `utsim-env` (Env::reset/step), a
+// política tabular de `utsim_env::qlearning` ou os testes em crates/utsim-env.
+// No teste golden o modelo roda com a política fixa "sempre a opção 0".
+Model(
+    name: "Roteamento por aprendizado por reforço",
+    description: "Um agente escolhe entre uma linha rápida (1 máquina) e uma lenta (2 máquinas)",
+    // Sem agente (utsim run, replay, 3D) a decisão padrão é a linha rápida (opção 0).
+    run: (stop_time: 200.0, seed: 11, replications: 5, default_decision: Some(0)),
+    objects: [
+        // Cada linha é uma fila seguida de máquinas; os itens são criados pelo fluxo.
+        (name: "fila_rapida",    kind: Queue(),                                  position: (0.0, 0.0, 0.0)),
+        (name: "maquina_rapida", kind: Processor(process: Exp(mean: 0.8)),       position: (4.0, 0.0, 0.0)),
+        (name: "fila_lenta",     kind: Queue(),                                  position: (0.0, 4.0, 0.0)),
+        // capacity: 2 = duas máquinas atendendo ao mesmo tempo.
+        (name: "maquina_lenta",  kind: Processor(capacity: 2, process: Exp(mean: 2.0)), position: (4.0, 4.0, 0.0)),
+        (name: "saida",          kind: Sink,                                     position: (8.0, 2.0, 0.0)),
+    ],
+    connections: [
+        ("fila_rapida", "maquina_rapida"),
+        ("maquina_rapida", "saida"),
+        ("fila_lenta", "maquina_lenta"),
+        ("maquina_lenta", "saida"),
+    ],
+    flows: [
+        (
+            name: "triagem",
+            activities: [
+                (name: "chegada", kind: Source(interarrival: Exp(mean: 0.5)), next: ["escolhe_linha"]),
+                // O agente recebe a observação ["now"] (o relógio); as filas são lidas
+                // pelo ambiente (EnvConfig.observe_blocks). Os ramos seguem a ordem das opções.
+                (name: "escolhe_linha", kind: Decide(rule: Agent(observation: ["now"])),
+                    next: ["cria_rapida", "cria_lenta"]),
+                (name: "cria_rapida", kind: CreateItem(into: "fila_rapida"), next: ["fim"]),
+                (name: "cria_lenta",  kind: CreateItem(into: "fila_lenta"),  next: ["fim"]),
+                (name: "fim", kind: Sink),
+            ],
+        ),
+    ],
+)

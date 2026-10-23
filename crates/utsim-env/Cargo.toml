@@ -1,0 +1,15 @@
+[package]
+name = "utsim-env"
+description = "Gym-like reinforcement-learning environment over UTSim models, with a tabular Q-learning baseline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+serde.workspace = true
+rand.workspace = true
+rand_pcg.workspace = true
+thiserror.workspace = true

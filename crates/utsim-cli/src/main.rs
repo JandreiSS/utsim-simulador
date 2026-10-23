@@ -1,4 +1,5 @@
 mod csv;
+mod emulate;
 mod experiment;
 mod fit;
 mod optimize;
@@ -86,6 +87,25 @@ enum Cmd {
         #[arg(long)]
         orcamento: Option<usize>,
     },
+    /// Emula o modelo em tempo real, com servidor OPC UA (comissionamento virtual)
+    Emular {
+        model: PathBuf,
+        /// Porta TCP do servidor OPC UA (0 escolhe uma livre)
+        #[arg(long, default_value_t = 4840)]
+        porta: u16,
+        /// Fator de velocidade: 1.0 = tempo real, 10.0 = dez vezes mais rápido
+        #[arg(long, default_value_t = 1.0)]
+        velocidade: f64,
+        /// Tempo simulado em que a emulação termina (padrão: run.stop_time)
+        #[arg(long)]
+        ate: Option<f64>,
+        /// Grava os comandos recebidos (tempo, variável, valor) neste arquivo RON
+        #[arg(long)]
+        gravar: Option<PathBuf>,
+        /// Reaplica os comandos de um arquivo RON, sem OPC UA e sem esperar o relógio
+        #[arg(long)]
+        reproduzir: Option<PathBuf>,
+    },
     /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
     Fit {
         file: PathBuf,
@@ -155,6 +175,21 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             json,
             reps,
             budget: orcamento,
+        })?,
+        Cmd::Emular {
+            model,
+            porta,
+            velocidade,
+            ate,
+            gravar,
+            reproduzir,
+        } => emulate::run(emulate::Args {
+            model,
+            port: porta,
+            speed: velocidade,
+            until: ate,
+            record: gravar,
+            replay: reproduzir,
         })?,
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
