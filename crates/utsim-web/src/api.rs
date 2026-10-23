@@ -15,6 +15,7 @@ const EXAMPLES: &[(&str, &str)] = &[
         include_str!("../../../examples/atendimento_com_perda.ron"),
     ),
     ("armazem", include_str!("../../../examples/armazem.ron")),
+    ("agvs", include_str!("../../../examples/agvs.ron")),
     (
         "celula_com_operadores",
         include_str!("../../../examples/celula_com_operadores.ron"),
@@ -51,6 +52,11 @@ const EXAMPLES: &[(&str, &str)] = &[
         "roteamento_por_tipo",
         include_str!("../../../examples/roteamento_por_tipo.ron"),
     ),
+    (
+        "roteamento_rl",
+        include_str!("../../../examples/roteamento_rl.ron"),
+    ),
+    ("tanques", include_str!("../../../examples/tanques.ron")),
     ("turnos", include_str!("../../../examples/turnos.ron")),
 ];
 
