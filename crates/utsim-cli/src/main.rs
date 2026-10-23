@@ -299,6 +299,12 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
             .keys()
             .map(|k| format!("{k} {}", cell(format!("{n}.{k}.mean"))))
             .collect();
+        // Metrics computed by the block itself (e.g. tank levels of a fluid network).
+        let custom: Vec<String> = b
+            .custom
+            .keys()
+            .map(|k| format!("{k} {}", cell(format!("{n}.{k}"))))
+            .collect();
         if !states.is_empty() || !extras.is_empty() {
             println!(
                 "{n:<14} {}",
@@ -308,6 +314,10 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
                     .collect::<Vec<_>>()
                     .join(" | ")
             );
+        }
+        // One per line: a fluid network may have several tanks.
+        for m in custom {
+            println!("{n:<14} {m}");
         }
     }
 }
