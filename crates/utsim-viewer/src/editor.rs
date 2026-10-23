@@ -103,7 +103,7 @@ impl Editor {
     /// An editor over `doc`. When every object sits at the origin the automatic
     /// layout is applied once, as one undoable step.
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // the browser build is read-only
-    pub fn new(doc: Document,pending_path: Option<PathBuf>, stop: Option<f64>) -> Self {
+    pub fn new(doc: Document, pending_path: Option<PathBuf>, stop: Option<f64>) -> Self {
         let stop = stop.unwrap_or_else(|| default_stop(doc.model().run.stop_time));
         let mut ed = Editor::blank(doc, pending_path, true);
         ed.stop_text = stop.to_string();
