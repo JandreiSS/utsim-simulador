@@ -102,6 +102,7 @@ enum Act {
 impl Editor {
     /// An editor over `doc`. When every object sits at the origin the automatic
     /// layout is applied once, as one undoable step.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // the browser build is read-only
     pub fn new(doc: Document, pending_path: Option<PathBuf>, stop: Option<f64>) -> Self {
         let stop = stop.unwrap_or_else(|| default_stop(doc.model().run.stop_time));
         let mut ed = Editor::blank(doc, pending_path, true);
@@ -280,10 +281,18 @@ impl Editor {
         };
         let model = run_model(self.doc.model(), stop);
         let (tx, rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
         std::thread::spawn(move || {
             let result = model.replay(0).map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
+        // The browser has no threads here: run it in place (the result is already in the
+        // channel when the next frame polls it).
+        #[cfg(target_arch = "wasm32")]
+        {
+            let result = model.replay(0).map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        }
         self.job = Some(Mutex::new(rx));
         self.status = "Simulando...".into();
     }

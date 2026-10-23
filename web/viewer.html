@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UTSim 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b1d21; color: #ddd; font: 14px system-ui, sans-serif; overflow: hidden; }
+  #utsim-canvas { display: block; width: 100%; height: 100%; outline: none; }
+  #utsim-msg { position: absolute; left: 16px; top: 16px; right: 16px; }
+</style>
+</head>
+<body>
+<canvas id="utsim-canvas" tabindex="0"></canvas>
+<p id="utsim-msg">Aguardando o replay…</p>
+<script type="module">
+// Hosted in an iframe by web/app.js. The parent posts {type: "utsim-replay", text}; the
+// replay text is exposed as window.UTSIM_REPLAY and the Bevy wasm module is started
+// (one fresh instance per iframe: a Bevy app cannot be restarted in the same page).
+const msg = document.getElementById("utsim-msg");
+let started = false;
+window.addEventListener("message", async (ev) => {
+  if (started || !ev.data || ev.data.type !== "utsim-replay") return;
+  started = true;
+  window.UTSIM_REPLAY = ev.data.text;
+  msg.textContent = "Carregando o visualizador 3D…";
+  try {
+    const mod = await import("./dist/viewer/utsim_viewer.js");
+    await mod.default({ module_or_path: "./dist/viewer/utsim_viewer_bg.wasm" });
+  } catch (e) {
+    // Bevy's winit loop ends init() with a deliberate exception ("control flow").
+    const text = String((e && e.message) || e);
+    if (!/control flow|Using exceptions/i.test(text)) {
+      msg.textContent = "Não foi possível iniciar o visualizador: " + text;
+      return;
+    }
+  }
+  msg.hidden = true;
+});
+if (window.parent !== window) window.parent.postMessage({ type: "utsim-viewer-ready" }, "*");
+</script>
+</body>
+</html>

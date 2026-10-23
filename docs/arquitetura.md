@@ -404,6 +404,19 @@ também guarda o histórico de convergência (`history`).
   Para abrir sem servidor, use `web/dist/utsim.html`; para `web/index.html`, sirva a pasta
   `web/` (`python3 -m http.server -d web`).
 
+- **Visualizador 3D no navegador (RF-109).** `utsim-viewer` também compila para
+  `wasm32-unknown-unknown` (binário `utsim-view`, ponto de entrada `src/web.rs`) com o Bevy em
+  **WebGL2** (feature `webgl2`; escolhido em vez de WebGPU por rodar em todos os navegadores
+  atuais). É somente leitura (modo Simular): a página grava um replay com `replay(ron, stop)`
+  do `utsim-web` e o entrega ao visualizador. Fica em `cfg(not(target_arch = "wasm32"))`: a
+  linha de comando (`clap`), o modo roteirizado (`script`/`roteiro`), arquivos e diálogos, a
+  saída do processo e a thread da simulação rápida (no navegador o editor, se um dia for
+  aberto, simula na própria thread). `scripts/web.sh` (ou `web.ps1`; `--sem-3d`/`-Sem3d` pula)
+  gera `web/dist/viewer/utsim_viewer.js` + `utsim_viewer_bg.wasm`, que **não** entram no
+  `utsim.html` autocontido (a aba 3D mostra uma nota). `web/viewer.html` roda num `<iframe>`
+  (uma instância nova por execução, pois um app Bevy não reinicia na mesma página) e recebe o
+  replay por `postMessage`. Só funciona servido por HTTP: `python3 -m http.server -d web`.
+
 ## 4k. Execução passo a passo, comandos externos e decisões (fase 7)
 `run()` é apenas um laço sobre a API passo a passo. Os resultados são idênticos, e os
 snapshots golden comprovam isso.

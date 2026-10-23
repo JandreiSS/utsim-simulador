@@ -12,6 +12,7 @@
   <nav role="tablist">
     <button role="tab" id="tab-sim" aria-selected="true" aria-controls="painel-sim">Simular</button>
     <button role="tab" id="tab-fit" aria-selected="false" aria-controls="painel-fit">Ajustar distribuição</button>
+    <button role="tab" id="tab-3d" aria-selected="false" aria-controls="painel-3d">3D</button>
   </nav>
 </header>
 
@@ -61,6 +62,17 @@
     <textarea id="dados" spellcheck="false" rows="10" placeholder="tempo&#10;1,2&#10;0,8&#10;2,5&#10;…"></textarea>
     <p id="fit-erro" class="erro" hidden></p>
     <iframe id="relatorio" title="Relatório de ajuste" hidden></iframe>
+  </section>
+  <section id="painel-3d" role="tabpanel" aria-labelledby="tab-3d" hidden>
+    <p>Visualização 3D do modelo da aba <strong>Simular</strong>: uma replicação é gravada aqui no navegador e animada com o visualizador do UTSim (somente leitura). Arraste para girar, role para aproximar.</p>
+    <div class="barra">
+      <label>Tempo de parada
+        <input id="parada3d" type="number" min="1" step="any" placeholder="automático" title="Padrão: o menor entre o tempo do modelo e 2000">
+      </label>
+      <button id="gerar3d" class="primario" disabled>Gerar visualização 3D</button>
+    </div>
+    <p id="nota3d" class="erro" hidden></p>
+    <iframe id="quadro3d" title="Visualização 3D" hidden allow="fullscreen"></iframe>
   </section>
 </main>
 

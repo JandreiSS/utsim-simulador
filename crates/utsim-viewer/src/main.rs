@@ -7,24 +7,40 @@ mod dock;
 mod editor;
 mod playback;
 mod scene;
+#[cfg(not(target_arch = "wasm32"))]
 mod script;
 mod ui;
-
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 use bevy::prelude::*;
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
-use clap::Parser;
 use editor::Editor;
 use playback::Data;
+
+// Everything that touches files, threads, the command line or the process exit code is
+// native-only: in the browser (`wasm32`) the entry point lives in `web.rs`.
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::{Path, PathBuf};
+#[cfg(not(target_arch = "wasm32"))]
+use std::process::ExitCode;
+
+#[cfg(not(target_arch = "wasm32"))]
+use clap::Parser;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_edit::Document;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_model::replay::Replay;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_viewer::editing;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_viewer::layout;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_viewer::source;
+#[cfg(not(target_arch = "wasm32"))]
 use utsim_viewer::timeline::TransitSetting;
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser)]
 #[command(
     name = "utsim-view",
@@ -59,18 +75,21 @@ struct Cli {
     capturas: Option<PathBuf>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn is_json(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| e.eq_ignore_ascii_case("json"))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// What to open: an editable document or a recorded replay.
 enum Start {
     Edit(Box<Editor>),
     Replay(Box<Replay>),
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn open(cli: &Cli, transit: TransitSetting) -> Result<Start, String> {
     let edit = |doc: Document, pending: Option<PathBuf>| {
         Ok(Start::Edit(Box::new(
@@ -102,6 +121,7 @@ fn open(cli: &Cli, transit: TransitSetting) -> Result<Start, String> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn headless_check(start: &Start, transit: TransitSetting) -> Result<(), String> {
     match start {
         Start::Edit(ed) => {
@@ -136,6 +156,7 @@ fn headless_check(start: &Start, transit: TransitSetting) -> Result<(), String> 
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn summary(data: &Data) {
     let tl = &data.timeline;
     println!(
@@ -172,42 +193,9 @@ fn summary(data: &Data) {
     println!("transferência visual padrão: {:.6}", tl.transit_default());
 }
 
-fn main() -> ExitCode {
-    let mut cli = Cli::parse();
-    let steps = match scripted_steps(&mut cli) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("erro: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let transit = cli
-        .transit
-        .map_or(TransitSetting::Auto, TransitSetting::Fixed);
-    let start = match open(&cli, transit) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("erro: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    if cli.headless_check {
-        return match headless_check(&start, transit) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(e) => {
-                eprintln!("erro: {e}");
-                ExitCode::FAILURE
-            }
-        };
-    }
-
-    let (editor, data) = match start {
-        Start::Edit(ed) => (*ed, Data::from_replay(editing::empty_replay(), transit)),
-        Start::Replay(replay) => (
-            Editor::read_only().with_transit(transit),
-            Data::from_replay(*replay, transit),
-        ),
-    };
+/// Adds the UTSim plugins, resources and systems to an app that already has the Bevy
+/// default plugins (shared by the native binary and the browser entry point).
+fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
     let positions: &[[f32; 3]] = if editor.editable {
         &editor.view.positions
     } else {
@@ -222,25 +210,7 @@ fn main() -> ExitCode {
         (min, max) = (Vec3::ZERO, Vec3::ZERO);
     }
 
-    let mut window = Window {
-        title: "UTSim".to_string(),
-        ..default()
-    };
-    if steps.is_some() {
-        // Predictable captures: fixed size, one pixel per logical pixel.
-        window.resolution =
-            bevy::window::WindowResolution::new(1280, 800).with_scale_factor_override(1.0);
-    }
-    let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(window),
-        ..default()
-    }));
-    if let (Some(steps), Some(dir)) = (steps, cli.capturas.clone()) {
-        app.add_plugins(script::ScriptPlugin { steps, dir });
-    }
-    let exit = app
-        .add_plugins(EguiPlugin::default())
+    app.add_plugins(EguiPlugin::default())
         .insert_resource(camera::OrbitCam::framing(min, max))
         .insert_resource(camera::CameraLock::default())
         .insert_resource(camera::FrameRequest(8))
@@ -288,14 +258,77 @@ fn main() -> ExitCode {
                 dock::apply_viewport,
             )
                 .chain(),
-        )
-        .run();
+        );
+    app
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    web::main();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() -> ExitCode {
+    let mut cli = Cli::parse();
+    let steps = match scripted_steps(&mut cli) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("erro: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let transit = cli
+        .transit
+        .map_or(TransitSetting::Auto, TransitSetting::Fixed);
+    let start = match open(&cli, transit) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("erro: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if cli.headless_check {
+        return match headless_check(&start, transit) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("erro: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
+    let (editor, data) = match start {
+        Start::Edit(ed) => (*ed, Data::from_replay(editing::empty_replay(), transit)),
+        Start::Replay(replay) => (
+            Editor::read_only().with_transit(transit),
+            Data::from_replay(*replay, transit),
+        ),
+    };
+    let mut window = Window {
+        title: "UTSim".to_string(),
+        ..default()
+    };
+    if steps.is_some() {
+        // Predictable captures: fixed size, one pixel per logical pixel.
+        window.resolution =
+            bevy::window::WindowResolution::new(1280, 800).with_scale_factor_override(1.0);
+    }
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(window),
+        ..default()
+    }));
+    if let (Some(steps), Some(dir)) = (steps, cli.capturas.clone()) {
+        app.add_plugins(script::ScriptPlugin { steps, dir });
+    }
+    let exit = configure(&mut app, editor, data).run();
     match exit {
         AppExit::Success => ExitCode::SUCCESS,
         AppExit::Error(_) => ExitCode::FAILURE,
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Parses the script, if any, and redirects an existing `.ron` input to a copy in the
 /// captures directory, so scripts never modify the original.
 fn scripted_steps(cli: &mut Cli) -> Result<Option<Vec<utsim_viewer::roteiro::Passo>>, String> {
