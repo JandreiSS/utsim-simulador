@@ -1,0 +1,35 @@
+// Fase 7: frota de AGVs na rede de caminhos, com um trecho de pista única (capacity).
+//   utsim-view examples/agvs.ron --roteiro crates/utsim-viewer/roteiros/agvs.ron --capturas saida/agvs
+// Confere: a aresta com capacidade em vermelho (linha dupla) com o rótulo "capacidade 1",
+// os AGVs andando sobre os caminhos, a cor de estado dos veículos e o AGV que espera
+// parado (estado "bloqueado") antes da pista única.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Captura("01_editar"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 40),
+    EsperarSegundos(3.0),
+    Captura("02_t0"),
+
+    // Velocidade x10 (de x50: duas vezes "-").
+    Tecla("-"),
+    Tecla("-"),
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(3.0),
+    Captura("03_agvs_a"),
+    EsperarSegundos(3.0),
+    Captura("04_agvs_b"),
+    EsperarSegundos(3.0),
+    Captura("05_agvs_c"),
+    EsperarSegundos(3.0),
+    Captura("06_agvs_d"),
+    EsperarSegundos(3.0),
+    Captura("07_agvs_e"),
+    EsperarSegundos(3.0),
+    Captura("08_agvs_f"),
+    Afirmar(TempoSimuladoMin(100.0)),
+    ClicarBotao("Pausar"),
+]

@@ -5,10 +5,11 @@ use bevy_egui::EguiContexts;
 use utsim_model::Model;
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::NetworkView;
+use utsim_viewer::fluids::FluidView;
 use utsim_viewer::geometry::{self, Geom};
 use utsim_viewer::handling::{BeltParams, Handling, RackParams};
 use utsim_viewer::layout;
-use utsim_viewer::timeline::{Timeline, TransitSetting};
+use utsim_viewer::timeline::{FluidSample, Timeline, TransitSetting};
 
 /// Read-only replay data. Nothing here is ever fed back into a simulation.
 #[derive(Resource)]
@@ -27,6 +28,14 @@ pub struct Data {
     /// Footprint and orientation of each block (conveyors and racks take their size
     /// from the model, or from defaults when only a `.json` replay is available).
     pub geoms: Vec<Geom>,
+    /// Layout of the model's fluid network (empty when it has none).
+    pub fluid: FluidView,
+}
+
+/// Blocks of the replay that are not drawn as objects in the 3D scene: token flows
+/// (shown in the Fluxos panel) and fluid networks (their nodes are drawn instead).
+fn hidden_kind(kind: &str) -> bool {
+    kind == "Flow" || kind == "Fluid"
 }
 
 impl Data {
@@ -35,11 +44,15 @@ impl Data {
         let timeline = Timeline::build(&replay, setting);
         // Token flows are blocks of the replay (after the objects) but have no place in
         // the 3D scene: they are left out of the layout and parked on the first object.
-        let objects = replay.blocks.iter().filter(|b| b.kind != "Flow").count();
+        let objects = replay
+            .blocks
+            .iter()
+            .filter(|b| !hidden_kind(&b.kind))
+            .count();
         let raw: Vec<[f64; 3]> = replay
             .blocks
             .iter()
-            .filter(|b| b.kind != "Flow")
+            .filter(|b| !hidden_kind(&b.kind))
             .map(|b| b.position)
             .collect();
         let object_links: Vec<(usize, usize)> = replay
@@ -75,24 +88,62 @@ impl Data {
             network: NetworkView::default(),
             logical: Vec::new(),
             geoms: Vec::new(),
+            fluid: FluidView::default(),
         };
         data.set_handlings(&handlings);
+        data.layout_fluid();
         data
+    }
+
+    /// Lays out the fluid network of the replay (below the drawn blocks when the model
+    /// gives no positions for its nodes).
+    fn layout_fluid(&mut self) {
+        let net = self.replay.blocks.iter().position(|b| b.kind == "Fluid");
+        self.fluid = match (&self.replay.fluids, net) {
+            (Some(def), Some(net)) => {
+                let drawn: Vec<[f32; 3]> = self
+                    .positions
+                    .iter()
+                    .zip(&self.replay.blocks)
+                    .filter(|(_, b)| !hidden_kind(&b.kind))
+                    .map(|(p, _)| *p)
+                    .collect();
+                FluidView::build(def, net, &self.replay.blocks, &drawn)
+            }
+            _ => FluidView::default(),
+        };
+    }
+
+    /// Level and rate of fluid node `node` at `t`; before the first sample a tank is at
+    /// its initial level and idle.
+    pub fn fluid_sample(&self, node: usize, t: f64) -> FluidSample {
+        let n = &self.fluid.nodes[node];
+        let capacity = (n.capacity > 0.0).then_some(n.capacity);
+        self.fluid
+            .net
+            .and_then(|net| self.timeline.fluid_at(net, node, t, capacity))
+            .unwrap_or(FluidSample {
+                level: n.initial,
+                rate: 0.0,
+            })
+    }
+
+    /// Whether replay block `b` is not drawn as an object (token flow or fluid network).
+    pub fn is_hidden(&self, b: usize) -> bool {
+        self.replay
+            .blocks
+            .get(b)
+            .is_some_and(|x| hidden_kind(&x.kind))
     }
 
     fn set_handlings(&mut self, handlings: &[Option<Handling>]) {
         let kinds: Vec<&str> = self.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
         self.geoms = geometry::build(&kinds, handlings, &self.positions, &self.replay.connections);
         for (geom, kind) in self.geoms.iter_mut().zip(&kinds) {
-            if *kind == "Flow" {
+            if hidden_kind(kind) {
                 geom.half = [0.0; 3];
             }
         }
-    }
-
-    /// Whether replay block `b` is a token flow (not drawn, picked or labelled in 3D).
-    pub fn is_flow(&self, b: usize) -> bool {
-        self.replay.blocks.get(b).is_some_and(|x| x.kind == "Flow")
     }
 
     /// Replay block index of the token flow called `name`.
@@ -186,6 +237,10 @@ impl Playback {
 
 #[derive(Resource, Default)]
 pub struct Selection(pub Option<usize>);
+
+/// Selected fluid node (index in `Data::fluid.nodes`); exclusive with `Selection`.
+#[derive(Resource, Default)]
+pub struct FluidSelection(pub Option<usize>);
 
 pub fn advance_clock(time: Res<Time>, data: Res<Data>, mut pb: ResMut<Playback>) {
     if !pb.playing {

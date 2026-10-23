@@ -28,7 +28,7 @@ use crate::camera::CameraLock;
 use crate::dock::{Dock, pointer_over_ui};
 use crate::playback::{Data, Playback, Selection};
 use crate::scene;
-use crate::ui::{Label, draw_labels};
+use crate::ui::{Label, capacity_labels, draw_labels};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mode {
@@ -962,7 +962,7 @@ pub fn edit_panels(
         });
     dock.free = right.available_rect_before_wrap();
 
-    let labels: Vec<Label> = (0..ed.view.names.len())
+    let mut labels: Vec<Label> = (0..ed.view.names.len())
         .map(|i| Label {
             text: ed.view.names[i].clone(),
             position: ed.view.positions[i],
@@ -970,6 +970,7 @@ pub fn edit_panels(
             selected: ed.selected.as_deref() == Some(ed.view.names[i].as_str()),
         })
         .collect();
+    labels.extend(capacity_labels(&NetworkView::of(ed.doc.model())));
     draw_labels(ctx, cam, cam_tf, &labels, dock.free);
 
     // Commands from the property panel may rename the selected object.

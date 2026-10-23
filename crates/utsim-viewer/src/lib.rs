@@ -9,6 +9,7 @@
 pub mod editing;
 pub mod flows;
 pub mod flows_ui;
+pub mod fluids;
 pub mod geometry;
 pub mod handling;
 pub mod layout;

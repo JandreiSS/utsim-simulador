@@ -122,7 +122,9 @@ pub fn frame_scene(
         }
         Mode::Sim => {
             let halves: Vec<[f32; 3]> = data.geoms.iter().map(|g| g.half).collect();
-            view::scene_bounds(&data.positions, &halves, &data.network.nodes)
+            let mut points = data.network.nodes.clone();
+            points.extend(data.fluid.bounds_points());
+            view::scene_bounds(&data.positions, &halves, &points)
         }
     }
     .unwrap_or(([0.0; 3], [0.0; 3]));
