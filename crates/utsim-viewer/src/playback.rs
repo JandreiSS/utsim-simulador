@@ -4,193 +4,52 @@ use bevy::prelude::*;
 use bevy_egui::EguiContexts;
 use utsim_model::Model;
 use utsim_model::replay::Replay;
-use utsim_viewer::editing::NetworkView;
-use utsim_viewer::fluids::FluidView;
-use utsim_viewer::geometry::{self, Geom};
-use utsim_viewer::handling::{BeltParams, Handling, RackParams};
-use utsim_viewer::layout;
-use utsim_viewer::timeline::{FluidSample, Timeline, TransitSetting};
+use utsim_scene::{Scene, SceneOptions};
+use utsim_viewer::timeline::TransitSetting;
 
 /// Read-only replay data. Nothing here is ever fed back into a simulation.
+///
+/// Positions, geometry, fluid layout and the timeline all come from the
+/// engine-independent [`Scene`] (reachable through `Deref`), so the viewer and every
+/// other scene client agree on where things are.
 #[derive(Resource)]
 pub struct Data {
     pub replay: Replay,
-    pub timeline: Timeline,
-    /// Bevy-space base position of each block.
-    pub positions: Vec<[f32; 3]>,
-    /// End of the animation, in simulation time.
-    pub end: f64,
-    /// Path network of the simulated model (empty when it has none or for a `.json` replay).
-    pub network: NetworkView,
+    pub scene: Scene,
     /// Per connection of the replay: a logical link (the source hands items to a
     /// transporter), drawn dashed. Empty when unknown.
     pub logical: Vec<bool>,
-    /// Footprint and orientation of each block (conveyors and racks take their size
-    /// from the model, or from defaults when only a `.json` replay is available).
-    pub geoms: Vec<Geom>,
-    /// Layout of the model's fluid network (empty when it has none).
-    pub fluid: FluidView,
 }
 
-/// Blocks of the replay that are not drawn as objects in the 3D scene: token flows
-/// (shown in the Fluxos panel) and fluid networks (their nodes are drawn instead).
-fn hidden_kind(kind: &str) -> bool {
-    kind == "Flow" || kind == "Fluid"
+impl std::ops::Deref for Data {
+    type Target = Scene;
+
+    fn deref(&self) -> &Scene {
+        &self.scene
+    }
 }
 
 impl Data {
-    /// Indexes a replay and places its blocks (model positions or automatic layout).
-    pub fn from_replay(replay: Replay, setting: TransitSetting) -> Self {
-        let timeline = Timeline::build(&replay, setting);
-        // Token flows are blocks of the replay (after the objects) but have no place in
-        // the 3D scene: they are left out of the layout and parked on the first object.
-        let objects = replay
-            .blocks
-            .iter()
-            .filter(|b| !hidden_kind(&b.kind))
-            .count();
-        let raw: Vec<[f64; 3]> = replay
-            .blocks
-            .iter()
-            .filter(|b| !hidden_kind(&b.kind))
-            .map(|b| b.position)
-            .collect();
-        let object_links: Vec<(usize, usize)> = replay
-            .connections
-            .iter()
-            .copied()
-            .filter(|&(a, b)| a < objects && b < objects)
-            .collect();
-        let mut positions = layout::place(&raw, &object_links);
-        let anchor = positions.first().copied().unwrap_or_default();
-        positions.resize(replay.blocks.len(), anchor);
-        let end = if replay.stop_time.is_finite() {
-            replay.stop_time
-        } else {
-            timeline.last_event_time()
-        }
-        .max(timeline.last_event_time());
-        let handlings: Vec<Option<Handling>> = replay
-            .blocks
-            .iter()
-            .enumerate()
-            .map(|(b, block)| match block.kind.as_str() {
-                "Conveyor" => Some(Handling::Conveyor(BeltParams::default())),
-                "Rack" => Some(Handling::Rack(RackParams::guess(timeline.max_slot(b)))),
-                _ => None,
-            })
-            .collect();
-        let mut data = Data {
+    /// Indexes a replay and composes its scene. `model` (the model that produced the
+    /// replay) gives the conveyor and rack sizes, the path network and the `visual` of
+    /// the objects; without it a `.json` replay uses defaults (see [`SceneOptions`]).
+    pub fn new(replay: Replay, transit: TransitSetting, model: Option<&Model>) -> Self {
+        let scene = Scene::build(&replay, &SceneOptions { transit, model });
+        Data {
             replay,
-            timeline,
-            positions,
-            end,
-            network: NetworkView::default(),
+            scene,
             logical: Vec::new(),
-            geoms: Vec::new(),
-            fluid: FluidView::default(),
-        };
-        data.set_handlings(&handlings);
-        data.layout_fluid();
-        data
-    }
-
-    /// Lays out the fluid network of the replay (below the drawn blocks when the model
-    /// gives no positions for its nodes).
-    fn layout_fluid(&mut self) {
-        let net = self.replay.blocks.iter().position(|b| b.kind == "Fluid");
-        self.fluid = match (&self.replay.fluids, net) {
-            (Some(def), Some(net)) => {
-                let drawn: Vec<[f32; 3]> = self
-                    .positions
-                    .iter()
-                    .zip(&self.replay.blocks)
-                    .filter(|(_, b)| !hidden_kind(&b.kind))
-                    .map(|(p, _)| *p)
-                    .collect();
-                FluidView::build(def, net, &self.replay.blocks, &drawn)
-            }
-            _ => FluidView::default(),
-        };
-    }
-
-    /// Level and rate of fluid node `node` at `t`; before the first sample a tank is at
-    /// its initial level and idle.
-    pub fn fluid_sample(&self, node: usize, t: f64) -> FluidSample {
-        let n = &self.fluid.nodes[node];
-        let capacity = (n.capacity > 0.0).then_some(n.capacity);
-        self.fluid
-            .net
-            .and_then(|net| self.timeline.fluid_at(net, node, t, capacity))
-            .unwrap_or(FluidSample {
-                level: n.initial,
-                rate: 0.0,
-            })
-    }
-
-    /// Whether replay block `b` is not drawn as an object (token flow or fluid network).
-    pub fn is_hidden(&self, b: usize) -> bool {
-        self.replay
-            .blocks
-            .get(b)
-            .is_some_and(|x| hidden_kind(&x.kind))
-    }
-
-    fn set_handlings(&mut self, handlings: &[Option<Handling>]) {
-        let kinds: Vec<&str> = self.replay.blocks.iter().map(|b| b.kind.as_str()).collect();
-        self.geoms = geometry::build(&kinds, handlings, &self.positions, &self.replay.connections);
-        for (geom, kind) in self.geoms.iter_mut().zip(&kinds) {
-            if hidden_kind(kind) {
-                geom.half = [0.0; 3];
-            }
         }
     }
 
-    /// Replay block index of the token flow called `name`.
-    pub fn flow_block(&self, name: &str) -> Option<usize> {
-        self.replay
-            .blocks
-            .iter()
-            .position(|b| b.kind == "Flow" && b.name == name)
-    }
-
-    /// Takes the conveyor and rack parameters (lengths, speeds, spacing) from `model`,
-    /// matching objects by name. Without it a `.json` replay uses defaults: belts of
-    /// 5 units at speed 1 with items of length 1, and racks guessed from the highest
-    /// slot used.
-    pub fn with_model(mut self, model: &Model) -> Self {
-        let handlings: Vec<Option<Handling>> = self
-            .replay
-            .blocks
-            .iter()
-            .enumerate()
-            .map(|(b, block)| {
-                model
-                    .objects
-                    .iter()
-                    .find(|o| o.name == block.name)
-                    .and_then(|o| Handling::of(&o.kind))
-                    .or_else(|| self.geoms.get(b).and_then(|g| g.handling))
-            })
-            .collect();
-        for (b, h) in handlings.iter().enumerate() {
-            if let Some(Handling::Conveyor(p)) = h {
-                self.timeline.set_belt_params(b, *p);
-            }
-        }
-        self.set_handlings(&handlings);
-        self
+    /// [`Data::new`] without the model.
+    pub fn from_replay(replay: Replay, transit: TransitSetting) -> Self {
+        Self::new(replay, transit, None)
     }
 
     /// Marks which connections are logical flow carried by a transporter.
     pub fn with_logical(mut self, logical: Vec<bool>) -> Self {
         self.logical = logical;
-        self
-    }
-
-    /// Adds the model's path network to be drawn on the ground.
-    pub fn with_network(mut self, network: NetworkView) -> Self {
-        self.network = network;
         self
     }
 }

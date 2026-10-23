@@ -356,10 +356,8 @@ pub fn poll_job(
     match result {
         Ok(replay) => {
             let logical = logical_flags(editor.doc.model(), &replay);
-            *data = Data::from_replay(replay, editor.transit)
-                .with_model(editor.doc.model())
-                .with_network(NetworkView::of(editor.doc.model()))
-                .with_logical(logical);
+            *data =
+                Data::new(replay, editor.transit, Some(editor.doc.model())).with_logical(logical);
             *pb = Playback::new(data.end);
             *selection = Selection(None);
             editor.mode = Mode::Sim;

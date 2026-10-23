@@ -9,9 +9,7 @@ use bevy_egui::EguiContexts;
 use utsim_viewer::editing::NetworkView;
 use utsim_viewer::geometry::{self, Geom};
 use utsim_viewer::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH};
-use utsim_viewer::layout;
 use utsim_viewer::style::{self, Shape};
-use utsim_viewer::timeline::ItemPos;
 use utsim_viewer::view;
 
 use crate::dock::{Dock, pointer_over_ui};
@@ -24,7 +22,7 @@ pub struct BlockVisual;
 #[derive(Component)]
 pub struct ItemVisual;
 
-const ITEM_SIZE: f32 = 0.3;
+use utsim_scene::compose::ITEM_SIZE;
 
 /// Visuals of the blocks currently shown (rebuilt by [`sync_blocks`]).
 #[derive(Resource, Default)]
@@ -48,16 +46,11 @@ fn color(rgb: [f32; 3]) -> Color {
     Color::srgb(rgb[0], rgb[1], rgb[2])
 }
 
-fn block_base(data: &Data, b: usize) -> Vec3 {
-    Vec3::from(data.positions[b])
-}
-
-/// Base position of block `b` at time `t`: its layout position, or, for a mobile
-/// resource that has started travelling, where the trace says it is.
+/// Base position of block `b` at time `t` (Bevy space): its layout position, or, for a
+/// mobile resource that has started travelling, where the trace says it is. Composed by
+/// the engine-independent scene ([`utsim_scene::Scene::base_at`]).
 pub fn block_base_at(data: &Data, b: usize, t: f64) -> Vec3 {
-    data.timeline
-        .carrier_pos(b, t)
-        .map_or_else(|| block_base(data, b), |p| Vec3::from(layout::to_bevy(p)))
+    Vec3::from(data.base_at(b, t))
 }
 
 fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
@@ -367,77 +360,14 @@ pub fn update_items(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut transforms: Query<&mut Transform, With<ItemVisual>>,
 ) {
-    let t = pb.t;
     let tl = &data.timeline;
-    let mut live = Vec::new();
-    tl.live_items(t, &mut live);
-
-    // Resting items per block (ordered by arrival), transiting items, container fill.
-    let mut resting: HashMap<usize, Vec<(f64, usize)>> = HashMap::new();
-    let mut placed: Vec<(usize, Vec3, f32)> = Vec::new();
-    let mut fill: HashMap<usize, usize> = HashMap::new();
-    let mut transit: Vec<(usize, Vec3)> = Vec::new();
-    for &i in &live {
-        let (pos, since) = tl.item_pos_since(i, t);
-        match pos {
-            ItemPos::At(b) if b < data.positions.len() => {
-                resting.entry(b).or_default().push((since, i));
-            }
-            ItemPos::Transit { from, to, progress }
-                if from < data.positions.len() && to < data.positions.len() =>
-            {
-                let s = progress as f32;
-                let s = s * s * (3.0 - 2.0 * s);
-                let a = block_base_at(&data, from, t) + Vec3::Y * 1.2;
-                let b = block_base_at(&data, to, t) + Vec3::Y * 1.2;
-                let arc = Vec3::Y * (PI * s).sin() * 0.7;
-                transit.push((i, a.lerp(b, s) + arc));
-            }
-            ItemPos::Inside(c) => *fill.entry(c).or_default() += 1,
-            _ => {}
-        }
-    }
-    for (b, list) in &mut resting {
-        list.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.cmp(&y.1)));
-        let geom = &data.geoms[*b];
-        // Items inside a transporter ride on it (stacked on its body).
-        let base = block_base_at(&data, *b, t);
-        match geom.shape {
-            // Belts and racks put every item where the trace says it is.
-            Shape::Belt | Shape::Rack => {
-                for &(_, i) in list.iter() {
-                    let spot = if geom.shape == Shape::Belt {
-                        tl.belt_position(*b, i, t)
-                            .and_then(|distance| geom.belt_item(distance))
-                    } else {
-                        tl.rack_slot(*b, i, t).and_then(|slot| geom.rack_item(slot))
-                    };
-                    if let Some((offset, size)) = spot {
-                        placed.push((i, base + Vec3::from(offset), size / ITEM_SIZE));
-                    }
-                }
-            }
-            shape => {
-                for (slot, &(_, i)) in list.iter().enumerate() {
-                    // The stack is capped; the label shows how many items are not drawn.
-                    if slot >= style::visible_slots(shape) {
-                        break;
-                    }
-                    let off = Vec3::from(style::slot_offset(shape, slot));
-                    placed.push((i, base + off, 1.0));
-                }
-            }
-        }
-    }
-    for (i, p) in transit {
-        placed.push((i, p, 1.0));
-    }
-    for entry in &mut placed {
-        if let Some(&n) = fill.get(&entry.0) {
-            // A container that holds items is drawn slightly larger.
-            entry.2 = 1.0 + 0.18 * n.min(5) as f32 + 0.2;
-        }
-    }
+    // Where every item is comes from the scene; the viewer only draws it.
+    let placed: Vec<(usize, Vec3, f32)> = data
+        .items_at(pb.t)
+        .into_iter()
+        .filter(|p| p.drawn)
+        .map(|p| (p.item, Vec3::from(p.center), p.scale))
+        .collect();
 
     let mut visible: HashSet<usize> = HashSet::with_capacity(placed.len());
     for (i, pos, scale) in placed {

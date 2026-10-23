@@ -579,6 +579,67 @@ nunca discordam sobre onde as coisas estão:
 - **Aparência** (`visual` no objeto): um item da biblioteca embutida ou um `.glb`, com
   escala, giro e cor. É só apresentação: a simulação nunca lê esse campo.
 
+### Como a cena é derivada do rastro
+
+`Scene::build(replay, opções)` indexa o replay uma vez. As opções trazem a duração visual das
+transferências e, quando existe, o modelo que gerou o replay (tamanhos de esteiras e
+porta-paletes, rede de caminhos, `visual` e parâmetros dos transportadores, casados pelo nome).
+Os módulos puros que vieram do visualizador (`timeline`, `layout`, `geometry`, `handling`,
+`fluids`, `style`, `network`, `tokens`) trabalham no espaço de layout do Bevy (Y para cima).
+A saída (`static_scene`, `frame`) converte tudo para as coordenadas do modelo com
+`layout::to_model`. O visualizador lê as mesmas funções (`base_at`, `items_at`), então só existe
+uma implementação.
+
+- **Papel do transportador**, vale a primeira regra que casar:
+  1. `visual.asset` contém "empilhadeira" ou "forklift": empilhadeira; "agv": AGV;
+     "operador", "pessoa" ou "person": pessoa;
+  2. `agv: true`: AGV;
+  3. serve um porta-paletes (um objeto cujo `transport` é ele, ou um despachante cuja equipe o
+     inclui, é um `Rack` ou está ligado a um): empilhadeira;
+  4. é operador (ele, ou um despachante com ele na equipe, é o `operators.team` de um
+     processo): pessoa;
+  5. senão, veículo genérico. Um replay `.json` sem o modelo só tem veículos genéricos.
+- **Posição**: o fim do último trecho `Travel`, interpolado linearmente no tempo ao longo do
+  caminho pelo comprimento de arco. Antes do primeiro trecho, a posição do layout.
+- **Direção (`yaw`)**: a do pedaço de caminho percorrido. Parado, entre trechos ou quebrado,
+  mantém a direção do fim do último trecho com comprimento.
+- **Movimento**, vale a primeira regra:
+  1. `Stopped` nos estados `down`, `off_shift` e `stopped`;
+  2. `Moving` enquanto percorre um trecho com comprimento;
+  3. `Loading` e `Unloading` nesses estados;
+  4. `Working` no estado `utilize` (operador num posto);
+  5. `Blocked` no estado `blocked`;
+  6. senão, `Idle`.
+
+  Blocos fixos: `Working` em `processing` e `setup`, `Blocked` e `Stopped` como acima.
+- **Velocidade** em `Moving`: comprimento do trecho dividido pela duração. Se o modelo dá
+  aceleração ou desaceleração e o perfil trapezoidal do comprimento do trecho dura o mesmo que
+  o trecho (tolerância de 0,5 %), vale a velocidade instantânea desse perfil. Os pedaços de um
+  AGV são fatias de um perfil da rota inteira e ficam com a velocidade média do pedaço.
+- **Janelas de carga e descarga**: o estado `loading` cobre a carga de todos os itens da
+  viagem. Cada coleta (`Moved` para dentro do transportador) fecha uma janela e abre a próxima,
+  e `progress` vai de 0 a 1 na janela que contém `t`. A descarga é igual, com as entregas
+  (`Moved` para fora do transportador).
+- **Altura da carga (`lift`)**: a empilhadeira descansa os garfos a 0,1 m vazia e a 0,3 m
+  carregada. Ao carregar ou descarregar num porta-paletes, os garfos sobem até a base da
+  célula do item, chegam lá no meio da janela e voltam à altura de viagem. Em outro bloco,
+  passam de uma altura de repouso à outra. Uma pessoa carregando segura o item a 1,0 m. Os
+  demais veículos informam 0.
+- **Objeto de apoio (`parent`)**: o bloco onde o item está (fila, célula, esteira,
+  transportador); o contêiner de um item embalado; nenhum durante uma transferência.
+- **Nível (`fill`)**: nível do tanque sobre a capacidade, linear entre as amostras do rastro.
+- **Itens**: ausentes do quadro antes de criados e depois de destruídos. Itens embalados e os
+  que passam da pilha visível de uma fila estão no quadro, mas o visualizador não os desenha.
+
+Lacunas conhecidas:
+- o rastro não traz o perfil de velocidade de cada trecho, então a posição no meio do trecho é
+  linear no tempo mesmo com aceleração (só a velocidade informada segue o perfil);
+- a duração de cada carga sai do intervalo entre o início do estado `loading` (ou a coleta
+  anterior) e a coleta seguinte. Isso é exato para um transportador, mas não existe um evento
+  próprio de "início da carga";
+- os itens sobre uma empilhadeira continuam desenhados em cima do veículo, sem seguir a altura
+  dos garfos.
+
 As esperas para a realidade virtual:
 1. Todo o cálculo de posição sai do código Bevy e fica puro e testável em `utsim-scene`.
 2. A escala é real.

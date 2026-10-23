@@ -1,3 +1,4 @@
+mod cena;
 mod csv;
 mod emulate;
 mod experiment;
@@ -64,6 +65,21 @@ enum Cmd {
         out: PathBuf,
         #[arg(long, default_value_t = 0)]
         rep: u32,
+    },
+    /// Grava a cena 3D de uma replicação (protocolo utsim-scene/1, JSON em linhas)
+    Cena {
+        model: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        rep: u32,
+        /// Quadros por unidade de tempo simulado
+        #[arg(long, default_value_t = 10.0)]
+        fps: f64,
+        /// Último instante gravado (padrão: o fim da rodada)
+        #[arg(long)]
+        ate: Option<f64>,
+        /// Arquivo de saída (padrão: a saída padrão)
+        #[arg(long)]
+        saida: Option<PathBuf>,
     },
     Experiment {
         file: PathBuf,
@@ -203,6 +219,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::Replay { model, out, rep } => replay::run(&model, rep, &out)?,
+        Cmd::Cena {
+            model,
+            rep,
+            fps,
+            ate,
+            saida,
+        } => cena::run(&model, rep, fps, ate, saida.as_deref())?,
         Cmd::Run {
             model,
             reps,

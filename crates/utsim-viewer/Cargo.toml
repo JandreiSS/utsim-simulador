@@ -20,6 +20,7 @@ utsim-model.workspace = true
 utsim-edit.workspace = true
 utsim-flow.workspace = true
 utsim-fluid.workspace = true
+utsim-scene.workspace = true
 utsim-script.workspace = true
 clap.workspace = true
 serde_json.workspace = true

@@ -146,7 +146,7 @@ fn headless_check(start: &Start, transit: TransitSetting) -> Result<(), String> 
                 let stop: f64 = ed.stop_text.parse().map_err(|_| "tempo inválido")?;
                 let model = editing::run_model(ed.doc.model(), stop);
                 let replay = model.replay(0).map_err(|e| e.to_string())?;
-                summary(&Data::from_replay(replay, transit).with_model(&model));
+                summary(&Data::new(replay, transit, Some(&model)));
             }
         }
         Start::Replay(replay) => {
