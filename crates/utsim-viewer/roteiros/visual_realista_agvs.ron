@@ -1,0 +1,41 @@
+// A3D-2: AGVs realistas na rede de caminhos.
+//   utsim-view examples/agvs.ron --roteiro crates/utsim-viewer/roteiros/visual_realista_agvs.ron --capturas %TEMP%/utsim_visual/agvs
+// Confere: cada AGV virado para onde anda (para +x no trecho a-b, para +y no trecho c-d),
+// a faixa de luz verde andando, laranja bloqueado antes da pista única (agv_2 em t = 30),
+// azul descarregando na estação (agv_1 em t = 36) e branca parado, o palete sobre o deque,
+// as estações como máquinas e a doca como área pintada no chão.
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(2.0),
+    Captura("01_visao_geral"),
+
+    // agv_1 andando para +x (verde), agv_2 bloqueado em b (laranja), agv_3 parado na doca.
+    IrPara(30.0),
+    Focar(objeto: "agv_2", distancia: 16.0, giro: Some(0.4), inclinacao: Some(0.45)),
+    Esperar(quadros: 10),
+    Captura("02_bloqueado_e_andando"),
+
+    // agv_1 descarregando na estação 1 (azul).
+    IrPara(36.0),
+    Focar(objeto: "estacao_1", distancia: 7.0, giro: Some(0.5), inclinacao: Some(0.4)),
+    Esperar(quadros: 10),
+    Captura("03_descarregando"),
+
+    // agv_2 subindo o trecho c-d: virado para +y (para o fundo da tela).
+    IrPara(56.0),
+    Focar(objeto: "agv_2", distancia: 6.0, giro: Some(0.9), inclinacao: Some(0.5)),
+    Esperar(quadros: 10),
+    Captura("04_virado_para_y"),
+
+    // Reproduzindo: as rodas e a luz acompanham o movimento.
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(1.0),
+    ClicarBotao("Pausar"),
+    Esperar(quadros: 5),
+    Captura("05_reproduzindo"),
+    Afirmar(TempoSimuladoMin(56.0)),
+]

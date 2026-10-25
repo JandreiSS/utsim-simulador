@@ -12,8 +12,12 @@ use utsim_viewer::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH};
 use utsim_viewer::style::{self, Shape};
 use utsim_viewer::view;
 
+use bevy::asset::io::embedded::EmbeddedAssetRegistry;
+use utsim_viewer::visual::{self, Carry, Look};
+
 use crate::dock::{Dock, pointer_over_ui};
 use crate::editor::{Editor, Mode};
+use crate::models::{self, Library, VisualMode};
 use crate::playback::{Data, FluidSelection, Playback, Selection};
 
 #[derive(Component)]
@@ -33,6 +37,11 @@ pub struct BlockMaterials {
     /// Geometry the entities were built for (a change rebuilds them).
     geoms: Vec<Geom>,
     entities: Vec<Entity>,
+    /// Height of each entity's origin above the block base (half the box for the simple
+    /// shapes, 0 for the realistic models, whose origin is on the floor).
+    offsets: Vec<f32>,
+    /// Realistic look of each block, when drawn with one.
+    looks: Vec<Option<Look>>,
 }
 
 #[derive(Resource)]
@@ -40,6 +49,13 @@ pub struct ItemPool {
     entities: HashMap<usize, Entity>,
     mesh: Handle<Mesh>,
     materials: HashMap<usize, Handle<StandardMaterial>>,
+    /// Realistic items (pallets and boxes) instead of cubes.
+    scenes: Option<models::ItemScenes>,
+    /// The scene moves pallet loads.
+    pallets: bool,
+    /// Edge of a load carried on forks (the rack's load size, so it does not change size
+    /// when it is stored).
+    fork_size: f32,
 }
 
 fn color(rgb: [f32; 3]) -> Color {
@@ -225,6 +241,10 @@ pub fn sync_blocks(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut transforms: Query<&mut Transform, With<BlockVisual>>,
     mut last_mode: Local<Option<Mode>>,
+    visual: Res<VisualMode>,
+    mut library: ResMut<Library>,
+    registry: Res<EmbeddedAssetRegistry>,
+    server: Res<AssetServer>,
 ) {
     let (kinds, positions, geoms): (Vec<&str>, &[[f32; 3]], &[Geom]) = match editor.mode {
         Mode::Edit => (
@@ -238,14 +258,23 @@ pub fn sync_blocks(
             &data.geoms,
         ),
     };
+    // The realistic looks follow the document (visual, roles) as well as the geometry.
+    let looks = if visual.active() {
+        models::looks(&editor, &data)
+    } else {
+        Vec::new()
+    };
+    let wanted = |i: usize| looks.get(i).cloned().flatten();
     let rebuild = *last_mode != Some(editor.mode)
         || (editor.mode == Mode::Sim && data.is_changed())
+        || visual.is_changed()
         || mats
             .kinds
             .iter()
             .map(String::as_str)
             .ne(kinds.iter().copied())
-        || mats.geoms.as_slice() != geoms;
+        || mats.geoms.as_slice() != geoms
+        || (0..geoms.len()).any(|i| mats.looks.get(i).cloned().flatten() != wanted(i));
     if rebuild {
         *last_mode = Some(editor.mode);
         for e in mats.entities.drain(..) {
@@ -256,6 +285,8 @@ pub fn sync_blocks(
         }
         mats.handles.clear();
         mats.last.clear();
+        mats.offsets.clear();
+        mats.looks.clear();
         mats.kinds = kinds.iter().map(|k| k.to_string()).collect();
         mats.geoms = geoms.to_vec();
         for (i, geom) in geoms.iter().enumerate() {
@@ -266,26 +297,71 @@ pub fn sync_blocks(
             });
             mats.handles.push(material.clone());
             mats.last.push(None);
-            let translation = Vec3::from(positions[i]) + Vec3::Y * geom.half[1];
-            let id = spawn_block(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                geom,
-                material,
-                translation,
-            );
+            let base = Vec3::from(positions[i]);
+            let look = wanted(i);
+            let realistic = look.as_ref().and_then(|look| {
+                models::spawn_block(
+                    &mut commands,
+                    &mut library,
+                    &registry,
+                    &server,
+                    i,
+                    look,
+                    base,
+                )
+            });
+            let id = match realistic {
+                Some(id) => {
+                    mats.offsets.push(0.0);
+                    mats.looks.push(look);
+                    id
+                }
+                None => {
+                    mats.offsets.push(geom.half[1]);
+                    mats.looks.push(None);
+                    spawn_block(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        geom,
+                        material,
+                        base + Vec3::Y * geom.half[1],
+                    )
+                }
+            };
             if kinds[i] == "Flow" || kinds[i] == "Fluid" {
                 // Token flows live in the Fluxos panel, not in the 3D scene.
                 commands.entity(id).insert(Visibility::Hidden);
             }
             mats.entities.push(id);
         }
+        // Items: realistic loads when the blocks are realistic.
+        pool.pallets = looks.iter().flatten().any(|l| {
+            matches!(
+                l.source,
+                visual::Source::Library(
+                    utsim_assets::Spec::PortaPaletes(_)
+                        | utsim_assets::Spec::Empilhadeira
+                        | utsim_assets::Spec::Paleteira
+                )
+            )
+        });
+        pool.scenes = if visual.active() {
+            models::ItemScenes::get(&mut library, &registry, &server)
+        } else {
+            None
+        };
+        pool.fork_size = geoms
+            .iter()
+            .filter_map(|g| g.rack_params())
+            .map(|p| p.item_size())
+            .fold(None, |a: Option<f32>, s| Some(a.map_or(s, |a| a.max(s))))
+            .unwrap_or(0.8);
         return;
     }
     for (i, &e) in mats.entities.iter().enumerate() {
         if let Ok(mut tr) = transforms.get_mut(e) {
-            tr.translation = Vec3::from(positions[i]) + Vec3::Y * geoms[i].half[1];
+            tr.translation = Vec3::from(positions[i]) + Vec3::Y * mats.offsets[i];
         }
     }
 }
@@ -313,6 +389,9 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
         entities: HashMap::new(),
         mesh: meshes.add(Cuboid::new(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)),
         materials: HashMap::new(),
+        scenes: None,
+        pallets: false,
+        fork_size: 0.8,
     });
 }
 
@@ -347,8 +426,58 @@ pub fn update_carriers(
             continue;
         }
         if let Ok(mut tr) = transforms.get_mut(e) {
-            tr.translation = block_base_at(&data, i, pb.t) + Vec3::Y * data.geoms[i].half[1];
+            let offset = mats
+                .offsets
+                .get(i)
+                .copied()
+                .unwrap_or(data.geoms[i].half[1]);
+            tr.translation = block_base_at(&data, i, pb.t) + Vec3::Y * offset;
         }
+    }
+}
+
+/// Where a drawn item goes in the realistic mode: on the forks or in the hands of its
+/// carrier, on an AGV's deck, on the floor of a queue area; elsewhere where the scene
+/// puts it. Returns the centre and the cube scale.
+fn realistic_placement(
+    data: &Data,
+    t: f64,
+    mats: &BlockMaterials,
+    fork_size: f32,
+    p: &utsim_scene::ItemPlacement,
+    stacked: &mut HashMap<usize, usize>,
+) -> (Vec3, f32) {
+    let center = Vec3::from(p.center);
+    let Some(utsim_scene::EntityId::Block(b)) = p.parent else {
+        return (center, p.scale);
+    };
+    let b = b as usize;
+    let Some(look) = mats.looks.get(b).and_then(Option::as_ref) else {
+        return (center, p.scale);
+    };
+    if mats.kinds.get(b).is_some_and(|k| k == "Queue") {
+        return (center - Vec3::Y * visual::queue_drop(), p.scale);
+    }
+    let Some(pose) = models::drawn_pose(data, b, t, look) else {
+        return (center, p.scale);
+    };
+    let scale = match look.carry {
+        Carry::Forks { .. } => fork_size / ITEM_SIZE,
+        _ => p.scale,
+    };
+    let index = stacked.entry(b).or_default();
+    let spot = visual::carried_center(
+        look.carry,
+        pose.position,
+        pose.yaw,
+        pose.lift,
+        *index,
+        scale * ITEM_SIZE,
+    );
+    *index += 1;
+    match spot {
+        Some(c) => (Vec3::from(c), scale),
+        None => (center, p.scale),
     }
 }
 
@@ -356,27 +485,54 @@ pub fn update_items(
     mut commands: Commands,
     data: Res<Data>,
     pb: Res<Playback>,
+    mats: Res<BlockMaterials>,
     mut pool: ResMut<ItemPool>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut transforms: Query<&mut Transform, With<ItemVisual>>,
 ) {
     let tl = &data.timeline;
-    // Where every item is comes from the scene; the viewer only draws it.
-    let placed: Vec<(usize, Vec3, f32)> = data
+    let realistic = pool.scenes.is_some();
+    // Where every item is comes from the scene; the viewer only draws it (the realistic
+    // models only move carried loads onto the forks, the hands or the deck).
+    let mut stacked = HashMap::new();
+    let placed: Vec<(usize, Vec3, f32, f32)> = data
         .items_at(pb.t)
         .into_iter()
         .filter(|p| p.drawn)
-        .map(|p| (p.item, Vec3::from(p.center), p.scale))
+        .map(|p| {
+            let (pos, scale) = if realistic {
+                realistic_placement(&data, pb.t, &mats, pool.fork_size, &p, &mut stacked)
+            } else {
+                (Vec3::from(p.center), p.scale)
+            };
+            (p.item, pos, scale, p.yaw)
+        })
         .collect();
 
     let mut visible: HashSet<usize> = HashSet::with_capacity(placed.len());
-    for (i, pos, scale) in placed {
+    for (i, pos, scale, yaw) in placed {
         visible.insert(i);
-        let transform = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+        let mut transform = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+        if realistic {
+            transform.rotation = Quat::from_rotation_y(yaw);
+        }
         if let Some(&e) = pool.entities.get(&i) {
             if let Ok(mut tr) = transforms.get_mut(e) {
                 *tr = transform;
             }
+        } else if let Some(scenes) = &pool.scenes {
+            let origin = tl.item_origin(i).unwrap_or(0);
+            let e = commands
+                .spawn((transform, Visibility::default(), ItemVisual))
+                .id();
+            models::spawn_item_children(
+                &mut commands,
+                e,
+                scenes,
+                pool.pallets,
+                style::origin_color(origin),
+            );
+            pool.entities.insert(i, e);
         } else {
             let origin = tl.item_origin(i).unwrap_or(0);
             let mat = pool

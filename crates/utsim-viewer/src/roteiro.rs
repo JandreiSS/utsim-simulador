@@ -22,6 +22,8 @@
 //!     ClicarBotao("▶ Simular"),               // visible egui label
 //!     Captura("nome"),                        // <capturas>/nome.png
 //!     Afirmar(ObjetosIgual(5)),
+//!     IrPara(1806.0),                         // Simular: pause and jump the clock
+//!     Focar(objeto: "empilhadeira_1", distancia: 9.0, giro: Some(0.6), inclinacao: None),
 //! ]
 //! ```
 //!
@@ -116,6 +118,18 @@ pub enum Passo {
     ClicarBotao(String),
     Captura(String),
     Afirmar(Condicao),
+    /// Pauses the playback and jumps to this simulated time (`Simular`).
+    IrPara(f64),
+    /// Points the camera at the block called `objeto` (where it is now), at `distancia`
+    /// metres; `giro` and `inclinacao` (radians) set the orbit angles when given.
+    Focar {
+        objeto: String,
+        distancia: f32,
+        #[serde(default)]
+        giro: Option<f32>,
+        #[serde(default)]
+        inclinacao: Option<f32>,
+    },
 }
 
 /// Parses a script.
@@ -305,6 +319,32 @@ mod tests {
                 para: Alvo::Mundo(8.0, 2.0)
             }
         );
+    }
+
+    #[test]
+    fn parses_playback_and_camera_steps() {
+        let steps = parse(
+            r#"[IrPara(1806.0), Focar(objeto: "agv_1", distancia: 6.0, giro: Some(0.5)),
+                Focar(objeto: "x", distancia: 2.0, giro: None, inclinacao: Some(0.3))]"#,
+        )
+        .unwrap();
+        assert_eq!(steps[0], Passo::IrPara(1806.0));
+        assert_eq!(
+            steps[1],
+            Passo::Focar {
+                objeto: "agv_1".into(),
+                distancia: 6.0,
+                giro: Some(0.5),
+                inclinacao: None,
+            }
+        );
+        assert!(matches!(
+            steps[2],
+            Passo::Focar {
+                inclinacao: Some(_),
+                ..
+            }
+        ));
     }
 
     #[test]

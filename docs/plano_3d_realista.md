@@ -64,11 +64,86 @@ Ainda falta, nas fases abaixo:
 | Fase | Conteúdo | Estimativa |
 |---|---|---|
 | A3D-1 | Cena independente de motor (`utsim-scene`), `utsim cena`, visualizador usando a cena (**em andamento**) | 3–4 h |
-| A3D-2 | Gerador de `.glb` articulados (empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque) e carga de glTF no Bevy pelo `visual.asset` | 4–6 h |
+| A3D-2 | Gerador de `.glb` articulados (empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque) e carga de glTF no Bevy pelo `visual.asset` (**feito**, ver abaixo) | 4–6 h |
 | A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas | 5–8 h |
 | A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta); instâncias e níveis de detalhe para modelos grandes | 3–4 h |
 | A3D-5 | Cliente Unreal + realidade virtual (OpenXR), lendo `utsim-scene/1` de arquivo e depois ao vivo | 6–10 h (sessão separada) |
 | A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP | 2–3 h |
+
+## Biblioteca de modelos (A3D-2, feita)
+
+A crate `crates/utsim-assets` gera os modelos por código e grava `.glb` (glTF binário):
+
+- só malhas montadas em Rust (caixas, cilindros, esferas), sem programa externo nem download;
+- medidas reais em metros, cores lisas PBR, de 60 a 1.300 triângulos por modelo;
+- modelados com Z para cima e `+x` para a frente, gravados em Y para cima: `(x, y, z)` vira `(x, z, -y)`;
+- os modelos olham para `+X` do glTF, a convenção de direção do UTSim. Um motor que espera
+  `+Z` para a frente gira o modelo -90° em torno da vertical;
+- cada peça móvel é um nó com nome e pivô na articulação, então o motor só muda a
+  transformação do nó, sem esqueleto;
+- o material `pintura` é a pintura principal (trocada por `visual.color`) e `luz` é a luz de
+  estado que o motor recolore.
+
+`cargo run -p utsim-assets` regrava os padrões em `assets/modelos/` (versionados, cerca de
+320 KB no total). `utsim-assets --listar` mostra nós, triângulos e medidas, e
+`--porta-paletes BAIAS,NIVEIS,LARGURA,ALTURA` ou `--esteira COMPRIMENTO` geram variantes. Um
+teste regera os arquivos e compara byte a byte (os números são arredondados numa grade de
+2^-14 m e o JSON é escrito numa ordem fixa, então o resultado é igual em qualquer sistema).
+Outro teste lê cada `.glb` com a crate `gltf` e confere os nós e as medidas.
+
+| Modelo | Medidas (m, x × y × z) | Nós (pivô) |
+|---|---|---|
+| `empilhadeira` | 3,43 × 1,10 × 2,25 (2,30 até a face dos garfos) | `chassi`; `cabine` (banco e proteção); `luz` (giroflex); `torre` (base da torre); `carro` (filho de `torre`; a altura da origem é a altura do topo dos garfos, 0,10 em repouso); `garfos` (filho de `carro`); `roda_de`, `roda_dd`, `roda_te`, `roda_td` (eixo; altura do pivô = raio) |
+| `paleteira` | 1,74 × 0,54 × 1,25 | `chassi`; `garfos` (topo a 0,085); `timao` (articulação na bomba); `roda_direcao`, `roda_e`, `roda_d` (eixo) |
+| `agv` | 1,13 × 0,81 × 0,35 | `chassi` (para-choque amarelo na frente, escuro atrás); `luz` (faixa de luz de estado); `roda_e`, `roda_d` (eixo) |
+| `palete` | 1,20 × 1,00 × 0,144 | só a raiz (estático) |
+| `caixa` | 0,40 × 0,30 × 0,30 | só a raiz (material `papelao`) |
+| `porta_paletes` | baias × largura da baia, profundidade, níveis × altura do nível + viga | `estrutura` (montantes azuis com travamento, vigas laranja; o nível k apoia a carga em k × altura + viga) |
+| `esteira` | comprimento × largura × altura dos rolos | `estrutura`, `rolos` |
+| `tanque` | 2r × 2r × (pernas + altura + teto) | `estrutura`, `casco` (base do casco) |
+| `maquina` | 1,80 × 1,52 × 2,20 | `chassi`; `porta`; `luz` (torre de sinalização) |
+| `bancada` | 1,50 × 0,75 × 1,50 | `estrutura` |
+| `operador_simples` | 0,30 × 0,64 × 1,76 | `tronco` (quadril); `cabeca` (pescoço, filho de `tronco`); `braco_e`, `braco_d` (ombros, filhos de `tronco`); `perna_e`, `perna_d` (quadril) |
+| `area` | comprimento × largura × 0,008 | `piso` |
+
+Braços, pernas e rodas giram em torno do eixo lateral (`Z` do glTF): ângulo positivo leva um
+membro para a frente, e uma roda que anda para a frente gira `-distância / raio`.
+
+**No visualizador** ("Visual: simples / realista" na barra; começa em realista):
+- os `.glb` da biblioteca são gerados em memória pela própria `utsim-assets` (os mesmos bytes
+  dos arquivos versionados) e registrados na fonte `embedded://` do Bevy. Assim o desktop e o
+  navegador carregam do mesmo jeito, sem acesso a arquivo nem HTTP. Um `.glb` do usuário em
+  `visual.asset` é lido do disco, relativo ao arquivo do modelo (só no desktop);
+- escolha padrão: empilhadeira, AGV e pessoa pelo `MobileRole`; veículo genérico vira
+  paleteira numa cena com paletes (porta-paletes ou empilhadeiras) e AGV nas demais;
+  porta-paletes pelo `RackParams`, esteira pelo comprimento, `Processor` vira máquina,
+  `Combiner` vira bancada, `Queue` vira área pintada no chão. Os demais tipos ficam com a
+  forma simples. Itens: palete com oito caixas numa cena com paletes, senão uma caixa;
+- os nós seguem a `Pose`: `carro` (e `garfos`) na altura `lift`, rodas pela distância
+  percorrida, luz do AGV pelo movimento (verde andando, laranja bloqueado, vermelho parado,
+  azul carregando ou descarregando, branco ocioso), luz das máquinas e da empilhadeira pela
+  cor do estado, operador com passo de 0,7 m sem deslizar o pé, braços para a frente
+  carregando, parado quando ocioso e um movimento curto trabalhando;
+- itens carregados vão nos garfos (na altura `lift`), nas mãos ou no deque do AGV;
+- como a rede leva o veículo até o centro do bloco, o visual ajusta a posição: a empilhadeira
+  que carrega ou descarrega num porta-paletes vai para o corredor na frente da célula, de
+  frente para ela; veículos e pessoas param na borda das máquinas; o operador trabalha de pé
+  na frente da máquina.
+
+Roteiros de conferência: `visual_realista_armazem.ron` (com
+`examples/centro_de_distribuicao.ron`), `visual_realista_agvs.ron` (com `examples/agvs.ron`)
+e `visual_realista_operadores.ron` (com `examples/celula_com_operadores.ron`).
+
+Lacunas conhecidas:
+- o item sai dos garfos para a célula no fim da janela de descarga, quando os garfos já
+  desceram, então ele "pula" para o nível. O mesmo vale para a coleta. Corrigir pede a
+  troca do item no meio da janela, na cena;
+- o corredor da empilhadeira é sempre o lado `-y` do porta-paletes;
+- o tanque existe na biblioteca, mas os tanques da rede de fluidos ainda usam o cilindro
+  transparente;
+- sem giro suave nas curvas, sem sombras e sem níveis de detalhe;
+- `.glb` do usuário com texturas externas (`.gltf` com arquivos ao lado) não é aceito, e no
+  navegador `visual.asset` com arquivo cai no modelo padrão.
 
 ## Pedidos prontos para outras sessões
 

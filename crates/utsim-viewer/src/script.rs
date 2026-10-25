@@ -64,7 +64,44 @@ impl Plugin for ScriptPlugin {
                     .after(EguiPostUpdateSet::EndPass)
                     .before(EguiPostUpdateSet::ProcessOutput),
             )
-            .add_systems(Update, run.after(crate::editor::title));
+            .add_systems(
+                Update,
+                (run, apply_control).chain().after(crate::editor::title),
+            );
+    }
+}
+
+/// Applies an `IrPara` (jump the clock) or `Focar` (aim the camera) step.
+fn apply_control(
+    mut runner: ResMut<Runner>,
+    mut pb: ResMut<Playback>,
+    mut cam: ResMut<crate::camera::OrbitCam>,
+    data: Res<Data>,
+) {
+    match runner.control.take() {
+        Some(Passo::IrPara(t)) => {
+            pb.playing = false;
+            pb.t = t.clamp(0.0, data.end);
+        }
+        Some(Passo::Focar {
+            objeto,
+            distancia,
+            giro,
+            inclinacao,
+        }) => {
+            if let Some(b) = data.replay.blocks.iter().position(|b| b.name == objeto) {
+                let h = data.geoms[b].half[1];
+                cam.target = Vec3::from(data.base_at(b, pb.t)) + Vec3::Y * h;
+                cam.dist = distancia.clamp(1.5, 5000.0);
+                if let Some(y) = giro {
+                    cam.yaw = y;
+                }
+                if let Some(p) = inclinacao {
+                    cam.pitch = p.clamp(0.05, 1.55);
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -246,6 +283,8 @@ pub struct Runner {
     /// A click or move target resolved at frame 0.
     aim: Option<Vec2>,
     started: bool,
+    /// Playback or camera change asked by `IrPara`/`Focar`, applied by [`apply_control`].
+    control: Option<Passo>,
 }
 
 impl Runner {
@@ -261,6 +300,7 @@ impl Runner {
             drag: None,
             aim: None,
             started: false,
+            control: None,
         }
     }
 }
@@ -700,6 +740,22 @@ fn advance(
             _ => Flow::Done,
         },
         Passo::Captura(name) => capture(runner, out, name, n),
+        Passo::IrPara(_) | Passo::Focar { .. } => match n {
+            0 => {
+                if let Passo::Focar { objeto, .. } = step
+                    && !world.data.replay.blocks.iter().any(|b| &b.name == objeto)
+                {
+                    return Flow::Fail(format!("bloco \"{objeto}\" não existe na simulação"));
+                }
+                if world.editor.mode != Mode::Sim {
+                    return Flow::Fail("IrPara/Focar exigem o modo Simular".into());
+                }
+                runner.control = Some(step.clone());
+                Flow::Pending
+            }
+            1..=3 => Flow::Pending,
+            _ => Flow::Done,
+        },
         Passo::Afirmar(cond) => match state.verificar(cond) {
             Ok(()) => Flow::Done,
             Err(e) => Flow::Fail(e),

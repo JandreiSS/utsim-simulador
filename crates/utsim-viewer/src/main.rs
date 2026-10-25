@@ -6,6 +6,7 @@ mod camera;
 mod dock;
 mod editor;
 mod fluid_scene;
+mod models;
 mod playback;
 mod scene;
 #[cfg(not(target_arch = "wasm32"))]
@@ -220,6 +221,8 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
         .insert_resource(playback::Selection::default())
         .insert_resource(playback::FluidSelection::default())
         .insert_resource(fluid_scene::FluidScene::default())
+        .insert_resource(models::VisualMode::default())
+        .insert_resource(models::Library::default())
         .insert_resource(data)
         .insert_resource(editor)
         .add_systems(Startup, scene::setup)
@@ -244,6 +247,13 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                 )
                     .chain()
                     .run_if(editor::in_sim),
+                (
+                    models::watch_library,
+                    models::bind_rigs,
+                    models::apply_tints,
+                    models::animate,
+                )
+                    .chain(),
                 scene::draw_sim.run_if(editor::in_sim),
                 fluid_scene::sync_fluids,
                 fluid_scene::update_fluids.run_if(editor::in_sim),

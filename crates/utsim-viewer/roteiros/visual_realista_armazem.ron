@@ -1,0 +1,46 @@
+// A3D-2: modelos 3D realistas num armazém (empilhadeiras, porta-paletes, esteiras, pessoas).
+//   utsim-view examples/centro_de_distribuicao.ron --roteiro crates/utsim-viewer/roteiros/visual_realista_armazem.ron --capturas %TEMP%/utsim_visual/armazem
+// Confere: o porta-paletes com montantes e vigas, as esteiras de rolos, a empilhadeira
+// levando o palete nos garfos, os garfos subindo até o nível da célula no porta-paletes
+// (t = 1806, empilhadeira_1 descarregando) e descendo de volta, o botão "Visual" voltando
+// às formas simples e de novo ao realista.
+[
+    Esperar(quadros: 20),
+    // The first glTF scenes compile their pipelines.
+    EsperarSegundos(3.0),
+    Afirmar(Modo(Editar)),
+    Captura("01_editar_realista"),
+
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(2.0),
+    Captura("02_simular_visao_geral"),
+
+    // Empilhadeira carregada indo para o porta-paletes (garfos a 0,3 m).
+    IrPara(1040.0),
+    Focar(objeto: "empilhadeira_1", distancia: 9.0, giro: Some(0.6), inclinacao: Some(0.35)),
+    Esperar(quadros: 10),
+    Captura("03_empilhadeira_carregada"),
+
+    // Descarga no porta-paletes: os garfos sobem até a célula e depois descem.
+    IrPara(1802.0),
+    Focar(objeto: "porta_paletes", distancia: 14.0, giro: Some(0.5), inclinacao: Some(0.3)),
+    Esperar(quadros: 10),
+    Captura("04_garfos_subindo"),
+    IrPara(1806.0),
+    Esperar(quadros: 10),
+    Captura("05_garfos_no_nivel"),
+    IrPara(1809.5),
+    Esperar(quadros: 10),
+    Captura("06_garfos_descendo"),
+
+    // As formas simples continuam disponíveis.
+    ClicarBotao("simples"),
+    Esperar(quadros: 20),
+    Captura("07_visual_simples"),
+    ClicarBotao("realista"),
+    Esperar(quadros: 20),
+    Captura("08_visual_realista_de_volta"),
+    Afirmar(TempoSimuladoMin(1800.0)),
+]

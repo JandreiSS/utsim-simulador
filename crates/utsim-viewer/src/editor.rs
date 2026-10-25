@@ -681,6 +681,7 @@ pub fn toolbar(
     mut contexts: EguiContexts,
     mut editor: ResMut<Editor>,
     mut dock: ResMut<Dock>,
+    mut visual: ResMut<crate::models::VisualMode>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     if !editor.editable {
@@ -743,6 +744,8 @@ pub fn toolbar(
             {
                 ed.flows.open = !ed.flows.open;
             }
+            ui.separator();
+            crate::models::toggle(ui, &mut visual);
             if running {
                 ui.spinner();
             }

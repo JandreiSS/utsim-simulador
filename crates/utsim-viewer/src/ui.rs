@@ -110,6 +110,7 @@ pub fn panel(
     mut dock: ResMut<Dock>,
     mut editor: ResMut<Editor>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    mut visual: ResMut<crate::models::VisualMode>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let tl = &data.timeline;
@@ -122,6 +123,10 @@ pub fn panel(
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    // Without the toolbar (a recorded replay), the look switch lives here.
+                    if !editor.editable {
+                        ui.horizontal(|ui| crate::models::toggle(ui, &mut visual));
+                    }
                     sim_controls(
                         ui,
                         &data,

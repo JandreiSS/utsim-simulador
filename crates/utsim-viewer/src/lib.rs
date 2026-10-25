@@ -15,6 +15,7 @@ pub mod properties;
 pub mod roteiro;
 pub mod source;
 pub mod view;
+pub mod visual;
 
 // Pure scene modules, moved to the engine-independent `utsim-scene` crate and
 // re-exported so the viewer keeps its paths.

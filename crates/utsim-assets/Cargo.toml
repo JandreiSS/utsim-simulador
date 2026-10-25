@@ -1,0 +1,21 @@
+[package]
+name = "utsim-assets"
+description = "Procedural generator of the articulated 3D models (.glb) of the UTSim appearance library"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "utsim_assets"
+path = "src/lib.rs"
+
+[[bin]]
+name = "utsim-assets"
+path = "src/main.rs"
+
+# No dependencies: the GLB (JSON + binary chunk) is written by hand, in a fixed order, so
+# the bytes never depend on feature unification of a JSON crate.
+
+[dev-dependencies]
+gltf = { version = "1.4", default-features = false, features = ["names"] }

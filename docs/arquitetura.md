@@ -637,8 +637,10 @@ Lacunas conhecidas:
 - a duração de cada carga sai do intervalo entre o início do estado `loading` (ou a coleta
   anterior) e a coleta seguinte. Isso é exato para um transportador, mas não existe um evento
   próprio de "início da carga";
-- os itens sobre uma empilhadeira continuam desenhados em cima do veículo, sem seguir a altura
-  dos garfos.
+- os itens sobre uma empilhadeira continuam no quadro em cima do veículo, sem seguir a altura
+  dos garfos. O visualizador realista corrige isso: com o `parent` e a `lift`, põe a carga nos
+  garfos, e a cena expõe `Scene::rack_target` (a célula da janela de carga atual) para o
+  motor virar a empilhadeira para ela.
 
 As esperas para a realidade virtual:
 1. Todo o cálculo de posição sai do código Bevy e fica puro e testável em `utsim-scene`.
@@ -648,6 +650,19 @@ As esperas para a realidade virtual:
 
 Com isso, um cliente de realidade virtual (OpenXR no Bevy, ou o Unreal com o OpenXR
 nativo) só precisa ler a cena e desenhar.
+
+### Biblioteca de modelos 3D (`utsim-assets`)
+
+A crate `utsim-assets` gera por código, sem programa externo, os modelos articulados da
+biblioteca de aparências (empilhadeira, paleteira, AGV, palete, caixa, porta-paletes, esteira,
+tanque, máquina, bancada, operador e área de piso) e grava `.glb` com medidas reais. Cada
+peça móvel é um nó com nome e pivô na articulação (`carro` e `garfos` da empilhadeira, rodas,
+`luz`, braços e pernas do operador), então qualquer motor anima só mudando a transformação do
+nó. Os padrões ficam versionados em `assets/modelos/` e um teste garante que o gerador
+reproduz os mesmos bytes. O visualizador gera os mesmos bytes em memória e os carrega como
+cenas glTF (desktop e navegador), escolhe o modelo pelo `MobileRole` e pelo tipo do objeto ou
+pelo `visual.asset`, e move os nós a partir da `Pose`. O botão "Visual: simples / realista"
+mantém as formas simples. A tabela de nós e as lacunas estão em `docs/plano_3d_realista.md`.
 
 ## 5. Estatísticas
 
