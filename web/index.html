@@ -16,7 +16,7 @@
   </nav>
 </header>
 
-<p id="status" class="status" role="status">Carregando o motor (WebAssembly)…</p>
+<p class="status-linha"><span id="status" class="status" role="status">Carregando o motor (WebAssembly)…</span> <button id="cancelar" hidden title="Interrompe a execução em andamento">Cancelar</button></p>
 
 <main>
   <section id="painel-sim" role="tabpanel" aria-labelledby="tab-sim">
@@ -80,7 +80,6 @@
   UTSim é software livre (GPL-3.0-or-later). Tudo roda no seu navegador; nenhum dado sai do seu computador.
 </footer>
 
-<script src="dist/utsim.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

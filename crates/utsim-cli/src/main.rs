@@ -3,6 +3,7 @@ mod csv;
 mod emulate;
 mod experiment;
 mod fit;
+mod gerar;
 mod optimize;
 mod replay;
 
@@ -77,6 +78,21 @@ enum Cmd {
         /// Último instante gravado (padrão: o fim da rodada)
         #[arg(long)]
         ate: Option<f64>,
+        /// Arquivo de saída (padrão: a saída padrão)
+        #[arg(long)]
+        saida: Option<PathBuf>,
+    },
+    /// Gera um modelo sintético de qualquer tamanho (testes de desempenho e de escala)
+    GerarModelo {
+        /// Número de objetos do modelo (no mínimo 4)
+        #[arg(long, default_value_t = 100)]
+        objetos: usize,
+        /// Forma do modelo: linha, rede ou armazem
+        #[arg(long, default_value = "linha")]
+        tipo: String,
+        /// Itens que a fonte cria (exatamente)
+        #[arg(long, default_value_t = 1000)]
+        itens: u64,
         /// Arquivo de saída (padrão: a saída padrão)
         #[arg(long)]
         saida: Option<PathBuf>,
@@ -218,6 +234,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
+        Cmd::GerarModelo {
+            objetos,
+            tipo,
+            itens,
+            saida,
+        } => gerar::run(&tipo, objetos, itens, saida.as_deref())?,
         Cmd::Replay { model, out, rep } => replay::run(&model, rep, &out)?,
         Cmd::Cena {
             model,
