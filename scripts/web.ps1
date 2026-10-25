@@ -45,13 +45,18 @@ $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("web/dist/utsim_bg.wasm
 $css = [IO.File]::ReadAllText("web/style.css")
 $glue = [IO.File]::ReadAllText("web/dist/utsim.js")
 $app = [IO.File]::ReadAllText("web/app.js")
+$worker = [IO.File]::ReadAllText("web/worker.js")
+foreach ($part in @($glue, $worker, $app)) {
+    if ($part.Contains("</script")) { throw "FALHOU: um dos scripts contém '</script' e não pode ser embutido" }
+}
 $out = New-Object System.Text.StringBuilder
 foreach ($line in [IO.File]::ReadAllLines("web/index.html")) {
     if ($line.Contains('href="style.css"')) {
         [void]$out.Append("<style>`n$css`n</style>`n")
-    } elseif ($line.Contains('src="dist/utsim.js"')) {
-        [void]$out.Append("<script>`n$glue`n</script>`n")
     } elseif ($line.Contains('src="app.js"')) {
+        # The engine runs in a Web Worker created from a Blob: glue + worker.js in inert scripts.
+        [void]$out.Append("<script type=`"text/plain`" id=`"utsim-glue`">`n$glue`n</script>`n")
+        [void]$out.Append("<script type=`"text/plain`" id=`"utsim-worker-src`">`n$worker`n</script>`n")
         [void]$out.Append("<script>window.UTSIM_WASM_B64=`"$b64`";</script>`n<script>`n$app`n</script>`n")
     } else {
         [void]$out.Append("$line`n")

@@ -1,6 +1,8 @@
-// UTSim in the browser: UI glue around the WebAssembly module (no framework).
-// Works both from web/dist (wasm fetched next to the page) and from the
-// self-contained utsim.html (wasm inlined as base64 in window.UTSIM_WASM_B64).
+// UTSim in the browser: UI glue around the WebAssembly engine (no framework).
+// The engine (run, validate, fit, replay) lives in a Web Worker (worker.js), so the page
+// stays responsive during long runs and a run can be cancelled. It works both from
+// web/dist (worker and wasm fetched next to the page) and from the self-contained
+// utsim.html (worker source, glue and wasm inlined; the worker is created from a Blob).
 (function () {
   "use strict";
 
@@ -15,7 +17,6 @@
   };
   const FIXED = Object.keys(LABELS);
 
-  let api = null;
   let examples = [];
 
   function setStatus(text) {
@@ -41,13 +42,92 @@
     return bytes;
   }
 
-  async function loadWasm() {
-    // `wasm_bindgen` is the global created by dist/utsim.js (wasm-bindgen --target no-modules).
-    const source = window.UTSIM_WASM_B64
-      ? decodeBase64(window.UTSIM_WASM_B64)
-      : "dist/utsim_bg.wasm";
-    await wasm_bindgen({ module_or_path: source });
-    return wasm_bindgen;
+  // ---- Engine in a Worker -------------------------------------------------------
+
+  const CANCELLED = "cancelado";
+
+  const engine = {
+    worker: null,
+    pending: new Map(),
+    seq: 0,
+
+    // Starts a fresh worker and loads the wasm in it.
+    start() {
+      const glue = $("utsim-glue");
+      const src = $("utsim-worker-src");
+      let worker;
+      if (glue && src) {
+        // Self-contained page: glue + worker code become one Blob script.
+        const blob = new Blob([glue.textContent, "\n", src.textContent], { type: "text/javascript" });
+        worker = new Worker(URL.createObjectURL(blob));
+      } else {
+        worker = new Worker("worker.js");
+      }
+      worker.onmessage = (ev) => {
+        const { id, ok, result, error } = ev.data;
+        const p = this.pending.get(id);
+        if (!p) return;
+        this.pending.delete(id);
+        if (ok) p.resolve(result);
+        else p.reject(new Error(error));
+      };
+      worker.onerror = (ev) => {
+        this.failAll(new Error(ev.message || "erro no motor (worker)"));
+      };
+      this.worker = worker;
+      const wasm = window.UTSIM_WASM_B64 ? [decodeBase64(window.UTSIM_WASM_B64)] : [];
+      return this.call("init", ...wasm);
+    },
+
+    call(op, ...args) {
+      return new Promise((resolve, reject) => {
+        const id = ++this.seq;
+        this.pending.set(id, { resolve, reject });
+        this.worker.postMessage({ id, op, args });
+      });
+    },
+
+    failAll(error) {
+      for (const p of this.pending.values()) p.reject(error);
+      this.pending.clear();
+    },
+
+    // Stops whatever is running by killing the worker, then starts a new one.
+    cancel() {
+      this.worker.terminate();
+      this.failAll(new Error(CANCELLED));
+      this.start().catch(() => {});
+    },
+  };
+
+  const BUSY = ["validar", "simular", "ajustar", "gerar3d"];
+  let busy = false;
+
+  // Runs `task` as the one active job: buttons off, "Cancelar" on, elapsed time shown.
+  async function job(label, task) {
+    if (busy) return;
+    busy = true;
+    for (const id of BUSY) $(id).disabled = true;
+    $("cancelar").hidden = false;
+    const t0 = performance.now();
+    const tick = () => setStatus(`${label} ${Math.floor((performance.now() - t0) / 1000)} s`);
+    tick();
+    const timer = setInterval(tick, 500);
+    try {
+      await task();
+    } catch (e) {
+      if (e && e.message === CANCELLED) {
+        setStatus("Cancelado.");
+      } else {
+        showErrors([String((e && e.message) || e)], false);
+        setStatus("Erro inesperado.");
+      }
+    } finally {
+      clearInterval(timer);
+      $("cancelar").hidden = true;
+      for (const id of BUSY) $(id).disabled = id === "gerar3d" && !viewerAvailable;
+      busy = false;
+    }
   }
 
   // ---- Simular ------------------------------------------------------------
@@ -92,36 +172,28 @@
   }
 
   function validate() {
-    const errors = JSON.parse(api.validate_model($("modelo").value));
-    if (errors.length === 0) showErrors(["Modelo válido."], true);
-    else showErrors(errors, false);
-    return errors.length === 0;
+    return job("Validando…", async () => {
+      const errors = JSON.parse(await engine.call("validate", $("modelo").value));
+      if (errors.length === 0) showErrors(["Modelo válido."], true);
+      else showErrors(errors, false);
+      setStatus("");
+    });
   }
 
   function simulate() {
     const reps = parseInt($("replicacoes").value, 10) || 0;
-    $("simular").disabled = true;
-    setStatus("Simulando…");
-    // Let the browser paint the status before the (synchronous) run starts.
-    setTimeout(() => {
-      try {
-        const t0 = performance.now();
-        const r = JSON.parse(api.run_model($("modelo").value, reps));
-        if (!r.ok) {
-          showErrors(r.errors, false);
-          setStatus("O modelo tem problemas; corrija e tente de novo.");
-        } else {
-          showErrors([], true);
-          renderResult(r);
-          setStatus(`Pronto em ${fmt.format((performance.now() - t0) / 1000)} s.`);
-        }
-      } catch (e) {
-        showErrors([String(e)], false);
-        setStatus("Erro inesperado na simulação.");
-      } finally {
-        $("simular").disabled = false;
+    return job("Simulando…", async () => {
+      const t0 = performance.now();
+      const r = JSON.parse(await engine.call("run", $("modelo").value, reps));
+      if (!r.ok) {
+        showErrors(r.errors, false);
+        setStatus("O modelo tem problemas; corrija e tente de novo.");
+      } else {
+        showErrors([], true);
+        renderResult(r);
+        setStatus(`Pronto em ${fmt.format((performance.now() - t0) / 1000)} s.`);
       }
-    }, 30);
+    });
   }
 
   function loadExample() {
@@ -144,25 +216,22 @@
       timestamps: $("instantes").checked,
       bootstrap: Math.max(0, parseInt($("bootstrap").value, 10) || 0),
     };
-    $("ajustar").disabled = true;
     $("fit-erro").hidden = true;
-    setStatus("Ajustando distribuições…");
-    setTimeout(() => {
+    return job("Ajustando distribuições…", async () => {
       try {
-        const html = api.fit_data(text, JSON.stringify(options));
+        const html = await engine.call("fit", text, JSON.stringify(options));
         const frame = $("relatorio");
         frame.srcdoc = html;
         frame.hidden = false;
         setStatus("Relatório pronto.");
       } catch (e) {
+        if (e && e.message === CANCELLED) throw e;
         $("relatorio").hidden = true;
         $("fit-erro").textContent = e && e.message ? e.message : String(e);
         $("fit-erro").hidden = false;
         setStatus("Não foi possível ajustar.");
-      } finally {
-        $("ajustar").disabled = false;
       }
-    }, 30);
+    });
   }
 
   // ---- Abas ---------------------------------------------------------------
@@ -222,23 +291,20 @@
   function generate3d() {
     const ron = $("modelo").value;
     const stop = stop3d(ron);
-    $("gerar3d").disabled = true;
     note3d("");
-    setStatus("Gravando a replicação para o 3D…");
-    setTimeout(() => {
+    return job("Gravando a replicação para o 3D…", async () => {
       let text;
       try {
-        text = api.replay(ron, stop);
+        text = await engine.call("replay", ron, stop);
         const r = JSON.parse(text);
         if (!r.ok) {
           note3d("O modelo tem problemas: " + r.errors.join("; "));
           setStatus("Corrija o modelo na aba Simular.");
-          $("gerar3d").disabled = false;
           return;
         }
       } catch (e) {
+        if (e && e.message === CANCELLED) throw e;
         note3d("Erro ao gravar a replicação: " + e);
-        $("gerar3d").disabled = false;
         return;
       }
       const frame = $("quadro3d");
@@ -247,13 +313,12 @@
         window.removeEventListener("message", onMessage);
         frame.contentWindow.postMessage({ type: "utsim-replay", text }, "*");
         setStatus(`Visualizador 3D iniciado (t até ${fmt.format(stop)}).`);
-        $("gerar3d").disabled = false;
       };
       window.addEventListener("message", onMessage);
       frame.hidden = false;
       frame.src = "viewer.html";
       setStatus("Carregando o visualizador 3D…");
-    }, 30);
+    });
   }
 
   async function prepare3d() {
@@ -274,12 +339,14 @@
     $("tab-fit").addEventListener("click", () => selectTab("tab-fit"));
     $("tab-3d").addEventListener("click", () => selectTab("tab-3d"));
     $("gerar3d").addEventListener("click", generate3d);
+    $("cancelar").addEventListener("click", () => engine.cancel());
     $("arquivo").addEventListener("change", async (ev) => {
       const file = ev.target.files[0];
       if (file) $("dados").value = await file.text();
     });
     try {
-      api = await loadWasm();
+      await engine.start();
+      examples = JSON.parse(await engine.call("examples"));
     } catch (e) {
       setStatus(
         "Não foi possível carregar o WebAssembly. Se abriu dist/ direto do disco, use o utsim.html " +
@@ -287,7 +354,6 @@
       );
       return;
     }
-    examples = JSON.parse(api.examples());
     const select = $("exemplos");
     for (const ex of examples) {
       const opt = document.createElement("option");

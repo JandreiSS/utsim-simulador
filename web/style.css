@@ -29,7 +29,7 @@ body {
   color: var(--fg);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-header, main, footer, .status { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+header, main, footer, .status-linha { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
 header { padding-top: 16px; }
 h1 { margin: 0 0 8px; font-size: 1.4rem; }
 h1 small { font-weight: 400; color: var(--muted); font-size: .85rem; margin-left: 8px; }
@@ -40,7 +40,10 @@ nav button {
   padding: 8px 14px; color: var(--muted); font: inherit; cursor: pointer;
 }
 nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
-.status { color: var(--muted); font-size: .9rem; margin-top: 8px; margin-bottom: 8px; }
+.status-linha { margin-top: 8px; margin-bottom: 8px; }
+.status { color: var(--muted); font-size: .9rem; }
+#cancelar { margin-left: 12px; }
+#cancelar[hidden] { display: none; }
 .barra { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 12px 0; }
 .barra label { display: flex; flex-direction: column; font-size: .85rem; color: var(--muted); gap: 2px; }
 .barra label.inline { flex-direction: row; align-items: center; gap: 6px; align-self: center; }

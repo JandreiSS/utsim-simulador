@@ -38,3 +38,37 @@ try { wb.fit_data("", ""); } catch { threw = true; }
 assert(threw, "fit_data com dados vazios deve lançar");
 
 console.log(`OK: wasm rodou mm1 (Wq = ${wq.toFixed(3)}), validou, reproduziu e ajustou.`);
+
+// The same engine behind web/worker.js (the page's Web Worker), driven through its
+// message protocol with a fake `self`: init, examples, validate, run, fit, replay, errors.
+{
+  const workerSrc = readFileSync(join(here, "worker.js"), "utf8");
+  const waiting = new Map();
+  const fakeSelf = { postMessage: (m) => waiting.get(m.id)(m) };
+  new Function("self", `${glue}\n${workerSrc}`)(fakeSelf);
+  let seq = 0;
+  const ask = (op, ...args) =>
+    new Promise((resolve) => {
+      const id = ++seq;
+      waiting.set(id, resolve);
+      fakeSelf.onmessage({ data: { id, op, args } });
+    });
+
+  const early = await ask("validate", mm1);
+  assert(!early.ok && /iniciado/.test(early.error), "operação antes do init deve falhar");
+  assert((await ask("init", wasm)).ok, "worker init");
+  const ex = await ask("examples");
+  assert(ex.ok && JSON.parse(ex.result).length === examples.length, "worker examples");
+  const val = await ask("validate", "Model(");
+  assert(val.ok && JSON.parse(val.result).length > 0, "worker validate");
+  const run = await ask("run", mm1, 2);
+  assert(run.ok && JSON.parse(run.result).replications === 2, "worker run");
+  const rep = await ask("replay", mm1, 20);
+  assert(rep.ok && JSON.parse(rep.result).ok, "worker replay");
+  const fit = await ask("fit", "t\n1\n2\n3\n4\n5\n6\n7\n8\n", '{"bootstrap":5}');
+  assert(fit.ok && fit.result.includes("<"), "worker fit");
+  const bad = await ask("fit", "", "");
+  assert(!bad.ok && bad.error.length > 0, "worker fit com erro devolve a mensagem");
+  assert(!(await ask("nada")).ok, "operação desconhecida");
+  console.log("OK: o worker respondeu a init, examples, validate, run, replay, fit e erros.");
+}
