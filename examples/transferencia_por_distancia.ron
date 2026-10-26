@@ -1,0 +1,49 @@
+// A mesma linha (chegada, fila, máquina, saída) em dois layouts, lado a lado no mesmo modelo.
+// Os tempos de processo e de chegada são iguais; só a distância entre os objetos muda:
+// 1 m no layout compacto (_c) e 5 m no espalhado (_e).
+//
+// Em `run.transfer` o modelo todo liga o tempo de viagem das ligações diretas: o item sai do
+// objeto de origem na hora e chega ao destino depois de `delay + distância / velocidade`
+// (aqui 1 m/s, sem espera fixa). Durante a viagem o item não está em nenhum dos dois objetos,
+// mas o lugar no destino fica reservado: uma máquina de capacidade 1 fica ocupada desde a
+// saída do item. Cada objeto pode ter o próprio `transfer`, que vale mais que o do modelo,
+// e `transfer: (speed: 1.0, path: Network)` segue a rede de caminhos em vez da linha reta.
+//
+// Resultado de `utsim run` (tempo em segundos, 5 replicações, média):
+//                          compacto      espalhado
+//   peças atendidas        ~8126         ~8209       (mesma vazão, mesma carga)
+//   espera na fila (s)     1,77          14,13
+//   peças na fila (média)  0,15          1,18
+//   tempo no sistema (s)   8,77          33,13       (4 s de máquina + viagens + fila)
+// A viagem de 15 m soma 15 s a cada peça no layout espalhado e, como a máquina fica reservada
+// durante os 5 m finais, a fila cresce. Sem `transfer`, os dois layouts dariam o mesmo resultado.
+Model(
+    name: "Transferência por distância",
+    description: "A mesma linha em dois layouts: a distância entre os objetos vira tempo de viagem",
+    run: (
+        stop_time: 100000.0,
+        warmup: 2000.0,
+        seed: 11,
+        replications: 5,
+        // Padrão do modelo todo: toda ligação direta leva distância / velocidade.
+        // Sem isto, as ligações seriam instantâneas e os dois layouts dariam o mesmo resultado.
+        transfer: (speed: 1.0),
+    ),
+    objects: [
+        // Layout compacto: 1 m entre um objeto e o próximo.
+        (name: "chegada_c", kind: Source(interarrival: Exp(mean: 12.0)), position: (0.0, 0.0, 0.0)),
+        (name: "fila_c", kind: Queue(), position: (1.0, 0.0, 0.0)),
+        (name: "maquina_c", kind: Processor(process: Const(4.0)), position: (2.0, 0.0, 0.0)),
+        (name: "saida_c", kind: Sink, position: (3.0, 0.0, 0.0)),
+
+        // Layout espalhado: 5 m entre um objeto e o próximo (mesmos tempos de processo).
+        (name: "chegada_e", kind: Source(interarrival: Exp(mean: 12.0)), position: (0.0, 10.0, 0.0)),
+        (name: "fila_e", kind: Queue(), position: (5.0, 10.0, 0.0)),
+        (name: "maquina_e", kind: Processor(process: Const(4.0)), position: (10.0, 10.0, 0.0)),
+        (name: "saida_e", kind: Sink, position: (15.0, 10.0, 0.0)),
+    ],
+    connections: [
+        ("chegada_c", "fila_c"), ("fila_c", "maquina_c"), ("maquina_c", "saida_c"),
+        ("chegada_e", "fila_e"), ("fila_e", "maquina_e"), ("maquina_e", "saida_e"),
+    ],
+)

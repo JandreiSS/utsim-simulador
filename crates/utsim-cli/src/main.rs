@@ -226,6 +226,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
             m.validate()?;
+            print_warnings(&m);
             println!(
                 "{}: ok ({} objetos, {} conexões)",
                 m.name,
@@ -278,6 +279,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(v) = bins {
                 m.run.histogram_bins = Some(v);
             }
+            m.validate()?;
+            print_warnings(&m);
             let started = std::time::Instant::now();
             let reports = m.run_replications()?;
             let elapsed = started.elapsed();
@@ -299,6 +302,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// Non-fatal model warnings, on stderr so they never mix with results.
+fn print_warnings(model: &Model) {
+    for warning in model.warnings() {
+        eprintln!("aviso: {warning}");
+    }
 }
 
 fn print_summary(model: &Model, reports: &[RunReport]) {
