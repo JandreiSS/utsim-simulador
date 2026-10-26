@@ -271,6 +271,46 @@ trajeto (Dijkstra pré-calculado para todos os pares; arestas de mão única ou 
 > nível, `Transport` e `Operate`, e decide os passos sozinho. É mais simples de
 > modelar e de testar. Sequências genéricas podem vir com o fluxo de tokens (fase 6).
 
+### Distâncias: tempo de viagem nas ligações diretas e avisos
+Uma ligação direta entre dois objetos fixos é instantânea, como no simuladores comerciais. Para que o
+layout pese no resultado há três caminhos: `transport` (recurso móvel), `Conveyor` e
+`transfer`, descrito aqui.
+
+**`transfer: (speed, delay, path)`** em um objeto (ou `run.transfer` para o modelo todo;
+o do objeto vence). Os itens que saem desse objeto por ligações diretas levam
+`delay + distância / speed` para chegar. A distância vem da linha reta entre as
+`position` (`path: Straight`, o padrão) ou do menor trajeto da `network`
+(`path: Network`, o mesmo roteador dos transportadores). Sem `transfer` nada muda: os
+modelos antigos e os resultados de referência ficam idênticos byte a byte.
+
+- **Saída e chegada.** O kernel reaproveita as duas metades de um movimento (`leave` e `arrive`): no instante em
+  que o destino aceita, o item sai da origem (`leave`: estatísticas, `on_exit`, nova
+  tentativa dos blocos a montante) e um evento `Arrive` agendado o coloca no destino
+  (`arrive`: contagem de entrada, `on_entry`, `Moved`). Se o tempo total for zero, o
+  movimento é imediato.
+- **Capacidade.** Como no transporte, o lugar no destino é reservado na saída
+  (`incoming`), então a capacidade nunca é ultrapassada. Um processador de capacidade 1
+  fica ocupado desde que o item parte e não aceita outro durante a viagem.
+- **Contagens.** Durante a viagem o item não pertence a nenhum objeto (`location` vazio):
+  o conteúdo da origem já o descontou e o do destino ainda não o inclui. A entrada do
+  destino conta no instante da chegada. Para a lei de Little, o número em trânsito é
+  `vazão × tempo de viagem`, somado ao conteúdo dos objetos.
+- **Rastro.** `TraceEvent::Transit { item, from, to, delay, duration, path }` na saída e
+  o `Moved` de sempre na chegada. A linha do tempo de `utsim-scene` mostra o item em
+  `ItemPos::Flight` (parado na origem durante `delay`, depois em velocidade constante ao
+  longo do caminho), fora do conteúdo dos dois objetos.
+- **Isenções do padrão global.** `run.transfer` não vale para objetos com `transport`,
+  recursos móveis, esteiras nem para quem alimenta uma esteira (a posição de uma esteira
+  é o seu meio). `transfer` explícito em objeto com `transport` é erro de validação.
+- **Experimentos.** `obj.transfer.speed`, `obj.transfer.delay`, `run.transfer.speed` e
+  `run.transfer.delay` (e `transfer` inteiro) aceitam `set`.
+
+**Avisos.** `Model::warnings()` devolve alertas que não impedem a execução; `utsim check`
+e `utsim run` os mostram como `aviso: ...` (em stderr). Hoje cobrem: recursos móveis com
+todos os objetos na origem; transporte ou equipe atendendo objetos na mesma posição; objeto
+atendido a mais de 50 m de qualquer nó da rede; e ligação direta de mais de 10 m sem
+transporte, esteira nem `transfer`.
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)
