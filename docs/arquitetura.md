@@ -1,9 +1,8 @@
 # Arquitetura do UTSim
 
-Este documento é a **especificação de comportamento** do UTSim. Ele foi escrito a partir
-do estudo da documentação pública de simuladores comerciais (principalmente o manual do
-simuladores comerciais, hoje mantido pela fabricante) e da literatura de simulação. Nenhum código ou binário
-proprietário foi analisado. Onde o UTSim decide diferente, isso aparece como **"Nosso jeito"**.
+Este documento é a **especificação de comportamento** do UTSim, escrita a partir da
+literatura de simulação a eventos discretos. Nenhum código ou binário proprietário foi
+analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso jeito"**.
 
 ## 1. Camadas
 
@@ -41,7 +40,7 @@ O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois ev
 2. **Processar.** Cada tipo de bloco decide quanto tempo o item fica: a Queue libera
    na hora, o Processor segura durante setup + processamento.
 3. **Liberar.** O bloco chama `ctx.release(item)`. Nesse instante a **regra de saída**
-   escolhe a porta, uma única vez por item (o "send to port" do simuladores comerciais):
+   escolhe a porta, uma única vez por item:
    - `FirstAvailable`: qualquer porta; vence a primeira aberta, em ordem de porta.
    - `RoundRobin` / `Random` / `Weighted([pesos])` / `ByLabel`: uma porta específica.
      O item espera por *aquela* porta, mesmo que outra esteja livre.
@@ -53,7 +52,7 @@ O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois ev
 isto é, blocos cuja saída pode ter destravado. Quando um item sai de B, B ganhou espaço
 e seus blocos de entrada são marcados como sujos **em ordem de porta de entrada**. Essa
 ordem é a prioridade de *pull* padrão: com duas filas ligadas a uma máquina, a conectada
-primeiro tem preferência, como no simuladores comerciais. Tudo acontece no mesmo instante simulado.
+primeiro tem preferência. Tudo acontece no mesmo instante simulado.
 
 **Portas de entrada.** `accepts(item, conteúdo, porta)` e `on_entry(item, porta)`
 recebem o número da porta de entrada (0, 1, ..., na ordem das conexões). É assim que o
@@ -63,8 +62,7 @@ Combiner distingue o contêiner (porta 0) dos componentes (portas 1..k).
 `A.conteúdo -= 1` → `A.on_exit` → `B.conteúdo += 1` → `B.on_entry(porta)` → reavaliar
 quem alimenta A.
 
-> **Nosso jeito:** no simuladores comerciais o `OnExit` roda com o item ainda contado no conteúdo.
-> Aqui o conteúdo já foi atualizado quando `on_exit` roda, o que simplifica a lógica
+> **Nosso jeito:** o conteúdo já foi atualizado quando `on_exit` roda, o que simplifica a lógica
 > dos blocos ("fiquei vazio?").
 
 > **Nosso jeito:** não existe um retorno mágico `-1` para "segurar o item".
@@ -74,13 +72,13 @@ quem alimenta A.
 
 ### Source
 - Cria um item, aplica rótulos (`labels`) e o libera.
-- **O próximo intervalo começa quando o item sai**, como no simuladores comerciais. Se a Source fica
+- **O próximo intervalo começa quando o item sai**. Se a Source fica
   bloqueada, ela para de gerar (estado `blocked`). Para ter chegadas de Poisson "puras",
   coloque uma fila depois dela.
 - `first_at_zero`: o primeiro item nasce em t=0, e não depois do primeiro intervalo.
 - `on_blocked` (o que fazer com um item que não consegue sair no instante em que nasce):
   - `Wait` (padrão): o comportamento acima, a Source espera e para de gerar.
-  - `Drop` (**nosso jeito**, o simuladores comerciais não tem): o item é destruído e o próximo intervalo
+  - `Drop` (**nosso jeito**): o item é destruído e o próximo intervalo
     começa na hora, então as chegadas formam um processo de renovação independente do
     bloqueio. Cada perda registra `lost` na Source (use o campo `count` da tally, aparece
     em `RunReport`); itens perdidos não contam em `output`. Serve para M/M/1/K e Erlang
@@ -119,8 +117,7 @@ Qualquer objeto pode ter `downtime: (mtbf: Dist, mttr: Dist)`, contado no relóg
 - As quebras usam um *stream* aleatório próprio por bloco. Ligar ou desligar quebras
   não altera os tempos de chegada e de processo sorteados.
 
-> **Nosso jeito:** o simuladores comerciais espalha isso entre MTBF/MTTR, Time Tables e `stop()`/`resume()`.
-> Aqui o "estar quebrado" é responsabilidade única do kernel, e o bloco só pausa os
+> **Nosso jeito:** o "estar quebrado" é responsabilidade única do kernel, e o bloco só pausa os
 > próprios relógios.
 
 ### Turnos programados e motivos de parada
@@ -236,8 +233,7 @@ Lacunas: a área de transferência não passa entre janelas nem para outros prog
 por caixa usa o centro do bloco, não a área inteira; alinhar não considera o tamanho dos
 blocos.
 
-> **Nosso jeito:** no simuladores comerciais o modelo é uma árvore binária editada só pela interface.
-> Aqui o modelo continua sendo um texto legível, e o editor é só uma forma confortável de
+> **Nosso jeito:** o modelo continua sendo um texto legível, e o editor é só uma forma confortável de
 > produzir esse texto.
 
 ## 4f. Recursos móveis (fase 4)
@@ -283,12 +279,11 @@ membro informa a posição atual e avisa com `MSG_IDLE` quando fica livre.
 começar. A fase só inicia quando todos chegam (`MSG_ARRIVED`). Liberação:
 
 - Se setup e processo usam operadores, a mesma equipe é mantida do setup até o fim do
-  processo, como no "same as setup" do simuladores comerciais.
+  processo.
 - Se só o setup usa, eles são liberados ao fim do setup.
 - A liberação acontece ao fim do processo, antes de a peça sair. Uma saída bloqueada
   não prende o operador.
-- Cada peça tem seus próprios pedidos, então capacidade > 1 funciona, coisa que o
-  simuladores comerciais não suporta bem.
+- Cada peça tem seus próprios pedidos, então capacidade > 1 funciona.
 - Numa quebra, os operadores ficam no posto e os tempos pausam.
 
 Prioridade de estado: processando > setup > aguardando operador > aguardando
@@ -304,13 +299,12 @@ trajeto (Dijkstra pré-calculado para todos os pares; arestas de mão única ou 
   de mão única, rede partida). Laços de mão única são permitidos.
 - O transportador só parte quando a tarefa existe. Ele não espera de antemão na origem.
 
-> **Nosso jeito:** no simuladores comerciais as sequências de tarefas são listas genéricas (travel,
-> load, unload, utilize, break...). Aqui o transportador recebe só duas tarefas de alto
+> **Nosso jeito:** o transportador recebe só duas tarefas de alto
 > nível, `Transport` e `Operate`, e decide os passos sozinho. É mais simples de
 > modelar e de testar. Sequências genéricas podem vir com o fluxo de tokens (fase 6).
 
 ### Distâncias: tempo de viagem nas ligações diretas e avisos
-Uma ligação direta entre dois objetos fixos é instantânea, como no simuladores comerciais. Para que o
+Uma ligação direta entre dois objetos fixos é instantânea. Para que o
 layout pese no resultado há três caminhos: `transport` (recurso móvel), `Conveyor` e
 `transfer`, descrito aqui.
 
@@ -424,8 +418,7 @@ usam o stream aleatório do próprio bloco, então a simulação continua reprod
 Erros de compilação aparecem na validação do modelo; erros durante a execução param a
 rodada com uma mensagem.
 
-> **Nosso jeito:** o simuladores comerciais usa linguagem de script própria, uma linguagem própria parecida com C++, em
-> dezenas de gatilhos. Aqui a lógica fica em dois lugares claros: o fluxo de tokens e
+> **Nosso jeito:** a lógica fica em dois lugares claros: o fluxo de tokens e
 > poucos ganchos de script, numa linguagem embutível e livre.
 
 ## 4i. Otimização de parâmetros (fase 7)
@@ -461,8 +454,7 @@ viáveis são simulados de novo com mais replicações e com as mesmas sementes 
 comparação final (`best`, `equivalent`) usa essas avaliações refinadas. O resultado
 também guarda o histórico de convergência (`history`).
 
-> **Nosso jeito:** o simuladores comerciais usa o otimizador proprietário, que é proprietário e tem licença à parte.
-> Aqui o otimizador é aberto, e o relatório mostra a significância estatística das
+> **Nosso jeito:** o otimizador é aberto, e o relatório mostra a significância estatística das
 > diferenças em vez de entregar um "melhor" sem contexto.
 
 ## 4j. UTSim no navegador (fase 7, WebAssembly)
@@ -778,10 +770,5 @@ Entre replicações: média, desvio e **semiamplitude do IC de 95%** (t de Stude
 
 ## 7. Referências estudadas
 
-- Manual do simuladores comerciais (fabricante): *Fixed Resources Concepts*, *Source*, *Queue*,
-  *Processor*, *Task Executer Concepts*, *Key Concepts About Events*,
-  *Key Concepts About Experiments*, *Key Concepts About Flow Items*.
-  Índice: <(link removido)>
-- simuladores livres, simulador DES 3D de código aberto (Apache 2.0): <(link removido)>
 - Law, A. M. *Simulation Modeling and Analysis*. McGraw-Hill.
 - Banks, J. et al. *Discrete-Event System Simulation*. Pearson.

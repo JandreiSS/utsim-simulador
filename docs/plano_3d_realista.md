@@ -1,6 +1,6 @@
 # Plano: 3D realista e realidade virtual
 
-Base: a pesquisa em `docs/pesquisa_3d_animacao.md` (simuladores comerciais, simuladores comerciais, simuladores livres) e a cena
+Base: a cena
 independente de motor (`utsim-scene`, `docs/arquitetura.md` seção 4p).
 
 ## Ideia central

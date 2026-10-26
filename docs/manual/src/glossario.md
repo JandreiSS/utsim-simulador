@@ -1,10 +1,10 @@
 # Glossário
 
-Português do UTSim e termos equivalentes do simuladores comerciais (em inglês) e da teoria de simulação.
+Termos do UTSim em português, com os equivalentes em inglês usados na literatura de simulação.
 
 ## Objetos
 
-| UTSim | Nome no arquivo | simuladores comerciais | Observação |
+| UTSim | Nome no arquivo | Termo em inglês | Observação |
 |---|---|---|---|
 | Chegada | `Source` | Source | cria itens |
 | Fila | `Queue` | Queue | buffer; pode formar lotes |
@@ -14,20 +14,20 @@ Português do UTSim e termos equivalentes do simuladores comerciais (em inglês)
 | Saída | `Sink` | Sink | destrói o item |
 | Esteira | `Conveyor` | Conveyor | cinemática, com ou sem acúmulo |
 | Porta-paletes | `Rack` | Rack | armazenagem endereçada |
-| Transportador | `Transporter` | Transporter / Operator / AGV | pessoa ou veículo |
+| Transportador | `Transporter` | Transporter / operator / AGV | pessoa ou veículo |
 | Despachante | `Dispatcher` | Dispatcher | reparte tarefas a uma equipe |
-| Rede de caminhos | `network` | Path Network (A* Navigator) | corredores dos veículos |
-| Fluxo de tokens | `flows` | fluxo de processo | lógica do usuário em grafo |
-| Fluidos | `fluids` | Fluid Library | tanques, tubos, conversores |
+| Rede de caminhos | `network` | path network (A*) | corredores dos veículos |
+| Fluxo de tokens | `flows` | token flow | lógica do usuário em grafo |
+| Fluidos | `fluids` | fluids | tanques, tubos, conversores |
 
 ## Conceitos
 
-| Português | Inglês / simuladores comerciais | Significado |
+| Português | Inglês | Significado |
 |---|---|---|
 | item | item, flow item | o que circula: peça, cliente, palete |
 | rótulo | label | valor guardado no item ou no token |
 | contêiner | container / tote | item que carrega outros |
-| regra de saída | output port rule ("send to port") | como escolher a porta de saída |
+| regra de saída | output port rule | como escolher a porta de saída |
 | prioridade de puxar | pull / input priority | ordem em que as entradas são atendidas |
 | bloqueio | blocking | objeto parado porque o destino está cheio |
 | setup | setup time | preparação antes de processar |
@@ -54,10 +54,10 @@ Português do UTSim e termos equivalentes do simuladores comerciais (em inglês)
 | meia-amplitude | half-width | metade do intervalo de confiança |
 | lei de Little | Little's law | L = λ x W |
 | cenário | scenario | variação do modelo base |
-| experimento | experiment  | comparação de cenários |
-| otimização | optimization (otimizador proprietário) | busca da melhor combinação de parâmetros |
+| experimento | experiment | comparação de cenários |
+| otimização | optimization | busca da melhor combinação de parâmetros |
 | restrição | constraint | limite sobre uma métrica |
-| ajuste de distribuição | input modelling (ferramentas de ajuste / ferramentas de ajuste) | escolher a distribuição a partir de dados |
+| ajuste de distribuição | input modelling | escolher a distribuição a partir de dados |
 | aderência | goodness of fit | quão bem a distribuição descreve os dados |
 | parcimônia | parsimony | preferir o modelo mais simples entre equivalentes |
 | emulação | emulation | modelo ligado a um CLP em tempo real |

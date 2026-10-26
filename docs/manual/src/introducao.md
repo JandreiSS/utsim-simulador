@@ -37,7 +37,7 @@ O UTSim é software livre (licença GPL-3.0 ou posterior). Ele reúne:
 
 O modelo é um arquivo de texto (extensão `.ron`). Você pode editá-lo no editor 3D ou em qualquer editor de texto, guardá-lo no Git e comparar versões. Veja o [formato `.ron`](referencia-ron.md).
 
-O UTSim foi escrito do zero. A inspiração conceitual vem de simuladores comerciais como o simuladores comerciais, e o [glossário](glossario.md) traz a correspondência entre os termos.
+O UTSim foi escrito do zero. O [glossário](glossario.md) traz os termos em português e os equivalentes em inglês da literatura de simulação.
 
 ## Instalação
 
