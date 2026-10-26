@@ -595,9 +595,9 @@ fn summary_tab(
                 let mark = match res.sort {
                     Some((sc, d)) if sc == c => {
                         if d {
-                            " ↓"
+                            " (decr.)"
                         } else {
-                            " ↑"
+                            " (cresc.)"
                         }
                     }
                     _ => "",
