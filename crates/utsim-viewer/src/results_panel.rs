@@ -82,6 +82,7 @@ impl Chart {
 
 /// Results of the latest run.
 pub struct RunOutput {
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // read by the exports (desktop)
     pub model: Model,
     pub form: RunForm,
     pub reports: Vec<RunReport>,
@@ -129,6 +130,7 @@ pub struct Results {
     export_dir: String,
     experiment_path: String,
     /// Every file written by the exports (full paths).
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // exports are desktop-only
     pub exported: Vec<String>,
 }
 
@@ -137,11 +139,13 @@ impl Results {
         self.job.is_some()
     }
 
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // read by scripts (desktop)
     pub fn bottleneck(&self) -> Option<String> {
         let run = self.run.as_ref()?;
         bottleneck(&run.stats).map(|i| run.stats[i].name.clone())
     }
 
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // read by scripts (desktop)
     pub fn best_point(&self) -> Option<String> {
         let (_, r) = self.optimized.as_ref()?;
         r.best_evaluation().map(|e| logic::point_text(&e.point))
