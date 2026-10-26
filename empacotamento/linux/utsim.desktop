@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=UTSim
+GenericName=Simulador de processos
+Comment=Editor e visualizador 3D de simulação de processos a eventos discretos
+Exec=@PREFIXO@/bin/utsim-view --novo
+Icon=utsim
+Terminal=false
+Categories=Education;Science;Engineering;
+Keywords=simulação;eventos discretos;processos;logística;

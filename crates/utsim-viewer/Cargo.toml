@@ -37,3 +37,11 @@ bevy = { version = "=0.20.0", default-features = false, features = ["3d", "png",
 wasm-bindgen.workspace = true
 js-sys = "0.3"
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "console"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+# Ícone da janela (src/icon.rs): só no aplicativo de mesa.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+winit = { version = "0.30", default-features = false }
+png = "0.18"

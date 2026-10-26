@@ -43,24 +43,63 @@ O UTSim foi escrito do zero. O [glossário](glossario.md) traz os termos em port
 
 Há três jeitos de usar o UTSim. Escolha o que for mais simples para você.
 
-### 1. Programas prontos (binários)
+### 1. Programas prontos (instaladores e pacotes)
 
-Cada versão publicada no GitHub traz três pacotes:
+Cada versão publicada na página de [Releases](https://github.com/JandreiSS/utsim/releases) do GitHub traz:
 
-| Pacote | Conteúdo |
+| Arquivo | Para quê |
 |---|---|
-| `utsim-<versão>-windows-x64` | `utsim.exe` (linha de comando) e `utsim-view.exe` (editor e visualizador 3D) |
-| `utsim-<versão>-linux-x64` | `utsim` e `utsim-view` |
-| `utsim-<versão>-web` | a página que roda no navegador |
+| `utsim-v<versão>-windows-x64-instalador.exe` | Instalador do Windows (recomendado) |
+| `utsim-v<versão>-windows-x64.zip` | Versão portátil do Windows: descompacte e use |
+| `utsim_<versão>_amd64.deb` | Pacote para Debian, Ubuntu e derivados |
+| `utsim-v<versão>-linux-x64.tar.gz` | Pasta portátil do Linux, com `instalar.sh` |
+| `utsim-v<versão>-web.zip` | A página que roda no navegador |
+| `SHA256SUMS.txt` | Somas de verificação dos arquivos acima |
 
-Descompacte e pronto. Não há instalador. Para usar `utsim` de qualquer pasta, coloque o programa numa pasta que esteja no `PATH`.
+#### Windows
 
-Confira se funciona:
+Baixe e abra o instalador. Ele **não pede administrador**: instala só para o seu usuário em `%LOCALAPPDATA%\Programs\UTSim` (você pode trocar a pasta). Como o instalador ainda não é assinado digitalmente, o Windows pode mostrar o aviso do SmartScreen; escolha "Mais informações" e "Executar assim mesmo".
+
+O instalador oferece três componentes:
+
+- **UTSim** (obrigatório): `bin\utsim.exe` (linha de comando), `bin\utsim-view.exe` (editor e visualizador 3D), a pasta `examples\` (modelos de exemplo), `assets\` (modelos 3D e ativos de terceiros, cada pacote com a sua licença e os créditos em `assets\terceiros\CREDITOS.md`), `manual\` (este manual em HTML, abra `manual\index.html`) e os arquivos `LICENSE`, `README.md` e `CHANGELOG.md`.
+- **Atalhos no Menu Iniciar**: a pasta "UTSim" com "UTSim" (abre o editor com um modelo novo), "UTSim (exemplos)" (abre a pasta dos exemplos; copie um para outro lugar antes de editar, pois o editor salva por cima do arquivo aberto), "Manual do UTSim" e "Desinstalar o UTSim".
+- **Adicionar o comando `utsim` ao PATH** (desmarcado por padrão): acrescenta `bin\` ao `PATH` do seu usuário, para digitar `utsim` em qualquer terminal novo.
+
+Para remover, use Configurações > Aplicativos > UTSim, ou "Desinstalar o UTSim" no Menu Iniciar. A desinstalação apaga só o que o instalador criou e tira o `PATH`, se ele foi mexido. Para instalar sem janelas, rode o instalador com `/S` (e `/D=C:\pasta` para escolher a pasta, sempre como último argumento).
+
+O instalador **não associa extensões de arquivo**. O Windows associa pela última parte do nome, então `modelo.utsim.ron` cairia em `.ron`, uma extensão genérica demais para o UTSim tomar para si. Para abrir um modelo, arraste o arquivo sobre `utsim-view.exe` ou rode `utsim-view modelo.ron`.
+
+#### Linux
+
+**Debian, Ubuntu e derivados** (`.deb`):
+
+```bash
+sudo apt install ./utsim_0.1.0_amd64.deb
+```
+
+Os arquivos ficam em `/opt/utsim` (`bin/`, `examples/`, `assets/`, `manual/`), os comandos `utsim` e `utsim-view` em `/usr/bin`, os atalhos "UTSim" e "UTSim (exemplos)" no menu de aplicativos, os ícones em `/usr/share/icons/hicolor` e a licença em `/usr/share/doc/utsim`. Remova com `sudo apt remove utsim`.
+
+**Qualquer distribuição** (`.tar.gz`, sem `sudo`):
+
+```bash
+tar xzf utsim-v0.1.0-linux-x64.tar.gz
+cd utsim-v0.1.0-linux-x64
+./instalar.sh
+```
+
+O script copia o programa para `~/.local/share/utsim`, cria os comandos em `~/.local/bin`, os atalhos no menu e os ícones. Para remover, rode `./instalar.sh --desinstalar`. Também dá para usar direto da pasta, sem instalar: `./bin/utsim-view --novo`.
+
+Em ambos, o visualizador usa as bibliotecas de áudio e de janela do sistema (ALSA, udev, xkbcommon, Wayland ou X11, Vulkan). Numa distribuição de mesa comum, elas já estão presentes.
+
+#### Conferindo
 
 ```bash
 utsim --version
 utsim run examples/mm1.ron
 ```
+
+No Windows, se você não marcou a opção do `PATH`, use o caminho completo, por exemplo `%LOCALAPPDATA%\Programs\UTSim\bin\utsim.exe`.
 
 ### 2. Compilando com o cargo
 

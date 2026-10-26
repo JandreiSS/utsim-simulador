@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=UTSim (exemplos)
+Comment=Abre a pasta com os modelos de exemplo do UTSim
+Exec=xdg-open @PREFIXO@/examples
+Icon=utsim
+Terminal=false
+Categories=Education;Science;Engineering;

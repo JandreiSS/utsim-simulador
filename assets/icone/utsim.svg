@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>UTSim</title>
+  <!-- Fundo -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#16324f"/>
+  <!-- Grafo de nós -->
+  <g stroke="#7fd1ff" stroke-width="9" stroke-linecap="round" fill="none">
+    <path d="M62 82 L128 56 L194 82"/>
+    <path d="M128 56 L128 120"/>
+  </g>
+  <circle cx="62" cy="82" r="19" fill="#f5b942"/>
+  <circle cx="194" cy="82" r="19" fill="#f5b942"/>
+  <circle cx="128" cy="56" r="21" fill="#ffffff"/>
+  <!-- Esteira -->
+  <rect x="28" y="168" width="200" height="34" rx="17" fill="#2f5f8f"/>
+  <circle cx="45" cy="185" r="9" fill="#16324f"/>
+  <circle cx="85" cy="185" r="6" fill="#7fd1ff"/>
+  <circle cx="128" cy="185" r="6" fill="#7fd1ff"/>
+  <circle cx="171" cy="185" r="6" fill="#7fd1ff"/>
+  <circle cx="211" cy="185" r="9" fill="#16324f"/>
+  <!-- Peças em fluxo -->
+  <rect x="48" y="134" width="34" height="30" rx="5" fill="#f5b942"/>
+  <rect x="111" y="124" width="34" height="40" rx="5" fill="#ffffff"/>
+  <rect x="174" y="140" width="34" height="24" rx="5" fill="#7fd1ff"/>
+</svg>
