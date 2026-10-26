@@ -178,7 +178,12 @@ fn block_info(editor: &Editor, data: &Data, b: usize) -> Option<([f32; 3], Optio
 
 /// What the LOD reads of an item: its root, where it is, its state and whether it is a
 /// plain cube already.
-type ItemQuery = (Entity, &'static Transform, Option<&'static LodItem>, Has<Mesh3d>);
+type ItemQuery = (
+    Entity,
+    &'static Transform,
+    Option<&'static LodItem>,
+    Has<Mesh3d>,
+);
 
 /// Switches the entities to the level their distance asks for.
 #[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
