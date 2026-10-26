@@ -917,7 +917,8 @@ disso. Com sombras a luz ambiente sobe (520 em vez de 350) para a face na sombra
 escura. A caixa "Sombras", ao lado de "Visual", liga e desliga; o padrão é ligado no desktop e
 desligado no navegador (WebGL2, duas cascatas quando ligadas). Medido no
 `centro_de_distribuicao.ron` (visão geral reproduzindo, build de release, RTX 4070 Ti, sem
-sincronismo vertical): 420 quadros por segundo sem sombras e 372 com elas.
+sincronismo vertical, com os níveis de detalhe do A3D-4): 548 quadros por segundo sem sombras e
+448 com elas.
 
 ## 4q. Resultados no editor (fase 10)
 

@@ -167,8 +167,8 @@ Lacunas conhecidas:
   contínuas, pedaços retos inalterados.
 - **Sombras.** Sol com sombras em cascata dimensionadas pela cena, piso que recebe sombras,
   luz ambiente mais suave com sombras, caixa "Sombras" ao lado da chave "Visual" (desligada
-  por padrão no navegador). No `centro_de_distribuicao.ron`, build de release: 420 quadros por
-  segundo sem sombras e 372 com elas.
+  por padrão no navegador). No `centro_de_distribuicao.ron`, build de release: 548 quadros por
+  segundo sem sombras e 448 com elas (com os níveis de detalhe do A3D-4).
 
 Roteiros de conferência: `a3d3_pessoas.ron` (com `examples/celula_com_operadores.ron`),
 `a3d3_pessoas_carregando.ron` (com o novo `examples/pessoas_carregando.ron`, em que pessoas
