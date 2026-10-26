@@ -4,11 +4,13 @@
 //! exposes block variables and accepts commands, and a command log makes every run
 //! reproducible without the network.
 
+pub mod cena;
 pub mod commands;
 pub mod pacing;
 pub mod runner;
 pub mod server;
 
+pub use cena::SceneFrontend;
 pub use commands::{CommandLog, Input, LoggedCommand, Value};
 pub use pacing::{Clock, FakeClock, Pacer, SystemClock};
 pub use runner::{

@@ -45,7 +45,7 @@ if [ -f "$PREFIXO/bin/utsim-view" ]; then
     rm -rf "$PREFIXO"
 fi
 mkdir -p "$PREFIXO" "$BIN_USUARIO" "$DADOS/applications"
-for item in bin examples assets manual LICENSE README.md CHANGELOG.md; do
+for item in bin examples assets manual README.md CHANGELOG.md; do
     cp -r "$ORIGEM/$item" "$PREFIXO/"
 done
 

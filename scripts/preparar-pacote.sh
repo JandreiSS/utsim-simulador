@@ -5,7 +5,7 @@
 #   <destino>/examples/        modelos de exemplo
 #   <destino>/assets/          modelos 3D, terceiros (com licenças) e ícones
 #   <destino>/manual/          manual em HTML (se docs/manual/book existir) ou em Markdown
-#   <destino>/LICENSE  README.md  CHANGELOG.md
+#   <destino>/README.md  CHANGELOG.md
 #
 # Uso: bash scripts/preparar-pacote.sh <destino> [pasta_dos_binarios]
 # A pasta dos binários padrão é target/release (rode antes:
@@ -52,5 +52,5 @@ else
     cp -r docs/manual/src "$DESTINO/manual"
 fi
 
-cp LICENSE README.md CHANGELOG.md "$DESTINO/"
+cp README.md CHANGELOG.md "$DESTINO/"
 echo "Pacote montado em $DESTINO ($achou programas)"

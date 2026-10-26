@@ -129,3 +129,19 @@ utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 ```
 
 O formato é JSON em linhas (protocolo `utsim-scene/1`): um cabeçalho com o layout, e depois um quadro por linha, em metros, com o eixo Z para cima. Opções: `--rep N` (replicação), `--fps` (quadros por unidade de tempo simulado), `--ate T` (último instante) e `--saida` (sem ela, escreve na saída padrão).
+
+### Ao vivo
+
+Durante uma emulação, a mesma cena pode ser servida por socket, no mesmo relógio do servidor OPC UA, para um cliente de realidade virtual acompanhar a planta enquanto o CLP a comanda:
+
+```bash
+utsim emular examples/tutorial_02_linha.ron --cena-porta 7878
+```
+
+Sem OPC UA, para desenvolver um cliente, `utsim cena examples/agvs.ron --servir 7878 --velocidade 5` roda a rodada no ritmo do relógio. Em ambos, `--cena-fps` (padrão 20) define os quadros por segundo de relógio e `--cena-endereco` o endereço de escuta (padrão `127.0.0.1`).
+
+- A porta atende TCP (um JSON por linha, como no arquivo) e WebSocket (um JSON por mensagem), ao mesmo tempo e para vários clientes. Cada um recebe o cabeçalho ao conectar e depois os quadros.
+- Um cliente lento perde quadros, mas não atrasa a simulação nem os outros.
+- O cliente pode mandar `{"tipo":"comando","variavel":"torno.Parar","valor":true}` para parar (ou retomar, com `false`) um objeto, ou `{"tipo":"comando","variavel":"Velocidade","valor":5}` para mudar a velocidade. O efeito aparece nos quadros seguintes (`state` igual a `stopped`). Mensagens do servidor têm `"tipo"` (`aviso`, `fim`); cabeçalho e quadros não, e leitores devem ignorar tipos que não conhecem.
+- Exemplos: `cargo run -p utsim-scene --features server --example cliente_cena -- 127.0.0.1:7878 --parar torno` (TCP, imprime um resumo por segundo) e a página `web/cena_ao_vivo.html` (WebSocket, vista de topo; clique num objeto para pará-lo).
+- **Segurança:** não há autenticação nem criptografia. Quem alcança a porta vê a planta e pode parar objetos. Use só em rede local confiável.

@@ -22,7 +22,7 @@ Em resumo, a simulação a eventos discretos serve para responder perguntas do t
 
 ## O que o UTSim faz
 
-O UTSim é software livre (licença GPL-3.0 ou posterior). Ele reúne:
+O UTSim reúne:
 
 - **Objetos de processo**: chegadas, filas, processadores, montagem e desmontagem, esteiras, porta-paletes e saídas. Veja [Objetos](objetos.md).
 - **Recursos móveis**: operadores, empilhadeiras e AGVs que andam pelo layout, com despachantes e rede de caminhos. Veja [Recursos móveis](recursos-moveis.md).
@@ -62,7 +62,7 @@ Baixe e abra o instalador. Ele **não pede administrador**: instala só para o s
 
 O instalador oferece três componentes:
 
-- **UTSim** (obrigatório): `bin\utsim.exe` (linha de comando), `bin\utsim-view.exe` (editor e visualizador 3D), a pasta `examples\` (modelos de exemplo), `assets\` (modelos 3D e ativos de terceiros, cada pacote com a sua licença e os créditos em `assets\terceiros\CREDITOS.md`), `manual\` (este manual em HTML, abra `manual\index.html`) e os arquivos `LICENSE`, `README.md` e `CHANGELOG.md`.
+- **UTSim** (obrigatório): `bin\utsim.exe` (linha de comando), `bin\utsim-view.exe` (editor e visualizador 3D), a pasta `examples\` (modelos de exemplo), `assets\` (modelos 3D e ativos de terceiros, cada pacote com a sua licença e os créditos em `assets\terceiros\CREDITOS.md`), `manual\` (este manual em HTML, abra `manual\index.html`) e os arquivos `README.md` e `CHANGELOG.md`.
 - **Atalhos no Menu Iniciar**: a pasta "UTSim" com "UTSim" (abre o editor com um modelo novo), "UTSim (exemplos)" (abre a pasta dos exemplos; copie um para outro lugar antes de editar, pois o editor salva por cima do arquivo aberto), "Manual do UTSim" e "Desinstalar o UTSim".
 - **Adicionar o comando `utsim` ao PATH** (desmarcado por padrão): acrescenta `bin\` ao `PATH` do seu usuário, para digitar `utsim` em qualquer terminal novo.
 

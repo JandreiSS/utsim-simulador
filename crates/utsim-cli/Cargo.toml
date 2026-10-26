@@ -4,7 +4,6 @@ description = "Command-line runner for UTSim models"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 
 [[bin]]
 name = "utsim"
@@ -13,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 utsim-core.workspace = true
 utsim-model.workspace = true
-utsim-scene.workspace = true
+utsim-scene = { workspace = true, features = ["server"] }
 utsim-fit.workspace = true
 utsim-opt.workspace = true
 utsim-emu.workspace = true

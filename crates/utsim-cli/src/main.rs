@@ -79,6 +79,19 @@ enum Cmd {
         /// Arquivo de saída (padrão: a saída padrão)
         #[arg(long)]
         saida: Option<PathBuf>,
+        /// Em vez de gravar, serve a cena ao vivo nesta porta (TCP e WebSocket), com a
+        /// rodada no ritmo do relógio e sem OPC UA
+        #[arg(long, value_name = "PORTA")]
+        servir: Option<u16>,
+        /// Com --servir: fator de velocidade (1.0 = tempo real)
+        #[arg(long, default_value_t = 1.0)]
+        velocidade: f64,
+        /// Com --servir: endereço de escuta (padrão: só esta máquina)
+        #[arg(long, default_value = "127.0.0.1")]
+        cena_endereco: String,
+        /// Com --servir: quadros por segundo de relógio enviados aos clientes
+        #[arg(long, default_value_t = 20.0)]
+        cena_fps: f64,
     },
     /// Gera um modelo sintético de qualquer tamanho (testes de desempenho e de escala)
     GerarModelo {
@@ -136,6 +149,16 @@ enum Cmd {
         /// Reaplica os comandos de um arquivo RON, sem OPC UA e sem esperar o relógio
         #[arg(long)]
         reproduzir: Option<PathBuf>,
+        /// Serve também a cena 3D ao vivo nesta porta (TCP e WebSocket, utsim-scene/1),
+        /// no mesmo relógio do OPC UA (0 escolhe uma livre)
+        #[arg(long)]
+        cena_porta: Option<u16>,
+        /// Endereço de escuta da cena (padrão: só esta máquina; 0.0.0.0 abre para a rede)
+        #[arg(long, default_value = "127.0.0.1")]
+        cena_endereco: String,
+        /// Quadros por segundo de relógio enviados aos clientes da cena
+        #[arg(long, default_value_t = 20.0)]
+        cena_fps: f64,
     },
     /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
     Fit {
@@ -214,6 +237,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             ate,
             gravar,
             reproduzir,
+            cena_porta,
+            cena_endereco,
+            cena_fps,
         } => emulate::run(emulate::Args {
             model,
             port: porta,
@@ -221,6 +247,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             until: ate,
             record: gravar,
             replay: reproduzir,
+            scene_port: cena_porta,
+            scene_addr: cena_endereco,
+            scene_fps: cena_fps,
         })?,
         Cmd::Check { model } => {
             let m = Model::load(&model)?;
@@ -247,7 +276,22 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             fps,
             ate,
             saida,
-        } => cena::run(&model, rep, fps, ate, saida.as_deref())?,
+            servir,
+            velocidade,
+            cena_endereco,
+            cena_fps,
+        } => match servir {
+            Some(porta) => cena::serve(
+                &model,
+                rep,
+                porta,
+                &cena_endereco,
+                cena_fps,
+                velocidade,
+                ate,
+            )?,
+            None => cena::run(&model, rep, fps, ate, saida.as_deref())?,
+        },
         Cmd::Run {
             model,
             reps,
