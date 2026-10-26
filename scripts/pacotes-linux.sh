@@ -57,8 +57,10 @@ done
 mkdir -p "$DEB/usr/share/icons/hicolor/scalable/apps"
 cp assets/icone/utsim.svg "$DEB/usr/share/icons/hicolor/scalable/apps/utsim.svg"
 
-# Documentação e licença no lugar padrão do Debian (os arquivos de /opt/utsim ficam como estão).
-cp LICENSE "$DEB/usr/share/doc/utsim/copyright"
+# Documentação no lugar padrão do Debian (os arquivos de /opt/utsim ficam como estão).
+printf 'UTSim
+Copyright 2026 Jandrei
+' > "$DEB/usr/share/doc/utsim/copyright"
 cp CHANGELOG.md "$DEB/usr/share/doc/utsim/changelog"
 gzip -9n "$DEB/usr/share/doc/utsim/changelog"
 

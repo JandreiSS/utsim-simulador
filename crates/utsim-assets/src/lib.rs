@@ -1,5 +1,5 @@
 //! Procedural, articulated 3D models of the UTSim appearance library, written as
-//! binary glTF (`.glb`) by code only (no modelling tool, no download, GPL-clean).
+//! binary glTF (`.glb`) by code only (no modelling tool, no download, no third-party licence).
 //!
 //! Every model is built at real size in metres from simple shapes (boxes, cylinders,
 //! spheres) with flat PBR colours and a low triangle count. Each moving part is a

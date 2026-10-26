@@ -1554,7 +1554,7 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command>) {
                         let on = current.asset.as_deref() == Some(n);
                         if ui
                             .selectable_label(on, n)
-                            .on_hover_text("UTSim, GPL (gerado por utsim-assets)")
+                            .on_hover_text("UTSim (gerado por utsim-assets)")
                             .clicked()
                         {
                             next.asset = Some(n.to_string());

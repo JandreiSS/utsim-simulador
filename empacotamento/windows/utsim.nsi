@@ -43,7 +43,6 @@ BrandingText "UTSim ${VERSAO}"
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o UTSim agora"
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${ORIGEM}\LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -58,7 +57,7 @@ VIProductVersion "${VERSAO}.0"
 VIAddVersionKey /LANG=${LANG_PORTUGUESEBR} "ProductName" "UTSim"
 VIAddVersionKey /LANG=${LANG_PORTUGUESEBR} "FileDescription" "Instalador do UTSim"
 VIAddVersionKey /LANG=${LANG_PORTUGUESEBR} "FileVersion" "${VERSAO}"
-VIAddVersionKey /LANG=${LANG_PORTUGUESEBR} "LegalCopyright" "GPL-3.0-or-later"
+VIAddVersionKey /LANG=${LANG_PORTUGUESEBR} "LegalCopyright" "Copyright (C) 2026 Jandrei"
 
 ; Remove de $R0 (lista de pastas separadas por ";") a entrada "$INSTDIR\bin".
 ; Mesmo código para o instalador e para o desinstalador (que exige o prefixo "un.").
@@ -111,7 +110,6 @@ Section "UTSim (programas, exemplos, manual e ativos)" SecPrincipal
   File "${ORIGEM}\bin\utsim-view.exe"
 
   SetOutPath "$INSTDIR"
-  File "${ORIGEM}\LICENSE"
   File "${ORIGEM}\README.md"
   File "${ORIGEM}\CHANGELOG.md"
   File /r "${ORIGEM}\examples"
@@ -188,7 +186,6 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\examples"
   RMDir /r "$INSTDIR\assets"
   RMDir /r "$INSTDIR\manual"
-  Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\README.md"
   Delete "$INSTDIR\CHANGELOG.md"
   Delete "$INSTDIR\desinstalar.exe"
