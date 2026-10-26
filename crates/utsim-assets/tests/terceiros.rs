@@ -189,6 +189,34 @@ fn every_catalogued_file_loads_with_its_clips_nodes_and_size() {
 }
 
 #[test]
+fn every_external_texture_referenced_by_a_glb_exists() {
+    // Kenney GLBs point at `Textures/colormap.png` next to the file; without it they render grey.
+    let cat = catalogo();
+    let mut conferidas = 0;
+    for a in &cat.ativos {
+        let bytes = std::fs::read(dir().join(&a.arquivo)).expect("GLB");
+        let gltf = gltf::Gltf::from_slice(&bytes).expect("GLB válido");
+        let pasta = dir().join(std::path::Path::new(&a.arquivo).parent().unwrap());
+        for imagem in gltf.images() {
+            if let gltf::image::Source::Uri { uri, .. } = imagem.source() {
+                if uri.starts_with("data:") {
+                    continue;
+                }
+                let alvo = pasta.join(uri);
+                assert!(
+                    alvo.is_file(),
+                    "{}: textura externa {uri} não existe em {}",
+                    a.nome,
+                    alvo.display()
+                );
+                conferidas += 1;
+            }
+        }
+    }
+    assert!(conferidas >= 1, "nenhuma textura externa conferida");
+}
+
+#[test]
 fn every_pack_has_its_licence_and_every_glb_is_catalogued() {
     let cat = catalogo();
     let creditos = std::fs::read_to_string(dir().join("CREDITOS.md")).expect("CREDITOS.md");
@@ -210,6 +238,20 @@ fn every_pack_has_its_licence_and_every_glb_is_catalogued() {
         for f in std::fs::read_dir(entry.path()).unwrap() {
             let f = f.unwrap();
             let name = f.file_name().to_string_lossy().to_string();
+            if f.file_type().unwrap().is_dir() {
+                // Only `Textures/` may hold files, and only PNG textures that a GLB uses.
+                assert_eq!(name, "Textures", "{pack}/{name}: só a pasta Textures");
+                for t in std::fs::read_dir(f.path()).unwrap() {
+                    let t = t.unwrap();
+                    let tname = t.file_name().to_string_lossy().to_string();
+                    assert!(
+                        tname.to_lowercase().ends_with(".png"),
+                        "{pack}/Textures/{tname}: só .png"
+                    );
+                    total += t.metadata().unwrap().len();
+                }
+                continue;
+            }
             let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
             assert!(
                 ext == "glb" || ext == "txt",

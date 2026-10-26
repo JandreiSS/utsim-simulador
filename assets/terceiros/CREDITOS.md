@@ -22,5 +22,10 @@ UTSim, mantenha a linha da empilhadeira e da paleteira abaixo.
 Atribuição exigida pela CC-BY 3.0: "Forklift" e "Pallet Truck" por KolosStudios, licença
 CC-BY 3.0, via Poly Pizza.
 
+Texturas: as GLBs de `kenney_factory_kit`, `kenney_conveyor_kit` e `kenney_mini_characters`
+apontam para `Textures/colormap.png` ao lado de cada arquivo. Essas PNGs são do próprio
+pacote Kenney (CC0 1.0), uma cópia por pasta, extraídas de `Models/GLB format/Textures/colormap.png`
+dos zips oficiais baixados em 2026-10-26.
+
 Para regerar ou trocar um arquivo, veja a seção "Ativos de terceiros" em
 `docs/plano_3d_realista.md`.
