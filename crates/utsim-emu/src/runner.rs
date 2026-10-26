@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use utsim_core::{BlockId, RunReport, Simulation, Step};
+use utsim_core::{BlockId, RunReport, Simulation, Step, TraceRecord};
 
 use crate::commands::{CommandLog, Input, VAR_SPEED, VAR_STOP_SUFFIX, Value};
 use crate::pacing::{Clock, Pacer};
@@ -51,6 +51,16 @@ pub trait Frontend {
     /// Writes received since the last call, in arrival order.
     fn poll(&mut self) -> Vec<Input>;
     fn publish(&mut self, snapshot: &Snapshot);
+
+    /// Whether this frontend wants the trace records of the run (the live 3D scene).
+    /// The emulator must have been created with [`Emulator::new_traced`].
+    fn wants_trace(&self) -> bool {
+        false
+    }
+
+    /// The trace records produced since the last call, after the simulation advanced to
+    /// `time`. Called before [`Frontend::publish`]; only when [`Frontend::wants_trace`].
+    fn trace(&mut self, _time: f64, _records: Vec<TraceRecord>) {}
 }
 
 /// A frontend that does nothing (replay, tests).
@@ -73,7 +83,20 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(mut sim: Simulation) -> Result<Self, EmuError> {
+    pub fn new(sim: Simulation) -> Result<Self, EmuError> {
+        Self::start(sim, false)
+    }
+
+    /// Like [`Emulator::new`], recording the trace from the very first event so that
+    /// [`Emulator::drain_trace`] returns all of it (what the live 3D scene consumes).
+    pub fn new_traced(sim: Simulation) -> Result<Self, EmuError> {
+        Self::start(sim, true)
+    }
+
+    fn start(mut sim: Simulation, traced: bool) -> Result<Self, EmuError> {
+        if traced {
+            sim.enable_trace();
+        }
         sim.begin()?;
         let names: Vec<String> = sim.block_status().into_iter().map(|b| b.0).collect();
         let ids = names
@@ -99,6 +122,14 @@ impl Emulator {
 
     pub fn time(&self) -> f64 {
         self.sim.time()
+    }
+
+    /// Trace records produced since the last call (empty unless the emulator was created
+    /// with [`Emulator::new_traced`]).
+    pub fn drain_trace(&mut self) -> Vec<TraceRecord> {
+        let records = self.sim.take_trace();
+        self.sim.enable_trace();
+        records
     }
 
     /// Applies a block command (`<block>.Parar`). Returns `Ok(false)` for variables that
@@ -233,6 +264,10 @@ pub fn run_paced(
         // 2. Advance to where the wall clock says we should be.
         let target = pacer.target(clock.now()).min(end);
         let step = emu.advance(target)?;
+        if frontend.wants_trace() {
+            let records = emu.drain_trace();
+            frontend.trace(emu.time(), records);
+        }
         frontend.publish(&emu.snapshot(pacer.speed()));
         if matches!(step, Step::Finished) || target >= end {
             break;

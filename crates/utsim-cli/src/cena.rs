@@ -1,6 +1,7 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use utsim_emu::{Emulator, NullFrontend, RunOptions, SceneFrontend, SystemClock, run_paced};
 use utsim_model::Model;
 use utsim_scene::{JsonLines, Scene, SceneOptions, SceneSink};
 
@@ -50,5 +51,46 @@ pub fn run(
             path.display()
         );
     }
+    Ok(())
+}
+
+/// `utsim cena --servir`: runs the model paced against the wall clock, without OPC UA,
+/// and serves the live scene on `addr:port` (TCP and WebSocket). It is the emulation
+/// loop with only the scene attached, so clients can also send commands (stop a block,
+/// change the speed). For developing a scene client without a PLC.
+pub fn serve(
+    model: &Path,
+    replication: u32,
+    port: u16,
+    addr: &str,
+    fps: f64,
+    speed: f64,
+    until: Option<f64>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !(speed.is_finite() && speed > 0.0) {
+        return Err("--velocidade deve ser positiva".into());
+    }
+    let model = Model::load(model)?;
+    model.validate()?;
+    let mut emu = Emulator::new_traced(model.build(replication))?;
+    let names = emu.block_names().to_vec();
+    let mut frontend = SceneFrontend::start(NullFrontend, (addr, port), &model, &names, fps)?;
+    println!(
+        "Cena 3D ao vivo de \"{}\" em {} (TCP e WebSocket, protocolo utsim-scene/1)",
+        model.name,
+        frontend.live().local_addr()
+    );
+    println!(
+        "Velocidade {speed}x; a rodada termina em t={}",
+        until.unwrap_or(model.run.stop_time)
+    );
+    crate::emulate::warn_if_open(addr);
+    let opts = RunOptions {
+        speed,
+        until,
+        ..Default::default()
+    };
+    let outcome = run_paced(&mut emu, &SystemClock::new(), &mut frontend, &opts)?;
+    println!("Rodada encerrada em t={}", outcome.report.end_time);
     Ok(())
 }

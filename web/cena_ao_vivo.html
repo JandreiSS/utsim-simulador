@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UTSim: cena ao vivo (depuração)</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { margin: 0; display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; gap: .6rem; align-items: center; padding: .4rem .8rem; flex-wrap: wrap;
+           border-bottom: 1px solid #8884; }
+  header input { width: 14rem; }
+  #estado { margin-left: auto; font-size: .85rem; opacity: .8; }
+  main { flex: 1; position: relative; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Cena ao vivo</strong>
+  <label>Servidor <input id="url" value="ws://127.0.0.1:7878"></label>
+  <button id="conectar">Conectar</button>
+  <span>Clique em um bloco para parar ou retomar.</span>
+  <span id="estado">desconectado</span>
+</header>
+<main><canvas id="tela"></canvas></main>
+<script>
+// Visualizador de depuração do protocolo utsim-scene/1 por WebSocket: vista de topo.
+// Eixos do modelo: x para a direita, y para cima na tela, z para cima (ignorado aqui).
+"use strict";
+const tela = document.getElementById("tela");
+const ctx = tela.getContext("2d");
+const estado = document.getElementById("estado");
+let ws = null, cabecalho = null, quadro = null, quadros = 0, fim = null;
+let porId = new Map();     // id serializado -> entidade estática
+let parados = new Set();   // blocos que este cliente mandou parar
+let vista = { x: 0, y: 0, k: 1 };
+
+const chave = id => JSON.stringify(id);
+
+function conectar() {
+  if (ws) ws.close();
+  cabecalho = quadro = fim = null; quadros = 0; porId.clear(); parados.clear();
+  ws = new WebSocket(document.getElementById("url").value);
+  estado.textContent = "conectando...";
+  ws.onopen = () => estado.textContent = "conectado, aguardando o cabeçalho";
+  ws.onclose = () => estado.textContent = fim !== null ? `rodada encerrada em t=${fim}` : "desconectado";
+  ws.onerror = () => estado.textContent = "erro de conexão";
+  ws.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (msg.tipo) {                          // extensão: ignora os tipos desconhecidos
+      if (msg.tipo === "fim") fim = msg.tempo;
+      if (msg.tipo === "aviso") estado.textContent = "aviso: " + msg.mensagem;
+      return;
+    }
+    if (!cabecalho) { iniciar(msg); return; }
+    quadro = msg; quadros++;
+  };
+}
+
+function iniciar(h) {
+  cabecalho = h;
+  for (const e of h.scene.entities) porId.set(chave(e.id), e);
+  const [lo, hi] = h.scene.bounds;
+  const w = Math.max(hi[0] - lo[0], 1), d = Math.max(hi[1] - lo[1], 1);
+  vista.k = Math.min(tela.clientWidth / (w + 4), tela.clientHeight / (d + 4));
+  vista.x = (lo[0] + hi[0]) / 2; vista.y = (lo[1] + hi[1]) / 2;
+  estado.textContent = `${h.protocol}: ${h.model}`;
+}
+
+const para = (x, y) => [tela.width / 2 + (x - vista.x) * vista.k * devicePixelRatio,
+                        tela.height / 2 - (y - vista.y) * vista.k * devicePixelRatio];
+const dePixel = (px, py) => [vista.x + (px * devicePixelRatio - tela.width / 2) / (vista.k * devicePixelRatio),
+                             vista.y - (py * devicePixelRatio - tela.height / 2) / (vista.k * devicePixelRatio)];
+
+const cores = { idle: "#9aa5b1", processing: "#3a9d5d", blocked: "#d9822b", down: "#c0392b",
+                stopped: "#c0392b", setup: "#3b82c4", off_shift: "#7a6fb0" };
+
+function desenhar() {
+  const r = tela.getBoundingClientRect();
+  if (tela.width !== r.width * devicePixelRatio) { tela.width = r.width * devicePixelRatio; tela.height = r.height * devicePixelRatio; }
+  ctx.clearRect(0, 0, tela.width, tela.height);
+  if (!cabecalho) { requestAnimationFrame(desenhar); return; }
+  const k = vista.k * devicePixelRatio;
+  const poses = new Map();
+  if (quadro) for (const p of quadro.poses) poses.set(chave(p.id), p);
+
+  ctx.strokeStyle = "#8886"; ctx.lineWidth = 2;
+  for (const s of cabecalho.scene.network) {
+    const a = para(s.from[0], s.from[1]), b = para(s.to[0], s.to[1]);
+    ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+  }
+  for (const [id, e] of porId) {
+    if (e.kind.Mobile) continue;
+    const p = poses.get(id);
+    const [cx, cy] = para(e.position[0], e.position[1]);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-e.yaw);
+    ctx.fillStyle = cores[(p && p.state) || "idle"] || "#9aa5b1";
+    ctx.globalAlpha = .75;
+    ctx.fillRect(-e.size[0] * k / 2, -e.size[1] * k / 2, e.size[0] * k, e.size[1] * k);
+    ctx.restore();
+    ctx.globalAlpha = 1; ctx.fillStyle = "#888"; ctx.font = `${11 * devicePixelRatio}px sans-serif`;
+    const nome = (e.kind.Block || e.kind.FluidNode || {}).name;
+    if (nome) ctx.fillText(nome, cx - e.size[0] * k / 2, cy - e.size[1] * k / 2 - 3);
+  }
+  ctx.globalAlpha = 1;
+  for (const [id, p] of poses) {
+    const [x, y] = para(p.position[0], p.position[1]);
+    if (id.includes('"Item"')) {                      // item: ponto
+      ctx.fillStyle = "#e6b422"; ctx.beginPath(); ctx.arc(x, y, 3 * devicePixelRatio, 0, 7); ctx.fill();
+    } else if (porId.get(id) && porId.get(id).kind.Mobile) {   // móvel: seta com a direção
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-p.yaw);
+      const s = 0.5 * k;
+      ctx.fillStyle = p.state === "stopped" ? "#c0392b" : "#2b6cb0";
+      ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * .7, s * .6); ctx.lineTo(-s * .4, 0); ctx.lineTo(-s * .7, -s * .6);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+  if (quadro) {
+    ctx.fillStyle = "#888"; ctx.font = `${12 * devicePixelRatio}px sans-serif`;
+    ctx.fillText(`t = ${quadro.time.toFixed(2)}   quadros: ${quadros}   poses: ${quadro.poses.length}`, 10, 18 * devicePixelRatio);
+  }
+  requestAnimationFrame(desenhar);
+}
+
+// Clique em um bloco: envia <bloco>.Parar (alterna parar e retomar).
+tela.addEventListener("click", ev => {
+  if (!cabecalho || !ws || ws.readyState !== 1) return;
+  const r = tela.getBoundingClientRect();
+  const [mx, my] = dePixel(ev.clientX - r.left, ev.clientY - r.top);
+  for (const e of porId.values()) {
+    const b = e.kind.Block;
+    if (!b || Math.abs(mx - e.position[0]) > e.size[0] / 2 || Math.abs(my - e.position[1]) > e.size[1] / 2) continue;
+    const parar = !parados.has(b.name);
+    parar ? parados.add(b.name) : parados.delete(b.name);
+    ws.send(JSON.stringify({ tipo: "comando", variavel: `${b.name}.Parar`, valor: parar }));
+    break;
+  }
+});
+
+document.getElementById("conectar").onclick = conectar;
+requestAnimationFrame(desenhar);
+</script>
+</body>
+</html>

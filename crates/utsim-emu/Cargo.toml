@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 utsim-core.workspace = true
 utsim-model.workspace = true
+utsim-scene = { workspace = true, features = ["server"] }
 serde.workspace = true
 ron.workspace = true
 thiserror.workspace = true
@@ -16,4 +17,5 @@ async-opcua = { version = "0.19", features = ["server"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "signal"] }
 
 [dev-dependencies]
+serde_json.workspace = true
 async-opcua = { version = "0.19", features = ["server", "client"] }
