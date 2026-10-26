@@ -1,0 +1,6 @@
+Pacote: Conveyor Kit 2.0
+Autor: Kenney
+Licença: CC0-1.0
+Texto da licença: https://creativecommons.org/publicdomain/zero/1.0/
+Fonte: https://kenney-assets.itch.io/conveyor-kit
+Conferido em: 2026-10-25 (página oficial do pacote)

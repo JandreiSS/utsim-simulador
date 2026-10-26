@@ -1,0 +1,6 @@
+Pacote: Universal Animation Library 2 (versão Standard, gratuita)
+Autor: Quaternius
+Licença: CC0-1.0
+Texto da licença: https://creativecommons.org/publicdomain/zero/1.0/
+Fonte: https://quaternius.itch.io/universal-animation-library-2
+Conferido em: 2026-10-25 (página oficial do pacote)

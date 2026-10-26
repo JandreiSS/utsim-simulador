@@ -1,0 +1,12 @@
+Pacote: Empilhadeira e paleteira: CC-BY 3.0, atribuição obrigatória
+Autor: KolosStudios (via Poly Pizza)
+Licença: CC-BY-3.0
+Texto da licença: https://creativecommons.org/licenses/by/3.0/
+Fonte: https://poly.pizza
+Conferido em: 2026-10-25 (página oficial do pacote)
+
+Páginas de origem (cada uma exibe a licença do modelo):
+  empilhadeira_kolosstudios.glb  <-  https://poly.pizza/m/DTQBuenKJY  (Forklift, autor KolosStudios)
+  paleteira_kolosstudios.glb  <-  https://poly.pizza/m/snDq7v3GRO  (Pallet Truck, autor KolosStudios)
+
+ATRIBUIÇÃO OBRIGATÓRIA (CC-BY 3.0): "Forklift" e "Pallet Truck" por KolosStudios, licença CC-BY 3.0, via Poly Pizza. Mantenha este crédito ao redistribuir.

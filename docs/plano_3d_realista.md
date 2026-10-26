@@ -145,6 +145,57 @@ Lacunas conhecidas:
 - `.glb` do usuário com texturas externas (`.gltf` com arquivos ao lado) não é aceito, e no
   navegador `visual.asset` com arquivo cai no modelo padrão.
 
+## Ativos de terceiros
+
+A pasta `assets/terceiros/` guarda 41 modelos `.glb` prontos (cerca de 18 MB), só com licença
+CC0 ou CC-BY 3.0, para trocar ou complementar os modelos procedurais. Créditos e licenças
+estão em `assets/terceiros/CREDITOS.md` e no `LICENCA.txt` de cada pacote; as medidas
+reais, os eixos, a escala sugerida, os clipes e os nós úteis de cada arquivo estão em
+`assets/terceiros/catalogo.ron`. O teste `crates/utsim-assets/tests/terceiros.rs` abre cada
+arquivo do catálogo e confere existência, clipes, nós, medidas e licença.
+
+O que veio:
+
+| Grupo | Origem (licença) | Conteúdo |
+|---|---|---|
+| Pessoa | Quaternius, Universal Animation Library 1 e 2, versão Standard (CC0) | Boneco com esqueleto humanoide de 65 ossos e 43 clipes em cada arquivo. Mapa para o `Motion`: `Idle` = `Idle_Loop`; `Moving` = `Walk_Loop` (ou `Jog_Fwd_Loop`, `Sprint_Loop`); carregando = `Walk_Carry_Loop` (no arquivo 2); `Working` = `Interact` ou `Fixing_Kneeling`; coleta = `PickUp_Table`; empurrar = `Push_Loop`; dirigindo = `Driving_Loop`; sentado = `Sitting_Idle_Loop`. Os dois arquivos têm o mesmo esqueleto e os mesmos nomes de ossos, então os clipes de um servem ao boneco do outro. |
+| Pessoa leve | Kenney, Mini Characters (CC0) | Quatro pessoas estilizadas de 7 ossos e 32 clipes (`idle`, `walk`, `sprint`, `pick-up`, `holding-both`, `interact-right`, `drive`, `sit`). Para carregar, toque `walk` e, por cima, a camada de braços `holding-both` (ela só mexe nos braços). Medem 0,7 m, então use a escala 2,6. |
+| Máquinas e esteiras | Kenney, Factory Kit e Conveyor Kit (CC0) | Máquinas, braços robóticos com nós `element-a`... e `claw-a/b`, ponte rolante, caixas, esteiras em módulos de 1 m, funis, pistão e alavanca com clipes `toggle`. Estáticos, mas com nós para articular. |
+| Armazenagem | Quaternius, Kenney, MilkAndBanana via Poly Pizza (CC0) | Palete, barril, caixote, carrinho, estantes e bancada. |
+| Empilhadeira e paleteira | KolosStudios via Poly Pizza (**CC-BY 3.0**, crédito obrigatório) | Modelos em escala de metros, mas de malha única: garfos e rodas não são nós separados. |
+
+Convenções: todos os arquivos são glTF padrão, Y para cima. Pessoas olham para `+Z` (conferido
+pela posição do pé e da ponta do pé no esqueleto do Quaternius); nos outros pacotes `+Z` é só
+a convenção, marcada como `frente_verificada: false` no catálogo. Os modelos do UTSim olham
+para `+X`, então o catálogo traz `giro_y_graus` (90). A escala vem de `escala_real`
+(`tamanho_real_m = tamanho_m * escala_real`), e `centro_m` mostra os arquivos cuja origem fica
+longe do centro (empilhadeira e paleteira), que o motor precisa recentrar.
+
+Lacunas conhecidas, sem item CC0 encontrado: empilhadeira ou paleteira com garfos separados
+(as duas obtidas são CC-BY e de malha única), AGV, carrinho de mão industrial de duas rodas,
+torno, prensa e fresadora CNC detalhadas (use as máquinas do Kenney como substitutas). Também
+ficou de fora o pacote Universal Base Characters (CC0): vem em `.gltf` com texturas separadas
+de vários MB e sem `.glb`, e o boneco do próprio Universal Animation Library já cobre o uso.
+Rejeitados por licença ou origem: Mixamo, Sketchfab com licença padrão e modelos gerados por
+IA sem termos claros (por exemplo, os da Meshy).
+
+Como personalizar:
+
+1. **Trocar um modelo**: copie o seu `.glb` para uma pasta do projeto e aponte `visual.asset`
+   do objeto para ele. O arquivo precisa ser `.glb` (texturas embutidas), com a malha em
+   metros e Y para cima.
+2. **Acrescentar**: ponha o `.glb` em `assets/terceiros/<pacote>/`, acrescente um
+   `LICENCA.txt` com a licença e o endereço, uma linha em `CREDITOS.md` e uma entrada em
+   `catalogo.ron`. O teste `terceiros` recusa arquivos sem catálogo, sem licença ou com
+   licença que não seja CC0 ou CC-BY, e o total precisa ficar abaixo de 40 MB.
+3. **Editar no Blender**: importe o `.glb`, ajuste forma, cores ou esqueleto e exporte de novo
+   como glTF binário (`.glb`) com "Y para cima". Para separar garfos ou rodas de uma malha
+   única, divida a malha em objetos e dê a cada um um nome e um pivô na articulação, como nos
+   modelos de `assets/modelos`. Para trocar o clipe usado por um movimento, edite o
+   `mapa_movimento` em `catalogo.ron`.
+4. **Reaproveitar clipes**: um clipe só funciona em um esqueleto com os mesmos nomes de ossos.
+   Os dois arquivos do Quaternius compartilham o esqueleto; os do Kenney usam outro.
+
 ## Pedidos prontos para outras sessões
 
 ### Sessão 1: cliente Unreal com realidade virtual (rodar depois que A3D-1 estiver integrada)

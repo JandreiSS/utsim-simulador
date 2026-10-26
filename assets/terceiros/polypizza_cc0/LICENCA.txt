@@ -1,0 +1,16 @@
+Pacote: Props avulsos publicados no Poly Pizza com a licença CC0 1.0 (página de cada modelo conferida)
+Autor: Quaternius, Kenney e MilkAndBanana (via Poly Pizza)
+Licença: CC0-1.0
+Texto da licença: https://creativecommons.org/publicdomain/zero/1.0/
+Fonte: https://poly.pizza
+Conferido em: 2026-10-25 (página oficial do pacote)
+
+Páginas de origem (cada uma exibe a licença do modelo):
+  palete_quaternius.glb  <-  https://poly.pizza/m/MwOFAOgOhg  (Pallet, autor Quaternius)
+  carrinho_quaternius.glb  <-  https://poly.pizza/m/l7bDe7ak6j  (Cart, autor Quaternius)
+  barril_quaternius.glb  <-  https://poly.pizza/m/ONdghDBByN  (Barrel, autor Quaternius)
+  caixote_quaternius.glb  <-  https://poly.pizza/m/3VGWnZPXmG  (Crate, autor Quaternius)
+  estante_alta_quaternius.glb  <-  https://poly.pizza/m/TDgvIuorcX  (Shelf Tall, autor Quaternius)
+  estante_baixa_quaternius.glb  <-  https://poly.pizza/m/0REJqMlmSW  (Shelf Small, autor Quaternius)
+  estante_containers_milkandbanana.glb  <-  https://poly.pizza/m/cvmkDWTTL8  (Container Shelf, autor MilkAndBanana)
+  bancada_kenney.glb  <-  https://poly.pizza/m/pX3YnfKa6Q  (Workbench, autor Kenney)

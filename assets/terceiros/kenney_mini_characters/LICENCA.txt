@@ -1,0 +1,6 @@
+Pacote: Mini Characters 1.0
+Autor: Kenney
+Licença: CC0-1.0
+Texto da licença: https://creativecommons.org/publicdomain/zero/1.0/
+Fonte: https://kenney.nl/assets/mini-characters
+Conferido em: 2026-10-25 (página oficial do pacote)
