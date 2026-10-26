@@ -36,7 +36,6 @@ utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 - `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
-- `experiment`: o texto de ajuda do `replay` e o do `experiment` ainda aparecem misturados na lista de comandos de `utsim --help`; é um erro conhecido do texto, o comportamento é o descrito neste manual.
 
 ## Saída de `--help`
 
@@ -51,10 +50,10 @@ Usage: utsim <COMMAND>
 Commands:
   run           Executa um modelo e mostra as estatísticas
   check         Valida um modelo sem executar
-  replay        Compara cenários de um arquivo de experimento Grava o rastro completo de uma replicação para o visualizador 3D
+  replay        Grava o rastro completo de uma replicação para o visualizador 3D
   cena          Grava a cena 3D de uma replicação (protocolo utsim-scene/1, JSON em linhas)
   gerar-modelo  Gera um modelo sintético de qualquer tamanho (testes de desempenho e de escala)
-  experiment    
+  experiment    Compara cenários de um arquivo de experimento
   otimizar      Otimiza parâmetros do modelo por simulação (busca com comparação pareada)
   emular        Emula o modelo em tempo real, com servidor OPC UA (comissionamento virtual)
   fit           Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
@@ -104,7 +103,7 @@ Options:
 ### `utsim replay --help`
 
 ```text
-Compara cenários de um arquivo de experimento Grava o rastro completo de uma replicação para o visualizador 3D
+Grava o rastro completo de uma replicação para o visualizador 3D
 
 Usage: utsim replay [OPTIONS] <MODEL>
 

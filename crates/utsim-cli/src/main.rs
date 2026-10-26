@@ -57,7 +57,6 @@ enum Cmd {
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
-    /// Compara cenários de um arquivo de experimento
     /// Grava o rastro completo de uma replicação para o visualizador 3D
     Replay {
         model: PathBuf,
@@ -97,6 +96,7 @@ enum Cmd {
         #[arg(long)]
         saida: Option<PathBuf>,
     },
+    /// Compara cenários de um arquivo de experimento
     Experiment {
         file: PathBuf,
         /// Grava o resultado completo em JSON
