@@ -66,7 +66,7 @@ Ainda falta, nas fases abaixo:
 | A3D-1 | Cena independente de motor (`utsim-scene`), `utsim cena`, visualizador usando a cena (**em andamento**) | 3–4 h |
 | A3D-2 | Gerador de `.glb` articulados (empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque) e carga de glTF no Bevy pelo `visual.asset` (**feito**, ver abaixo) | 4–6 h |
 | A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas, sombras (**feito**, ver abaixo) | 5–8 h |
-| A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta); instâncias e níveis de detalhe para modelos grandes | 3–4 h |
+| A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta), do recurso; níveis de detalhe para modelos grandes (**feito**: `camera_modes.rs`, `lod.rs`, `docs/arquitetura.md` 4p e `docs/desempenho.md`; os itens já compartilham malha e material, então não foram precisas instâncias) | 3–4 h |
 | A3D-5 | Cliente Unreal + realidade virtual (OpenXR), lendo `utsim-scene/1` de arquivo e depois ao vivo | 6–10 h (sessão separada) |
 | A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP (**feito**: `--cena-porta`, `utsim cena --servir`, TCP e WebSocket, comandos de volta) | 2–3 h |
 
@@ -138,7 +138,6 @@ Lacunas conhecidas:
 - o corredor da empilhadeira é sempre o lado `-y` do porta-paletes;
 - o tanque existe na biblioteca, mas os tanques da rede de fluidos ainda usam o cilindro
   transparente;
-- sem níveis de detalhe;
 - `.glb` do usuário com texturas externas (`.gltf` com arquivos ao lado) não é aceito, e no
   navegador `visual.asset` com arquivo cai no modelo padrão.
 

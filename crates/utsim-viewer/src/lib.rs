@@ -8,9 +8,11 @@
 //! binary and only ever *reads* a [`utsim_model::replay::Replay`]: the simulation is
 //! never driven by the viewer.
 
+pub mod cameras;
 pub mod editing;
 pub mod flows;
 pub mod flows_ui;
+pub mod lod_rules;
 pub mod properties;
 pub mod results;
 pub mod roteiro;

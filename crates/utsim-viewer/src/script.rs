@@ -47,6 +47,9 @@ use crate::playback::{Data, Playback};
 const DRAG_FRAMES: u32 = 8;
 /// Whole-run safety limit, in seconds.
 const RUN_LIMIT: f64 = 600.0;
+
+/// Seconds a `Medir` step lets the scene settle before it starts counting frames.
+const MEASURE_WARMUP: f64 = 0.5;
 /// Limit of a screenshot, in seconds.
 const CAPTURE_LIMIT: f64 = 20.0;
 
@@ -80,9 +83,25 @@ fn apply_control(
     mut runner: ResMut<Runner>,
     mut pb: ResMut<Playback>,
     mut cam: ResMut<crate::camera::OrbitCam>,
+    mut modes: ResMut<crate::camera_modes::CameraModes>,
+    mut lod: ResMut<crate::lod::Lod>,
     data: Res<Data>,
 ) {
     match runner.control.take() {
+        Some(Passo::Camera { modo, objeto }) => {
+            use utsim_viewer::cameras::CameraKind;
+            let Some(kind) = CameraKind::parse(&modo) else {
+                return;
+            };
+            let block = objeto.and_then(|n| data.replay.blocks.iter().position(|b| b.name == n));
+            match (kind, block) {
+                (CameraKind::Follow, Some(b)) => modes.follow_block(b),
+                (CameraKind::Ride, Some(b)) => modes.ride_block(b),
+                _ => modes.request(kind),
+            }
+        }
+        Some(Passo::Lod(on)) => lod.settings.enabled = on,
+        Some(Passo::Tempos(on)) => lod.overlay = on,
         Some(Passo::IrPara(t)) => {
             pb.playing = false;
             pb.t = t.clamp(0.0, data.end);
@@ -94,6 +113,7 @@ fn apply_control(
             inclinacao,
         }) => {
             if let Some(b) = data.replay.blocks.iter().position(|b| b.name == objeto) {
+                modes.request(utsim_viewer::cameras::CameraKind::Orbit);
                 let h = data.geoms[b].half[1];
                 cam.target = Vec3::from(data.base_at(b, pb.t)) + Vec3::Y * h;
                 cam.dist = distancia.clamp(1.5, 5000.0);
@@ -266,6 +286,8 @@ struct World3<'w, 's> {
     data: Res<'w, Data>,
     playback: Res<'w, Playback>,
     labels: Res<'w, TextLabels>,
+    modes: Res<'w, crate::camera_modes::CameraModes>,
+    lod: Res<'w, crate::lod::Lod>,
     camera: Single<'w, 's, (&'static Camera, &'static GlobalTransform), With<Camera3d>>,
 }
 
@@ -289,6 +311,8 @@ pub struct Runner {
     started: bool,
     /// Playback or camera change asked by `IrPara`/`Focar`, applied by [`apply_control`].
     control: Option<Passo>,
+    /// Frame times (seconds) collected by a `Medir` step.
+    samples: Vec<f64>,
 }
 
 impl Runner {
@@ -305,6 +329,7 @@ impl Runner {
             aim: None,
             started: false,
             control: None,
+            samples: Vec::new(),
         }
     }
 }
@@ -386,6 +411,31 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
             .map_or(0, |e| e.scenarios.len()),
         exportados: ed.results.exported.clone(),
         melhor_ponto: ed.results.best_point(),
+        camera_modo: world.modes.kind.label().to_string(),
+        camera_alvo: world
+            .modes
+            .target
+            .filter(|_| world.modes.kind.needs_resource())
+            .and_then(|b| world.data.replay.blocks.get(b))
+            .map(|b| b.name.clone()),
+        camera_pos: world.camera.1.translation().to_array().map(f64::from),
+        camera_distancias: if ed.mode == Mode::Sim {
+            let eye = world.camera.1.translation();
+            world
+                .data
+                .replay
+                .blocks
+                .iter()
+                .enumerate()
+                .map(|(b, blk)| {
+                    let at = Vec3::from(world.data.base_at(b, world.playback.t));
+                    (blk.name.clone(), f64::from(eye.distance(at)))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        },
+        lod_ativo: world.lod.settings.enabled,
         niveis: match ed.mode {
             Mode::Edit => ed
                 .fluid_view
@@ -608,6 +658,9 @@ fn run(
     }
 
     let step = runner.steps[runner.index].clone();
+    if matches!(step, Passo::Medir { .. }) && runner.secs > MEASURE_WARMUP {
+        runner.samples.push(dt);
+    }
     let state = snapshot(&world, window);
     let flow = advance(&step, &mut runner, &world, &mut out, window, entity, &state);
     runner.frame += 1;
@@ -843,6 +896,43 @@ fn advance(
             1..=3 => Flow::Pending,
             _ => Flow::Done,
         },
+        Passo::Camera { modo, objeto } => match n {
+            0 => {
+                if utsim_viewer::cameras::CameraKind::parse(modo).is_none() {
+                    return Flow::Fail(format!("modo de câmera desconhecido: {modo}"));
+                }
+                if let Some(o) = objeto
+                    && !world.data.replay.blocks.iter().any(|b| &b.name == o)
+                {
+                    return Flow::Fail(format!("bloco \"{o}\" não existe na simulação"));
+                }
+                runner.control = Some(step.clone());
+                Flow::Pending
+            }
+            // The camera glides for a moment, then settles.
+            _ if runner.secs < 1.2 => Flow::Pending,
+            _ => Flow::Done,
+        },
+        Passo::Lod(_) | Passo::Tempos(_) => match n {
+            0 => {
+                runner.control = Some(step.clone());
+                Flow::Pending
+            }
+            1..=3 => Flow::Pending,
+            _ => Flow::Done,
+        },
+        Passo::Medir { segundos, nome } => {
+            if n == 0 {
+                runner.samples.clear();
+            }
+            if runner.secs < *segundos {
+                return Flow::Pending;
+            }
+            let line = measurement(nome, &runner.samples);
+            log_line(&runner.dir, &line);
+            println!("{line}");
+            Flow::Done
+        }
         Passo::Afirmar(cond) => match state.verificar(cond) {
             Ok(()) => Flow::Done,
             Err(e) => Flow::Fail(e),
@@ -858,6 +948,25 @@ fn advance(
             }
         }
     }
+}
+
+/// The summary line of a `Medir` step: mean, median, 95th percentile and worst frame.
+fn measurement(name: &str, samples: &[f64]) -> String {
+    if samples.is_empty() {
+        return format!("medição {name}: sem quadros");
+    }
+    let mut ms: Vec<f64> = samples.iter().map(|s| s * 1000.0).collect();
+    ms.sort_by(f64::total_cmp);
+    let mean = ms.iter().sum::<f64>() / ms.len() as f64;
+    let pick = |q: f64| ms[((ms.len() - 1) as f64 * q).round() as usize];
+    format!(
+        "medição {name}: {} quadros, média {mean:.2} ms ({:.0} quadros/s), mediana {:.2} ms, p95 {:.2} ms, pior {:.2} ms",
+        ms.len(),
+        1000.0 / mean,
+        pick(0.5),
+        pick(0.95),
+        ms[ms.len() - 1]
+    )
 }
 
 /// Press, several moves, release. Endpoints are resolved at the first frame.

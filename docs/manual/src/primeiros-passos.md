@@ -109,6 +109,9 @@ Itens, operadores e veículos aparecem em movimento. As estatísticas finais da 
 | Girar | botão direito arrastando |
 | Aproximar e afastar | roda do mouse |
 | Enquadrar tudo | tecla `F` ou botão **Enquadrar** |
+| Trocar o modo da câmera | menu **Câmera** da barra, ou as teclas `1` (órbita), `2` (seguir), `3` (primeira pessoa) e `4` (do recurso) |
+
+Os outros modos servem para ver a planta de dentro: **Seguir** acompanha um empilhador ou AGV (selecione-o e use **Seguir este recurso**), **Primeira pessoa** deixa você andar pela planta a 1,6 m do chão com `W`, `A`, `S`, `D` (`Shift` corre, botão direito olha em volta) e **Do recurso** põe a câmera no assento do motorista. `Esc` volta à órbita. Detalhes em [3D realista e aparência](visual-3d.md). `F3` mostra o tempo de quadro.
 
 ## Posições e unidades
 
