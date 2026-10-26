@@ -11,7 +11,7 @@ fn main() {
             "FileDescription",
             "UTSim: simulador de processos a eventos discretos (linha de comando)",
         );
-        recurso.set("LegalCopyright", "GPL-3.0-or-later");
+        recurso.set("LegalCopyright", "© 2026 Jandrei");
         if let Err(e) = recurso.compile() {
             println!("cargo:warning=não foi possível embutir o ícone: {e}");
         }

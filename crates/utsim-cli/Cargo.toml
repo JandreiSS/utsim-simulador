@@ -4,7 +4,6 @@ description = "Command-line runner for UTSim models"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 
 [[bin]]
 name = "utsim"

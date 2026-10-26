@@ -24,7 +24,7 @@ modelo .ron ─► simulação ─► rastro ─► utsim-scene ─┬─► Bev
 
 | Tipo | Como | Por quê |
 |---|---|---|
-| Empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque | **Gerados por código** (gerador de `.glb` em Rust, peças articuladas como nós separados: chassi, torre, carro dos garfos, garfos, rodas) | Licença GPL sem dúvida; medidas reais e paramétricas (altura dos níveis do porta-paletes, comprimento da esteira); o motor só move os nós (sem esqueleto) |
+| Empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque | **Gerados por código** (gerador de `.glb` em Rust, peças articuladas como nós separados: chassi, torre, carro dos garfos, garfos, rodas) | Sem dúvida de licença (código nosso); medidas reais e paramétricas (altura dos níveis do porta-paletes, comprimento da esteira); o motor só move os nós (sem esqueleto) |
 | Pessoas (operadores) | **Personagens CC0 já animados** (Quaternius Universal Animation Library 2: parado, andando, andando carregando) | Animação de esqueleto é cara de fazer à mão; CC0 permite redistribuir junto com o UTSim |
 | Cenário decorativo (máquinas específicas, paredes, docas) | `.glb` do usuário no campo `visual.asset`; opcionalmente gerados com IA | Não precisa articular; cada fábrica é diferente |
 
@@ -230,7 +230,7 @@ Como personalizar:
 >    linhas JSON.
 >
 > Teste no desktop (sem óculos) com `agvs.jsonl`. O projeto Unreal fica fora do
-> repositório GPL, porque o conteúdo da Epic segue a licença do Unreal. A comunicação é
+> repositório do UTSim, porque o conteúdo da Epic segue a licença do Unreal. A comunicação é
 > só pelo protocolo.
 
 ### Sessão 2: gerador de modelos articulados (A3D-2; pode rodar depois que A3D-1 estiver integrada)

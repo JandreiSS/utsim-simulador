@@ -4,7 +4,6 @@ description = "UTSim in the browser: WebAssembly bindings (run, validate, fit, r
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 
 [lib]
 # `cdylib` is what wasm-bindgen turns into the .wasm; `rlib` lets the plain Rust

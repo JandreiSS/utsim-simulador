@@ -4,7 +4,6 @@ description = "Procedural generator of the articulated 3D models (.glb) of the U
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
 
 [lib]
 name = "utsim_assets"
