@@ -4,6 +4,7 @@ use std::path::Path;
 
 use utsim_core::stats::Summary;
 use utsim_model::ModelError;
+use utsim_model::analysis::delta_cell;
 use utsim_model::experiment::{Experiment, ExperimentResult};
 
 pub fn run(file: &Path, json: Option<&Path>) -> Result<(), ModelError> {
@@ -33,18 +34,7 @@ fn cell(s: Option<&Summary>) -> String {
 }
 
 fn print_table(result: &ExperimentResult) {
-    let measures: Vec<String> = if result.measures.is_empty() {
-        let mut all: Vec<String> = result
-            .scenarios
-            .iter()
-            .flat_map(|s| s.summary.keys().cloned())
-            .collect();
-        all.sort();
-        all.dedup();
-        all
-    } else {
-        result.measures.clone()
-    };
+    let measures = result.metric_names();
     let rows: Vec<Vec<String>> = measures
         .iter()
         .map(|m| {
@@ -55,6 +45,44 @@ fn print_table(result: &ExperimentResult) {
                 .collect()
         })
         .collect();
+    print_grid(
+        &format!(
+            "{}: média ± meia-amplitude do IC de 95% entre replicações",
+            result.name
+        ),
+        result,
+        &measures,
+        &rows,
+    );
+    if result.scenarios.len() < 2 {
+        return;
+    }
+    // Paired differences to the first scenario (same seeds); `≈`: not significant.
+    let deltas: Vec<Vec<String>> = measures
+        .iter()
+        .map(|m| {
+            (0..result.scenarios.len())
+                .map(|i| match result.difference_to_first(i, m) {
+                    Some(d) => delta_cell(&d),
+                    None if i == 0 => "base".to_string(),
+                    None => "-".to_string(),
+                })
+                .collect()
+        })
+        .collect();
+    println!();
+    print_grid(
+        &format!(
+            "Diferença pareada para '{}' (Δ ± IC de 95%; ≈ = sem diferença significativa)",
+            result.scenarios[0].name
+        ),
+        result,
+        &measures,
+        &deltas,
+    );
+}
+
+fn print_grid(title: &str, result: &ExperimentResult, measures: &[String], rows: &[Vec<String>]) {
     let first = measures
         .iter()
         .map(String::len)
@@ -74,16 +102,13 @@ fn print_table(result: &ExperimentResult) {
         })
         .collect();
 
-    println!(
-        "{}: média ± meia-amplitude do IC de 95% entre replicações\n",
-        result.name
-    );
+    println!("{title}\n");
     print!("{:<first$}", "medida");
     for (s, w) in result.scenarios.iter().zip(&widths) {
         print!("  {:>w$}", s.name);
     }
     println!();
-    for (m, row) in measures.iter().zip(&rows) {
+    for (m, row) in measures.iter().zip(rows) {
         print!("{m:<first$}");
         for (c, w) in row.iter().zip(&widths) {
             print!("  {c:>w$}");

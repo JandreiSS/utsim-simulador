@@ -374,6 +374,18 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
         nos_fluido: model.fluids.as_ref().map_or(0, |f| f.nodes.len()),
         ligacoes_fluido: model.fluids.as_ref().map_or(0, |f| f.links.len()),
         avisos: ed.warnings.len(),
+        painel_resultados: ed.results.open,
+        aba_resultados: ed.results.tab.label().to_string(),
+        analise_rodando: ed.results.running(),
+        replicacoes_resultado: ed.results.run.as_ref().map_or(0, |r| r.reports.len()),
+        gargalo: ed.results.bottleneck(),
+        cenarios_comparados: ed
+            .results
+            .experiment
+            .as_ref()
+            .map_or(0, |e| e.scenarios.len()),
+        exportados: ed.results.exported.clone(),
+        melhor_ponto: ed.results.best_point(),
         niveis: match ed.mode {
             Mode::Edit => ed
                 .fluid_view

@@ -156,6 +156,8 @@ pub struct Editor {
     transit: TransitSetting,
     /// The "Fluxos" panel (token flows): open flag and selection.
     pub flows: FlowsState,
+    /// The "Resultados" window: analysis runs, scenarios and optimisation.
+    pub results: crate::results_panel::Results,
 }
 
 enum Act {
@@ -239,6 +241,7 @@ impl Editor {
             job: None,
             transit: TransitSetting::Auto,
             flows: FlowsState::default(),
+            results: Default::default(),
         }
     }
 
@@ -1188,6 +1191,14 @@ pub fn toolbar(
                 ed.flows.open = !ed.flows.open;
             }
             if ui
+                .selectable_label(ed.results.open, "Resultados")
+                .on_hover_text("Replicações, resumo com intervalos de confiança, gráficos, cenários e otimização")
+                .clicked()
+            {
+                let path = ed.doc.path().map(PathBuf::from).or_else(|| ed.pending_path.clone());
+                ed.results.toggle(ed.doc.model(), path.as_deref());
+            }
+            if ui
                 .selectable_label(ed.shortcuts_open, "Atalhos")
                 .on_hover_text("Atalhos de teclado e mouse (F1)")
                 .clicked()
@@ -1296,6 +1307,39 @@ pub fn toolbar(
 
     for act in acts {
         editor.run(act);
+    }
+    Ok(())
+}
+
+/// The "Resultados" window (both modes, editable models only). Its jobs are polled
+/// even while the window is closed.
+pub fn results_window(mut contexts: EguiContexts, mut editor: ResMut<Editor>) -> Result {
+    let ctx = contexts.ctx_mut()?;
+    if !editor.editable {
+        return Ok(());
+    }
+    let ed = &mut *editor;
+    let path = ed
+        .doc
+        .path()
+        .map(PathBuf::from)
+        .or_else(|| ed.pending_path.clone());
+    let requests = crate::results_panel::window(
+        ctx,
+        &mut ed.results,
+        ed.doc.model(),
+        path.as_deref(),
+        ed.issues.len(),
+    );
+    for request in requests {
+        match request {
+            crate::results_panel::Request::Exec(command) => {
+                editor.exec(command);
+                if editor.status.is_empty() {
+                    editor.status = "Valores gravados no modelo (Ctrl+Z desfaz)".into();
+                }
+            }
+        }
     }
     Ok(())
 }

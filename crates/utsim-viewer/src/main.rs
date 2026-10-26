@@ -11,6 +11,7 @@ mod icon;
 mod layers;
 mod models;
 mod playback;
+mod results_panel;
 mod scene;
 #[cfg(not(target_arch = "wasm32"))]
 mod script;
@@ -274,6 +275,7 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                 editor::flows_panel.run_if(editor::flows_open),
                 editor::edit_panels.run_if(editor::in_edit),
                 ui::panel.run_if(editor::in_sim),
+                editor::results_window,
                 dock::apply_viewport,
             )
                 .chain(),

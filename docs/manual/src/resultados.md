@@ -125,6 +125,46 @@ utsim run modelo.ron --sample 100 --bins 20 --csv saida/
 
 As colunas do `resumo.csv` são `metrica`, `n`, `media`, `desvio_padrao` e `meia_largura_95`.
 
+## A janela Resultados do editor
+
+Tudo o que este capítulo descreve também está no editor 3D (`utsim-view`), sem usar a linha de comando. O botão **Resultados** da barra de cima abre uma janela grande com quatro abas: **Resumo**, **Gráficos**, **Cenários** e **Otimização** (as duas últimas estão em [Experimentos e otimização](experimentos-e-otimizacao.md)). A janela funciona em Editar e em Simular e só roda quando o modelo não tem problemas.
+
+### Rodar as replicações
+
+No alto da aba **Resumo** ficam as configurações da rodada: replicações, tempo de parada, aquecimento e semente. Elas começam com os valores do modelo e valem só para a análise. **Gravar no modelo** copia esses valores para o `run` do modelo (Ctrl+Z desfaz) e **Restaurar do modelo** volta aos do arquivo.
+
+- **Séries temporais a cada** liga `run.sample_interval` para esta rodada. Vem marcado, com um intervalo que dá cerca de 200 pontos na janela de estatísticas.
+- **Histogramas com classes** liga `run.histogram_bins` (20 classes por padrão).
+
+**Rodar replicações** executa as replicações em segundo plano (no navegador, no mesmo processo), com uma barra de progresso. **Cancelar** interrompe: as replicações em andamento terminam e as próximas não começam.
+
+### A tabela de resumo
+
+Uma linha por objeto, com entradas, saídas, conteúdo médio, permanência média, ocupação e a fração de tempo em cada estado, todos como `média ± meia-amplitude` do intervalo de 95%. Os números são os mesmos do `utsim run`.
+
+- Clique no título de uma coluna para ordenar (de novo, inverte a ordem). A caixa **Tipo** filtra por tipo de objeto.
+- A **ocupação** de um processo é o conteúdo médio dividido pela capacidade (peças terminadas e bloqueadas ainda ocupam a máquina). A de um transportador é a fração do tempo viajando, carregando, descarregando ou trabalhando num posto.
+- O **gargalo** é o recurso de maior ocupação entre processos, montagens, desmontagens e transportadores. Ele aparece em laranja na tabela e nos gráficos, e o nome vem logo acima da tabela.
+- Em **Métricas próprias** ficam as medidas de cada objeto: o `time_in_system` da saída, as dos fluxos e os níveis dos tanques de fluidos.
+
+### Os gráficos
+
+| Gráfico | O que mostra |
+|---|---|
+| Ocupação | uma barra por recurso, de 0 a 100%, com o intervalo de 95%; o gargalo em laranja |
+| Estados | uma barra empilhada por objeto, com as mesmas cores dos estados no 3D |
+| Série temporal | o conteúdo do objeto escolhido ao longo do tempo: a média das replicações e cada replicação |
+| Histograma | a distribuição da permanência (ou de uma medida própria, como `time_in_system`) do objeto escolhido, juntando todas as replicações |
+
+Se a rodada foi feita sem séries ou sem histogramas, o gráfico oferece um botão que liga a opção e roda de novo.
+
+### Exportar
+
+No aplicativo de mesa, o fim da aba Resumo tem a pasta de exportação (por padrão `<modelo>_resultados`, ao lado do arquivo do modelo):
+
+- **Exportar CSV** grava os mesmos arquivos do `utsim run --csv` (`resumo.csv`, `replicacoes.csv`, `series.csv`, `histogramas.csv`) e mais `objetos.csv`, a tabela de resumo com uma coluna `_mw` (meia-amplitude) ao lado de cada média;
+- **Exportar HTML** grava `relatorio.html`, um arquivo único com a tabela, o gargalo e os gráficos de ocupação e de estados em SVG. Se houver uma comparação de cenários, ela entra no relatório.
+
 ## Nomes das métricas
 
 Experimentos, otimização e testes referem-se às métricas por nome, no formato `objeto.métrica`:

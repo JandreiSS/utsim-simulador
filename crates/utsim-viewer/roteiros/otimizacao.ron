@@ -1,0 +1,35 @@
+// Aba Otimização da janela Resultados (fase 10): número de servidores por busca em grade.
+//   utsim-view examples/servidores.ron --roteiro crates/utsim-viewer/roteiros/otimizacao.ron --capturas %TEMP%\utsim_resultados\otimizacao
+// Variável maquina.capacity de 1 a 4, objetivo minimizar o tempo no sistema, busca em
+// grade com 5 replicações por ponto; confere o melhor ponto, a convergência e a
+// comparação pareada, e aplica o melhor ao modelo (um passo de desfazer).
+[
+    Esperar(quadros: 20),
+    ClicarBotao("Resultados"),
+    Esperar(quadros: 6),
+    ClicarBotao("Otimização"),
+    Esperar(quadros: 4),
+    Afirmar(AbaResultados("Otimização")),
+
+    ClicarBotao("objeto.campo"),
+    Esperar(quadros: 2),
+    Digitar("maquina.capacity"),
+    ClicarBotao("Adicionar parâmetro"),
+    Esperar(quadros: 3),
+    ClicarBotao("objeto.métrica"),
+    Esperar(quadros: 2),
+    Digitar("saida.time_in_system.mean"),
+    Esperar(quadros: 2),
+    Captura("01_problema"),
+
+    ClicarBotao("Otimizar"),
+    EsperarAte(MelhorPontoContem("maquina.capacity"), 180.0),
+    Afirmar(AnaliseRodando(false)),
+    Esperar(quadros: 4),
+    Captura("02_resultado"),
+
+    ClicarBotao("Aplicar ao modelo"),
+    Esperar(quadros: 3),
+    Afirmar(StatusContem("Valores gravados")),
+    Captura("03_aplicado"),
+]

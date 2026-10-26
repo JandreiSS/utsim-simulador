@@ -1,0 +1,64 @@
+// Janela Resultados (fase 10): replicações, resumo com o gargalo, gráficos e exportação.
+//   utsim-view examples/tutorial_02_linha.ron --roteiro crates/utsim-viewer/roteiros/resultados.ron --capturas %TEMP%\utsim_resultados\resultados
+// Abre a janela pela barra, troca as replicações para 5, roda, confere o gargalo na
+// furação (a máquina mais ocupada da linha do tutorial 02), passa pelos quatro
+// gráficos e exporta CSV e HTML para a pasta ao lado da cópia do modelo.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(PainelResultados(false)),
+    ClicarBotao("Resultados"),
+    Esperar(quadros: 6),
+    Afirmar(PainelResultados(true)),
+    Afirmar(AbaResultados("Resumo")),
+    Captura("01_janela"),
+
+    // Replicações: 10 no modelo, 5 para esta análise.
+    MoverPara(Deslocado(Botao("Replicações"), 152.0, 0.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 3),
+    Atalho(["Ctrl", "A"]),
+    Digitar("5"),
+    Tecla("Enter"),
+    Esperar(quadros: 3),
+    ClicarBotao("Rodar replicações"),
+    Esperar(quadros: 2),
+    Captura("02_rodando"),
+    EsperarAte(ReplicacoesNoResultado(5), 180.0),
+    Afirmar(AnaliseRodando(false)),
+    Afirmar(Gargalo(Some("furacao"))),
+    Esperar(quadros: 4),
+    Captura("03_resumo"),
+
+    // Ordena pela ocupação (maior primeiro) e filtra os processos.
+    ClicarBotao("Ocupação"),
+    Esperar(quadros: 3),
+    Captura("04_ordenado"),
+
+    ClicarBotao("Gráficos"),
+    Esperar(quadros: 4),
+    Afirmar(AbaResultados("Gráficos")),
+    Captura("05_ocupacao"),
+    ClicarBotao("Estados"),
+    Esperar(quadros: 4),
+    Captura("06_estados"),
+    ClicarBotao("Série temporal"),
+    Esperar(quadros: 4),
+    Captura("07_serie"),
+    ClicarBotao("Histograma"),
+    Esperar(quadros: 4),
+    Captura("08_histograma"),
+
+    ClicarBotao("Resumo"),
+    Esperar(quadros: 3),
+    Esperar(quadros: 4),
+    ClicarBotao("Exportar CSV"),
+    Esperar(quadros: 3),
+    Afirmar(Exportado("resumo.csv")),
+    Afirmar(Exportado("objetos.csv")),
+    Afirmar(Exportado("series.csv")),
+    ClicarBotao("Exportar HTML"),
+    Esperar(quadros: 3),
+    Afirmar(Exportado("relatorio.html")),
+    Captura("09_exportado"),
+]

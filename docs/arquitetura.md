@@ -766,6 +766,17 @@ carregados (fica a forma padrão); as pessoas animadas aparecem na pose de repou
 porque os clipes ainda não são tocados; a cor (`visual.color`) só pinta o material `pintura` da
 biblioteca embutida.
 
+## 4q. Resultados no editor (fase 10)
+
+A janela **Resultados** do `utsim-view` roda replicações, cenários e otimizações do modelo aberto e mostra as estatísticas sem a linha de comando. A divisão segue a do resto do editor: números num lugar só, lógica pura testável e um painel fino.
+
+- `utsim-model::analysis`: uma linha por objeto (`ObjectStats`, cada coluna um `Summary` entre replicações, os mesmos números de `summarize`), a ocupação (conteúdo médio / capacidade nas estações; fração do tempo em viagem, carga, descarga ou trabalho nos transportadores), o gargalo (maior ocupação entre os recursos), a série temporal média entre replicações, os histogramas das replicações reunidos numa grade comum e a diferença pareada (`paired_difference`, `delta_cell` com `≈`).
+- `Model::run_replications_with(progress)` e `experiment::run_scenarios(.., progress)` avisam cada replicação concluída; quando o aviso responde `false`, nenhuma replicação nova começa e o resultado é `ModelError::Cancelled`. `utsim_opt::optimize_with` faz o mesmo por ponto avaliado. Os resultados são idênticos aos das versões sem progresso.
+- `ScenarioResult::per_replication` guarda o valor de cada métrica por replicação (fora do JSON), para a diferença pareada com o primeiro cenário, que o `utsim experiment` também passou a imprimir.
+- `utsim-model::csv` (vindo do `utsim-cli`) e `utsim-model::html` geram os arquivos exportados: os CSV do `utsim run --csv`, mais `objetos.csv`, e um relatório HTML autocontido com SVG em linha.
+- `utsim-viewer::results` (biblioteca, sem egui): configurações da rodada, ordenação e filtro da tabela, dados dos gráficos (cores de estado de `style::state_color`), cenários montados das linhas da grade, problema de otimização montado do formulário e o comando de "Aplicar ao modelo" (um `Command::Batch` de `Set`, um passo de desfazer).
+- `results_panel.rs` (binário): a janela, com os gráficos em `egui_plot` 0.37 (a versão feita para o egui 0.36 do `bevy_egui` 0.43). Os trabalhos rodam numa thread no aplicativo de mesa e no próprio quadro no navegador; o progresso volta por um canal e "Cancelar" liga um `AtomicBool`. Arquivos (CSV, HTML, experimento `.ron`) só no aplicativo de mesa.
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:

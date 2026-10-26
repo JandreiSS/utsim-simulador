@@ -1,0 +1,52 @@
+// Aba Cenários da janela Resultados (fase 10): dois cenários para o número de servidores.
+//   utsim-view examples/servidores.ron --roteiro crates/utsim-viewer/roteiros/cenarios.ron --capturas %TEMP%\utsim_resultados\cenarios
+// Acrescenta a coluna maquina.capacity, cria o cenário com 3 servidores, roda os dois
+// com as mesmas sementes, confere a comparação (diferença pareada para o cenário base),
+// mostra o gráfico de uma métrica e salva o experimento em .ron.
+[
+    Esperar(quadros: 20),
+    ClicarBotao("Resultados"),
+    Esperar(quadros: 6),
+    ClicarBotao("Cenários"),
+    Esperar(quadros: 4),
+    Afirmar(AbaResultados("Cenários")),
+
+    // Parâmetro pela chave (a lista ao lado traz os mesmos com nomes em português).
+    ClicarBotao("objeto.campo"),
+    Esperar(quadros: 2),
+    Digitar("maquina.capacity"),
+    ClicarBotao("Adicionar parâmetro"),
+    Esperar(quadros: 3),
+    ClicarBotao("Adicionar cenário"),
+    Esperar(quadros: 3),
+    // Célula de maquina.capacity na linha do novo cenário.
+    MoverPara(Deslocado(Botao("cenário 2"), 190.0, 0.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 2),
+    Digitar("3"),
+    Tecla("Enter"),
+    Esperar(quadros: 2),
+    Captura("01_cenarios"),
+
+    ClicarBotao("Rodar cenários"),
+    EsperarAte(CenariosComparados(2), 180.0),
+    Afirmar(AnaliseRodando(false)),
+    Esperar(quadros: 4),
+    MoverPara(Deslocado(Botao("Filtrar métricas:"), 160.0, 0.0)),
+    Clicar(Esquerdo),
+    Digitar("maquina"),
+    Esperar(quadros: 4),
+    Captura("02_comparacao"),
+
+    ClicarBotao("maquina.content.mean"),
+    Esperar(quadros: 4),
+    MoverPara(Deslocado(Botao("Gráfico da métrica:"), 0.0, 60.0)),
+    Rolar(-30.0),
+    Esperar(quadros: 4),
+    Captura("03_grafico"),
+
+    ClicarBotao("Salvar experimento"),
+    Esperar(quadros: 3),
+    Afirmar(Exportado("servidores_experimento.ron")),
+    Captura("04_salvo"),
+]

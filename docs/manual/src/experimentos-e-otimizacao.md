@@ -70,7 +70,19 @@ fila.content.mean          3.2147 ± 0.1019  1.6344 ± 0.0365  0.1519 ± 0.0042
 ...
 ```
 
-Cada coluna é um cenário e cada linha, uma medida. Com `--json arquivo.json` o resultado completo vai para um arquivo.
+Cada coluna é um cenário e cada linha, uma medida. Com dois cenários ou mais vem uma segunda tabela, a **diferença pareada** de cada cenário para o primeiro:
+
+```text
+Diferença pareada para 'base' (Δ ± IC de 95%; ≈ = sem diferença significativa)
+
+medida                     base    maquina rapida     duas maquinas
+fila.content.mean          base  -1.5803 ± 0.0841  -3.0628 ± 0.1011
+...
+```
+
+Como todos os cenários usam as mesmas sementes, a replicação 1 de um cenário é comparada com a replicação 1 do outro, e assim por diante. O intervalo dessa diferença costuma ser bem mais estreito que o de cada média. O sinal `≈` marca as diferenças cujo intervalo contém zero: com essas replicações, não dá para dizer que os cenários diferem naquela medida.
+
+Com `--json arquivo.json` o resultado completo vai para um arquivo.
 
 Use os experimentos para **comparar poucas alternativas** que você mesmo escolheu. Para explorar muitas combinações, use a otimização.
 
@@ -79,6 +91,19 @@ Use os experimentos para **comparar poucas alternativas** que você mesmo escolh
 - Dê nomes curtos aos cenários; eles viram títulos de colunas.
 - Mude uma coisa por vez, para saber o que causou a diferença. Mude várias de uma vez só quando quiser testar um pacote, como "demanda alta com duas furadeiras".
 - Cuidado ao comparar um cenário estável com um instável (veja [Resultados](resultados.md)). Os números do cenário instável dependem do tempo simulado.
+
+### No editor: a aba Cenários
+
+A janela **Resultados** do editor 3D (veja [Resultados](resultados.md)) monta e roda experimentos sem escrever o arquivo:
+
+1. Escolha um **parâmetro** na lista (cada campo de cada objeto, com o nome em português e o valor atual) ou digite a chave (`maquina.capacity`, `run.warmup`, `esteira.transfer.speed`...) e clique em **Adicionar parâmetro**. Cada parâmetro vira uma coluna.
+2. Cada linha é um cenário. **Adicionar cenário** cria uma linha nova; o nome é editável. Uma célula vazia mantém o valor do modelo, que aparece em cinza dentro dela. Os valores são texto RON, como no `set` (`3`, `Exp(mean: 2.0)`, `Some(10)`).
+3. Em **Métricas** você pode limitar a comparação a algumas medidas (vazio compara todas).
+4. **Rodar cenários** usa as replicações da aba Resumo, com as mesmas sementes em todos os cenários, em segundo plano e com **Cancelar**.
+
+O resultado é a tabela da comparação, com a média ± intervalo de cada cenário e a coluna **Δ** de cada cenário para o primeiro (a diferença pareada, com `≈` quando não é significativa; as significativas ficam em laranja). Clique no nome de uma métrica para vê-la no gráfico de barras com os intervalos de 95%, um por cenário. O campo **Filtrar métricas** encurta a tabela.
+
+No aplicativo de mesa, **Abrir experimento** lê um arquivo `.ron` de experimento e preenche a grade (os cenários são aplicados ao modelo aberto), e **Salvar experimento** grava a grade num `.ron` que o `utsim experiment` também roda. O caminho do modelo é gravado em relação ao arquivo do experimento quando os dois estão na mesma pasta.
 
 ## Otimização
 
@@ -185,6 +210,17 @@ Cenário para colar em um arquivo de experimento
 - ✓ marca ponto viável, ✗ marca ponto inviável.
 
 Com `--html`, o relatório inclui gráficos do objetivo por ordem de avaliação e dos 10 melhores pontos. Com `--json`, o resultado completo vai para um arquivo. Com `--reps N` e `--orcamento N` você troca as replicações e o orçamento sem editar o arquivo.
+
+### No editor: a aba Otimização
+
+A aba **Otimização** da janela Resultados monta o mesmo problema pela interface:
+
+- **variáveis de decisão**: escolha o parâmetro como nos cenários; para cada um, o domínio (inteiro com mínimo, máximo e passo; contínuo com o número de valores e o modelo de texto com `{x}`; ou lista de opções separadas por `;`) e o **custo por unidade**, que entra no objetivo;
+- **objetivo**: minimizar ou maximizar peso x métrica, mais os custos. A métrica pode ser digitada ou escolhida na lista das métricas da última rodada;
+- **restrições**: mínimo e/ou máximo sobre a média de uma métrica;
+- **método**: grade, recozimento simulado (iterações) ou genético (população e gerações), com o orçamento de pontos, a semente da busca, as replicações por ponto e o refinamento opcional.
+
+**Otimizar** roda em segundo plano, com o progresso em pontos avaliados e **Cancelar**. O resultado mostra o melhor ponto com o objetivo e as restrições, a explicação, o gráfico de convergência (cada ponto avaliado e a linha do melhor viável até então) e a tabela da comparação pareada com o melhor, com `≈` e "equivalente" para os pontos que não se distinguem dele. **Aplicar ao modelo** grava os valores do melhor ponto no modelo como um único passo de desfazer (Ctrl+Z).
 
 ### Limitações
 

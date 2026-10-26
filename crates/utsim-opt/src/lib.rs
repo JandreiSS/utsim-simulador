@@ -457,15 +457,62 @@ fn describe(point: &Point) -> String {
 
 /// Runs the search and compares the evaluated points.
 pub fn optimize(problem: &OptProblem, base: &Model) -> Result<OptResult, ModelError> {
+    optimize_with(problem, base, &mut |_, _| true)
+}
+
+/// Upper bound of the points the search will simulate (the budget, or fewer when the
+/// algorithm stops earlier), plus the refined ones. Used for progress bars.
+pub fn planned_evaluations(problem: &OptProblem) -> usize {
+    let grid: usize = problem
+        .variables
+        .iter()
+        .map(|v| values(&v.domain).len().max(1))
+        .product();
+    let search = match &problem.algorithm {
+        Algorithm::Grid => grid,
+        Algorithm::Annealing { iterations } => 1 + iterations.min(&5) + iterations,
+        Algorithm::Genetic {
+            population,
+            generations,
+        } => population.max(&2) * (generations + 1),
+    };
+    let search = search.min(grid).min(problem.budget).max(1);
+    search + problem.refine.as_ref().map_or(0, |r| r.top.min(search))
+}
+
+/// Like [`optimize`], calling `progress(done, planned)` after every simulated point
+/// (`planned` from [`planned_evaluations`]). Returning `false` stops the search with
+/// [`ModelError::Cancelled`].
+pub fn optimize_with(
+    problem: &OptProblem,
+    base: &Model,
+    progress: &mut dyn FnMut(usize, usize) -> bool,
+) -> Result<OptResult, ModelError> {
     let errors = problem.validate(base);
     if !errors.is_empty() {
         return Err(ModelError::Invalid(errors));
     }
-    let (evaluations, history) = search::run(problem, base)?;
+    let planned = planned_evaluations(problem);
+    let done = std::cell::Cell::new(0usize);
+    let progress = std::cell::RefCell::new(progress);
+    let tick = || -> Result<(), ModelError> {
+        done.set(done.get() + 1);
+        if (progress.borrow_mut())(done.get(), planned.max(done.get())) {
+            Ok(())
+        } else {
+            Err(ModelError::Cancelled)
+        }
+    };
+    let sim = |p: &Point| {
+        let e = evaluate(base, problem, p)?;
+        tick()?;
+        Ok(e)
+    };
+    let (evaluations, history) = search::run_with(problem, sim)?;
     let mut result = compare(problem, evaluations);
     result.history = history;
     if let Some(refine) = &problem.refine {
-        search::apply_refinement(problem, base, refine, &mut result)?;
+        search::apply_refinement(problem, base, refine, &mut result, &tick)?;
     }
     Ok(result)
 }
@@ -544,6 +591,24 @@ mod tests {
             "2 servidores ficam congestionados"
         );
         assert!(!r.explanation.is_empty());
+    }
+
+    #[test]
+    fn progress_counts_points_and_can_cancel() {
+        let base = Model::parse(MODEL).unwrap();
+        let mut p = problem();
+        p.replications = 2;
+        assert_eq!(planned_evaluations(&p), 4);
+        let mut seen = Vec::new();
+        let r = optimize_with(&p, &base, &mut |done, planned| {
+            seen.push((done, planned));
+            true
+        })
+        .unwrap();
+        assert_eq!(seen, [(1, 4), (2, 4), (3, 4), (4, 4)]);
+        assert_eq!(r.evaluations.len(), 4);
+        let stopped = optimize_with(&p, &base, &mut |done, _| done < 2);
+        assert!(matches!(stopped, Err(ModelError::Cancelled)));
     }
 
     #[test]

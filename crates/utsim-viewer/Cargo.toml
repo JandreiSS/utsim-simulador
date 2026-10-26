@@ -23,12 +23,15 @@ utsim-fluid.workspace = true
 utsim-scene.workspace = true
 utsim-assets.workspace = true
 utsim-script.workspace = true
+utsim-opt.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 ron.workspace = true
 bevy = { version = "=0.20.0", default-features = false, features = ["3d", "png"] }
 bevy_egui = { version = "=0.43.1", default-features = false, features = ["render", "default_fonts"] }
+# Charts of the "Resultados" area; 0.37 is the release built on egui 0.36 (bevy_egui 0.43).
+egui_plot = { version = "=0.37.0", default-features = false }
 
 # Browser build (RF-109): WebGL2 through Bevy's `webgl2` feature (works in every current
 # browser; WebGPU is not yet universal). The entry point is `src/web.rs`.

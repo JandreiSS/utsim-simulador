@@ -1,5 +1,4 @@
 mod cena;
-mod csv;
 mod emulate;
 mod experiment;
 mod fit;
@@ -288,7 +287,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let events: u64 = reports.iter().map(|r| r.events).sum();
             println!("\n{events} eventos em {:.2?}", elapsed);
             if let Some(dir) = csv {
-                let files = csv::export(&dir, &reports)?;
+                let files = utsim_model::csv::export(&dir, &reports)?;
                 println!("CSV gravado em {}: {}", dir.display(), files.join(", "));
             }
             if let Some(path) = json {

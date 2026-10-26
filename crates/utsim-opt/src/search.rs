@@ -391,6 +391,7 @@ pub(crate) fn apply_refinement(
     base: &Model,
     refine: &Refine,
     result: &mut OptResult,
+    tick: &dyn Fn() -> Result<(), ModelError>,
 ) -> Result<(), ModelError> {
     let sign = match problem.objective.sense {
         Sense::Minimize => 1.0,
@@ -410,12 +411,14 @@ pub(crate) fn apply_refinement(
     let refined = order
         .iter()
         .map(|&i| {
-            evaluate_with(
+            let e = evaluate_with(
                 base,
                 problem,
                 &result.evaluations[i].point,
                 refine.replications,
-            )
+            )?;
+            tick()?;
+            Ok::<_, ModelError>(e)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let n = refined.len();

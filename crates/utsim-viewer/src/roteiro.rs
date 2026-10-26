@@ -123,6 +123,23 @@ pub enum Condicao {
     /// Level of a tank at the current time (`Simular`; the initial level in `Editar`)
     /// between `min` and `max`.
     NivelEntre(String, f64, f64),
+    /// Whether the "Resultados" window is open.
+    PainelResultados(bool),
+    /// Tab of the "Resultados" window: `"Resumo"`, `"Gráficos"`, `"Cenários"` or
+    /// `"Otimização"`.
+    AbaResultados(String),
+    /// A run, scenario comparison or optimisation of "Resultados" is in progress.
+    AnaliseRodando(bool),
+    /// Number of replications of the latest results (0: nothing run yet).
+    ReplicacoesNoResultado(usize),
+    /// Object highlighted as the bottleneck of the latest results.
+    Gargalo(Option<String>),
+    /// Number of scenarios of the latest comparison.
+    CenariosComparados(usize),
+    /// Some file written by the "Resultados" exports ends with this text.
+    Exportado(String),
+    /// The best point of the latest optimisation, as `chave = valor, ...`, contains this.
+    MelhorPontoContem(String),
     Nao(Box<Condicao>),
 }
 
@@ -212,6 +229,16 @@ pub struct Estado {
     pub avisos: usize,
     /// Tank levels now, by node name.
     pub niveis: Vec<(String, f64)>,
+    pub painel_resultados: bool,
+    pub aba_resultados: String,
+    pub analise_rodando: bool,
+    pub replicacoes_resultado: usize,
+    pub gargalo: Option<String>,
+    pub cenarios_comparados: usize,
+    /// Files written by the exports, as full paths.
+    pub exportados: Vec<String>,
+    /// Best point of the latest optimisation (`chave = valor, ...`).
+    pub melhor_ponto: Option<String>,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -371,6 +398,46 @@ impl Estado {
                 Some((_, l)) => Err(format!("nível de {n}: {l:.3} fora de [{min}, {max}]")),
                 None => Err(format!("tanque \"{n}\" não existe")),
             },
+            Condicao::PainelResultados(b) => {
+                igual("janela Resultados aberta", self.painel_resultados, *b)
+            }
+            Condicao::AbaResultados(a) => igual(
+                "aba de Resultados",
+                self.aba_resultados.as_str(),
+                a.as_str(),
+            ),
+            Condicao::AnaliseRodando(b) => igual("análise rodando", self.analise_rodando, *b),
+            Condicao::ReplicacoesNoResultado(n) => {
+                igual("replicações no resultado", self.replicacoes_resultado, *n)
+            }
+            Condicao::Gargalo(g) => {
+                if &self.gargalo == g {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "gargalo: esperado {g:?}, encontrado {:?}",
+                        self.gargalo
+                    ))
+                }
+            }
+            Condicao::CenariosComparados(n) => {
+                igual("cenários comparados", self.cenarios_comparados, *n)
+            }
+            Condicao::Exportado(fim) => {
+                if self.exportados.iter().any(|f| f.ends_with(fim.as_str())) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "nenhum arquivo exportado termina com \"{fim}\" ({:?})",
+                        self.exportados
+                    ))
+                }
+            }
+            Condicao::MelhorPontoContem(t) => match &self.melhor_ponto {
+                Some(p) if p.contains(t.as_str()) => Ok(()),
+                Some(p) => Err(format!("melhor ponto \"{p}\" não contém \"{t}\"")),
+                None => Err("nenhuma otimização concluída".to_string()),
+            },
             Condicao::Nao(inner) => match self.verificar(inner) {
                 Ok(()) => Err(format!("a condição negada é verdadeira: {inner:?}")),
                 Err(_) => Ok(()),
@@ -518,7 +585,39 @@ mod tests {
             ligacoes_fluido: 2,
             avisos: 1,
             niveis: vec![("tanque".into(), 12.5)],
+            painel_resultados: true,
+            aba_resultados: "Resumo".into(),
+            analise_rodando: false,
+            replicacoes_resultado: 5,
+            gargalo: Some("furacao".into()),
+            cenarios_comparados: 2,
+            exportados: vec!["C:/tmp/linha_resultados/resumo.csv".into()],
+            melhor_ponto: Some("maquina.capacity = 3".into()),
         }
+    }
+
+    #[test]
+    fn results_assertions() {
+        let s = state();
+        let ok = |c: Condicao| assert!(s.verificar(&c).is_ok(), "{c:?}");
+        let bad = |c: Condicao| assert!(s.verificar(&c).is_err(), "{c:?}");
+        ok(Condicao::PainelResultados(true));
+        ok(Condicao::AbaResultados("Resumo".into()));
+        bad(Condicao::AbaResultados("Cenários".into()));
+        ok(Condicao::AnaliseRodando(false));
+        ok(Condicao::ReplicacoesNoResultado(5));
+        bad(Condicao::ReplicacoesNoResultado(4));
+        ok(Condicao::Gargalo(Some("furacao".into())));
+        bad(Condicao::Gargalo(None));
+        ok(Condicao::CenariosComparados(2));
+        ok(Condicao::Exportado("resumo.csv".into()));
+        bad(Condicao::Exportado("relatorio.html".into()));
+        ok(Condicao::MelhorPontoContem("capacity = 3".into()));
+        bad(Condicao::MelhorPontoContem("capacity = 4".into()));
+        let steps =
+            parse(r#"[Afirmar(Gargalo(Some("furacao"))), Afirmar(Exportado("resumo.csv"))]"#)
+                .unwrap();
+        assert_eq!(steps.len(), 2);
     }
 
     #[test]
