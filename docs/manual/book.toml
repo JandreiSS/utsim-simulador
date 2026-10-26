@@ -1,0 +1,13 @@
+[book]
+title = "Manual do UTSim"
+description = "Manual do usuário e tutoriais do UTSim, simulador de eventos discretos para processos produtivos"
+authors = ["Equipe UTSim"]
+language = "pt"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "light"
+git-repository-url = "https://github.com/jandreiss/utsim"

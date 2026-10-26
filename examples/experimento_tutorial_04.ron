@@ -1,0 +1,22 @@
+// Tutorial 04: quantas empilhadeiras o armazém precisa?
+// Só a equipe do despachante muda. Uso: utsim experiment examples/experimento_tutorial_04.ron
+Experiment(
+    name: "Tutorial 04: tamanho da frota",
+    model: "tutorial_04_armazem.ron",
+    scenarios: [
+        (name: "1 empilhadeira", set: { "frota.team": "[\"empilhadeira_1\"]" }),
+        (name: "2 empilhadeiras"),
+        (name: "3 empilhadeiras", set: { "frota.team": "[\"empilhadeira_1\", \"empilhadeira_2\", \"empilhadeira_3\"]" }),
+        // Mais espaço no porta-paletes: 8 colunas x 3 níveis = 24 posições.
+        (name: "2 empilhadeiras, 24 posições", set: { "porta_paletes.bays": "8" }),
+    ],
+    measures: [
+        "empilhadeira_1.state.idle",
+        "empilhadeira_2.state.idle",
+        "recebimento.content.mean",
+        "recebimento.staytime.mean",
+        "porta_paletes.content.mean",
+        "porta_paletes.content.max",
+        "expedicao.input",
+    ],
+)

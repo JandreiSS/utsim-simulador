@@ -1,0 +1,51 @@
+// Tutorial 03: operadores que andam entre máquinas.
+// Tempo em segundos, distâncias em metros. Peças chegam a cada 35 s, em média, a uma fila
+// que alimenta 3 máquinas. Cada máquina precisa de UM operador só durante o setup
+// (Exp, média 20 s); depois o operador sai para atender outra máquina e a peça é
+// processada sozinha (Exp, média 60 s).
+//
+// Os dois operadores andam a 1,2 m/s em linha reta até a máquina que pediu ajuda.
+// Aqui as máquinas estão a 5 m uma da outra (caminhadas curtas). Para ver o efeito da
+// distância, afaste as máquinas: mude o "y" de maq1 e maq3 (ou use experimento_tutorial_03.ron).
+Model(
+    name: "Tutorial 03: operadores que andam",
+    description: "Três máquinas que dependem de dois operadores para o setup",
+    run: (
+        stop_time: 100000.0,
+        warmup: 2000.0,
+        seed: 21,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 35.0)), position: (3.0, 5.0, 0.0)),
+        (name: "fila",    kind: Queue(),                               position: (10.0, 5.0, 0.0)),
+        (name: "maq1", kind: Processor(
+            setup: Some(Exp(mean: 20.0)),
+            process: Exp(mean: 60.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 0.0, 0.0)),
+        (name: "maq2", kind: Processor(
+            setup: Some(Exp(mean: 20.0)),
+            process: Exp(mean: 60.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 5.0, 0.0)),
+        (name: "maq3", kind: Processor(
+            setup: Some(Exp(mean: 20.0)),
+            process: Exp(mean: 60.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), position: (15.0, 10.0, 0.0)),
+        (name: "saida", kind: Sink, position: (21.0, 5.0, 0.0)),
+        (name: "ana",   kind: Transporter(speed: 1.2), position: (10.0, 2.0, 0.0)),
+        (name: "bruno", kind: Transporter(speed: 1.2), position: (10.0, 8.0, 0.0)),
+        (name: "equipe", kind: Dispatcher(team: ["ana", "bruno"], rule: Nearest), position: (10.0, 5.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "maq1"),
+        ("fila", "maq2"),
+        ("fila", "maq3"),
+        ("maq1", "saida"),
+        ("maq2", "saida"),
+        ("maq3", "saida"),
+    ],
+)

@@ -1,0 +1,36 @@
+// Tutorial 02: linha de produção com gargalo.
+// Tempo em minutos. Uma peça chega a cada 4 minutos, em média, e passa por três
+// máquinas em série, cada uma com a sua fila:
+//   corte    : 3,0 min por peça -> ocupação esperada 3,0 / 4 = 0,75
+//   furacao  : 3,6 min por peça -> ocupação esperada 3,6 / 4 = 0,90  (o gargalo)
+//   pintura  : 2,5 min por peça -> ocupação esperada 2,5 / 4 = 0,625
+// Para tirar o gargalo, mude "capacity" da furacao de 1 para 2.
+Model(
+    name: "Tutorial 02: linha com gargalo",
+    description: "Três máquinas em série; a furação é a mais carregada",
+    run: (
+        stop_time: 50000.0,
+        warmup: 2000.0,
+        seed: 7,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada",      kind: Source(interarrival: Exp(mean: 4.0)),  position: (0.0, 0.0, 0.0)),
+        (name: "fila_corte",   kind: Queue(),                               position: (4.0, 0.0, 0.0)),
+        (name: "corte",        kind: Processor(process: Exp(mean: 3.0)),    position: (8.0, 0.0, 0.0)),
+        (name: "fila_furacao", kind: Queue(),                               position: (12.0, 0.0, 0.0)),
+        (name: "furacao",      kind: Processor(capacity: 1, process: Exp(mean: 3.6)), position: (16.0, 0.0, 0.0)),
+        (name: "fila_pintura", kind: Queue(),                               position: (20.0, 0.0, 0.0)),
+        (name: "pintura",      kind: Processor(process: Exp(mean: 2.5)),    position: (24.0, 0.0, 0.0)),
+        (name: "saida",        kind: Sink,                                  position: (28.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila_corte"),
+        ("fila_corte", "corte"),
+        ("corte", "fila_furacao"),
+        ("fila_furacao", "furacao"),
+        ("furacao", "fila_pintura"),
+        ("fila_pintura", "pintura"),
+        ("pintura", "saida"),
+    ],
+)

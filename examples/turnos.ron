@@ -8,8 +8,8 @@
 // Enquanto estão fora de turno, o estado mostrado é "off_shift" e o item em processamento
 // fica pausado, retomando quando o turno volta.
 //
-// As janelas não se encostam: uma janela que começa exatamente quando outra termina
-// ainda não é tratada corretamente pelo motor, então o exemplo evita esse caso.
+// Janelas que se encostam (uma começa exatamente quando outra termina) também funcionam:
+// o motor conta as janelas abertas, em vez de usar uma marca simples de ligado/desligado.
 //
 // A fonte chega a cada 8 minutos em média, para a linha não ficar saturada. A fila entre
 // as duas estações guarda o que espera. Rodamos 3 dias (4320 minutos), descartando o primeiro dia como aquecimento.
