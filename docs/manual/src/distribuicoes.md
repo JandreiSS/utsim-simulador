@@ -32,7 +32,7 @@ Duas dicas que evitam erros comuns:
 | `Uniform(min, max)` | `min <= max` | (min + max) / 2 | só se conhece o intervalo |
 | `Triangular(min, mode, max)` | `min <= mode <= max` | (min + mode + max) / 3 | estimativa de especialista: menor, mais comum, maior |
 | `Exp(mean)` | `mean > 0` | `mean` | tempo entre eventos independentes; o coeficiente de variação é 1 |
-| `Normal(mean, sd)` | `sd >= 0` | `mean` | tempo em torno de um valor, simétrico. Cuidado: valores negativos viram zero. Prefira quando `sd` é bem menor que `mean` |
+| `Normal(mean, sd)` | `sd >= 0` | `mean` | tempo em torno de um valor, simétrico. Cuidado: quando usada como duração, valores negativos viram zero. Prefira quando `sd` é bem menor que `mean` |
 | `LogNormal(mean, sd)` | `mean > 0`, `sd >= 0` | `mean` | tempo positivo, assimétrico à direita (cauda longa). `mean` e `sd` são os da própria variável |
 | `Gamma(shape, scale)` | ambos `> 0` | shape x scale | tempos de serviço com variabilidade moderada; `shape` grande dá menos variação |
 | `Erlang(k, mean)` | `k` inteiro `> 0`, `mean > 0` | `mean` | soma de `k` etapas exponenciais; coeficiente de variação `1/raiz(k)`. É a Gama com `shape` inteiro |

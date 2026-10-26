@@ -77,7 +77,7 @@ Os testes são:
 - **AD (Anderson-Darling)**: parecido, mas dá mais peso às caudas;
 - **qui-quadrado**: compara a contagem de dados em faixas de igual probabilidade com a esperada.
 
-Como os parâmetros foram estimados dos próprios dados, os p-valores de KS e AD vêm de um **bootstrap paramétrico**: o programa simula amostras da família ajustada, reajusta cada uma e conta com que frequência o teste dá pior. É por isso que os p-valores não passam de 1/(`bootstrap`+1) em precisão, e com 300 réplicas o menor p possível é cerca de 0,003.
+Como os parâmetros foram estimados dos próprios dados, os p-valores de KS e AD vêm de um **bootstrap paramétrico**: o programa simula amostras da família ajustada, reajusta cada uma e conta com que frequência o teste dá pior. Por isso a resolução dos p-valores é 1/(`bootstrap`+1): com 300 réplicas, o menor p possível é cerca de 0,003.
 
 ### 5. Por que
 

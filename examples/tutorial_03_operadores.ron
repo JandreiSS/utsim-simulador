@@ -17,8 +17,8 @@ Model(
         replications: 10,
     ),
     objects: [
-        (name: "chegada", kind: Source(interarrival: Exp(mean: 35.0)), position: (0.0, 5.0, 0.0)),
-        (name: "fila",    kind: Queue(),                               position: (5.0, 5.0, 0.0)),
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 35.0)), position: (3.0, 5.0, 0.0)),
+        (name: "fila",    kind: Queue(),                               position: (10.0, 5.0, 0.0)),
         (name: "maq1", kind: Processor(
             setup: Some(Exp(mean: 20.0)),
             process: Exp(mean: 60.0),
@@ -34,7 +34,7 @@ Model(
             process: Exp(mean: 60.0),
             operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
         ), position: (15.0, 10.0, 0.0)),
-        (name: "saida", kind: Sink, position: (25.0, 5.0, 0.0)),
+        (name: "saida", kind: Sink, position: (21.0, 5.0, 0.0)),
         (name: "ana",   kind: Transporter(speed: 1.2), position: (10.0, 2.0, 0.0)),
         (name: "bruno", kind: Transporter(speed: 1.2), position: (10.0, 8.0, 0.0)),
         (name: "equipe", kind: Dispatcher(team: ["ana", "bruno"], rule: Nearest), position: (10.0, 5.0, 0.0)),

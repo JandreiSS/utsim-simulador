@@ -67,22 +67,22 @@ utsim experiment examples/experimento_tutorial_03.ron
 Resultado (médias entre 10 replicações):
 
 ```text
-medida                         5 m   fila a 200 m       20 m        50 m
-maq1.state.waiting_operator   0.0247     0.0247       0.1019      0.3021
-maq2.state.waiting_operator   0.0274     0.0274       0.1037      0.2826
-maq3.state.waiting_operator   0.0284     0.0284       0.1090      0.3043
-ana.state.travel_empty        0.0376     0.0376       0.1520      0.3907
-bruno.state.travel_empty      0.0265     0.0265       0.1271      0.3724
-fila.content.mean             1.92       1.92         3.84        112.00
-saida.time_in_system.mean     149.6      149.6        224.9       4014.3
-saida.input                   2796.7     2796.7       2794.6      2593.5
+medida                         5 m   fila a 200 m   fila a 30 m, com transfer       20 m        50 m
+maq1.state.waiting_operator   0.0247     0.0247          0.0258                    0.1019      0.3021
+maq2.state.waiting_operator   0.0274     0.0274          0.0294                    0.1037      0.2826
+maq3.state.waiting_operator   0.0284     0.0284          0.0262                    0.1090      0.3043
+ana.state.travel_empty        0.0376     0.0376          0.0427                    0.1520      0.3907
+bruno.state.travel_empty      0.0265     0.0265          0.0273                    0.1271      0.3724
+fila.content.mean             1.92       1.92            53.6                      3.84        112.00
+saida.time_in_system.mean     149.6      149.6           1985.3                    224.9       4014.3
+saida.input                   2796.7     2796.7          2712.9                    2794.6      2593.5
 ```
 
 ### O que os números dizem
 
 **Quanto maior a distância, mais as máquinas esperam o operador.** A espera por operador sobe de cerca de 2,7% do tempo (5 m) para 10% (20 m) e para 29% (50 m).
 
-**Os operadores passam a maior parte do tempo andando.** A caminhada vai de 3% para 15% e para 39% do tempo. Em 50 m, cada viagem leva uns 42 s, mais que o próprio setup de 20 s.
+**Os operadores passam cada vez mais tempo andando.** A caminhada vai de 3% para 15% e para 39% do tempo. Em 50 m, cada viagem leva uns 42 s, mais que o próprio setup de 20 s.
 
 **O efeito não é linear.** De 5 m para 20 m, o tempo no sistema passa de 150 s para 225 s (+50%). Mas de 20 m para 50 m ele passa de 225 s para **4.014 s**. A 50 m, os operadores já não dão conta: a fila cresce (112 peças em média) e a produção cai de 2.797 para 2.594 peças (-7%). O sistema ficou **instável**: o tempo de caminhada consumiu a capacidade dos operadores.
 
@@ -90,11 +90,11 @@ Uma conta rápida confirma. A 50 m, cada setup custa ao operador cerca de 20 s d
 
 ### A contraprova: a fila que está longe
 
-O cenário `fila a 200 m` afasta a fila e a chegada **200 metros** das máquinas. O resultado é **idêntico** ao de `5 m`, até a última casa decimal.
+O cenário `fila a 200 m` afasta a fila e a chegada **200 metros** das máquinas, sem `transfer`. O resultado é **idêntico** ao de `5 m`, até a última casa decimal. (O `utsim check` avisaria que essas ligações longas são instantâneas.)
 
 Isso acontece porque a ligação da fila para a máquina é uma **transferência direta entre objetos fixos**, e ela é instantânea. Ninguém anda por ali. Só os operadores se deslocam, então só as distâncias que **eles** percorrem importam. Veja a seção "A distância importa?" em [Recursos móveis](../recursos-moveis.md).
 
-> **Em breve:** uma opção para dar tempo de transferência proporcional à distância também nas ligações diretas. Hoje, para que uma distância entre dois objetos fixos custe tempo, ponha entre eles um transportador (como no [tutorial 04](04-armazem.md)) ou uma esteira.
+Se você **quer** que essa distância custe tempo, ligue o `transfer`. O cenário `fila a 30 m, com transfer` do experimento põe a fila a 30 m das máquinas e dá `run.transfer: (speed: 1.2)`: cada peça agora anda da fila até a máquina a 1,2 m/s, uns 25 s, e o lugar na máquina fica reservado durante a viagem. O resultado muda muito: o tempo no sistema vai de 150 s para cerca de 1.985 s, a fila média de 1,9 para 54 peças e a produção cai de 2.797 para 2.713. Sem `transfer` a distância é grátis; com ele, vira tempo e ocupação. Outras opções são um transportador (como no [tutorial 04](04-armazem.md)) ou uma esteira.
 
 ## Faça no visualizador
 

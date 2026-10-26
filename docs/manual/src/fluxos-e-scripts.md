@@ -68,7 +68,7 @@ As atividades `Assign`, `Decide`, `Release`, `CreateItem` e um `Acquire` com rec
 
 ### Editar no visualizador
 
-O botão **Fluxos** da barra superior abre o painel da lógica do usuário, onde se editam recursos, atividades e ligações.
+O botão **Fluxos** da barra superior abre o painel da lógica do usuário: a lista de fluxos, o diagrama 2D do fluxo selecionado e o editor de atividades e recursos. No modo Simular, o mesmo diagrama mostra quantos tokens há em cada atividade.
 
 ## Scripts
 

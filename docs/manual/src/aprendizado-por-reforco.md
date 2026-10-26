@@ -85,6 +85,7 @@ A crate `crates/utsim-py` expõe `utsim.Env` em Python (listas e dicionários si
 ```bash
 cd crates/utsim-py
 maturin develop --release
+cd ../..
 python crates/utsim-py/python/exemplo_gym.py
 ```
 

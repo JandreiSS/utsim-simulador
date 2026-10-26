@@ -45,9 +45,9 @@ Sem `visual.asset`, o visualizador escolhe pelo papel do objeto:
 
 | Objeto | Modelo padrão |
 |---|---|
-| Transportador que carrega paletes de um porta-paletes | `empilhadeira` |
-| Transportador de uma rede com `agv: true` | `agv` |
-| Transportador que trabalha como operador numa máquina | `operador_simples` |
+| Transportador que serve um porta-paletes (ele, ou o despachante dele, é o `transport` de um `Rack` ou de um objeto ligado a um) | `empilhadeira` |
+| Transportador com `agv: true` | `agv` |
+| Transportador que é operador de uma máquina (`operators.team`) | `operador_simples` |
 | Outro veículo | `paleteira` numa cena com paletes, senão `agv` |
 | `Rack` | `porta_paletes`, nas medidas do objeto |
 | `Conveyor` | `esteira`, no comprimento do objeto |

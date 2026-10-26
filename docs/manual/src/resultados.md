@@ -45,7 +45,7 @@ Detalhes:
 - A **saída (Sink)** mostra o total em entradas e `0` em saídas.
 - Numa **fila**, o `conteúdo médio` é o tamanho médio da fila e a `permanência média` é o tempo médio de espera.
 - Num **processo com uma máquina**, o `conteúdo médio` é a **utilização**: a fração do tempo em que a máquina está ocupada. Com `capacity: n`, é o número médio de máquinas ocupadas; divida por `n` para obter a utilização por máquina.
-- Para esteiras, porta-paletes e recursos móveis, o conteúdo é o número de itens dentro (ou, para transportadores, carregados).
+- Para esteiras e porta-paletes, o conteúdo é o número de itens dentro. Para recursos móveis, olhe os estados (`travel_empty`, `utilize`...).
 
 Depois da tabela vêm as linhas de **estados**, uma por objeto:
 
@@ -69,13 +69,13 @@ Todo número vem como `média ± meia-amplitude`. A média é a das replicaçõe
 meia-amplitude = t x desvio-padrão / raiz(n)
 ```
 
-onde `n` é o número de replicações e `t` é o valor da distribuição t de Student para `n - 1` graus de liberdade (por exemplo, 2,262 para 10 replicações). Com uma única replicação não há como calcular o intervalo, e o programa mostra `NaN`.
+onde `n` é o número de replicações e `t` é o valor da distribuição t de Student para `n - 1` graus de liberdade (por exemplo, 2,262 para 10 replicações). Com uma única replicação não há como calcular o intervalo, e o programa mostra só a média, sem o `±`.
 
 Como interpretar: "se eu repetisse o experimento muitas vezes, em 95% delas o intervalo cobriria o valor verdadeiro". Na prática, o valor verdadeiro provavelmente está dentro do intervalo.
 
 - O intervalo **estreita com a raiz do número de replicações**. Para reduzir a meia-amplitude à metade, quadruplique as replicações.
 - Uma boa meta é meia-amplitude de uns 5% da média ou menos.
-- Se duas médias têm intervalos que não se encostam, elas são diferentes. Se os intervalos se sobrepõem, **não conclua nada** olhando só os intervalos. Use a comparação pareada de [Experimentos e otimização](experimentos-e-otimizacao.md), que usa as mesmas sementes e é muito mais sensível.
+- Se duas médias têm intervalos que não se encostam, elas são diferentes. Se os intervalos se sobrepõem, **não conclua nada** olhando só os intervalos. Compare cenários com as mesmas sementes ([Experimentos e otimização](experimentos-e-otimizacao.md)); o `utsim otimizar` ainda calcula a diferença pareada com o seu intervalo, que é muito mais sensível.
 
 ## A lei de Little
 

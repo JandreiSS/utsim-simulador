@@ -95,9 +95,9 @@ Repare também que, com a demanda alta, o `corte` chega a 0,88 de utilização e
 
 ## Exercícios
 
-1. Em vez de `capacity: 2`, mude o tempo da furação para `Exp(mean: 2.7)` (máquina 33% mais rápida). Compare com a segunda furadeira. Qual dá menos espera?
+1. Em vez de `capacity: 2`, mude o tempo da furação para `Exp(mean: 2.7)` (máquina 25% mais rápida). O tempo no sistema cai para uns 26,9 minutos, contra 23,0 com a segunda furadeira. Por que a segunda furadeira ganha?
 2. Ache a **demanda máxima** que a linha com duas furadeiras suporta, aumentando a taxa de chegada (`Exp(mean: 3.0)`, `Exp(mean: 2.8)`...). O corte, com 3,0 min por peça, trava em 1 peça a cada 3 minutos.
-3. Limite o buffer antes da furação a 5 peças (`Queue(capacity: 5)`). Veja o estado `blocked` aparecer no `corte`: ele passa a ficar parado esperando espaço.
+3. Limite o buffer antes da furação a 5 peças (`Queue(capacity: 5)`). O `corte` passa a ficar em `blocked` cerca de 18% do tempo, esperando espaço. A espera não some: ela se desloca para a fila antes do corte, que passa a ter uns 20 itens, e o tempo no sistema sobe para uns 105 minutos.
 
 ## O que você aprendeu
 

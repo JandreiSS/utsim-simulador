@@ -19,7 +19,7 @@ O ciclo de todo objeto fixo é **receber, processar, liberar, transferir**.
 3. **Liberar.** O objeto declara o item pronto para sair. Nesse instante a **regra de saída** escolhe a porta.
 4. **Transferir.** A conexão anda quando os dois lados estão abertos: há um item liberado na saída e o destino aceita.
 
-A transferência entre dois objetos fixos ligados diretamente é **instantânea**. Ela não leva tempo, mesmo que os objetos estejam a 100 metros um do outro. Para que o transporte leve tempo, use uma [esteira](esteiras-e-porta-paletes.md) ou um [transportador](recursos-moveis.md). Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md).
+A transferência entre dois objetos fixos ligados diretamente é, por padrão, **instantânea**. Ela não leva tempo, mesmo que os objetos estejam a 100 metros um do outro. Para que o transporte leve tempo, use o `transfer` (tempo de viagem pela distância), uma [esteira](esteiras-e-porta-paletes.md) ou um [transportador](recursos-moveis.md). Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md).
 
 ## Portas e prioridade
 

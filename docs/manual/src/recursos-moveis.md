@@ -152,23 +152,58 @@ Com `agv: true`, o transportador segue a rede aresta por aresta. Se a próxima a
 
 ## A distância importa?
 
-Sim, mas só em alguns lugares. É a dúvida mais comum, então vale ler com calma.
+Sim, mas só onde o modelo a usa. É a dúvida mais comum, então vale ler com calma.
 
 **Onde a distância entra na conta:**
 
 - Todo deslocamento de um recurso móvel (operador, empilhadeira, AGV) leva `distância / velocidade`, mais a aceleração e a desaceleração, se houver. A distância vem das **posições dos objetos em metros**, em linha reta, ou ao longo da rede de caminhos quando ela existe.
 - Uma esteira leva um item de uma ponta à outra em `comprimento / velocidade`.
+- Uma ligação direta entre objetos fixos, **se você ligar o `transfer`** (veja abaixo).
 
 **Onde a distância não entra:**
 
-- Uma **ligação direta** entre dois objetos fixos (uma fila ligada a uma máquina, por exemplo) é instantânea. Não importa se os objetos estão a 1 metro ou a 500 metros.
+- Uma **ligação direta** entre dois objetos fixos (uma fila ligada a uma máquina, por exemplo) é, por padrão, **instantânea**. Não importa se os objetos estão a 1 metro ou a 500 metros.
 - As posições também não importam para nada além do desenho no 3D e das viagens dos recursos móveis.
 
-Na prática, isto quer dizer:
+Na prática, há três maneiras de a distância entre dois postos custar tempo:
 
-- Para que a distância entre dois postos custe tempo, **ponha um transportador ou uma esteira entre eles** (o campo `transport` do objeto de origem, ou uma `Conveyor` na ligação).
-- Afastar duas máquinas que se alimentam por ligação direta não muda nada no resultado. Afastar duas máquinas que dependem do mesmo operador muda muito. O [tutorial 03](tutoriais/03-operadores.md) mostra isso com números.
+1. um **transportador** (campo `transport` do objeto de origem);
+2. uma **esteira** (`Conveyor`) entre eles;
+3. o **`transfer`**, que dá à própria ligação direta um tempo de viagem. É o mais simples quando não há veículo nem esteira.
 
-> **Em breve:** uma opção para dar tempo de transferência proporcional à distância nas ligações diretas. Ela ainda não existe. Enquanto isso, use uma esteira ou um transportador.
+Afastar duas máquinas que se alimentam por ligação direta sem `transfer` não muda nada no resultado. Afastar duas máquinas que dependem do mesmo operador muda muito. O [tutorial 03](tutoriais/03-operadores.md) mostra as duas coisas com números.
 
-A posição `z` entra no cálculo da distância, que é a distância euclidiana em três dimensões.
+A posição `z` entra no cálculo, que é a distância euclidiana em três dimensões.
+
+### O `transfer`
+
+```ron
+// padrão do modelo todo
+run: (stop_time: 1000.0, transfer: (speed: 1.0)),
+// ou só para os itens que saem de um objeto (vale mais que o padrão do modelo)
+(name: "fila", kind: Queue(), transfer: (speed: 1.5, delay: 2.0, path: Straight)),
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `speed` | obrigatório | velocidade do item, em unidades de comprimento por unidade de tempo. Maior que 0 |
+| `delay` | `0.0` | tempo fixo somado a cada transferência |
+| `path` | `Straight` | `Straight`: linha reta entre as posições. `Network`: menor caminho pela rede de caminhos |
+
+Os itens que saem por ligações diretas levam `delay + distância / velocidade`. Durante a viagem:
+
+- o item já saiu do objeto de origem e ainda não chegou ao destino, então **não conta no conteúdo de nenhum dos dois**;
+- o **lugar no destino fica reservado**. Uma máquina de capacidade 1 fica ocupada desde o instante em que o item sai da origem, e por isso uma distância maior pode reduzir a vazão.
+
+Detalhes:
+
+- o `transfer` do objeto vale mais que o `run.transfer`;
+- recursos móveis e objetos que têm `transport` nunca usam `transfer` (usar os dois no mesmo objeto é erro);
+- o padrão do modelo não vale para esteiras nem para os objetos que alimentam uma esteira, pois a esteira já leva o item e a posição dela é o meio dela;
+- num cenário de experimento, use as chaves `"objeto.transfer.speed"` e `"objeto.transfer.delay"` (ou `"run.transfer.speed"` e `"run.transfer.delay"`), se o `transfer` já existe, ou `"objeto.transfer": "(speed: 1.0)"` para criá-lo.
+
+O exemplo `examples/transferencia_por_distancia.ron` roda a mesma linha em dois layouts, com 1 m e com 5 m entre os objetos, e `transfer: (speed: 1.0)`. A vazão é a mesma, mas o tempo no sistema passa de 8,8 s (layout compacto) para 33,1 s (espalhado), pela soma das viagens e da fila que se forma.
+
+### Avisos de distância
+
+O `utsim check` e o `utsim run` imprimem avisos (`aviso: ...`) que **não impedem** a rodada, sobre coisas válidas mas provavelmente não pretendidas: ligações diretas com mais de 10 m e instantâneas, distâncias zero, objetos muito longe da rede de caminhos.

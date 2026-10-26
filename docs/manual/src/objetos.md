@@ -2,7 +2,7 @@
 
 Um modelo é uma lista de **objetos** ligados por **conexões**. Este capítulo descreve cada tipo, seus parâmetros e quando usá-lo. Os nomes dos campos são os do arquivo `.ron`; a tabela completa com os valores padrão está no [formato `.ron`](referencia-ron.md).
 
-Os tempos (`interarrival`, `process`, `setup` e outros) são [distribuições](distribuicoes.md). Um tempo sorteado negativo, como pode ocorrer com a `Normal`, vira zero.
+Os tempos (`interarrival`, `process`, `setup` e outros) são [distribuições](distribuicoes.md). Uma duração sorteada negativa, como pode ocorrer com a `Normal`, vira zero.
 
 ## Campos comuns a todos os objetos
 
@@ -15,6 +15,7 @@ Os tempos (`interarrival`, `process`, `setup` e outros) são [distribuições](d
 | `downtime` | nenhum | quebras aleatórias. Veja [Quebras e turnos](quebras-e-turnos.md) |
 | `shifts` | nenhum | janelas fora de turno. Veja [Quebras e turnos](quebras-e-turnos.md) |
 | `transport` | nenhum | transportador ou despachante que leva os itens que saem deste objeto |
+| `transfer` | nenhum | tempo de viagem (`speed`, `delay`, `path`) das ligações diretas que saem deste objeto. Veja [Recursos móveis](recursos-moveis.md) |
 | `on_entry` | nenhum | script executado quando um item entra. Veja [Fluxos de tokens e scripts](fluxos-e-scripts.md) |
 | `visual` | nenhum | aparência no 3D. Veja [3D realista](visual-3d.md) |
 

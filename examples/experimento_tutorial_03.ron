@@ -12,6 +12,12 @@ Experiment(
             "fila.position": "(-200.0, 5.0, 0.0)",
             "chegada.position": "(-205.0, 5.0, 0.0)",
         }),
+        // Agora a ligação direta também leva tempo: o item anda a 1,2 m/s da fila (a 30 m) até a máquina.
+        (name: "fila a 30 m, com transfer", set: {
+            "fila.position": "(-15.0, 5.0, 0.0)",
+            "chegada.position": "(-20.0, 5.0, 0.0)",
+            "run.transfer": "(speed: 1.2)",
+        }),
         (name: "20 m", set: {
             "maq1.position": "(15.0, -15.0, 0.0)",
             "maq3.position": "(15.0, 25.0, 0.0)",
