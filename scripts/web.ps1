@@ -32,10 +32,10 @@ Run wasm-bindgen @("target/wasm32-unknown-unknown/web/utsim_web.wasm", "--target
 # The 3D viewer (Bevy + WebGL2) is large: it goes to web/dist/viewer/ and is NOT inlined
 # in utsim.html. Pass -Sem3d to skip it. web/viewer.html loads it.
 if (-not $Sem3d) {
-    Write-Host "==> compilando utsim-viewer (perfil web, wasm32; demora)"
-    Run cargo @("build", "--profile", "web", "--target", "wasm32-unknown-unknown", "-p", "utsim-viewer")
+    Write-Host "==> compilando utsim-viewer (perfil web-3d, wasm32; demora)"
+    Run cargo @("build", "--profile", "web-3d", "--target", "wasm32-unknown-unknown", "-p", "utsim-viewer")
     Write-Host "==> wasm-bindgen (visualizador)"
-    Run wasm-bindgen @("target/wasm32-unknown-unknown/web/utsim-view.wasm", "--target", "web",
+    Run wasm-bindgen @("target/wasm32-unknown-unknown/web-3d/utsim-view.wasm", "--target", "web",
         "--no-typescript", "--out-dir", "web/dist/viewer", "--out-name", "utsim_viewer")
 }
 
