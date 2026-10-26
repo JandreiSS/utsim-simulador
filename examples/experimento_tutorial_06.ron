@@ -1,0 +1,21 @@
+// Tutorial 06: quantos atendentes? Compara de 3 a 8 atendentes, com tudo mais igual.
+// Todos os cenários usam as mesmas sementes por replicação.
+// Uso: utsim experiment examples/experimento_tutorial_06.ron
+Experiment(
+    name: "Tutorial 06: número de atendentes",
+    model: "tutorial_06_atendimento.ron",
+    scenarios: [
+        (name: "3", set: { "atendentes.capacity": "3" }),
+        (name: "4", set: { "atendentes.capacity": "4" }),
+        (name: "5", set: { "atendentes.capacity": "5" }),
+        (name: "6", set: { "atendentes.capacity": "6" }),
+        (name: "7", set: { "atendentes.capacity": "7" }),
+        (name: "8", set: { "atendentes.capacity": "8" }),
+    ],
+    measures: [
+        "atendentes.content.mean",
+        "fila.staytime.mean",
+        "fila.content.mean",
+        "saida.input",
+    ],
+)

@@ -1,0 +1,27 @@
+// Tutorial 06: o menor custo que cumpre o nível de serviço.
+// Variáveis: número de atendentes e lugares na sala de espera.
+// Custo por hora: 18 por atendente e 1 por lugar de espera.
+// Restrições: o tempo médio de espera na fila não passa de 1 minuto e pelo menos 18.950 dos
+// cerca de 19.000 clientes da janela de estatísticas são atendidos (no máximo 0,3% perdidos).
+// Uso: utsim otimizar examples/otimizacao_tutorial_06.ron --html relatorio.html
+OptProblem(
+    name: "Tutorial 06: atendentes e sala de espera",
+    model: "tutorial_06_atendimento.ron",
+    replications: 5,
+    variables: [
+        (key: "atendentes.capacity", domain: Integer(min: 3, max: 8)),
+        (key: "fila.capacity",       domain: Integer(min: 2, max: 14, step: 4)),
+    ],
+    objective: (
+        sense: Minimize,
+        terms: [],
+        costs: [("atendentes.capacity", 18.0), ("fila.capacity", 1.0)],
+    ),
+    constraints: [
+        (metric: "fila.staytime.mean", max: 1.0),
+        (metric: "saida.input", min: 18950.0),
+    ],
+    algorithm: Grid,
+    budget: 30,
+    refine: (top: 3, replications: 15),
+)

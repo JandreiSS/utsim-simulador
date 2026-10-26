@@ -1,0 +1,29 @@
+// Tutorial 06: quantos atendentes? (base do experimento e da otimização)
+// Tempo em minutos. Chega um cliente por minuto, em média. O atendimento dura 3 minutos,
+// em média (Gama, forma 2, escala 1,5), então a carga é de 3 "atendentes inteiros":
+// com menos de 4 atendentes a fila cresce sem parar.
+// A sala de espera tem 10 lugares. Quem chega e a encontra cheia vai embora
+// (on_blocked: Drop): é um cliente perdido.
+// Experimento: utsim experiment examples/experimento_tutorial_06.ron
+// Otimização:  utsim otimizar examples/otimizacao_tutorial_06.ron
+Model(
+    name: "Tutorial 06: central de atendimento",
+    description: "Atendentes em paralelo e uma sala de espera de 10 lugares",
+    run: (
+        stop_time: 20000.0,
+        warmup: 1000.0,
+        seed: 11,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada",    kind: Source(interarrival: Exp(mean: 1.0), on_blocked: Drop), position: (0.0, 0.0, 0.0)),
+        (name: "fila",       kind: Queue(capacity: Some(10)),                              position: (4.0, 0.0, 0.0)),
+        (name: "atendentes", kind: Processor(capacity: 4, process: Gamma(shape: 2.0, scale: 1.5)), position: (8.0, 0.0, 0.0)),
+        (name: "saida",      kind: Sink,                                                   position: (12.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "atendentes"),
+        ("atendentes", "saida"),
+    ],
+)

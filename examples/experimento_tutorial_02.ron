@@ -1,0 +1,25 @@
+// Tutorial 02: compara a linha original com uma segunda furadeira.
+// Uso: utsim experiment examples/experimento_tutorial_02.ron
+Experiment(
+    name: "Tutorial 02: tirando o gargalo",
+    model: "tutorial_02_linha.ron",
+    scenarios: [
+        (name: "base"),
+        (name: "2 furadeiras", set: { "furacao.capacity": "2" }),
+        // Demanda 18% maior (uma peça a cada 3,4 min): agora a furação não dá conta.
+        (name: "demanda alta", set: { "chegada.interarrival": "Exp(mean: 3.4)" }),
+        (name: "demanda alta, 2 furadeiras", set: {
+            "chegada.interarrival": "Exp(mean: 3.4)",
+            "furacao.capacity": "2",
+        }),
+    ],
+    measures: [
+        "corte.content.mean",
+        "furacao.content.mean",
+        "furacao.state.processing",
+        "pintura.content.mean",
+        "fila_furacao.content.mean",
+        "saida.time_in_system.mean",
+        "saida.input",
+    ],
+)

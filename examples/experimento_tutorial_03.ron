@@ -1,0 +1,38 @@
+// Tutorial 03: o que muda quando as máquinas ficam longe uma da outra.
+// As posições são em metros. Só a posição muda; tempos, número de máquinas e de operadores
+// são os mesmos. Uso: utsim experiment examples/experimento_tutorial_03.ron
+Experiment(
+    name: "Tutorial 03: distância entre as máquinas",
+    model: "tutorial_03_operadores.ron",
+    scenarios: [
+        (name: "5 m"),
+        // Contraprova: a fila e a chegada ficam a 200 m das máquinas, mas ninguém anda por ali
+        // (a ligação entre objetos fixos é instantânea), então o resultado é igual ao de "5 m".
+        (name: "fila a 200 m", set: {
+            "fila.position": "(-200.0, 5.0, 0.0)",
+            "chegada.position": "(-205.0, 5.0, 0.0)",
+        }),
+        (name: "20 m", set: {
+            "maq1.position": "(15.0, -15.0, 0.0)",
+            "maq3.position": "(15.0, 25.0, 0.0)",
+            "ana.position": "(10.0, -5.0, 0.0)",
+            "bruno.position": "(10.0, 15.0, 0.0)",
+        }),
+        (name: "50 m", set: {
+            "maq1.position": "(15.0, -45.0, 0.0)",
+            "maq3.position": "(15.0, 55.0, 0.0)",
+            "ana.position": "(10.0, -20.0, 0.0)",
+            "bruno.position": "(10.0, 30.0, 0.0)",
+        }),
+    ],
+    measures: [
+        "maq1.state.waiting_operator",
+        "maq2.state.waiting_operator",
+        "maq3.state.waiting_operator",
+        "ana.state.travel_empty",
+        "bruno.state.travel_empty",
+        "fila.content.mean",
+        "saida.time_in_system.mean",
+        "saida.input",
+    ],
+)

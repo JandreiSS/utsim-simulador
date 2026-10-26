@@ -1,0 +1,30 @@
+// Tutorial 05: o modelo com as distribuições ajustadas a dados reais.
+// Tempo em minutos.
+// Chegadas: examples/dados/tutorial_05_chegadas.csv
+//   utsim fit examples/dados/tutorial_05_chegadas.csv --timestamps --coluna instante_min
+//   -> Exponencial, média 2,896 min
+// Atendimento: examples/dados/tutorial_05_atendimento.csv
+//   utsim fit examples/dados/tutorial_05_atendimento.csv
+//   -> Gama, forma 3,506 e escala 1,459 (média 5,115 min)
+// Com 3 atendentes, a ocupação esperada de cada um é 5,115 / (3 x 2,896) = 0,59.
+Model(
+    name: "Tutorial 05: atendimento com dados ajustados",
+    description: "Três atendentes; chegadas e atendimento ajustados por utsim fit",
+    run: (
+        stop_time: 50000.0,
+        warmup: 2000.0,
+        seed: 3,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada",    kind: Source(interarrival: Exp(mean: 2.896)),          position: (0.0, 0.0, 0.0)),
+        (name: "fila",       kind: Queue(),                                         position: (4.0, 0.0, 0.0)),
+        (name: "atendentes", kind: Processor(capacity: 3, process: Gamma(shape: 3.506, scale: 1.459)), position: (8.0, 0.0, 0.0)),
+        (name: "saida",      kind: Sink,                                            position: (12.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "atendentes"),
+        ("atendentes", "saida"),
+    ],
+)

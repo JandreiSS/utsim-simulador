@@ -1,0 +1,18 @@
+// Tutorial 05: o que se perde ao usar só a média em vez da distribuição ajustada.
+// As três versões têm a mesma média de atendimento (5,115 min).
+// Uso: utsim experiment examples/experimento_tutorial_05.ron
+Experiment(
+    name: "Tutorial 05: forma da distribuição",
+    model: "tutorial_05_ajuste.ron",
+    scenarios: [
+        (name: "Gama ajustada"),
+        (name: "só a média", set: { "atendentes.process": "Const(5.115)" }),
+        (name: "Exponencial", set: { "atendentes.process": "Exp(mean: 5.115)" }),
+    ],
+    measures: [
+        "atendentes.content.mean",
+        "fila.content.mean",
+        "fila.staytime.mean",
+        "saida.time_in_system.mean",
+    ],
+)

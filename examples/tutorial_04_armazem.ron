@@ -1,0 +1,66 @@
+// Tutorial 04: empilhadeiras e porta-paletes num armazém.
+// Tempo em segundos, distâncias em metros.
+//
+// Um palete chega ao recebimento a cada 90 s, em média. Uma empilhadeira o leva até o
+// porta-paletes (6 colunas x 3 níveis = 18 posições). O palete fica guardado de 10 a 30
+// minutos (600 a 1800 s) e depois outra viagem de empilhadeira o leva até a expedição.
+//
+//   recebimento (0, 0) ---- 40 m ---- porta_paletes (40, 0)
+//        |
+//   expedicao (0, 30)                       garagem das empilhadeiras (20, 10)
+//
+// Carga esperada: cada palete pede duas viagens de empilhadeira, cerca de 70 s cada
+// (ir até o palete, carregar, andar, descarregar), ou seja, uns 140 s de trabalho
+// por palete a cada 90 s. Uma empilhadeira não dá conta; duas dão, com folga pequena.
+// O porta-paletes guarda em média 1200 / 90 = 13 paletes, de 18 posições.
+Model(
+    name: "Tutorial 04: armazém com empilhadeiras",
+    description: "Recebimento, porta-paletes e expedição servidos por uma equipe de empilhadeiras",
+    run: (
+        stop_time: 50000.0,
+        warmup: 3600.0,
+        seed: 5,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 90.0)), position: (-6.0, 0.0, 0.0)),
+        // Os paletes esperam aqui. O "transport" diz que a empilhadeira os leva até o porta-paletes.
+        (name: "recebimento", kind: Queue(), transport: "frota", position: (0.0, 0.0, 0.0)),
+        (name: "porta_paletes", kind: Rack(
+            bays: 6,
+            levels: 3,
+            dwell: Some(Uniform(min: 600.0, max: 1800.0)),
+            placement: FirstFree,
+            bay_width: 1.2,
+            level_height: 1.5,
+        ), transport: "frota", position: (40.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (0.0, 30.0, 0.0)),
+
+        // Empilhadeiras: 2 m/s, aceleram e freiam a 0,5 m/s², carga e descarga de 8 a 12 s.
+        // "home: true": quando não há serviço, voltam sozinhas para a garagem.
+        (name: "empilhadeira_1", kind: Transporter(
+            speed: 2.0, acceleration: Some(0.5), deceleration: Some(0.5),
+            load_time: Uniform(min: 8.0, max: 12.0), unload_time: Uniform(min: 8.0, max: 12.0),
+            home: true,
+        ), position: (20.0, 10.0, 0.0)),
+        (name: "empilhadeira_2", kind: Transporter(
+            speed: 2.0, acceleration: Some(0.5), deceleration: Some(0.5),
+            load_time: Uniform(min: 8.0, max: 12.0), unload_time: Uniform(min: 8.0, max: 12.0),
+            home: true,
+        ), position: (20.0, 10.0, 0.0)),
+        (name: "empilhadeira_3", kind: Transporter(
+            speed: 2.0, acceleration: Some(0.5), deceleration: Some(0.5),
+            load_time: Uniform(min: 8.0, max: 12.0), unload_time: Uniform(min: 8.0, max: 12.0),
+            home: true,
+        ), position: (20.0, 10.0, 0.0)),
+        // O despachante entrega cada serviço à empilhadeira livre mais próxima.
+        // A terceira empilhadeira existe, mas só trabalha se estiver na equipe.
+        (name: "frota", kind: Dispatcher(team: ["empilhadeira_1", "empilhadeira_2"], rule: Nearest),
+            position: (20.0, 10.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "recebimento"),
+        ("recebimento", "porta_paletes"),
+        ("porta_paletes", "expedicao"),
+    ],
+)
