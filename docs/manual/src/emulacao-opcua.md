@@ -51,3 +51,7 @@ Rode com `--gravar` e o programa guarda cada comando com o instante simulado. De
 ## Parar um objeto por comando
 
 A parada por `Parar` usa o mesmo mecanismo das quebras e dos turnos: o objeto fecha entrada e saída, os tempos pausam, e o estado mostrado é `stopped`. O objeto só volta quando nenhum motivo de parada está ativo.
+
+## Cena 3D ao vivo junto
+
+Com `--cena-porta 7878`, a emulação também serve a cena 3D (protocolo `utsim-scene/1`, por TCP e WebSocket) no mesmo relógio do servidor OPC UA. Um cliente de realidade virtual vê o mesmo instante que o CLP. Os clientes de cena podem mandar os mesmos comandos de `Parar` e `Velocidade`, que entram no log de `--gravar`. Opções: `--cena-endereco` (padrão `127.0.0.1`) e `--cena-fps` (padrão 20). Sem autenticação: use só em rede confiável. Detalhes em [Visual 3D](visual-3d.md#ao-vivo).

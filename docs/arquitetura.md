@@ -634,6 +634,12 @@ Comissionamento virtual: o modelo roda contra o relógio de parede e conversa co
   `Estado`, `Entradas`, `Saidas`, `Parar`) atualizados a cada tick. Parar usa
   `stop_block` (motivo `EXTERNAL`, estado `stopped`). Endpoint sem segurança: só em rede
   confiável.
+- **Cena ao vivo junto:** `--cena-porta` liga o servidor de cena (seção 4p) no mesmo
+  `run_paced`. O OPC UA e a cena compartilham o relógio e o tempo simulado, então um CLP e
+  um cliente de realidade virtual veem o mesmo instante. A trait `Frontend` ganhou
+  `wants_trace`/`trace`: o `SceneFrontend` embrulha o frontend OPC UA, recebe os registros
+  do rastro (`Emulator::new_traced`, `drain_trace`) e devolve ao `poll` os comandos que os
+  clientes de cena mandam.
 
 ## 4p. Cena 3D independente de motor e preparo para realidade virtual
 A simulação gera um rastro. A crate `utsim-scene` transforma esse rastro no que um motor
@@ -664,10 +670,53 @@ nunca discordam sobre onde as coisas estão:
 - **Fluxo de cena** (protocolo `utsim-scene/1`):
   - formato JSON em linhas: um cabeçalho (`Header`) e depois um quadro por linha;
   - `SceneSink` abstrai o destino: arquivo, socket, runtime de realidade virtual ou teste;
-  - `utsim cena` grava o fluxo de uma rodada, e um socket ao vivo (emulação) é o passo
-    seguinte.
+  - `utsim cena` grava o fluxo de uma rodada, e o servidor ao vivo (abaixo) serve o mesmo
+    fluxo durante uma emulação.
 - **Aparência** (`visual` no objeto): um item da biblioteca embutida ou um `.glb`, com
   escala, giro e cor. É só apresentação: a simulação nunca lê esse campo.
+
+### Cena ao vivo (socket)
+
+`utsim emular modelo.ron --cena-porta 7878` serve a cena enquanto emula (OPC UA e cena no
+mesmo relógio). `utsim cena modelo.ron --servir 7878 --velocidade 5` faz o mesmo sem OPC UA,
+para desenvolver clientes. Opções: `--cena-endereco` (padrão `127.0.0.1`) e `--cena-fps`
+(quadros por segundo de relógio, padrão 20).
+
+- **Uma porta, dois transportes:** quem abre com `GET` (navegador, biblioteca WebSocket) é
+  promovido a WebSocket e recebe um JSON por mensagem de texto. Os demais são TCP puro e
+  recebem um JSON por linha, os mesmos bytes do arquivo de `utsim cena`. A primeira
+  mensagem é o `Header`, depois os quadros. Vários clientes ao mesmo tempo.
+- **Cena incremental** (`LiveScene`, `utsim-scene/src/live.rs`): guarda o replay estático e
+  acrescenta os registros que chegam (`push`); `frame(t)` reindexa de forma preguiçosa, só
+  quando chegaram registros, com o mesmo código do `Scene::build`. Logo, depois que todos os
+  registros entraram, o quadro é idêntico ao do lote (testado em três exemplos, em muitos
+  instantes). O que o ao vivo não pode saber é o futuro: a duração do trânsito visual entre
+  blocos fixos é fixa (`LIVE_TRANSIT`, 0,4) em vez de automática, e o progresso de uma janela
+  de carga/descarga só fecha quando o próximo evento chega. Um quadro até 0,8 unidade antes
+  do registro mais novo já é idêntico ao do lote em modelos sem transportadores. O custo de
+  cada reindexação é linear no número de registros, fora do fio da simulação.
+- **Fios:** o fio da simulação só acrescenta registros a uma fila e grava o tempo (sem
+  esperar ninguém). Um fio de quadros reindexa, renderiza e serializa o quadro uma vez por
+  período; um fio aceita conexões; cada cliente tem um fio que escreve e lê comandos.
+- **Contrapressão:** cada cliente tem uma fila limitada (4 mensagens). Se estiver cheia, a
+  mensagem é descartada só para aquele cliente (contador `dropped`); um cliente lento ou
+  travado vê menos quadros, e a simulação e os outros clientes não percebem. Um socket que
+  não aceita dados por 1 s é desconectado. Sem clientes, a cena nem é reindexada.
+- **Mensagens de extensão** (campo `"tipo"`; cabeçalho e quadros nunca o têm, então arquivos
+  não mudam, e leitores devem ignorar tipos desconhecidos):
+  - cliente para servidor: `{"tipo":"comando","variavel":"M1.Parar","valor":true}`, com as
+    variáveis do OPC UA (`<bloco>.Parar` booleano, `Velocidade` número). Entra no mesmo
+    `Input` da emulação e no log de comandos; o efeito aparece nos quadros seguintes
+    (`state` do bloco vira `stopped`);
+  - servidor para cliente: `{"tipo":"aviso","mensagem":"..."}` (JSON inválido, comando
+    recusado) e `{"tipo":"fim","tempo":T}` ao fim da rodada.
+- **Segurança:** não há autenticação nem criptografia, e a origem do WebSocket não é
+  verificada. Quem alcança a porta vê a planta e pode parar blocos. Por isso o padrão é
+  escutar só em `127.0.0.1`; `--cena-endereco 0.0.0.0` abre para a rede e imprime um aviso.
+  Use só em rede local confiável.
+- **Código:** `utsim-scene` com a feature `server` (só nativo; sem ela a crate compila para
+  wasm32). Clientes de teste: `crates/utsim-scene/examples/cliente_cena.rs` (TCP) e
+  `web/cena_ao_vivo.html` (WebSocket, vista de topo).
 
 ### Como a cena é derivada do rastro
 

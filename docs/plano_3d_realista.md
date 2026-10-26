@@ -68,7 +68,7 @@ Ainda falta, nas fases abaixo:
 | A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas | 5–8 h |
 | A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta); instâncias e níveis de detalhe para modelos grandes | 3–4 h |
 | A3D-5 | Cliente Unreal + realidade virtual (OpenXR), lendo `utsim-scene/1` de arquivo e depois ao vivo | 6–10 h (sessão separada) |
-| A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP | 2–3 h |
+| A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP (**feito**: `--cena-porta`, `utsim cena --servir`, TCP e WebSocket, comandos de volta) | 2–3 h |
 
 ## Biblioteca de modelos (A3D-2, feita)
 
@@ -226,11 +226,19 @@ Como personalizar:
 > 3. Controles: reproduzir, pausar e velocidade, com um widget 3D na mão (RV) e teclado
 >    no desktop. Na RV, teleporte e movimento livre. O jogador começa na altura dos olhos,
 >    a 160 cm.
-> 4. Deixe preparado, sem implementar, um modo ao vivo: um socket TCP que recebe as mesmas
->    linhas JSON.
+> 4. Implemente também o modo ao vivo, que já existe no servidor: `utsim emular
+>    modelo.ron --cena-porta 7878` (ou `utsim cena modelo.ron --servir 7878`) serve o mesmo
+>    fluxo por TCP (um JSON por linha) e por WebSocket (um JSON por mensagem), na mesma
+>    porta. Conecte, leia o `Header`, depois os quadros (20 por segundo de relógio; o
+>    campo `time` é o tempo simulado, então interpole entre os dois últimos quadros). Linhas
+>    com o campo `"tipo"` são extensões: `aviso`, `fim`; ignore as desconhecidas. Para
+>    "apertar um botão" numa máquina, envie
+>    `{"tipo":"comando","variavel":"<bloco>.Parar","valor":true}` (`false` retoma;
+>    `Velocidade` com um número muda a velocidade). Não há autenticação: use na rede local.
+>    Veja `crates/utsim-scene/examples/cliente_cena.rs` e `web/cena_ao_vivo.html`.
 >
 > Teste no desktop (sem óculos) com `agvs.jsonl`. O projeto Unreal fica fora do
-> repositório GPL, porque o conteúdo da Epic segue a licença do Unreal. A comunicação é
+> repositório, porque o conteúdo da Epic segue a licença do Unreal. A comunicação é
 > só pelo protocolo.
 
 ### Sessão 2: gerador de modelos articulados (A3D-2; pode rodar depois que A3D-1 estiver integrada)
