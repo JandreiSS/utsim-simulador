@@ -62,6 +62,7 @@ pub enum Tool {
 
 impl Tool {
     /// Text of the tool in the script assertions (`Ferramenta("...")`).
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))] // scripts are native-only
     pub fn script_name(&self) -> String {
         match self {
             Tool::Select => "Selecionar".to_string(),
