@@ -182,10 +182,10 @@ ordem em que ocorrem. Um `Observer` recebe os mesmos eventos ao vivo.
 > (Gama verdadeira), a Weibull deslocada, com 3 parâmetros, tinha AIC 0,3 menor. A regra
 > escolhe a Gama, com 2, e diz por quê.
 
-## 4e. Editor (fase 3)
+## 4e. Editor (fases 3 e 9)
 O editor não altera o modelo diretamente: toda ação vira um `Command` (adicionar,
-remover, renomear, mover, alterar campo, ligar, desligar, lote) aplicado por um
-`Document` (`utsim-edit`, sem dependência de interface gráfica).
+remover, renomear, mover, alterar campo, alterar aparência, ligar, desligar, lote)
+aplicado por um `Document` (`utsim-edit`, sem dependência de interface gráfica).
 
 - **Desfazer/refazer** por instantâneo do modelo, que é pequeno. Gestos contínuos, como
   arrastar um objeto, usam uma chave de agrupamento e viram um passo só.
@@ -197,6 +197,44 @@ remover, renomear, mover, alterar campo, ligar, desligar, lote) aplicado por um
   Editor, cenários e scripts falam a mesma língua.
 - **Salvamento estável.** RON formatado de forma determinística e com os comentários do
   cabeçalho preservados. Comentários no meio do modelo se perdem ao salvar.
+
+### Montar modelos sem editar arquivos (fase 9)
+
+- **Biblioteca de objetos** (`utsim_edit::PALETTE`): cada tipo agrupado por categoria
+  (fluxo de itens, montagem, manuseio de materiais, recursos móveis), com ícone e rótulo em
+  português. Além dos tipos puros há predefinições: operador, empilhadeira e AGV são
+  `Transporter` com o `visual` e as velocidades do papel. Coloca-se clicando no item e depois
+  no chão (o fantasma mostra onde, Shift mantém a ferramenta) ou arrastando o item até o chão.
+- **Grade.** Colocar e arrastar encaixam na grade quando "Encaixar na grade" está ligado; o
+  passo é configurável e a grade desenhada segue o passo. As setas movem a seleção um passo.
+- **Seleção múltipla.** Shift + clique põe ou tira um bloco; Shift + arrastar no chão desenha
+  uma caixa e soma à seleção os blocos cujo centro projetado cai nela. O primeiro selecionado é
+  o principal (contorno branco, os demais em azul). Arrastar um bloco da seleção move todos.
+- **Tudo em um passo de desfazer.** O módulo puro `utsim_edit::arrange` devolve um único
+  `Command::Batch` para cada operação em vários objetos: mover, excluir, alinhar (esquerda,
+  centro, direita, topo, centro, base, pelos centros dos objetos), distribuir (os extremos
+  ficam, os do meio ganham passos iguais) e editar uma propriedade comum (`fan_out` repete em
+  cada selecionado do mesmo tipo os `Set` e `SetVisual` feitos no principal; renomear não se
+  repete). O arrasto de uma seleção recalcula as posições a partir das iniciais e usa uma
+  chave de agrupamento, como o arrasto de um bloco.
+- **Área de transferência** (`arrange::Clipboard`, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+D):
+  copia os objetos e só as ligações entre eles. Ao colar, cada cópia recebe um nome livre
+  (`maquina` vira `maquina_2`, `maquina_2` vira `maquina_3`; depois de recortar, o nome
+  original volta), é deslocada 2 m por colagem, e as referências entre objetos copiados
+  (`transport`, `operators.team`, equipe de um despachante) passam a apontar para as cópias.
+  Referências a objetos não copiados ficam, exceto na equipe de um despachante copiado, que
+  perde os membros não copiados (um transportador só pertence a uma equipe). A área de
+  transferência é interna ao editor, não a do sistema.
+- **Aparência** (`Command::SetVisual`): a seção "Aparência" das propriedades escolhe o ativo
+  da biblioteca embutida ou do catálogo de terceiros (`assets/terceiros/catalogo.ron`, com
+  autor e licença na dica), cor, escala e giro, e "Restaurar padrão" apaga o `visual`. Os
+  ajustes de um mesmo gesto (arrastar no seletor de cor) viram um passo de desfazer, que
+  termina quando o botão do mouse é solto.
+- **Atalhos.** A janela "Atalhos" (F1) lista a tabela `editing::SHORTCUTS`, a mesma testada.
+
+Lacunas: a área de transferência não passa entre janelas nem para outros programas; a seleção
+por caixa usa o centro do bloco, não a área inteira; alinhar não considera o tamanho dos
+blocos.
 
 > **Nosso jeito:** no simuladores comerciais o modelo é uma árvore binária editada só pela interface.
 > Aqui o modelo continua sendo um texto legível, e o editor é só uma forma confortável de
@@ -703,6 +741,18 @@ reproduz os mesmos bytes. O visualizador gera os mesmos bytes em memória e os c
 cenas glTF (desktop e navegador), escolhe o modelo pelo `MobileRole` e pelo tipo do objeto ou
 pelo `visual.asset`, e move os nós a partir da `Pose`. O botão "Visual: simples / realista"
 mantém as formas simples. A tabela de nós e as lacunas estão em `docs/plano_3d_realista.md`.
+
+`visual.asset` também aceita os nomes do catálogo de terceiros (`assets/terceiros/catalogo.ron`,
+compilado no visualizador pelo módulo `terceiros`). O arquivo é lido do disco, da pasta dada por
+`UTSIM_TERCEIROS` ou da primeira `assets/terceiros` acima do executável ou da pasta de trabalho,
+e posto no tamanho real virado para +x: escala `escala_real` (vezes `visual.scale`), giro
+`giro_y_graus` (mais `visual.yaw`) e um deslocamento que leva o centro da planta
+(`centro_m`) à posição do objeto e o ponto mais baixo (`minimo_m`) ao chão. Texturas que um
+`.glb` cita por caminho relativo são servidas da pasta dele; se faltarem, uma textura cinza as
+substitui para a malha continuar visível. Lacunas: no navegador os arquivos de terceiros não são
+carregados (fica a forma padrão); as pessoas animadas aparecem na pose de repouso (a T do UAL),
+porque os clipes ainda não são tocados; a cor (`visual.color`) só pinta o material `pintura` da
+biblioteca embutida.
 
 ## 5. Estatísticas
 

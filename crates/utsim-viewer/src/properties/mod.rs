@@ -235,6 +235,26 @@ mod tests {
     }
 
     #[test]
+    fn the_transfer_field_round_trips() {
+        let mut doc = kitchen_sink();
+        let t = utsim_core::TransferDef {
+            speed: 1.5,
+            delay: 0.25,
+            path: utsim_core::TransferPath::Network,
+        };
+        apply_set(&mut doc, "q.transfer", &ron_text::transfer(&t));
+        let q = doc.model().objects.iter().find(|o| o.name == "q").unwrap();
+        assert_eq!(q.transfer, Some(t));
+        assert_eq!(
+            spec::read_field(q, "transfer").unwrap(),
+            ron_text::transfer(&t)
+        );
+        apply_set(&mut doc, "q.transfer", "None");
+        let q = doc.model().objects.iter().find(|o| o.name == "q").unwrap();
+        assert_eq!(q.transfer, None);
+    }
+
+    #[test]
     fn every_distribution_family_survives_text_and_lands_in_the_model() {
         let mut doc = kitchen_sink();
         for d in all_families() {

@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use bevy_egui::egui::{self, Color32, Id, Ui, emath::Numeric};
-use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable};
+use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable, TransferDef, TransferPath};
 use utsim_edit::{Command, Document};
 use utsim_model::experiment::patch;
 use utsim_model::{ObjectDef, ObjectKind, VisualDef};
@@ -1015,6 +1015,66 @@ impl Editor<'_> {
         }
     }
 
+    /// `transfer`: travel time of items leaving by direct connections
+    /// (`delay + distância / speed`), straight or over the path network.
+    fn transfer_field(&mut self, ui: &mut Ui, current: Option<&TransferDef>) {
+        let field = "transfer";
+        let id = self.id(field);
+        let mut on = current.is_some();
+        if ui
+            .checkbox(&mut on, "Transferência pela distância")
+            .on_hover_text(
+                "Os itens levam atraso + distância / velocidade para chegar ao próximo bloco \
+                 pelas ligações diretas (sem transportador)",
+            )
+            .changed()
+        {
+            let default = TransferDef {
+                speed: 1.0,
+                delay: 0.0,
+                path: TransferPath::Straight,
+            };
+            self.set(
+                field,
+                if on {
+                    ron::transfer(&default)
+                } else {
+                    "None".into()
+                },
+            );
+        }
+        let Some(t) = current else { return };
+        let mut new = *t;
+        ui.indent(id, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Velocidade");
+                let mut v = t.speed;
+                if num(ui, id.with("speed"), &mut v, float_speed(t.speed), 0.001) {
+                    new.speed = v;
+                }
+                ui.label("Atraso");
+                let mut d = t.delay;
+                if num(ui, id.with("delay"), &mut d, float_speed(t.delay), 0.0) {
+                    new.delay = d;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Caminho");
+                for (label, path) in [
+                    ("reta", TransferPath::Straight),
+                    ("pela rede", TransferPath::Network),
+                ] {
+                    if ui.selectable_label(t.path == path, label).clicked() {
+                        new.path = path;
+                    }
+                }
+            });
+        });
+        if new != *t {
+            self.set(field, ron::transfer(&new));
+        }
+    }
+
     fn shifts_field(&mut self, ui: &mut Ui, current: Option<&ShiftTable>) {
         let field = "shifts";
         let id = self.id(field);
@@ -1376,6 +1436,8 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
         editor.output_field(ui, obj);
         ui.separator();
         editor.transport_field(ui, "transport", obj.transport.as_deref());
+        ui.separator();
+        editor.transfer_field(ui, obj.transfer.as_ref());
         ui.separator();
     }
     if !utsim_model::is_mobile(&obj.kind) {

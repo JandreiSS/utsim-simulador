@@ -42,7 +42,8 @@
     Captura("03_busca"),
     ClicarBotao("bancada_kenney"),
     Afirmar(AtivoDe("processo", Some("bancada_kenney"))),
-    Esperar(quadros: 30),
+    // O .glb carrega em segundo plano: espera ele aparecer.
+    EsperarSegundos(3.0),
     Captura("04_bancada_escolhida"),
 
     // Restaurar padrão e desfazer.
