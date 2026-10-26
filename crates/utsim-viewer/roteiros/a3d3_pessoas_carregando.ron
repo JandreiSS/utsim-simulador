@@ -1,0 +1,83 @@
+// A3D-3: pessoas carregando caixas, pegando, entregando e correndo.
+//   utsim-view examples/pessoas_carregando.ron --roteiro crates/utsim-viewer/roteiros/a3d3_pessoas_carregando.ron --capturas %TEMP%/utsim_a3d3/carregando
+// Confere: "ana" pegando a caixa no estoque (t = 8,25, meio da coleta: a caixa já nas
+// mãos), andando com ela entre as mãos à frente do peito (clipe de andar carregando,
+// t = 14), entregando na montagem (t = 21,25, a caixa sai das mãos no meio da entrega),
+// "bruno" no painel da montagem (t = 35), "carla" correndo vazia até a montagem
+// (2,5 m/s, t = 55) e andando com a caixa até a expedição (t = 60,5). Por fim, as
+// sombras desligadas e ligadas de novo.
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(3.0),
+    IrPara(14.0),
+    Esperar(quadros: 30),
+    Captura("01_visao_geral"),
+
+    // Andando vazia até o estoque.
+    IrPara(5.0),
+    Focar(objeto: "ana", distancia: 4.0, giro: Some(1.3), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("02_andando_vazia"),
+
+    // Coleta (6,75 a 9,75): antes e depois do meio.
+    IrPara(7.6),
+    Focar(objeto: "estoque", distancia: 5.0, giro: Some(0.9), inclinacao: Some(0.3)),
+    Esperar(quadros: 30),
+    Captura("03_pegando_25"),
+    IrPara(8.9),
+    Esperar(quadros: 30),
+    Captura("04_pegando_75"),
+
+    // Andando com a caixa.
+    IrPara(14.0),
+    Focar(objeto: "ana", distancia: 4.0, giro: Some(1.3), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("05_carregando_a"),
+    IrPara(14.8),
+    Esperar(quadros: 30),
+    Captura("06_carregando_b"),
+    Focar(objeto: "ana", distancia: 3.5, giro: Some(0.0), inclinacao: Some(0.25)),
+    Esperar(quadros: 30),
+    Captura("07_carregando_de_lado"),
+
+    // Entrega na montagem (19,75 a 22,75).
+    IrPara(20.5),
+    Focar(objeto: "montagem", distancia: 5.0, giro: Some(4.0), inclinacao: Some(0.3)),
+    Esperar(quadros: 30),
+    Captura("08_entregando_25"),
+    IrPara(22.0),
+    Esperar(quadros: 30),
+    Captura("09_entregando_75"),
+
+    // Bruno no painel da montagem.
+    IrPara(35.0),
+    Focar(objeto: "montagem", distancia: 5.0, giro: Some(1.0), inclinacao: Some(0.3)),
+    Esperar(quadros: 30),
+    Captura("10_trabalhando"),
+
+    // Carla correndo vazia e depois andando com a caixa.
+    IrPara(55.0),
+    Focar(objeto: "carla", distancia: 4.5, giro: Some(0.3), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("11_correndo"),
+    IrPara(60.5),
+    Focar(objeto: "carla", distancia: 4.5, giro: Some(0.3), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("12_carla_carregando"),
+
+    // Sombras: desligadas e de volta.
+    IrPara(14.0),
+    Focar(objeto: "ana", distancia: 6.0, giro: Some(0.8), inclinacao: Some(0.5)),
+    Esperar(quadros: 30),
+    ClicarBotao("Sombras"),
+    Esperar(quadros: 20),
+    Captura("13_sem_sombras"),
+    ClicarBotao("Sombras"),
+    Esperar(quadros: 20),
+    Captura("14_com_sombras"),
+    Afirmar(TempoSimuladoMin(14.0)),
+]

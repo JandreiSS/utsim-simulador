@@ -36,7 +36,7 @@ Os modelos da biblioteca são gerados pelo próprio UTSim, estão em `assets/mod
 | `tanque` | tanque com pernas | `tank` |
 | `maquina` | máquina com porta e torre de sinalização | `machine` |
 | `bancada` | bancada de trabalho | |
-| `operador_simples` | pessoa estilizada | `operador`, `pessoa`, `person` |
+| `operador_simples` | pessoa estilizada, feita de blocos | |
 | `area` | faixa pintada no chão | |
 
 ### Escolha automática
@@ -47,7 +47,7 @@ Sem `visual.asset`, o visualizador escolhe pelo papel do objeto:
 |---|---|
 | Transportador que serve um porta-paletes (ele, ou o despachante dele, é o `transport` de um `Rack` ou de um objeto ligado a um) | `empilhadeira` |
 | Transportador com `agv: true` | `agv` |
-| Transportador que é operador de uma máquina (`operators.team`) | `operador_simples` |
+| Transportador que é operador de uma máquina (`operators.team`), ou com `asset` `"operador"`, `"pessoa"` ou `"person"` | pessoa animada (veja abaixo); no navegador, `operador_simples` |
 | Outro veículo | `paleteira` numa cena com paletes, senão `agv` |
 | `Rack` | `porta_paletes`, nas medidas do objeto |
 | `Conveyor` | `esteira`, no comprimento do objeto |
@@ -57,6 +57,15 @@ Sem `visual.asset`, o visualizador escolhe pelo papel do objeto:
 | demais | forma simples |
 
 Os itens aparecem como um palete com caixas numa cena com paletes (porta-paletes ou empilhadeiras), e como uma caixa nas demais. Veículos e pessoas param na borda das máquinas, e a empilhadeira que opera um porta-paletes vai ao corredor em frente a ele.
+
+## Movimento
+
+- **Pessoas animadas.** As pessoas usam o boneco CC0 da Universal Animation Library, com roupa azul de trabalho, capacete amarelo e colete laranja com faixas. Cada situação tem a sua animação: parada, andando, correndo (acima de 2 m/s), andando com a caixa nas mãos, de pé segurando a caixa, pegando ou entregando o item e trabalhando no painel da máquina. A passada acompanha a velocidade, então o pé não desliza, e a troca de uma animação para outra leva um quarto de segundo. A pose depende só do instante: saltar para um tempo mostra a mesma pose que chegar lá reproduzindo. O item carregado fica entre as mãos. Para usar a pessoa de blocos, escreva `visual: (asset: "operador_simples")`.
+- **Carga nos garfos.** Ao guardar um palete, a empilhadeira para no corredor de frente para a célula, os garfos sobem com o palete, ele entra na célula quando os garfos chegam ao nível (no meio da descarga) e os garfos descem vazios. Ao retirar, é o inverso. Em filas, esteiras e máquinas o item também muda de lugar no meio da carga ou descarga.
+- **Curvas suaves.** Nas quinas do caminho, veículos e pessoas fazem uma curva em arco de meio metro antes e depois do vértice, girando aos poucos, em vez de virar de uma vez. Os trechos retos e os instantes de chegada não mudam.
+- **Sombras.** Com o visual realista, a caixa **Sombras** ao lado da chave liga as sombras do sol sobre o piso e os modelos. Vem ligada no desktop e desligada no navegador, onde pesam mais.
+
+O exemplo `examples/pessoas_carregando.ron` mostra pessoas levando caixas a pé, uma delas correndo de volta.
 
 ## Ativos de terceiros
 
@@ -117,8 +126,9 @@ Para pessoas animadas, os dois arquivos do Quaternius têm o mesmo esqueleto e o
 
 - O corredor da empilhadeira num porta-paletes é sempre o lado `-y` dele.
 - Os tanques da rede de fluidos ainda usam o cilindro translúcido, não o modelo `tanque`.
-- No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá.
-- Não há sombras nem níveis de detalhe.
+- No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá, e as pessoas aparecem como `operador_simples`.
+- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto.
+- Não há animação de empurrar, dirigir ou sentar, e a pessoa com a caixa anda com o mesmo passo em qualquer velocidade (não há animação de correr carregando).
 
 ## Cena 3D para outros motores
 

@@ -173,6 +173,9 @@ pub enum Passo {
     Afirmar(Condicao),
     /// Pauses the playback and jumps to this simulated time (`Simular`).
     IrPara(f64),
+    /// Counts the frames drawn over this many seconds and writes the frame rate to
+    /// `log.txt` (`quadros por segundo: ...`).
+    MedirQuadros(f64),
     /// Points the camera at the block called `objeto` (where it is now), at `distancia`
     /// metres; `giro` and `inclinacao` (radians) set the orbit angles when given.
     Focar {

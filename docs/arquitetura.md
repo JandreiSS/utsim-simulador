@@ -739,9 +739,23 @@ uma implementação.
      processo): pessoa;
   5. senão, veículo genérico. Um replay `.json` sem o modelo só tem veículos genéricos.
 - **Posição**: o fim do último trecho `Travel`, interpolado linearmente no tempo ao longo do
-  caminho pelo comprimento de arco. Antes do primeiro trecho, a posição do layout.
-- **Direção (`yaw`)**: a do pedaço de caminho percorrido. Parado, entre trechos ou quebrado,
-  mantém a direção do fim do último trecho com comprimento.
+  caminho pelo comprimento de arco. Antes do primeiro trecho, a posição do layout. As quinas
+  do caminho são arredondadas (módulo `turning`, função pura): nos últimos e primeiros 0,5 m
+  em volta de cada vértice (menos em pedaços curtos, nunca mais que metade de um pedaço) a
+  posição segue um arco tangente aos dois pedaços. O parâmetro continua sendo o comprimento
+  do caminho original, então o trecho começa e termina onde e quando o rastro diz, e os
+  pedaços retos não mudam. A quina entre dois trechos percorridos sem parar (os pedaços de
+  um AGV) também é arredondada, metade em cada trecho. Quase meia-volta (acima de 170 graus)
+  vira giro no lugar. Uma empilhadeira carregando ou descarregando num porta-paletes vai para
+  o corredor na frente da célula, de frente para ela (`compose::rack_approach`, nos primeiros
+  e últimos 15 % da janela), com o centro dos garfos (`FORK_REACH`, 1,555 m à frente) sob a
+  célula.
+- **Direção (`yaw`)**: a do pedaço de caminho percorrido, girando a taxa constante nas quinas
+  arredondadas (contínua em posição e direção). Parado, entre trechos ou quebrado, mantém a
+  direção do fim do último trecho com comprimento.
+- **Distância percorrida** (`Scene::distance_at`): o comprimento de caminho andado até `t`,
+  só dos trechos. Rodas e ciclo de passos dependem só de `t`, então saltar no tempo dá a mesma
+  pose que chegar lá reproduzindo.
 - **Movimento**, vale a primeira regra:
   1. `Stopped` nos estados `down`, `off_shift` e `stopped`;
   2. `Moving` enquanto percorre um trecho com comprimento;
@@ -764,8 +778,16 @@ uma implementação.
   célula do item, chegam lá no meio da janela e voltam à altura de viagem. Em outro bloco,
   passam de uma altura de repouso à outra. Uma pessoa carregando segura o item a 1,0 m. Os
   demais veículos informam 0.
+- **Troca de mãos no meio da janela**: o item de uma janela de carga ou descarga muda de
+  lugar em `HANDOFF_AT` (a metade) da janela, quando os garfos estão na célula, e não no
+  `Moved` do fim dela. Dali em diante ele aparece onde vai ficar: a célula, o ponto da esteira
+  ou a pilha da fila que terá, ou o transportador. Descarregando num porta-paletes, a carga
+  sobe nos garfos, entra na célula lá em cima e os garfos descem vazios; a coleta é o
+  inverso.
 - **Objeto de apoio (`parent`)**: o bloco onde o item está (fila, célula, esteira,
-  transportador); o contêiner de um item embalado; nenhum durante uma transferência.
+  transportador); o contêiner de um item embalado; nenhum durante uma transferência. A carga
+  de uma empilhadeira fica nos garfos: `FORK_REACH` à frente, a base na altura `lift`, no
+  tamanho da carga do porta-paletes (`Scene::fork_scale`).
 - **Nível (`fill`)**: nível do tanque sobre a capacidade, linear entre as amostras do rastro.
 - **Itens**: ausentes do quadro antes de criados e depois de destruídos. Itens embalados e os
   que passam da pilha visível de uma fila estão no quadro, mas o visualizador não os desenha.
@@ -776,10 +798,9 @@ Lacunas conhecidas:
 - a duração de cada carga sai do intervalo entre o início do estado `loading` (ou a coleta
   anterior) e a coleta seguinte. Isso é exato para um transportador, mas não existe um evento
   próprio de "início da carga";
-- os itens sobre uma empilhadeira continuam no quadro em cima do veículo, sem seguir a altura
-  dos garfos. O visualizador realista corrige isso: com o `parent` e a `lift`, põe a carga nos
-  garfos, e a cena expõe `Scene::rack_target` (a célula da janela de carga atual) para o
-  motor virar a empilhadeira para ela.
+- no modo ao vivo, a quina entre dois trechos só é arredondada quando o segundo trecho chega
+  (ver `live.rs`), e o instante da troca de mãos depende do fim da janela, como o `progress`;
+- a aproximação ao porta-paletes supõe o corredor no lado `-y` dele.
 
 As esperas para a realidade virtual:
 1. Todo o cálculo de posição sai do código Bevy e fica puro e testável em `utsim-scene`.
@@ -811,9 +832,50 @@ e posto no tamanho real virado para +x: escala `escala_real` (vezes `visual.scal
 (`centro_m`) à posição do objeto e o ponto mais baixo (`minimo_m`) ao chão. Texturas que um
 `.glb` cita por caminho relativo são servidas da pasta dele; se faltarem, uma textura cinza as
 substitui para a malha continuar visível. Lacunas: no navegador os arquivos de terceiros não são
-carregados (fica a forma padrão); as pessoas animadas aparecem na pose de repouso (a T do UAL),
-porque os clipes ainda não são tocados; a cor (`visual.color`) só pinta o material `pintura` da
+carregados (fica a forma padrão); a cor (`visual.color`) só pinta o material `pintura` da
 biblioteca embutida.
+
+### Pessoas animadas por esqueleto (A3D-3)
+
+No visual realista, as pessoas (`MobileRole::Person`, inclusive os operadores) usam o boneco
+CC0 da Universal Animation Library (`pessoa_operador` no catálogo), com os clipes dos dois
+arquivos (`pessoa_operador_carga` traz o de andar carregando). Os dois têm o mesmo esqueleto e
+os mesmos nomes de ossos, e o Bevy identifica o alvo de um clipe pelo caminho de nomes desde a
+raiz da animação, então os clipes do segundo arquivo movem o boneco do primeiro sem conversão
+(o visualizador confere, ao montar o grafo, que todo alvo de todo clipe usado existe no
+esqueleto). O módulo `people` do binário monta um `AnimationGraph` só, com um nó por clipe:
+
+| Situação (`Pose`) | Clipe |
+|---|---|
+| `Moving`, sem carga | `Walk_Loop` (`Jog_Fwd_Loop` acima de 2 m/s) |
+| `Moving`, carregando (`lift` > 0 ou conteúdo) | `Walk_Carry_Loop` |
+| `Loading`, `Unloading` | `PickUp_Table`, no ritmo do `progress` |
+| `Working` | `Interact` (no painel da máquina) |
+| parado carregando | pernas de `Idle_Loop` com os braços de `Walk_Carry_Loop` (dois nós com máscara) |
+| `Idle`, `Blocked`, `Stopped` | `Idle_Loop` |
+
+Todos os nós ficam pausados: a cada quadro o visualizador define o peso (transição de 0,25 s
+de tempo real) e o tempo do clipe, que vem da cena (`visual::clip_time`): os clipes de andar
+seguem a distância percorrida (`Scene::distance_at`), uma volta do clipe por passada medida
+no próprio clipe (velocidade do pé de apoio: 1,31 m por volta no andar e no andar carregando,
+5,44 m na corrida, na escala do arquivo), então a taxa do clipe acompanha a velocidade e o pé
+não desliza; a coleta segue o `progress`; os demais repetem no relógio simulado. Saltar para
+`t` dá a pose de `t`. O item carregado fica entre as mãos (ponto médio de `hand_l` e `hand_r`,
+lido depois da propagação das transformações), nunca dentro do peito. O boneco não tem
+textura: os materiais `M_Main` e `M_Joints` são tingidos de roupa de trabalho, e um capacete
+amarelo e um colete laranja com faixas são presos aos ossos `Head` e `spine_02`. Sem os
+arquivos (navegador) ou se eles não carregarem, as pessoas voltam ao `operador_simples`.
+
+### Luz e sombras
+
+No visual realista há um piso cinza sob a cena (com 15 m de margem) que recebe sombras, e o sol
+(luz direcional) projeta sombras em cascata dimensionadas pela cena: do mínimo de 0,1 m até a
+distância da câmera ao centro mais meia diagonal da cena, com a primeira cascata em um sexto
+disso. Com sombras a luz ambiente sobe (520 em vez de 350) para a face na sombra não ficar
+escura. A caixa "Sombras", ao lado de "Visual", liga e desliga; o padrão é ligado no desktop e
+desligado no navegador (WebGL2, duas cascatas quando ligadas). Medido no
+`centro_de_distribuicao.ron` (visão geral reproduzindo, build de release, RTX 4070 Ti, sem
+sincronismo vertical): 420 quadros por segundo sem sombras e 372 com elas.
 
 ## 4q. Resultados no editor (fase 10)
 

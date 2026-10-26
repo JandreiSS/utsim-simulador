@@ -245,6 +245,7 @@ pub fn sync_blocks(
     mut library: ResMut<Library>,
     registry: Res<EmbeddedAssetRegistry>,
     server: Res<AssetServer>,
+    people: Res<crate::people::People>,
 ) {
     let (kinds, positions, geoms): (Vec<&str>, &[[f32; 3]], &[Geom]) = match editor.mode {
         Mode::Edit => (
@@ -260,7 +261,7 @@ pub fn sync_blocks(
     };
     // The realistic looks follow the document (visual, roles) as well as the geometry.
     let looks = if visual.active() {
-        models::looks(&editor, &data)
+        models::looks(&editor, &data, people.available())
     } else {
         Vec::new()
     };
@@ -366,7 +367,47 @@ pub fn sync_blocks(
     }
 }
 
-pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+/// The sun of the scene (its shadows follow [`Lighting`]).
+#[derive(Component)]
+pub struct Sun;
+
+/// The floor of the realistic look: receives the shadows.
+#[derive(Component)]
+pub struct Ground;
+
+/// Lighting choices of the realistic look ("Sombras" next to the "Visual" switch).
+#[derive(Resource)]
+pub struct Lighting {
+    /// Shadows of the sun on the floor and on the models. Off by default in the
+    /// browser (WebGL2), where the shadow passes cost the most.
+    pub shadows: bool,
+}
+
+impl Default for Lighting {
+    fn default() -> Self {
+        Lighting {
+            shadows: !cfg!(target_arch = "wasm32"),
+        }
+    }
+}
+
+/// The "Sombras" switch.
+pub fn shadows_toggle(ui: &mut bevy_egui::egui::Ui, lighting: &mut ResMut<Lighting>) {
+    let mut on = lighting.shadows;
+    if ui
+        .checkbox(&mut on, "Sombras")
+        .on_hover_text("Sombras do sol sobre o piso e os modelos (pode pesar em máquinas fracas)")
+        .changed()
+    {
+        lighting.shadows = on;
+    }
+}
+
+pub fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     commands.insert_resource(ClearColor(Color::srgb(0.10, 0.11, 0.14)));
     commands.spawn((
         DirectionalLight {
@@ -375,6 +416,7 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             ..default()
         },
         Transform::from_xyz(8.0, 14.0, 6.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Sun,
     ));
     commands.spawn((
         Camera3d::default(),
@@ -382,6 +424,18 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             brightness: 350.0,
             ..default()
         },
+    ));
+    // A unit square scaled to the scene by `update_lighting`.
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(1.0, 1.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.30, 0.31, 0.32),
+            perceptual_roughness: 0.95,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, -0.004, 0.0),
+        Visibility::Hidden,
+        Ground,
     ));
 
     commands.insert_resource(BlockMaterials::default());
@@ -393,6 +447,79 @@ pub fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
         pallets: false,
         fork_size: 0.8,
     });
+}
+
+/// The parts of the sun that [`update_lighting`] changes.
+type SunParts = (
+    &'static mut DirectionalLight,
+    &'static mut bevy::light::CascadeShadowConfig,
+    &'static mut Transform,
+);
+
+/// Ground and sun of the realistic look: the floor covers the scene with a margin, the
+/// shadow cascades reach from the camera to the far side of the scene, and the ambient
+/// light is softer with shadows on (the shaded side is lit by the sky only).
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
+pub fn update_lighting(
+    editor: Res<Editor>,
+    data: Res<Data>,
+    visual: Res<VisualMode>,
+    lighting: Res<Lighting>,
+    mut ground: Single<(&mut Transform, &mut Visibility), With<Ground>>,
+    mut sun: Single<SunParts, (With<Sun>, Without<Ground>)>,
+    camera: Single<(&GlobalTransform, &mut AmbientLight), With<Camera3d>>,
+) {
+    let positions: &[[f32; 3]] = match editor.mode {
+        Mode::Edit => &editor.view.positions,
+        Mode::Sim => &data.positions,
+    };
+    let (mut min, mut max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+    for p in positions
+        .iter()
+        .chain(data.fluid.nodes.iter().map(|n| &n.pos))
+    {
+        min = min.min(Vec3::from(*p));
+        max = max.max(Vec3::from(*p));
+    }
+    if min.x > max.x {
+        (min, max) = (Vec3::ZERO, Vec3::ZERO);
+    }
+    let center = (min + max) / 2.0;
+    let span = (max - min).with_y(0.0).length() + 30.0;
+    let realistic = visual.active();
+    let (gt, gv) = &mut *ground;
+    gt.translation = Vec3::new(center.x, -0.004, center.z);
+    gt.scale = Vec3::new(max.x - min.x + 30.0, 1.0, max.z - min.z + 30.0);
+    **gv = if realistic {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    let on = realistic && lighting.shadows;
+    let (light, cascades, tf) = &mut *sun;
+    if light.shadow_maps_enabled != on {
+        light.shadow_maps_enabled = on;
+    }
+    // The sun keeps its direction; its position only matters to the gizmos.
+    tf.translation = center + Vec3::new(8.0, 14.0, 6.0);
+    **tf = tf.looking_at(center, Vec3::Y);
+    let (cam, mut ambient) = camera.into_inner();
+    let target = if on { 520.0 } else { 350.0 };
+    if ambient.brightness != target {
+        ambient.brightness = target;
+    }
+    if on {
+        let reach = cam.translation().distance(center) + span / 2.0;
+        let config = bevy::light::CascadeShadowConfigBuilder {
+            num_cascades: if cfg!(target_arch = "wasm32") { 2 } else { 3 },
+            minimum_distance: 0.1,
+            maximum_distance: reach.max(20.0),
+            first_cascade_far_bound: (reach / 6.0).max(8.0),
+            overlap_proportion: 0.2,
+        }
+        .build();
+        **cascades = config;
+    }
 }
 
 pub fn update_block_colors(
@@ -446,6 +573,7 @@ fn realistic_placement(
     fork_size: f32,
     p: &utsim_scene::ItemPlacement,
     stacked: &mut HashMap<usize, usize>,
+    holds: &HashMap<usize, Vec3>,
 ) -> (Vec3, f32) {
     let center = Vec3::from(p.center);
     let Some(utsim_scene::EntityId::Block(b)) = p.parent else {
@@ -465,6 +593,16 @@ fn realistic_placement(
         Carry::Forks { .. } => fork_size / ITEM_SIZE,
         _ => p.scale,
     };
+    // A skeletal person holds it between the hands.
+    if let Some(&hold) = holds.get(&b) {
+        let index = stacked.entry(b).or_default();
+        let size = scale * ITEM_SIZE;
+        let local = crate::people::held_center(hold, size) + Vec3::Y * (*index as f32 * size);
+        *index += 1;
+        let root = Transform::from_translation(Vec3::from(pose.position))
+            .with_rotation(Quat::from_rotation_y(pose.yaw));
+        return (root.transform_point(local), scale);
+    }
     let index = stacked.entry(b).or_default();
     let spot = visual::carried_center(
         look.carry,
@@ -481,6 +619,7 @@ fn realistic_placement(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
 pub fn update_items(
     mut commands: Commands,
     data: Res<Data>,
@@ -489,9 +628,14 @@ pub fn update_items(
     mut pool: ResMut<ItemPool>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut transforms: Query<&mut Transform, With<ItemVisual>>,
+    figures: Query<&models::Realistic>,
 ) {
     let tl = &data.timeline;
     let realistic = pool.scenes.is_some();
+    let holds: HashMap<usize, Vec3> = figures
+        .iter()
+        .filter_map(|r| Some((r.block, r.person.as_ref()?.hold?)))
+        .collect();
     // Where every item is comes from the scene; the viewer only draws it (the realistic
     // models only move carried loads onto the forks, the hands or the deck).
     let mut stacked = HashMap::new();
@@ -501,7 +645,7 @@ pub fn update_items(
         .filter(|p| p.drawn)
         .map(|p| {
             let (pos, scale) = if realistic {
-                realistic_placement(&data, pb.t, &mats, pool.fork_size, &p, &mut stacked)
+                realistic_placement(&data, pb.t, &mats, pool.fork_size, &p, &mut stacked, &holds)
             } else {
                 (Vec3::from(p.center), p.scale)
             };

@@ -10,6 +10,7 @@ mod fluid_scene;
 mod icon;
 mod layers;
 mod models;
+mod people;
 mod playback;
 mod results_panel;
 mod scene;
@@ -227,6 +228,8 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
         .insert_resource(fluid_scene::FluidScene::default())
         .insert_resource(models::VisualMode::default())
         .insert_resource(models::Library::default())
+        .insert_resource(people::People::default())
+        .insert_resource(scene::Lighting::default())
         .insert_resource(data)
         .insert_resource(editor)
         .add_systems(Startup, scene::setup)
@@ -256,8 +259,12 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                     models::bind_rigs,
                     models::apply_tints,
                     models::animate,
+                    people::prepare,
+                    people::bind,
+                    people::drive,
                 )
                     .chain(),
+                scene::update_lighting,
                 scene::draw_sim.run_if(editor::in_sim),
                 fluid_scene::sync_fluids,
                 fluid_scene::update_fluids,
@@ -266,6 +273,10 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                 editor::title,
             )
                 .chain(),
+        )
+        .add_systems(
+            PostUpdate,
+            people::track_hands.after(bevy::transform::TransformSystems::Propagate),
         )
         .add_systems(
             EguiPrimaryContextPass,
@@ -333,6 +344,8 @@ fn main() -> ExitCode {
         // Predictable captures: fixed size, one pixel per logical pixel.
         window.resolution =
             bevy::window::WindowResolution::new(1280, 800).with_scale_factor_override(1.0);
+        // Uncapped, so `MedirQuadros` measures the renderer and not the display.
+        window.present_mode = bevy::window::PresentMode::AutoNoVsync;
     }
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {

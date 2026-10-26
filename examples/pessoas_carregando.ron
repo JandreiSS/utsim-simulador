@@ -1,0 +1,39 @@
+// Pessoas levando caixas a pé: o estoque recebe caixas, ana e bruno (equipe) as levam
+// até a montagem e também fazem o setup dela; carla leva as peças montadas até a
+// expedição e volta correndo. Tempos em segundos, distâncias em metros.
+//
+// No visual realista as três aparecem como pessoas animadas: andando, andando com a caixa
+// nas mãos, correndo de volta (carla, acima de 2 m/s), pegando e entregando a caixa e
+// trabalhando no painel da montagem. O "pessoa" em visual.asset só marca o papel (a
+// pessoa leva itens, então sem ele seria um veículo).
+//
+//   chegada -> estoque (4, 0) --[ana, bruno]--> montagem (16, 0) --[carla]--> expedicao (16, 12)
+Model(
+    name: "Pessoas carregando",
+    description: "Equipe a pé levando caixas entre estoque, montagem e expedição",
+    run: (stop_time: 3600.0, seed: 11, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 70.0)), position: (0.0, 0.0, 0.0)),
+        (name: "estoque", kind: Queue(), transport: "equipe", position: (4.0, 0.0, 0.0)),
+        (name: "montagem", kind: Processor(
+            setup: Some(Const(8.0)),
+            process: Exp(mean: 30.0),
+            operators: Some(OperatorUse(team: "equipe", count: 1, setup: true, process: false)),
+        ), transport: "carla", position: (16.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (16.0, 12.0, 0.0)),
+        // Caminhada normal (1,2 m/s); pegar ou largar a caixa leva 3 s.
+        (name: "ana", kind: Transporter(speed: 1.2, load_time: Const(3.0), unload_time: Const(3.0)),
+            position: (6.0, 3.0, 0.0), visual: Some((asset: Some("pessoa")))),
+        (name: "bruno", kind: Transporter(speed: 1.2, load_time: Const(3.0), unload_time: Const(3.0)),
+            position: (6.0, -3.0, 0.0), visual: Some((asset: Some("pessoa")))),
+        (name: "equipe", kind: Dispatcher(team: ["ana", "bruno"], rule: RoundRobin), position: (6.0, 0.0, 0.0)),
+        // Carla anda a 2,5 m/s: com a caixa o passo é de quem carrega; sem ela, corre.
+        (name: "carla", kind: Transporter(speed: 2.5, load_time: Const(2.0), unload_time: Const(2.0)),
+            position: (18.0, 4.0, 0.0), visual: Some((asset: Some("pessoa")))),
+    ],
+    connections: [
+        ("chegada", "estoque"),
+        ("estoque", "montagem"),
+        ("montagem", "expedicao"),
+    ],
+)

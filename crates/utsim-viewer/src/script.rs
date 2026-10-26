@@ -847,6 +847,16 @@ fn advance(
             Ok(()) => Flow::Done,
             Err(e) => Flow::Fail(e),
         },
+        Passo::MedirQuadros(s) => {
+            if runner.secs >= *s && n > 0 {
+                let fps = n as f64 / runner.secs;
+                log_line(&runner.dir, &format!("quadros por segundo: {fps:.1}"));
+                println!("quadros por segundo: {fps:.1}");
+                Flow::Done
+            } else {
+                Flow::Pending
+            }
+        }
     }
 }
 

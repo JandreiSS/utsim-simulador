@@ -1128,6 +1128,7 @@ pub fn toolbar(
     mut editor: ResMut<Editor>,
     mut dock: ResMut<Dock>,
     mut visual: ResMut<crate::models::VisualMode>,
+    mut lighting: ResMut<crate::scene::Lighting>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     if !editor.editable {
@@ -1206,7 +1207,7 @@ pub fn toolbar(
                 ed.shortcuts_open = !ed.shortcuts_open;
             }
             ui.separator();
-            crate::models::toggle(ui, &mut visual);
+            crate::models::toggle(ui, &mut visual, &mut lighting);
             if running {
                 ui.spinner();
             }

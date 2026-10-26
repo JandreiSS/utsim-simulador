@@ -10,8 +10,10 @@
 //!   model file. Parametric library assets (rack, conveyor, floor area) still take their
 //!   size from the object's geometry.
 //! - Transporters by [`MobileRole`]: `Forklift` → `empilhadeira`, `Agv` → `agv`,
-//!   `Person` → `operador_simples`, `Vehicle` → `paleteira` in a scene with pallet loads
-//!   (it has racks or forklifts), else `agv`.
+//!   `Person` → the skeletal mannequin of the catalogue ([`PERSON`], animated by
+//!   [`person_clip`]) when its files are available ([`Context::skeletal_people`]), else
+//!   `operador_simples`; `Vehicle` → `paleteira` in a scene with pallet loads (it has
+//!   racks or forklifts), else `agv`.
 //! - Objects by kind: `Rack` → `porta_paletes` sized by its `RackParams`, `Conveyor` →
 //!   `esteira` of its length, `Processor` → `maquina`, `Combiner` → `bancada`, `Queue` →
 //!   a painted floor `area`. Other kinds keep their simple shape.
@@ -65,6 +67,9 @@ pub struct Look {
     /// Translation of the glTF scene under the block's root (layout space): zero for
     /// the library and user files, the catalogue centring for a third-party asset.
     pub offset: [f32; 3],
+    /// The skeletal mannequin of the catalogue ([`is_skeletal`]): driven by animation
+    /// clips instead of named nodes.
+    pub skeletal: bool,
 }
 
 /// Scene-wide choices.
@@ -72,6 +77,20 @@ pub struct Look {
 pub struct Context {
     /// The scene moves pallet loads (it has racks or forklifts).
     pub pallets: bool,
+    /// People get the skeletal mannequin by default (its `.glb` files can be read: the
+    /// desktop build, with `assets/terceiros` present and loading).
+    pub skeletal_people: bool,
+}
+
+/// Catalogue entry of the default skeletal person.
+pub const PERSON: &str = "pessoa_operador";
+/// Catalogue entry whose file has the extra clips (carrying) for the same skeleton.
+pub const PERSON_CLIPS: &str = "pessoa_operador_carga";
+
+/// Whether the catalogue entry `name` is the skeletal mannequin (either file of the
+/// Universal Animation Library: same skeleton, same bone names).
+pub fn is_skeletal(name: &str) -> bool {
+    name.eq_ignore_ascii_case(PERSON) || name.eq_ignore_ascii_case(PERSON_CLIPS)
 }
 
 /// `"#rrggbb"` (or `"rrggbb"`) as sRGB components.
@@ -186,11 +205,23 @@ pub fn look_of(
     let color = visual
         .and_then(|v| v.color.as_deref())
         .and_then(parse_color);
-    // A third-party asset of the catalogue: real size, facing +x, centred.
-    if let Some(entry) = asset
+    // A third-party asset of the catalogue: real size, facing +x, centred. A person
+    // whose `visual.asset` names no model (none, or only the role: "pessoa", "operador",
+    // "person") gets the skeletal mannequin when it is available; `operador_simples`
+    // keeps the procedural one.
+    let library_or_file = asset.is_some_and(|a| {
+        let n = a.trim().to_lowercase();
+        !matches!(n.as_str(), "operador" | "pessoa" | "person")
+            && (Spec::by_name(&n).is_some() || n.ends_with(".glb"))
+    });
+    let catalogue = asset
         .filter(|a| Spec::by_name(a).is_none())
-        .and_then(terceiros::by_name)
-    {
+        .and_then(terceiros::by_name);
+    let default_person =
+        (role == Some(MobileRole::Person) && ctx.skeletal_people && !library_or_file)
+            .then(|| terceiros::by_name(PERSON))
+            .flatten();
+    if let Some(entry) = catalogue.or(default_person) {
         let p = entry.placement(user_scale, user_yaw);
         return Some(Look {
             source: Source::File(terceiros::file_of(entry)),
@@ -199,6 +230,7 @@ pub fn look_of(
             color,
             carry: carry_of(None, role),
             offset: p.offset,
+            skeletal: is_skeletal(&entry.nome),
         });
     }
     let source = match asset {
@@ -231,6 +263,7 @@ pub fn look_of(
         yaw: belt_yaw + user_yaw,
         color,
         offset: [0.0; 3],
+        skeletal: false,
     })
 }
 
@@ -352,6 +385,122 @@ pub fn person_pose(motion: Motion, walked: f32, lift: f32, clock: f32) -> Limbs 
     }
 }
 
+/// Animation clips of the skeletal person, from the two files of the Universal
+/// Animation Library ([`PERSON`] and [`PERSON_CLIPS`]). `IdleCarry` has no clip of its
+/// own: the legs of `Idle_Loop` under the arms of `Walk_Carry_Loop` (two masked nodes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Clip {
+    Idle,
+    Walk,
+    Jog,
+    Carry,
+    Interact,
+    PickUp,
+    IdleCarry,
+}
+
+/// Speed above which a person jogs instead of walking, m/s.
+pub const JOG_SPEED: f32 = 2.0;
+/// Length of the crossfade between two clips, seconds of real time.
+pub const FADE: f32 = 0.25;
+
+impl Clip {
+    pub const ALL: [Clip; 7] = [
+        Clip::Idle,
+        Clip::Walk,
+        Clip::Jog,
+        Clip::Carry,
+        Clip::Interact,
+        Clip::PickUp,
+        Clip::IdleCarry,
+    ];
+
+    pub fn index(self) -> usize {
+        Clip::ALL.iter().position(|c| *c == self).unwrap_or(0)
+    }
+
+    /// Name of the glTF animation, and whether it is in the [`PERSON_CLIPS`] file. For
+    /// `IdleCarry`, the upper-body layer (the legs come from [`Clip::Idle`]).
+    pub fn source(self) -> (&'static str, bool) {
+        match self {
+            Clip::Idle => ("Idle_Loop", false),
+            Clip::Walk => ("Walk_Loop", false),
+            Clip::Jog => ("Jog_Fwd_Loop", false),
+            Clip::Carry | Clip::IdleCarry => ("Walk_Carry_Loop", true),
+            Clip::Interact => ("Interact", false),
+            Clip::PickUp => ("PickUp_Table", false),
+        }
+    }
+
+    /// Ground covered by one loop of a walking clip, in file units (multiply by the
+    /// asset scale), so that the planted foot does not slide. Measured from the clips:
+    /// the speed of the stance foot (`ball_l`, lowest 2 cm) relative to the root, times
+    /// the loop length. `Walk_Loop` 0.98 m/s over 1.333 s, `Walk_Carry_Loop` 0.65 m/s
+    /// over 2 s, `Jog_Fwd_Loop` 5.8 m/s over 0.933 s (a short, fast stance).
+    pub fn stride(self) -> Option<f32> {
+        match self {
+            Clip::Walk => Some(1.306),
+            Clip::Carry => Some(1.304),
+            Clip::Jog => Some(5.44),
+            _ => None,
+        }
+    }
+}
+
+/// Which clip a person plays: walking (jogging above [`JOG_SPEED`]) or walking with the
+/// load when moving, the pick-up while loading or unloading, the work at the station
+/// panel while working, standing (holding the load) otherwise.
+pub fn person_clip(motion: Motion, carrying: bool) -> Clip {
+    match motion {
+        Motion::Moving { .. } if carrying => Clip::Carry,
+        Motion::Moving { speed } if speed > JOG_SPEED => Clip::Jog,
+        Motion::Moving { .. } => Clip::Walk,
+        Motion::Loading { .. } | Motion::Unloading { .. } => Clip::PickUp,
+        Motion::Working => Clip::Interact,
+        _ if carrying => Clip::IdleCarry,
+        _ => Clip::Idle,
+    }
+}
+
+/// Time inside `clip` (of length `duration`, seconds) for a person who has walked
+/// `distance` metres (at asset `scale`) at simulated time `t`, `progress` into a load
+/// window. Walking clips follow the distance (one loop per stride, so the clip rate
+/// follows the speed and the feet do not slide), the pick-up follows the window, the
+/// others loop on the simulated clock. Nothing depends on how the clock got to `t`.
+pub fn clip_time(
+    clip: Clip,
+    duration: f32,
+    distance: f32,
+    scale: f32,
+    t: f64,
+    progress: f32,
+) -> f32 {
+    if duration <= 0.0 {
+        return 0.0;
+    }
+    let time = match (clip, clip.stride()) {
+        (_, Some(stride)) => {
+            let loops = distance as f64 / (stride * scale.max(1e-3)) as f64;
+            loops.rem_euclid(1.0) as f32 * duration
+        }
+        (Clip::PickUp, _) => progress.clamp(0.0, 1.0) * duration,
+        _ => t.rem_euclid(duration as f64) as f32,
+    };
+    time.clamp(0.0, duration * 0.9999)
+}
+
+/// Crossfade: the weight of `target` rises and every other one falls by `dt / FADE`.
+pub fn fade(weights: &mut [f32; 7], target: Clip, dt: f32) {
+    let step = (dt / FADE).max(0.0);
+    for (k, w) in weights.iter_mut().enumerate() {
+        *w = if k == target.index() {
+            (*w + step).min(1.0)
+        } else {
+            (*w - step).max(0.0)
+        };
+    }
+}
+
 /// Status light colour (sRGB): AGVs by their motion (green moving, orange blocked, red
 /// stopped, blue loading or unloading, white otherwise); everything else by the block
 /// state colour.
@@ -410,41 +559,6 @@ pub fn carried_center(
         Carry::Stack => return None,
     };
     Some([xz[0], y, xz[1]])
-}
-
-/// Where a forklift stands while it loads or unloads at a rack cell: in the aisle in
-/// front of the cell (the rack's `+Z` side in layout space, the model's `-y`), facing
-/// the rack, so the fork centre is under the cell. The trace puts the vehicle at the
-/// rack's network node instead; the visual moves there over the first and last 15 % of
-/// the load window (`progress`). Returns the layout position and the heading.
-pub fn rack_approach(
-    position: [f32; 3],
-    yaw: f32,
-    progress: f32,
-    rack_base: [f32; 3],
-    cell_x: f32,
-) -> ([f32; 3], f32) {
-    let target = [
-        rack_base[0] + cell_x,
-        position[1],
-        rack_base[2] + dims::FORK_CENTER,
-    ];
-    // Facing -Z (towards the rack) is a heading of +pi/2.
-    let facing = PI / 2.0;
-    let u = (progress.min(1.0 - progress) / 0.15).clamp(0.0, 1.0);
-    let u = u * u * (3.0 - 2.0 * u);
-    let mut turn = (facing - yaw).rem_euclid(2.0 * PI);
-    if turn > PI {
-        turn -= 2.0 * PI;
-    }
-    (
-        [
-            position[0] + (target[0] - position[0]) * u,
-            position[1],
-            position[2] + (target[2] - position[2]) * u,
-        ],
-        yaw + turn * u,
-    )
 }
 
 /// Where an operator works at a station whose footprint has half extents `half`: at
@@ -521,7 +635,10 @@ mod tests {
             spec(pick("Transporter", Some(MobileRole::Vehicle))),
             Some("agv")
         );
-        let pallets = Context { pallets: true };
+        let pallets = Context {
+            pallets: true,
+            ..Context::default()
+        };
         let jack = look_of(
             "Transporter",
             Some(MobileRole::Vehicle),
@@ -718,6 +835,9 @@ mod tests {
 
     #[test]
     fn a_forklift_turns_to_face_the_rack_cell_mid_window() {
+        use utsim_scene::compose::{FORK_REACH, rack_approach};
+        // The scene's fork reach is the library model's.
+        assert_eq!(FORK_REACH, dims::FORK_CENTER);
         let (rack, pos) = ([60.0, 0.0, 0.0], [60.0, 0.0, 0.0]);
         // At the window ends it is where the trace says.
         let (p, y) = rack_approach(pos, 0.0, 0.0, rack, 1.8);
@@ -744,6 +864,91 @@ mod tests {
         // Turns the short way round.
         let (_, y) = rack_approach(pos, PI, 0.5, rack, 0.0);
         assert!((y - PI / 2.0).abs() < 1e-5, "{y}");
+    }
+
+    #[test]
+    fn people_pick_the_clip_of_their_motion() {
+        let walk = Motion::Moving { speed: 1.2 };
+        assert_eq!(person_clip(walk, false), Clip::Walk);
+        assert_eq!(person_clip(Motion::Moving { speed: 2.5 }, false), Clip::Jog);
+        assert_eq!(person_clip(walk, true), Clip::Carry);
+        assert_eq!(person_clip(Motion::Idle, true), Clip::IdleCarry);
+        assert_eq!(person_clip(Motion::Blocked, false), Clip::Idle);
+        assert_eq!(person_clip(Motion::Stopped, false), Clip::Idle);
+        assert_eq!(person_clip(Motion::Working, false), Clip::Interact);
+        assert_eq!(
+            person_clip(Motion::Unloading { progress: 0.3 }, true),
+            Clip::PickUp
+        );
+        for c in Clip::ALL {
+            assert_eq!(Clip::ALL[c.index()], c);
+        }
+    }
+
+    #[test]
+    fn the_walk_cycle_follows_the_distance_so_the_feet_do_not_slide() {
+        let (d, s) = (1.3333, 0.96);
+        let stride = Clip::Walk.stride().unwrap() * s;
+        // One loop per stride, whatever the time.
+        let a = clip_time(Clip::Walk, d, 2.0, s, 10.0, 0.0);
+        let b = clip_time(Clip::Walk, d, 2.0 + stride, s, 99.0, 0.0);
+        assert!((a - b).abs() < 1e-3, "{a} {b}");
+        // At speed v the clip plays at v / (stride / duration) times its own rate.
+        let v = 1.5;
+        let rate = (clip_time(Clip::Walk, d, 0.1 * v, s, 0.0, 0.0)
+            - clip_time(Clip::Walk, d, 0.0, s, 0.0, 0.0))
+            / 0.1;
+        assert!((rate - v * d / stride).abs() < 1e-3, "{rate}");
+        // The pick-up follows the window; the rest loops on the simulated clock.
+        assert!((clip_time(Clip::PickUp, 0.8, 0.0, s, 5.0, 0.5) - 0.4).abs() < 1e-6);
+        let idle = clip_time(Clip::Idle, 2.5, 7.0, s, 3.5, 0.0);
+        assert!((idle - 1.0).abs() < 1e-5);
+        assert_eq!(idle, clip_time(Clip::Idle, 2.5, 0.0, s, 3.5, 0.9));
+    }
+
+    #[test]
+    fn clips_crossfade_over_a_quarter_second() {
+        let mut w = [0.0; 7];
+        w[Clip::Idle.index()] = 1.0;
+        fade(&mut w, Clip::Walk, 0.1);
+        assert!((w[Clip::Walk.index()] - 0.4).abs() < 1e-6);
+        assert!((w[Clip::Idle.index()] - 0.6).abs() < 1e-6);
+        fade(&mut w, Clip::Walk, 0.2);
+        assert_eq!(w[Clip::Walk.index()], 1.0);
+        assert_eq!(w[Clip::Idle.index()], 0.0);
+    }
+
+    #[test]
+    fn people_get_the_skeletal_mannequin_when_it_is_available() {
+        let person = Some(MobileRole::Person);
+        let g = geom("Transporter");
+        let ctx = Context {
+            skeletal_people: true,
+            ..Context::default()
+        };
+        let l = look_of("Transporter", person, None, &g, ctx, None).unwrap();
+        let entry = crate::terceiros::by_name(PERSON).unwrap();
+        assert_eq!(l.source, Source::File(crate::terceiros::file_of(entry)));
+        assert!(l.skeletal && l.carry == Carry::Hands);
+        // Without the files: the procedural operator.
+        let l = look_of("Transporter", person, None, &g, Context::default(), None).unwrap();
+        assert_eq!(l.source, Source::Library(Spec::OperadorSimples));
+        assert!(!l.skeletal);
+        // A name that only marks the role keeps the mannequin; a library name wins.
+        let only_role = VisualDef {
+            asset: Some("pessoa".into()),
+            ..VisualDef::default()
+        };
+        let l = look_of("Transporter", person, Some(&only_role), &g, ctx, None).unwrap();
+        assert!(l.skeletal);
+        let simple = VisualDef {
+            asset: Some("operador_simples".into()),
+            ..VisualDef::default()
+        };
+        let l = look_of("Transporter", person, Some(&simple), &g, ctx, None).unwrap();
+        assert_eq!(l.source, Source::Library(Spec::OperadorSimples));
+        // Both files of the library share the skeleton.
+        assert!(is_skeletal("pessoa_operador_carga") && !is_skeletal("pessoa_mini_homem_a"));
     }
 
     #[test]

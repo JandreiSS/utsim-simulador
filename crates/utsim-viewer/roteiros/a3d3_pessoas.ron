@@ -1,0 +1,45 @@
+// A3D-3: pessoas animadas por esqueleto (boneco CC0 da Universal Animation Library).
+//   utsim-view examples/celula_com_operadores.ron --roteiro crates/utsim-viewer/roteiros/a3d3_pessoas.ron --capturas %TEMP%/utsim_a3d3/pessoas
+// Confere: "ana" andando de 10,2 até maq1 com o clipe de caminhada (capacete amarelo,
+// colete laranja com faixas, roupa azul), o passo trocando de perna entre as capturas
+// (t = 26,0 a 27,0; o clipe segue a distância andada, então o mesmo t dá a mesma pose),
+// a curva suave perto da máquina, "ana" trabalhando no painel da maq1 (t = 31) e
+// "bruno" parado de pé. A última captura repete t = 26,5 depois de saltar no tempo e
+// precisa sair igual à 03.
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(3.0),
+    Captura("01_visao_geral"),
+
+    // Caminhada: quatro instantes de um passo e meio (a 1,2 m/s, 0,4 m entre eles).
+    IrPara(26.0),
+    Focar(objeto: "ana", distancia: 4.5, giro: Some(1.2), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("02_andando_t26_0"),
+    IrPara(26.5),
+    Esperar(quadros: 30),
+    Captura("03_andando_t26_5"),
+    IrPara(27.0),
+    Esperar(quadros: 30),
+    Captura("04_andando_t27_0"),
+
+    // Na máquina, trabalhando no setup.
+    IrPara(31.0),
+    Focar(objeto: "maq1", distancia: 5.0, giro: Some(0.6), inclinacao: Some(0.3)),
+    Esperar(quadros: 30),
+    Captura("05_trabalhando"),
+    IrPara(32.0),
+    Esperar(quadros: 30),
+    Captura("06_trabalhando_1s_depois"),
+
+    // Volta ao mesmo instante depois de saltar: a pose é a mesma.
+    IrPara(26.5),
+    Focar(objeto: "ana", distancia: 4.5, giro: Some(1.2), inclinacao: Some(0.2)),
+    Esperar(quadros: 30),
+    Captura("07_andando_t26_5_de_novo"),
+    Afirmar(TempoSimuladoMin(26.0)),
+]

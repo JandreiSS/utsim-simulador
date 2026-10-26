@@ -65,7 +65,7 @@ Ainda falta, nas fases abaixo:
 |---|---|---|
 | A3D-1 | Cena independente de motor (`utsim-scene`), `utsim cena`, visualizador usando a cena (**em andamento**) | 3–4 h |
 | A3D-2 | Gerador de `.glb` articulados (empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque) e carga de glTF no Bevy pelo `visual.asset` (**feito**, ver abaixo) | 4–6 h |
-| A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas | 5–8 h |
+| A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas, sombras (**feito**, ver abaixo) | 5–8 h |
 | A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta); instâncias e níveis de detalhe para modelos grandes | 3–4 h |
 | A3D-5 | Cliente Unreal + realidade virtual (OpenXR), lendo `utsim-scene/1` de arquivo e depois ao vivo | 6–10 h (sessão separada) |
 | A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP (**feito**: `--cena-porta`, `utsim cena --servir`, TCP e WebSocket, comandos de volta) | 2–3 h |
@@ -135,15 +135,52 @@ Roteiros de conferência: `visual_realista_armazem.ron` (com
 e `visual_realista_operadores.ron` (com `examples/celula_com_operadores.ron`).
 
 Lacunas conhecidas:
-- o item sai dos garfos para a célula no fim da janela de descarga, quando os garfos já
-  desceram, então ele "pula" para o nível. O mesmo vale para a coleta. Corrigir pede a
-  troca do item no meio da janela, na cena;
 - o corredor da empilhadeira é sempre o lado `-y` do porta-paletes;
 - o tanque existe na biblioteca, mas os tanques da rede de fluidos ainda usam o cilindro
   transparente;
-- sem giro suave nas curvas, sem sombras e sem níveis de detalhe;
+- sem níveis de detalhe;
 - `.glb` do usuário com texturas externas (`.gltf` com arquivos ao lado) não é aceito, e no
   navegador `visual.asset` com arquivo cai no modelo padrão.
+
+## Movimento realista (A3D-3, feito)
+
+- **Pessoas animadas por esqueleto.** As pessoas usam o boneco do `pessoa_operador`, com os
+  clipes dos dois arquivos do Quaternius (mesmo esqueleto, retarget pelo nome dos ossos,
+  conferido ao montar o grafo de animação). Clipes: `Idle_Loop` parado, bloqueado ou parado
+  por quebra; `Walk_Loop` andando, `Jog_Fwd_Loop` acima de 2 m/s; `Walk_Carry_Loop` andando
+  carregando; parado carregando, as pernas de `Idle_Loop` com os braços de
+  `Walk_Carry_Loop` (máscaras de ossos); `PickUp_Table` na coleta e na entrega, no ritmo do
+  `progress`; `Interact` trabalhando. Transição de 0,25 s. O tempo de cada clipe sai da cena:
+  os de andar pela distância percorrida (passada medida no clipe pela velocidade do pé de
+  apoio: 1,31 m por volta no andar e no andar carregando, 5,44 m na corrida, na escala do
+  arquivo), a coleta pelo `progress`, os outros pelo relógio simulado. Saltar no tempo dá a
+  mesma pose. O item fica entre as mãos. Roupa de trabalho por tingimento dos dois
+  materiais, capacete e colete presos aos ossos `Head` e `spine_02`. Sem os arquivos (navegador)
+  ou se falharem, volta o `operador_simples`.
+- **Carga saindo dos garfos na hora certa.** Na cena (`utsim-scene`), o item troca de mãos no
+  meio da janela de carga ou descarga, quando os garfos estão no nível: descarregando, sobe
+  nos garfos, entra na célula lá em cima e os garfos descem vazios; coletando, o inverso. Vale
+  também para filas, esteiras e máquinas. A cena põe a carga da empilhadeira nos garfos e a
+  própria empilhadeira no corredor de frente para a célula (antes só o visualizador fazia
+  isso), então o fluxo `utsim-scene/1` também mostra a troca sem salto.
+- **Giro suave.** Função pura `turning::sample`: arco tangente nos últimos e primeiros 0,5 m em
+  volta de cada vértice, inclusive entre trechos percorridos sem parar; posição e direção
+  contínuas, pedaços retos inalterados.
+- **Sombras.** Sol com sombras em cascata dimensionadas pela cena, piso que recebe sombras,
+  luz ambiente mais suave com sombras, caixa "Sombras" ao lado da chave "Visual" (desligada
+  por padrão no navegador). No `centro_de_distribuicao.ron`, build de release: 420 quadros por
+  segundo sem sombras e 372 com elas.
+
+Roteiros de conferência: `a3d3_pessoas.ron` (com `examples/celula_com_operadores.ron`),
+`a3d3_pessoas_carregando.ron` (com o novo `examples/pessoas_carregando.ron`, em que pessoas
+levam caixas) e `a3d3_empilhadeira.ron` (com `examples/centro_de_distribuicao.ron`). O passo
+`MedirQuadros(segundos)` dos roteiros grava a taxa de quadros no `log.txt`.
+
+Lacunas do A3D-3:
+- não há clipe de correr carregando: acima de 2 m/s com carga, o andar carregando acelera;
+- pessoas paradas no mesmo objeto podem se sobrepor (o rastro as põe no centro do bloco);
+- o capacete e o colete são formas simples presas a ossos, não roupa com pele;
+- no modo ao vivo, a quina entre dois trechos só se arredonda quando o segundo trecho chega.
 
 ## Ativos de terceiros
 

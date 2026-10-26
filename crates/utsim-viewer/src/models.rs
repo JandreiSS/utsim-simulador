@@ -11,7 +11,8 @@
 //! Once a scene is spawned, its named nodes are bound ([`Rig`]) and driven every frame
 //! from the scene pose (`utsim_scene`): the forklift's `carro` at the `lift` height,
 //! wheels by the distance travelled, the `luz` status light, the operator's limbs. The
-//! numbers come from the pure rules of `utsim_viewer::visual`.
+//! numbers come from the pure rules of `utsim_viewer::visual`. The skeletal mannequin of
+//! the people is animated by clips instead (`crate::people`).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,8 @@ impl VisualMode {
 #[derive(Resource, Default)]
 pub struct Library {
     scenes: HashMap<String, Handle<WorldAsset>>,
+    /// Embedded path of every registered `.glb`, by asset key.
+    paths: HashMap<String, String>,
     /// Tinted copies of materials, by (original, colour).
     tints: HashMap<(AssetId<StandardMaterial>, [u8; 3]), Handle<StandardMaterial>>,
 }
@@ -85,12 +88,41 @@ impl Library {
         registry: &EmbeddedAssetRegistry,
         server: &AssetServer,
     ) -> Option<Handle<WorldAsset>> {
-        let key = match source {
-            Source::Library(spec) => safe(&spec.key()),
-            Source::File(path) => format!("arquivo_{}", safe(&path.to_string_lossy())),
-        };
+        let key = Self::key(source);
         if let Some(h) = self.scenes.get(&key) {
             return Some(h.clone());
+        }
+        let path = self.register(source, registry)?;
+        let handle: Handle<WorldAsset> =
+            server.load(GltfAssetLabel::Scene(0).from_asset(format!("embedded://{path}")));
+        self.scenes.insert(key, handle.clone());
+        Some(handle)
+    }
+
+    /// The whole glTF of `source` (its named animations), registering its bytes the
+    /// first time; `None` when the file cannot be read.
+    pub fn gltf(
+        &mut self,
+        source: &Source,
+        registry: &EmbeddedAssetRegistry,
+        server: &AssetServer,
+    ) -> Option<Handle<bevy::gltf::Gltf>> {
+        let path = self.register(source, registry)?;
+        Some(server.load(format!("embedded://{path}")))
+    }
+
+    fn key(source: &Source) -> String {
+        match source {
+            Source::Library(spec) => safe(&spec.key()),
+            Source::File(path) => format!("arquivo_{}", safe(&path.to_string_lossy())),
+        }
+    }
+
+    /// Embedded path of the `.glb` of `source`, registering its bytes the first time.
+    fn register(&mut self, source: &Source, registry: &EmbeddedAssetRegistry) -> Option<String> {
+        let key = Self::key(source);
+        if let Some(path) = self.paths.get(&key) {
+            return Some(path.clone());
         }
         let path = match source {
             Source::Library(spec) => {
@@ -134,14 +166,19 @@ impl Library {
                 path
             }
         };
-        let handle: Handle<WorldAsset> =
-            server.load(GltfAssetLabel::Scene(0).from_asset(format!("embedded://{path}")));
-        self.scenes.insert(key, handle.clone());
-        Some(handle)
+        self.paths.insert(key, path.clone());
+        Some(path)
+    }
+
+    /// Load state of the scene of `source`, when it was requested.
+    pub fn failed(&self, source: &Source, server: &AssetServer) -> bool {
+        self.scenes
+            .get(&Self::key(source))
+            .is_some_and(|h| matches!(server.load_state(h.id()), LoadState::Failed(_)))
     }
 
     /// A copy of `original` with base colour `rgb` (shared by every user of that tint).
-    fn tinted(
+    pub fn tinted(
         &mut self,
         original: &Handle<StandardMaterial>,
         rgb: [f32; 3],
@@ -211,7 +248,7 @@ pub fn watch_library(
 }
 
 /// The looks of the blocks shown now (`None`: simple shape), in block order.
-pub fn looks(editor: &Editor, data: &Data) -> Vec<Option<Look>> {
+pub fn looks(editor: &Editor, data: &Data, skeletal_people: bool) -> Vec<Option<Look>> {
     let dir = editor
         .doc
         .path()
@@ -230,6 +267,7 @@ pub fn looks(editor: &Editor, data: &Data) -> Vec<Option<Look>> {
             let ctx = Context {
                 pallets: (0..view.kinds.len())
                     .any(|i| view.kinds[i] == "Rack" || role(i) == Some(MobileRole::Forklift)),
+                skeletal_people,
             };
             (0..view.kinds.len())
                 .map(|i| {
@@ -248,6 +286,7 @@ pub fn looks(editor: &Editor, data: &Data) -> Vec<Option<Look>> {
                 pallets: (0..blocks.len()).any(|b| {
                     blocks[b].kind == "Rack" || data.role(b) == Some(MobileRole::Forklift)
                 }),
+                skeletal_people,
             };
             (0..blocks.len())
                 .map(|b| {
@@ -268,13 +307,12 @@ pub fn looks(editor: &Editor, data: &Data) -> Vec<Option<Look>> {
     }
 }
 
-/// Pose of mobile block `b` as the realistic model draws it: the scene's pose, except
-/// that a forklift serving a rack cell turns to face it from the aisle
-/// ([`visual::rack_approach`]).
+/// Pose of mobile block `b` as the realistic model draws it: the scene's pose (which
+/// already puts a forklift serving a rack cell in the aisle, facing it), except that
+/// vehicles and people keep out of the machines and an operator works at the front.
 pub fn drawn_pose(data: &Data, b: usize, t: f64, look: &Look) -> Option<utsim_scene::MobilePose> {
     let mut p = data.mobile_at(b, t)?;
     let original = p.position;
-    let forklift = matches!(look.carry, visual::Carry::Forks { height: None, .. });
     // Machines are solid: a vehicle or person parked at a station's centre (its network
     // node) is drawn at the station's edge, its front (forks, body) facing it.
     let reach = match look.carry {
@@ -296,16 +334,6 @@ pub fn drawn_pose(data: &Data, b: usize, t: f64, look: &Look) -> Option<utsim_sc
             );
         }
     }
-    if forklift
-        && let Motion::Loading { progress } | Motion::Unloading { progress } = p.motion
-        && let Some((rack, slot)) = data.rack_target(b, t)
-        && let Some((offset, _)) = data.geoms[rack].rack_item(slot)
-    {
-        let (position, yaw) =
-            visual::rack_approach(p.position, p.yaw, progress, data.positions[rack], offset[0]);
-        p.position = position;
-        p.yaw = yaw;
-    }
     if look.carry == visual::Carry::Hands && p.motion == Motion::Working {
         // The trace puts an operator at the station's centre: stand at its front instead.
         let station = (0..data.replay.blocks.len()).find(|&s| {
@@ -324,7 +352,11 @@ pub fn drawn_pose(data: &Data, b: usize, t: f64, look: &Look) -> Option<utsim_sc
 }
 
 /// The "Visual: simples / realista" switch.
-pub fn toggle(ui: &mut bevy_egui::egui::Ui, mode: &mut ResMut<VisualMode>) {
+pub fn toggle(
+    ui: &mut bevy_egui::egui::Ui,
+    mode: &mut ResMut<VisualMode>,
+    lighting: &mut ResMut<crate::scene::Lighting>,
+) {
     ui.label("Visual:");
     let (on, available) = (mode.realistic, mode.available);
     ui.add_enabled_ui(available, |ui| {
@@ -338,6 +370,9 @@ pub fn toggle(ui: &mut bevy_egui::egui::Ui, mode: &mut ResMut<VisualMode>) {
             && !on
         {
             mode.realistic = true;
+        }
+        if on && available {
+            crate::scene::shadows_toggle(ui, lighting);
         }
     });
 }
@@ -362,18 +397,20 @@ pub struct Realistic {
     /// The child entity holding the glTF scene.
     pub asset: Entity,
     rig: Option<Rig>,
-    /// Distance driven or walked so far (metres, along the heading).
-    walked: f32,
-    last: Option<Vec3>,
     light_rgb: Option<[f32; 3]>,
+    /// Skeletal person: its animation state (`crate::people`).
+    pub person: Option<crate::people::Figure>,
 }
 
-/// Recolours the materials called `name` under an entity once its scene is spawned
-/// (items: the box cardboard by the item's origin).
+/// Recolours the materials with these names under an entity once its scene is spawned
+/// (items: the box cardboard by the item's origin; the mannequin's work clothes).
 #[derive(Component)]
-pub struct Tint {
-    pub material: &'static str,
-    pub rgb: [f32; 3],
+pub struct Tint(pub Vec<(&'static str, [f32; 3])>);
+
+impl Tint {
+    pub fn one(material: &'static str, rgb: [f32; 3]) -> Tint {
+        Tint(vec![(material, rgb)])
+    }
 }
 
 /// Spawns the realistic visual of a block at `translation` (its floor base); returns
@@ -406,20 +443,18 @@ pub fn spawn_block(
             ChildOf(root),
         ))
         .id();
-    if let Some(rgb) = look.color {
-        commands.entity(asset).insert(Tint {
-            material: "pintura",
-            rgb,
-        });
+    if look.skeletal {
+        commands.entity(asset).insert(crate::people::clothes());
+    } else if let Some(rgb) = look.color {
+        commands.entity(asset).insert(Tint::one("pintura", rgb));
     }
     commands.entity(root).insert(Realistic {
         block,
         look: look.clone(),
         asset,
         rig: None,
-        walked: 0.0,
-        last: None,
         light_rgb: None,
+        person: look.skeletal.then(crate::people::Figure::default),
     });
     Some(root)
 }
@@ -468,10 +503,7 @@ pub fn spawn_item_children(
 ) {
     let e = utsim_scene::compose::ITEM_SIZE;
     let half = e / 2.0;
-    let tint = || Tint {
-        material: "papelao",
-        rgb: box_tint(origin_rgb),
-    };
+    let tint = || Tint::one("papelao", box_tint(origin_rgb));
     if !pallets {
         // Box 0.40 x 0.30 x 0.30 m: the long side fills the cube edge.
         let k = e / 0.40;
@@ -528,10 +560,10 @@ pub fn apply_tints(
             let Ok((mat, name)) = meshes.get(e) else {
                 continue;
             };
-            if name.0 != tint.material {
+            let Some(&(_, rgb)) = tint.0.iter().find(|(m, _)| name.0 == *m) else {
                 continue;
-            }
-            match library.tinted(&mat.0, tint.rgb, &mut materials) {
+            };
+            match library.tinted(&mat.0, rgb, &mut materials) {
                 Some(h) => {
                     commands.entity(e).insert(MeshMaterial3d(h));
                 }
@@ -647,14 +679,13 @@ pub fn animate(
         if let Some(p) = pose {
             root.translation = Vec3::from(p.position);
             root.rotation = Quat::from_rotation_y(p.yaw);
-            let here = root.translation;
-            if let Some(last) = real.last {
-                let forward = Vec3::new(p.yaw.cos(), 0.0, -p.yaw.sin());
-                real.walked += (here - last).dot(forward);
-            }
-            real.last = Some(here);
         }
-        let walked = real.walked / scale;
+        // From the scene, so the wheels and the stride depend on the time only.
+        let walked = if sim {
+            data.distance_at(b, pb.t) as f32 / scale
+        } else {
+            0.0
+        };
         let agv = sim && data.role(b) == Some(MobileRole::Agv);
         let state = if sim {
             data.timeline.block_state(b, pb.t)

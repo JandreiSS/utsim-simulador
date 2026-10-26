@@ -1,0 +1,67 @@
+// A3D-3: a carga sai dos garfos no momento certo, curvas suaves e sombras.
+//   utsim-view examples/centro_de_distribuicao.ron --roteiro crates/utsim-viewer/roteiros/a3d3_empilhadeira.ron --capturas %TEMP%/utsim_a3d3/empilhadeira
+// Confere:
+// - empilhadeira_1 virando no cruzamento "meio" (40, 0) vinda da garagem: o giro é
+//   gradual (t = 1001,6 a 1002,2), sem pulo de direção;
+// - a descarga no nível 1 do porta-paletes (janela de 1801,2 a 1810,7, meio em 1805,94):
+//   a 25 % o palete
+//   sobe nos garfos; logo antes do meio está nos garfos, já na altura da célula; logo
+//   depois do meio está na célula, no mesmo lugar; a 75 % os garfos descem vazios (o
+//   visualizador para em t = 2000, então os níveis mais altos ficam para depois);
+// - as sombras desligadas e ligadas, e a taxa de quadros com e sem elas (log.txt,
+//   "quadros por segundo", reproduzindo a visão geral).
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(3.0),
+    Captura("01_visao_geral"),
+
+    // Curva no cruzamento.
+    IrPara(1001.5),
+    Focar(objeto: "empilhadeira_1", distancia: 9.0, giro: Some(0.8), inclinacao: Some(0.9)),
+    Esperar(quadros: 20),
+    Captura("02_curva_antes"),
+    IrPara(1001.85),
+    Esperar(quadros: 20),
+    Captura("03_curva_meio"),
+    IrPara(1002.2),
+    Esperar(quadros: 20),
+    Captura("04_curva_depois"),
+
+    // Descarga no nível 1.
+    IrPara(1803.58),
+    Focar(objeto: "empilhadeira_1", distancia: 8.0, giro: Some(0.9), inclinacao: Some(0.3)),
+    Esperar(quadros: 20),
+    Captura("05_descarga_25_subindo"),
+    IrPara(1805.75),
+    Esperar(quadros: 20),
+    Captura("06_descarga_antes_do_meio"),
+    IrPara(1806.13),
+    Esperar(quadros: 20),
+    Captura("07_descarga_depois_do_meio"),
+    IrPara(1808.3),
+    Esperar(quadros: 20),
+    Captura("08_descarga_75_descendo_vazio"),
+
+    // Sombras: desligadas, ligadas e a taxa de quadros reproduzindo a visão geral.
+    IrPara(1040.0),
+    Focar(objeto: "empilhadeira_1", distancia: 12.0, giro: Some(0.6), inclinacao: Some(0.5)),
+    Esperar(quadros: 20),
+    Captura("09_com_sombras"),
+    ClicarBotao("Sombras"),
+    Esperar(quadros: 20),
+    Captura("10_sem_sombras"),
+    Tecla("F"),
+    Esperar(quadros: 30),
+    ClicarBotao("Reproduzir"),
+    MedirQuadros(5.0),
+    ClicarBotao("Sombras"),
+    Esperar(quadros: 10),
+    MedirQuadros(5.0),
+    ClicarBotao("Pausar"),
+    Captura("11_visao_geral_com_sombras"),
+    Afirmar(TempoSimuladoMin(1040.0)),
+]
