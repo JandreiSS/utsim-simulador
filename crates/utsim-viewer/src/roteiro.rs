@@ -24,6 +24,10 @@
 //!     Afirmar(ObjetosIgual(5)),
 //!     IrPara(1806.0),                         // Simular: pause and jump the clock
 //!     Focar(objeto: "empilhadeira_1", distancia: 9.0, giro: Some(0.6), inclinacao: None),
+//!     Camera(modo: "Seguir", objeto: Some("empilhadeira_1")),   // Orbita, Seguir, PrimeiraPessoa, DoRecurso
+//!     Lod(false),                             // levels of detail off/on (F4)
+//!     Tempos(true),                           // frame-time overlay (F3)
+//!     Medir(segundos: 4.0, nome: "lod_ligado"), // frame times over 4 s, written to log.txt
 //! ]
 //! ```
 //!
@@ -140,6 +144,16 @@ pub enum Condicao {
     Exportado(String),
     /// The best point of the latest optimisation, as `chave = valor, ...`, contains this.
     MelhorPontoContem(String),
+    /// Camera mode: `"Órbita"`, `"Seguir"`, `"Primeira pessoa"` or `"Do recurso"`.
+    CameraModo(String),
+    /// Block the follow or ride camera tracks (`None`: none).
+    CameraAlvo(Option<String>),
+    /// Height of the camera above the ground (metres) between `min` and `max`.
+    CameraAlturaEntre(f64, f64),
+    /// The camera is at most this far (metres) from the named block.
+    CameraPertoDe(String, f64),
+    /// The levels of detail are on.
+    LodAtivo(bool),
     Nao(Box<Condicao>),
 }
 
@@ -182,6 +196,24 @@ pub enum Passo {
         giro: Option<f32>,
         #[serde(default)]
         inclinacao: Option<f32>,
+    },
+    /// Switches the camera mode (`Orbita`, `Seguir`, `PrimeiraPessoa`, `DoRecurso`, with
+    /// or without accents). `Seguir` and `DoRecurso` track `objeto` (else the selected
+    /// vehicle, else the first one). Needs `Simular`.
+    Camera {
+        modo: String,
+        #[serde(default)]
+        objeto: Option<String>,
+    },
+    /// Turns the levels of detail on or off (F4).
+    Lod(bool),
+    /// Shows or hides the frame-time overlay (F3).
+    Tempos(bool),
+    /// Records the frame times for this many seconds (after half a second of warm-up)
+    /// and writes the mean, median, 95th percentile and worst frame to `log.txt`.
+    Medir {
+        segundos: f64,
+        nome: String,
     },
 }
 
@@ -239,6 +271,15 @@ pub struct Estado {
     pub exportados: Vec<String>,
     /// Best point of the latest optimisation (`chave = valor, ...`).
     pub melhor_ponto: Option<String>,
+    /// Camera mode label.
+    pub camera_modo: String,
+    /// Name of the block the follow or ride camera tracks.
+    pub camera_alvo: Option<String>,
+    /// Camera position in the scene (Bevy space, metres).
+    pub camera_pos: [f64; 3],
+    /// Distance from the camera to each block (`Simular`).
+    pub camera_distancias: Vec<(String, f64)>,
+    pub lod_ativo: bool,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -438,6 +479,38 @@ impl Estado {
                 Some(p) => Err(format!("melhor ponto \"{p}\" não contém \"{t}\"")),
                 None => Err("nenhuma otimização concluída".to_string()),
             },
+            Condicao::CameraModo(m) => {
+                let quer = crate::cameras::CameraKind::parse(m)
+                    .ok_or_else(|| format!("modo de câmera desconhecido: {m}"))?
+                    .label();
+                igual("modo da câmera", self.camera_modo.as_str(), quer)
+            }
+            Condicao::CameraAlvo(a) => {
+                if &self.camera_alvo == a {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "alvo da câmera: esperado {a:?}, encontrado {:?}",
+                        self.camera_alvo
+                    ))
+                }
+            }
+            Condicao::CameraAlturaEntre(min, max) => {
+                let h = self.camera_pos[1];
+                if h >= *min && h <= *max {
+                    Ok(())
+                } else {
+                    Err(format!("altura da câmera {h:.2} fora de {min}..{max}"))
+                }
+            }
+            Condicao::CameraPertoDe(nome, max) => {
+                match self.camera_distancias.iter().find(|(n, _)| n == nome) {
+                    Some((_, d)) if d <= max => Ok(()),
+                    Some((_, d)) => Err(format!("câmera a {d:.1} m de \"{nome}\" (máximo {max})")),
+                    None => Err(format!("bloco \"{nome}\" não existe na simulação")),
+                }
+            }
+            Condicao::LodAtivo(b) => igual("LOD ativo", self.lod_ativo, *b),
             Condicao::Nao(inner) => match self.verificar(inner) {
                 Ok(()) => Err(format!("a condição negada é verdadeira: {inner:?}")),
                 Err(_) => Ok(()),
@@ -593,7 +666,45 @@ mod tests {
             cenarios_comparados: 2,
             exportados: vec!["C:/tmp/linha_resultados/resumo.csv".into()],
             melhor_ponto: Some("maquina.capacity = 3".into()),
+            camera_modo: "Seguir".into(),
+            camera_alvo: Some("empilhadeira_1".into()),
+            camera_pos: [3.0, 6.5, -2.0],
+            camera_distancias: vec![("empilhadeira_1".into(), 9.0), ("doca".into(), 40.0)],
+            lod_ativo: true,
         }
+    }
+
+    #[test]
+    fn camera_steps_and_assertions() {
+        let steps = parse(
+            r#"[Camera(modo: "Seguir", objeto: Some("empilhadeira_1")), Camera(modo: "Orbita"),
+                Lod(false), Tempos(true), Medir(segundos: 2.0, nome: "x")]"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(&steps[0], Passo::Camera { objeto: Some(o), .. } if o == "empilhadeira_1")
+        );
+        assert!(matches!(&steps[1], Passo::Camera { objeto: None, .. }));
+        assert_eq!(steps[2], Passo::Lod(false));
+        let s = state();
+        assert!(s.verificar(&Condicao::CameraModo("seguir".into())).is_ok());
+        assert!(s.verificar(&Condicao::CameraModo("Órbita".into())).is_err());
+        assert!(s.verificar(&Condicao::CameraModo("voo".into())).is_err());
+        assert!(
+            s.verificar(&Condicao::CameraAlvo(Some("empilhadeira_1".into())))
+                .is_ok()
+        );
+        assert!(s.verificar(&Condicao::CameraAlturaEntre(5.0, 7.0)).is_ok());
+        assert!(s.verificar(&Condicao::CameraAlturaEntre(1.5, 1.7)).is_err());
+        assert!(
+            s.verificar(&Condicao::CameraPertoDe("empilhadeira_1".into(), 10.0))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::CameraPertoDe("doca".into(), 10.0))
+                .is_err()
+        );
+        assert!(s.verificar(&Condicao::LodAtivo(true)).is_ok());
     }
 
     #[test]

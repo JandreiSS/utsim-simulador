@@ -1,0 +1,41 @@
+// A3D-4: níveis de detalhe (LOD) num modelo sintético grande.
+//   utsim gerar-modelo --objetos 500 --tipo armazem --saida %TEMP%/utsim_a3d4/armazem_500.ron
+//   utsim-view %TEMP%/utsim_a3d4/armazem_500.ron --roteiro crates/utsim-viewer/roteiros/a3d4_lod.ron --capturas %TEMP%/utsim_a3d4/lod
+// Para medir de verdade (sem o limite de quadros do monitor): defina UTSIM_SEM_VSYNC=1 e use o
+// build de release. Cada medição é feita com o relógio parado no mesmo instante (IrPara), então
+// as situações são comparáveis.
+// Confere: com o LOD ligado a visão geral mostra caixas no lugar dos modelos longe e poucos
+// rótulos; desligado, tudo em detalhe; de perto os modelos e os rótulos próximos continuam
+// completos. Os tempos de quadro de cada situação vão para o log.txt (passo Medir).
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(2.0),
+    Afirmar(LodAtivo(true)),
+    IrPara(600.0),
+    Tempos(true),
+    Esperar(quadros: 20),
+    Captura("01_visao_geral_lod_ligado"),
+    Medir(segundos: 4.0, nome: "visao_geral_lod_ligado"),
+
+    Lod(false),
+    Afirmar(LodAtivo(false)),
+    Esperar(quadros: 30),
+    Captura("02_visao_geral_lod_desligado"),
+    Medir(segundos: 4.0, nome: "visao_geral_lod_desligado"),
+
+    // De perto: o que está ao alcance continua em detalhe com o LOD ligado.
+    Lod(true),
+    Focar(objeto: "rack250", distancia: 22.0, giro: Some(0.6), inclinacao: Some(0.5)),
+    Esperar(quadros: 30),
+    Captura("03_perto_lod_ligado"),
+    Medir(segundos: 4.0, nome: "perto_lod_ligado"),
+    Lod(false),
+    Esperar(quadros: 30),
+    Captura("04_perto_lod_desligado"),
+    Medir(segundos: 4.0, nome: "perto_lod_desligado"),
+    Lod(true),
+]

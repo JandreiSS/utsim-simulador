@@ -105,6 +105,10 @@ pub struct Editor {
     /// False when a recorded `.json` replay was opened: Simular only, nothing to edit.
     pub editable: bool,
     pub doc: Document,
+    /// Revision of the document the view, issues and warnings were built from (they are
+    /// rebuilt only when it changes: validation is not free on a model of hundreds of
+    /// objects).
+    refreshed: Option<u64>,
     /// File to create on the first save (a path given on the command line that does not exist yet).
     pub pending_path: Option<PathBuf>,
     pub view: EditView,
@@ -211,6 +215,7 @@ impl Editor {
             editable,
             stop_text: default_stop(doc.model().run.stop_time).to_string(),
             doc,
+            refreshed: None,
             pending_path,
             view,
             issues: Vec::new(),
@@ -252,10 +257,14 @@ impl Editor {
 
     /// Recomputes what depends on the document (view, issues, stale selection).
     pub fn refresh(&mut self) {
-        self.view = EditView::of(self.doc.model());
-        self.issues = self.doc.issues();
-        self.warnings = self.doc.warnings();
-        self.fluid_view = fluid_edit_view(self.doc.model(), &self.view);
+        let revision = self.doc.revision();
+        if self.refreshed != Some(revision) {
+            self.refreshed = Some(revision);
+            self.view = EditView::of(self.doc.model());
+            self.issues = self.doc.issues();
+            self.warnings = self.doc.warnings();
+            self.fluid_view = fluid_edit_view(self.doc.model(), &self.view);
+        }
         layers::prune(self);
         if self
             .selected
@@ -476,6 +485,7 @@ impl Editor {
 
     fn new_document(&mut self) {
         self.doc = Document::new("novo");
+        self.refreshed = None;
         self.pending_path = None;
         self.select_only(None);
         self.net_sel = None;
@@ -1128,6 +1138,7 @@ pub fn toolbar(
     mut editor: ResMut<Editor>,
     mut dock: ResMut<Dock>,
     mut visual: ResMut<crate::models::VisualMode>,
+    mut cameras: ResMut<crate::camera_modes::CameraModes>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     if !editor.editable {
@@ -1207,6 +1218,8 @@ pub fn toolbar(
             }
             ui.separator();
             crate::models::toggle(ui, &mut visual);
+            ui.separator();
+            crate::camera_modes::selector(ui, &mut cameras);
             if running {
                 ui.spinner();
             }
@@ -1431,6 +1444,7 @@ pub fn edit_panels(
     mut contexts: EguiContexts,
     mut editor: ResMut<Editor>,
     mut dock: ResMut<Dock>,
+    mut lod: ResMut<crate::lod::Lod>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
@@ -1556,7 +1570,15 @@ pub fn edit_panels(
     dock.free = right.available_rect_before_wrap();
 
     let chosen = ed.selection();
+    // Big models: only the nearest labels are laid out (see `lod.rs`).
+    let mask = crate::lod::label_mask(
+        &lod,
+        cam_tf.translation(),
+        ed.view.positions.iter().map(|p| Vec3::from(*p)),
+        |i| chosen.contains(&ed.view.names[i]),
+    );
     let mut labels: Vec<Label> = (0..ed.view.names.len())
+        .filter(|i| mask[*i])
         .map(|i| Label {
             text: ed.view.names[i].clone(),
             position: ed.view.positions[i],
@@ -1564,6 +1586,8 @@ pub fn edit_panels(
             selected: chosen.contains(&ed.view.names[i]),
         })
         .collect();
+    lod.stats.labels_drawn = labels.len();
+    lod.stats.labels_total = mask.len();
     labels.extend(capacity_labels(&NetworkView::of(ed.doc.model())));
     labels.extend(layers::labels(ed));
     draw_labels(ctx, cam, cam_tf, &labels, dock.free);

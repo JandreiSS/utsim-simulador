@@ -111,6 +111,8 @@ pub fn panel(
     mut editor: ResMut<Editor>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut visual: ResMut<crate::models::VisualMode>,
+    mut cameras: ResMut<crate::camera_modes::CameraModes>,
+    mut lod: ResMut<crate::lod::Lod>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let tl = &data.timeline;
@@ -125,7 +127,11 @@ pub fn panel(
                 .show(ui, |ui| {
                     // Without the toolbar (a recorded replay), the look switch lives here.
                     if !editor.editable {
-                        ui.horizontal(|ui| crate::models::toggle(ui, &mut visual));
+                        ui.horizontal(|ui| {
+                            crate::models::toggle(ui, &mut visual);
+                            ui.separator();
+                            crate::camera_modes::selector(ui, &mut cameras);
+                        });
                     }
                     sim_controls(
                         ui,
@@ -134,19 +140,31 @@ pub fn panel(
                         &mut selection,
                         &mut fluid_sel,
                         &mut editor,
+                        &mut cameras,
                     )
                 });
         });
     dock.free = ui.available_rect_before_wrap();
 
     let (cam, cam_tf) = *camera;
-    let labels: Vec<Label> = data
-        .replay
-        .blocks
+    // Big models: only the nearest labels are laid out (see `lod.rs`).
+    let shown: Vec<usize> = (0..data.replay.blocks.len())
+        .filter(|i| !data.is_hidden(*i))
+        .collect();
+    let mask = crate::lod::label_mask(
+        &lod,
+        cam_tf.translation(),
+        shown
+            .iter()
+            .map(|i| crate::scene::block_base_at(&data, *i, pb.t)),
+        |k| selection.0 == Some(shown[k]),
+    );
+    let labels: Vec<Label> = shown
         .iter()
-        .enumerate()
-        .filter(|(i, _)| !data.is_hidden(*i))
-        .map(|(i, block)| {
+        .zip(&mask)
+        .filter(|(_, keep)| **keep)
+        .map(|(&i, _)| {
+            let block = &data.replay.blocks[i];
             let geom = &data.geoms[i];
             let content = tl.block_content(i, pb.t);
             let hidden = geom.hidden_items(content);
@@ -159,6 +177,8 @@ pub fn panel(
             }
         })
         .collect();
+    lod.stats.labels_drawn = labels.len();
+    lod.stats.labels_total = shown.len();
     let mut labels = labels;
     labels.extend(fluid_labels(&data, pb.t, fluid_sel.0));
     labels.extend(capacity_labels(&data.network));
@@ -173,6 +193,7 @@ fn sim_controls(
     selection: &mut Selection,
     fluid_sel: &mut FluidSelection,
     editor: &mut Editor,
+    cameras: &mut crate::camera_modes::CameraModes,
 ) {
     let tl = &data.timeline;
     ui.heading("Simulação");
@@ -234,6 +255,7 @@ fn sim_controls(
     ui.label(format!("tempo simulado: {:.4} de {:.4}", pb.t, data.end));
     ui.weak("Espaço: reproduzir/pausar | +/-: velocidade | setas: evento anterior/próximo | F: enquadrar");
     ui.weak("Mouse: esquerdo arrasta (move) e clica (seleciona), direito gira, roda aproxima");
+    ui.weak("Câmera: 1 órbita, 2 seguir, 3 primeira pessoa, 4 do recurso | F3: tempos de quadro");
     ui.separator();
 
     ui.strong("Blocos");
@@ -300,7 +322,7 @@ fn sim_controls(
         None => {
             ui.label("Clique em um bloco para ver suas estatísticas.");
         }
-        Some(sel) => block_stats(ui, data, sel, pb.t),
+        Some(sel) => block_stats(ui, data, sel, pb.t, cameras),
     }
 }
 
@@ -446,10 +468,34 @@ fn fluid_stats(ui: &mut egui::Ui, data: &Data, node: usize, t: f64) {
     ui.weak("Nível e taxa interpolados a partir do rastro da rede de fluidos.");
 }
 
-fn block_stats(ui: &mut egui::Ui, data: &Data, sel: usize, t: f64) {
+fn block_stats(
+    ui: &mut egui::Ui,
+    data: &Data,
+    sel: usize,
+    t: f64,
+    cameras: &mut crate::camera_modes::CameraModes,
+) {
     let block = &data.replay.blocks[sel];
     let tl = &data.timeline;
     ui.strong(format!("{} ({})", block.name, block.kind));
+    if tl.is_mobile(sel) {
+        ui.horizontal(|ui| {
+            if ui
+                .button("Seguir este recurso")
+                .on_hover_text("A câmera acompanha o recurso por trás e por cima (2)")
+                .clicked()
+            {
+                cameras.follow_block(sel);
+            }
+            if ui
+                .button("Ver do recurso")
+                .on_hover_text("A câmera vai na posição do motorista (4)")
+                .clicked()
+            {
+                cameras.ride_block(sel);
+            }
+        });
+    }
     let report = data
         .replay
         .report

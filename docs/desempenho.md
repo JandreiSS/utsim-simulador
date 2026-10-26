@@ -121,3 +121,58 @@ A simulação, a validação, o ajuste e o replay rodam em um Web Worker (`web/w
 - Modo autocontido (`dist/utsim.html`): `scripts/web.sh` grava o código de cola do wasm-bindgen e o `worker.js` em elementos `<script type="text/plain">`; a página monta um `Blob` com os dois, cria o worker a partir dele e passa os bytes do wasm (decodificados do base64) na mensagem `init`.
 - Cancelar: o botão "Cancelar" aparece enquanto há uma tarefa. Ele encerra o worker (`terminate`), rejeita as chamadas pendentes e já inicia um worker novo. Não há progresso fino, então a barra de status mostra o tempo decorrido.
 - `node web/smoke.mjs` exercita o protocolo do worker (com um `self` simulado) além do wasm direto.
+
+## Visualizador 3D
+
+Tempo de quadro do `utsim-view` em modelos sintéticos grandes, com os níveis de detalhe (LOD, `docs/arquitetura.md` 4p) ligados e desligados. O roteiro `crates/utsim-viewer/roteiros/a3d4_lod.ron` faz tudo: simula, para o relógio simulado em t = 600 (o mesmo instante em todas as medições, então as situações são comparáveis), mede 4 s de quadros com o LOD ligado e desligado, na visão geral e de perto (`Focar` a 22 m de um bloco do meio), e grava média, mediana, p95 e pior quadro no `log.txt`.
+
+| Item | Valor |
+|---|---|
+| Máquina | AMD Ryzen 9 5900XT, 32 GB, NVIDIA GeForce RTX 4070 Ti (Vulkan), Windows 11 Pro |
+| Build | `cargo build --release -p utsim-viewer`, janela de 1280 x 800, visual realista |
+| Sem limite do monitor | `UTSIM_SEM_VSYNC=1` (só no modo roteirizado) |
+| Modelos | `utsim gerar-modelo --objetos N --tipo armazem --itens 1000`; `--objetos 300 --tipo rede --itens 20000` (2.043 itens desenhados) |
+
+Reproduzir (as medições ficam no `log.txt` da pasta de capturas):
+
+```
+utsim gerar-modelo --objetos 500 --tipo armazem --itens 1000 --saida %TEMP%/utsim_a3d4/armazem_500.ron
+set UTSIM_SEM_VSYNC=1
+utsim-view %TEMP%/utsim_a3d4/armazem_500.ron --roteiro crates/utsim-viewer/roteiros/a3d4_lod.ron --capturas %TEMP%/utsim_a3d4/lod
+```
+
+Para outro modelo, troque o bloco do `Focar` (`rack250`) por um nome que exista nele. Dentro do visualizador, `F3` mostra os tempos e as contagens e `F4` liga e desliga o LOD.
+
+### Tempo médio por quadro (ms; entre parênteses, quadros por segundo)
+
+| modelo | situação | LOD ligado | LOD desligado |
+|---|---|---|---|
+| 500 objetos (armazém) | visão geral | 2,69 (372) | 24,83 (40) |
+| 500 objetos (armazém) | de perto | 2,63 (381) | 4,92 (203) |
+| 300 objetos (rede, 2.043 itens) | visão geral | 2,49 (402) | 7,84 (128) |
+| 300 objetos (rede, 2.043 itens) | de perto | 2,41 (416) | 3,75 (267) |
+| 100 objetos (armazém) | visão geral | 2,28 (439) | 2,08 (482) |
+| 100 objetos (armazém) | de perto | 1,86 (537) | 2,00 (500) |
+
+Com 100 objetos o LOD não ajuda nem atrapalha (a diferença está no ruído de medição): o custo ainda é do egui e dos gizmos, não das malhas. Por isso ele só age a partir de 100 blocos realistas ou 400 itens desenhados (`min_blocks`, `min_items`); abaixo disso a planta é desenhada inteira de qualquer distância.
+
+O que cada nível tira, no modelo de 500 objetos visto de longe: 498 modelos glTF viram caixas, os rótulos caem de 500 para no máximo 150 (na visão geral, 0) e, na rede visto de perto, 73 de 157 itens somem e 68 viram cubos.
+
+### O gargalo que não era a renderização
+
+A primeira medição dava de 165 a 190 ms por quadro (6 quadros/s) com ou sem LOD, no modelo de 500 objetos. Cronometrando os sistemas, quase tudo era `Editor::refresh`, que a cada quadro reconstruía a vista de edição e revalidava o documento (`Document::issues`, `warnings`, com uma busca de nome por mensagem que alocava textos), mesmo em Simular, sem nada ter mudado. Correções:
+
+- `Document::revision()` (contador de mudanças do documento) e `Editor::refresh` só refaz vista, problemas e avisos quando a revisão muda;
+- `Document::object_of` sem alocar um texto por par (mensagem, objeto).
+
+Depois disso o quadro caiu para cerca de 24 ms com todos os rótulos desenhados (o custo restante era o egui desenhando 500 rótulos e o desagrupamento deles, que o LOD limita) e para 2,7 ms com o LOD. Antes da correção as medições do LOD ficaram escondidas atrás desse custo fixo: 168,8 ms (ligado) contra 186,8 ms (desligado) na visão geral.
+
+### Itens e instâncias
+
+Os itens já compartilham os recursos: o cubo simples usa uma só malha e um material por origem, e o item realista usa as mesmas cenas glTF (palete e caixa) com uma cópia de material por cor. O Bevy junta os desenhos que repartem malha e material, então não foi preciso criar instâncias próprias. O custo que sobra por item é criar a entidade e movê-la; o LOD o reduz escondendo (e trocando por um cubo) os distantes.
+
+### Limites
+
+- O tempo medido é de quadro inteiro (CPU e GPU juntos). Não há medição separada da GPU.
+- O LOD de bloco troca o modelo por uma caixa sólida, que de longe parece mais cheia que um porta-paletes (vazado). É a troca desejada, mas muda o aspecto no limiar (45 m).
+- Os rótulos do modo Editar usam o mesmo limite de 150, também só em modelos pesados.

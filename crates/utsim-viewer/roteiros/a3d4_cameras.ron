@@ -1,0 +1,97 @@
+// A3D-4: modos de câmera (órbita, seguir, primeira pessoa, do recurso).
+//   utsim-view examples/centro_de_distribuicao.ron --roteiro crates/utsim-viewer/roteiros/a3d4_cameras.ron --capturas %TEMP%/utsim_a3d4/cameras
+// Confere: a órbita de sempre; a empilhadeira clicada e o botão "Seguir este recurso", com a
+// câmera acompanhando a empilhadeira por trás e por cima
+// enquanto ela anda; Esc voltando à órbita; "Primeira pessoa" pelo menu da barra (andando
+// com W e Shift, olhando com o botão direito, sempre a 1,6 m do chão); "Do recurso" na
+// posição do motorista (tecla 4); F enquadrando de volta em órbita.
+[
+    Esperar(quadros: 20),
+    EsperarSegundos(3.0),
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    EsperarSegundos(2.0),
+    Afirmar(CameraModo("Órbita")),
+    Captura("01_orbita"),
+
+    // Seguir: a empilhadeira carregada indo para o porta-paletes.
+    IrPara(1030.0),
+    Focar(objeto: "empilhadeira_1", distancia: 12.0, giro: Some(0.6), inclinacao: Some(0.45)),
+    Esperar(quadros: 10),
+    // Seleciona pela lista de blocos (rola até a empilhadeira); o painel mostra os botões.
+    MoverPara(Tela(150.0, 450.0)),
+    Rolar(-3.0),
+    EsperarSegundos(1.0),
+    ClicarBotao("empilhadeira_1 [Transporter]"),
+    Esperar(quadros: 5),
+    Captura("01b_selecionada"),
+    ClicarBotao("Seguir este recurso"),
+    EsperarSegundos(1.2),
+    Afirmar(CameraModo("Seguir")),
+    Afirmar(CameraAlvo(Some("empilhadeira_1"))),
+    Afirmar(CameraPertoDe("empilhadeira_1", 14.0)),
+    Captura("02_seguir_parado"),
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(2.5),
+    Afirmar(CameraPertoDe("empilhadeira_1", 14.0)),
+    Captura("03_seguir_andando"),
+    ClicarBotao("Pausar"),
+    // A roda aproxima a câmera do recurso.
+    MoverPara(Tela(800.0, 400.0)),
+    Rolar(4.0),
+    EsperarSegundos(0.5),
+    Captura("04_seguir_perto"),
+    Afirmar(CameraPertoDe("empilhadeira_1", 9.0)),
+
+    // Esc sai do modo.
+    Tecla("Esc"),
+    EsperarSegundos(1.2),
+    Afirmar(CameraModo("Órbita")),
+    Captura("05_de_volta_na_orbita"),
+
+    // Primeira pessoa, pelo menu da barra.
+    ClicarBotao("Câmera: Órbita"),
+    Esperar(quadros: 5),
+    ClicarBotao("Primeira pessoa"),
+    EsperarSegundos(1.2),
+    Afirmar(CameraModo("Primeira pessoa")),
+    Afirmar(CameraAlturaEntre(1.55, 1.65)),
+    Captura("06_primeira_pessoa_inicio"),
+    // Anda para a frente, corre e olha em volta.
+    Segurar("W"),
+    EsperarSegundos(2.0),
+    LargarTecla("W"),
+    Captura("07_andando"),
+    Segurar("Shift"),
+    Segurar("W"),
+    EsperarSegundos(1.5),
+    LargarTecla("W"),
+    LargarTecla("Shift"),
+    MoverPara(Tela(800.0, 400.0)),
+    Pressionar(Direito),
+    MoverPara(Tela(900.0, 380.0)),
+    Soltar(Direito),
+    Esperar(quadros: 5),
+    Afirmar(CameraAlturaEntre(1.55, 1.65)),
+    Captura("08_olhando_em_volta"),
+
+    // Do recurso: no assento do motorista da empilhadeira em movimento.
+    IrPara(1030.0),
+    Tecla("4"),
+    EsperarSegundos(1.5),
+    Afirmar(CameraModo("Do recurso")),
+    Afirmar(CameraPertoDe("empilhadeira_1", 3.0)),
+    Captura("09_do_recurso_parado"),
+    ClicarBotao("Reproduzir"),
+    EsperarSegundos(2.5),
+    Afirmar(CameraPertoDe("empilhadeira_1", 3.0)),
+    Captura("10_do_recurso_andando"),
+    ClicarBotao("Pausar"),
+
+    // Enquadrar volta à órbita.
+    Tecla("F"),
+    EsperarSegundos(2.0),
+    Afirmar(CameraModo("Órbita")),
+    Captura("11_enquadrar"),
+]

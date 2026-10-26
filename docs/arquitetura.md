@@ -675,6 +675,48 @@ nunca discordam sobre onde as coisas estão:
 - **Aparência** (`visual` no objeto): um item da biblioteca embutida ou um `.glb`, com
   escala, giro e cor. É só apresentação: a simulação nunca lê esse campo.
 
+### Câmeras e níveis de detalhe do visualizador
+
+O visualizador Bevy é um cliente da cena: ele só lê. Duas peças dele importam para um
+modo de realidade virtual e para modelos grandes.
+
+**Câmeras** (`camera_modes.rs`; regras puras em `utsim_viewer::cameras`, com testes):
+
+- Cada modo é um `CameraController`: recebe a entrada do quadro (`CamInput`: mouse, roda, teclas)
+  e o que a cena sabe (`CamWorld`: o veículo seguido como está desenhado, as pegadas dos blocos
+  para a colisão) e devolve a pose da câmera. O sistema `drive` escolhe o controlador ativo,
+  desliza da pose antiga para a nova em 0,7 s quando o modo muda e grava o `Transform` da câmera.
+  Nada mais no visualizador lê a câmera senão por esse `Transform`.
+- Modos: **Órbita** (o de sempre), **Seguir** (por trás e por cima do recurso, com suavização
+  da posição e da direção), **Primeira pessoa** (a 1,6 m do chão, `EYE_HEIGHT`, escala real,
+  com colisão simples contra as pegadas dos blocos) e **Do recurso** (no assento do motorista,
+  `driver_seat` por papel). Cada controlador guarda o próprio estado (distância, velocidade, giro),
+  então voltar a um modo o encontra como foi deixado.
+- **Ponto de extensão para realidade virtual:** uma câmera de headset é mais um controlador, com
+  a pose vinda do XR em vez do mouse, mais uma variante de `CameraKind` e um campo em
+  `CameraModes`. O restante (escala real, altura dos olhos, a cena em metros) já vale.
+- O recurso seguido é lido do `Transform` da entidade desenhada (a pose do modelo realista,
+  que já inclui a aproximação do porta-paletes), e o `drive` roda depois da animação dos
+  modelos, para a câmera não ficar um quadro atrás.
+
+**Níveis de detalhe** (`lod.rs`; regras e limiares em `utsim_viewer::lod_rules`):
+
+- O sistema `apply` mede a distância de cada entidade até a câmera e troca as distantes por
+  algo mais barato, achando-as pelos componentes que a cena já põe (`Realistic` nos blocos,
+  `ItemVisual` nos itens). Cria um filho de substituição por entidade (caixa do tamanho do bloco,
+  cubo do item), uma vez, e só liga e desliga a visibilidade depois.
+- Degraus: bloco realista, caixa; item realista (palete com caixas), cubo, e além de
+  `item_hide_m` nada. Rótulos: só os `label_max` mais próximos (150) e nenhum além de
+  `label_hide_m`. Os limiares ficam em `LodSettings` (padrão: 45 m, 30 m, 140 m, 90 m, 150) e
+  têm histerese de 10 %, para um objeto na fronteira não piscar.
+- O LOD só age num modelo pesado (`min_blocks` 100 blocos realistas ou `min_items` 400 itens
+  desenhados): uma planta pequena é vista inteira, de qualquer distância.
+- Os itens já compartilham a malha e o material (cubo simples: um material por origem; modelo
+  realista: as mesmas cenas glTF e uma cópia de material por cor), e o Bevy agrupa os
+  desenhos iguais, então não houve necessidade de instâncias próprias.
+- `F3` mostra tempo de quadro, entidades e a contagem por nível; `F4` liga e desliga o LOD.
+  Medições em `docs/desempenho.md`, seção "Visualizador 3D".
+
 ### Cena ao vivo (socket)
 
 `utsim emular modelo.ron --cena-porta 7878` serve a cena enquanto emula (OPC UA e cena no

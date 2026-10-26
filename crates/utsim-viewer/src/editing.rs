@@ -162,7 +162,7 @@ pub fn paste_offset(n: u32) -> [f64; 3] {
 
 /// The keyboard and mouse shortcuts of `Editar`, as shown in the "Atalhos" window
 /// (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 24] = [
+pub const SHORTCUTS: [(&str, &str); 29] = [
     ("Clique", "seleciona o bloco (ou remove a ligação clicada)"),
     ("Shift + clique", "põe ou tira o bloco da seleção"),
     (
@@ -184,9 +184,23 @@ pub const SHORTCUTS: [(&str, &str); 24] = [
     ("Setas", "move a seleção um passo da grade"),
     ("Del", "exclui a seleção"),
     ("C", "liga o bloco selecionado ao próximo clicado"),
-    ("Esc", "cancela a ferramenta e fecha os diálogos"),
-    ("F", "enquadra o modelo"),
+    (
+        "Esc",
+        "cancela a ferramenta, fecha os diálogos e sai das câmeras seguir e primeira pessoa",
+    ),
+    ("F", "enquadra o modelo (volta à câmera em órbita)"),
+    (
+        "1, 2, 3, 4",
+        "câmera: órbita, seguir um recurso, primeira pessoa, do recurso",
+    ),
+    (
+        "W A S D",
+        "anda na primeira pessoa (Shift corre, a roda muda a velocidade)",
+    ),
+    ("L", "trava o mouse na primeira pessoa"),
     ("F1", "mostra ou esconde esta janela"),
+    ("F3", "mostra ou esconde os tempos de quadro"),
+    ("F4", "liga ou desliga os níveis de detalhe"),
     ("Ctrl + A", "seleciona todos os objetos"),
     ("Ctrl + C", "copia a seleção"),
     ("Ctrl + X", "recorta a seleção"),

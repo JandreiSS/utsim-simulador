@@ -3,12 +3,14 @@
 //! produces a `Replay` that the viewer only reads.
 
 mod camera;
+mod camera_modes;
 mod dock;
 mod editor;
 mod fluid_scene;
 #[cfg(not(target_arch = "wasm32"))]
 mod icon;
 mod layers;
+mod lod;
 mod models;
 mod playback;
 mod results_panel;
@@ -220,6 +222,9 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
         .insert_resource(camera::OrbitCam::framing(min, max))
         .insert_resource(camera::CameraLock::default())
         .insert_resource(camera::FrameRequest(8))
+        .insert_resource(camera_modes::CameraModes::default())
+        .insert_resource(lod::Lod::default())
+        .insert_resource(lod::LodAssets::default())
         .insert_resource(dock::Dock::default())
         .insert_resource(playback::Playback::new(data.end))
         .insert_resource(playback::Selection::default())
@@ -235,13 +240,16 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
             (
                 editor::refresh,
                 editor::poll_job,
-                (editor::keys, editor::mouse)
+                (
+                    editor::keys,
+                    editor::mouse.run_if(camera_modes::editing_allowed),
+                )
                     .chain()
                     .run_if(editor::in_edit),
                 playback::keyboard.run_if(editor::in_sim),
                 playback::advance_clock.run_if(editor::in_sim),
+                lod::frames,
                 camera::frame_scene,
-                camera::control,
                 scene::pick.run_if(editor::in_sim),
                 scene::sync_blocks,
                 (
@@ -258,10 +266,16 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                     models::animate,
                 )
                     .chain(),
+                // After the models are animated, so a followed vehicle is where it is
+                // drawn; the LOD looks at the camera this leaves.
+                (camera_modes::drive, lod::apply).chain(),
                 scene::draw_sim.run_if(editor::in_sim),
-                fluid_scene::sync_fluids,
-                fluid_scene::update_fluids,
-                fluid_scene::draw_fluids,
+                (
+                    fluid_scene::sync_fluids,
+                    fluid_scene::update_fluids,
+                    fluid_scene::draw_fluids,
+                )
+                    .chain(),
                 editor::draw_edit.run_if(editor::in_edit),
                 editor::title,
             )
@@ -276,6 +290,8 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                 editor::edit_panels.run_if(editor::in_edit),
                 ui::panel.run_if(editor::in_sim),
                 editor::results_window,
+                camera_modes::hud,
+                lod::overlay,
                 dock::apply_viewport,
             )
                 .chain(),
@@ -333,6 +349,10 @@ fn main() -> ExitCode {
         // Predictable captures: fixed size, one pixel per logical pixel.
         window.resolution =
             bevy::window::WindowResolution::new(1280, 800).with_scale_factor_override(1.0);
+    }
+    if steps.is_some() && std::env::var_os("UTSIM_SEM_VSYNC").is_some() {
+        // Frame-time measurements (`Medir`): do not cap the frame rate at the display's.
+        window.present_mode = bevy::window::PresentMode::AutoNoVsync;
     }
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {

@@ -113,12 +113,34 @@ Para pessoas animadas, os dois arquivos do Quaternius têm o mesmo esqueleto e o
 
 `visual.color` troca a cor do material chamado `pintura`. Para o seu modelo aceitar a troca de cor, dê o nome `pintura` ao material da parte que deve mudar. O material `luz` é a luz de estado, que o visualizador recolore.
 
+## Câmeras
+
+Em **Simular** (e a primeira pessoa também em Editar), o menu **Câmera** da barra troca o modo de olhar a planta. As teclas `1` a `4` fazem o mesmo, e a câmera desliza do ponto de vista antigo para o novo.
+
+| Modo | Tecla | O que faz |
+|---|---|---|
+| Órbita | `1` | o de sempre: arrastar desloca, botão direito gira, roda aproxima |
+| Seguir | `2` | acompanha um recurso móvel por trás e por cima; o botão direito gira em volta dele e a roda muda a distância (ou use o controle "distância" do quadro no canto da vista) |
+| Primeira pessoa | `3` | anda pela planta a 1,6 m do chão |
+| Do recurso | `4` | vai no assento do motorista (empilhadeira), no ponto de vista de uma pessoa ou sobre o AGV; o botão direito olha em volta |
+
+- **Seguir um recurso:** clique num recurso móvel (ou escolha na lista de blocos) e use **Seguir este recurso** ou **Ver do recurso** no painel. Sem seleção, as teclas `2` e `4` escolhem o primeiro recurso móvel. Clicar em outro recurso enquanto segue passa a seguir esse. `Esc` sai do modo, e **Enquadrar (F)** volta à órbita e enquadra o modelo.
+- **Primeira pessoa:** `W`, `A`, `S`, `D` andam, `Shift` corre, a roda do mouse muda a velocidade (0,5 a 30 m/s; o controle "velocidade" do quadro no canto também). Segure o botão direito para olhar em volta, ou ligue **Travar o mouse** (tecla `L`) para olhar só movendo o mouse; `Esc` solta o mouse e, de novo, sai do modo. O chão é plano (a câmera fica sempre a 1,6 m) e os blocos são obstáculos: você desliza ao longo deles em vez de atravessá-los. Marcas no chão (áreas pintadas) podem ser pisadas. Em Editar, o mouse não edita enquanto você anda. No navegador não há trava do mouse; o botão direito olha em volta.
+- Cada modo guarda o que você ajustou (distância, velocidade, para onde olhava).
+- Seguir e Do recurso só existem em Simular, e só para recursos móveis (empilhadeiras, AGVs e pessoas).
+
+## Modelos grandes (níveis de detalhe)
+
+Numa planta com muitos objetos, o visualizador troca o que está longe por algo mais barato: o modelo realista vira uma caixa a mais de 45 m, o item realista vira um cubo a mais de 30 m e some a mais de 140 m, e só os 150 rótulos mais próximos (a até 90 m) são escritos. Isso só vale para modelos com pelo menos 100 blocos realistas (ou 400 itens desenhados); uma planta pequena é sempre vista inteira.
+
+`F3` mostra o tempo de quadro, a contagem de objetos em cada nível e os controles dos limiares; `F4` liga e desliga o recurso. Os números medidos estão em `docs/desempenho.md`.
+
 ## Limites atuais
 
 - O corredor da empilhadeira num porta-paletes é sempre o lado `-y` dele.
 - Os tanques da rede de fluidos ainda usam o cilindro translúcido, não o modelo `tanque`.
 - No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá.
-- Não há sombras nem níveis de detalhe.
+- Não há sombras.
 
 ## Cena 3D para outros motores
 
