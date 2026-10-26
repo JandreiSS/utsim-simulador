@@ -15,12 +15,13 @@ use utsim_edit::arrange::{self, Align, Axis, Clipboard};
 use utsim_edit::{CATEGORIES, Command, Document, Issue, PALETTE, from_palette, palette_entry};
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::{
-    EditView, LINE_PICK_PIXELS, NetworkView, SHORTCUTS, auto_layout_command, coalesce_key,
-    connect_blocked, default_stop, ground_to_model_snapped, group_issues, inside_box,
-    logical_flags, name_base, nearest_segment, needs_layout, palette_icon, paste_offset, renamed,
-    run_model, select_names, selection_of, toggle_selected,
+    EditView, LINE_PICK_PIXELS, Layer, NetworkView, SHORTCUTS, auto_layout_command, coalesce_key,
+    connect_blocked, default_stop, fluid_edit_view, ground_to_model_snapped, group_issues,
+    inside_box, logical_flags, name_base, nearest_segment, needs_layout, palette_icon,
+    paste_offset, renamed, run_model, select_names, selection_of, toggle_selected,
 };
 use utsim_viewer::flows_ui::{self, FlowsState};
+use utsim_viewer::fluids::FluidView;
 use utsim_viewer::layout;
 use utsim_viewer::properties::{properties_panel, run_panel};
 use utsim_viewer::style;
@@ -28,6 +29,7 @@ use utsim_viewer::timeline::TransitSetting;
 
 use crate::camera::CameraLock;
 use crate::dock::{Dock, pointer_over_ui};
+use crate::layers::{self, LayerPress, NetSel};
 use crate::playback::{Data, Playback, Selection};
 use crate::scene;
 use crate::ui::{Label, capacity_labels, draw_labels};
@@ -46,6 +48,33 @@ pub enum Tool {
     Place(&'static str),
     /// Connect this object to the next block clicked.
     Connect(String),
+    /// `Rede`: a click on the floor adds a node.
+    Node,
+    /// `Rede`: clicking node after node draws edges (from the pending node, if any; a
+    /// click on the floor adds a node there and connects it).
+    Edge(Option<String>),
+    /// `Fluidos`: a click on the floor adds a fluid node of this kind
+    /// (`utsim_edit::fluids::FLUID_PALETTE`, by id).
+    FluidPlace(&'static str),
+    /// `Fluidos`: clicking node after node links them (from the pending node, if any).
+    FluidLink(Option<String>),
+}
+
+impl Tool {
+    /// Text of the tool in the script assertions (`Ferramenta("...")`).
+    pub fn script_name(&self) -> String {
+        match self {
+            Tool::Select => "Selecionar".to_string(),
+            Tool::Place(k) => format!("Colocar:{k}"),
+            Tool::Connect(f) => format!("Ligar:{f}"),
+            Tool::Node => "Rede:No".to_string(),
+            Tool::Edge(None) => "Rede:Aresta".to_string(),
+            Tool::Edge(Some(n)) => format!("Rede:Aresta:{n}"),
+            Tool::FluidPlace(k) => format!("Fluido:{k}"),
+            Tool::FluidLink(None) => "Fluido:Ligar".to_string(),
+            Tool::FluidLink(Some(n)) => format!("Fluido:Ligar:{n}"),
+        }
+    }
 }
 
 /// A left-button gesture in progress.
@@ -79,6 +108,20 @@ pub struct Editor {
     pub pending_path: Option<PathBuf>,
     pub view: EditView,
     pub issues: Vec<Issue>,
+    /// Non-blocking warnings (`Document::warnings`), shown apart from the issues.
+    pub warnings: Vec<Issue>,
+    /// What `Editar` edits: objects, the path network or the fluid network.
+    pub layer: Layer,
+    /// Selected node or edge of the path network (`Rede`).
+    pub net_sel: Option<NetSel>,
+    /// Selected node of the fluid network (`Fluidos`).
+    pub fluid_sel: Option<String>,
+    /// New edges are two-way.
+    pub new_two_way: bool,
+    /// The fluid network of the document as drawn in `Editar`.
+    pub fluid_view: FluidView,
+    /// A left-button gesture of the `Rede` or `Fluidos` layer.
+    pub layer_press: Option<LayerPress>,
     /// The primary selected object (its properties are shown).
     pub selected: Option<String>,
     /// The other selected objects (never the primary one).
@@ -99,7 +142,7 @@ pub struct Editor {
     pub shortcuts_open: bool,
     press: Option<Press>,
     /// Snapped ground position under the cursor while placing.
-    hover: Option<[f64; 3]>,
+    pub hover: Option<[f64; 3]>,
     pub status: String,
     /// Set to ask the camera to frame the whole model (consumed by `camera::frame_scene`).
     pub frame_request: bool,
@@ -168,6 +211,13 @@ impl Editor {
             pending_path,
             view,
             issues: Vec::new(),
+            warnings: Vec::new(),
+            layer: Layer::Objects,
+            net_sel: None,
+            fluid_sel: None,
+            new_two_way: true,
+            fluid_view: FluidView::default(),
+            layer_press: None,
             selected: None,
             multi: Vec::new(),
             tool: Tool::Select,
@@ -200,6 +250,9 @@ impl Editor {
     pub fn refresh(&mut self) {
         self.view = EditView::of(self.doc.model());
         self.issues = self.doc.issues();
+        self.warnings = self.doc.warnings();
+        self.fluid_view = fluid_edit_view(self.doc.model(), &self.view);
+        layers::prune(self);
         if self
             .selected
             .as_ref()
@@ -232,7 +285,7 @@ impl Editor {
             .unwrap_or_else(|| "sem título.ron".to_string())
     }
 
-    fn exec(&mut self, command: Command) {
+    pub fn exec(&mut self, command: Command) {
         let key = coalesce_key(&command);
         match self.doc.apply_coalescing(command, key.as_deref()) {
             Ok(()) => self.status.clear(),
@@ -277,6 +330,10 @@ impl Editor {
     }
 
     fn delete_selected(&mut self) {
+        if self.layer != Layer::Objects {
+            layers::delete(self);
+            return;
+        }
         let names = self.selection();
         if let Some(c) = arrange::delete_command(&names) {
             self.select_only(None);
@@ -417,6 +474,8 @@ impl Editor {
         self.doc = Document::new("novo");
         self.pending_path = None;
         self.select_only(None);
+        self.net_sel = None;
+        self.fluid_sel = None;
         self.tool = Tool::Select;
         self.confirm_new = false;
         self.stop_text = default_stop(self.doc.model().run.stop_time).to_string();
@@ -575,6 +634,36 @@ pub fn keys(
     ]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     let pressed = |k| keys.just_pressed(k);
+    let objects = editor.layer == Layer::Objects;
+    if ctrl && !objects {
+        // Clipboard and selection shortcuts are for objects; history and file still work.
+        if pressed(KeyCode::KeyZ) {
+            editor.run(if shift { Act::Redo } else { Act::Undo });
+        } else if pressed(KeyCode::KeyY) {
+            editor.run(Act::Redo);
+        } else if pressed(KeyCode::KeyS) {
+            editor.run(Act::Save);
+        } else if pressed(KeyCode::KeyN) {
+            editor.run(Act::New);
+        }
+        return;
+    }
+    if !objects {
+        if pressed(KeyCode::Delete) {
+            editor.run(Act::Delete);
+        }
+        if pressed(KeyCode::F1) {
+            editor.shortcuts_open = !editor.shortcuts_open;
+        }
+        if pressed(KeyCode::Escape) {
+            layers::escape(&mut editor);
+            editor.shortcuts_open = false;
+            editor.save_prompt = None;
+            editor.confirm_new = false;
+            editor.show_blocked = false;
+        }
+        return;
+    }
     if ctrl {
         if pressed(KeyCode::KeyZ) {
             editor.run(if shift { Act::Redo } else { Act::Undo });
@@ -691,6 +780,20 @@ pub fn mouse(
         KeyCode::ControlLeft,
         KeyCode::ControlRight,
     ]);
+    if editor.layer != Layer::Objects {
+        let pointer = layers::Pointer {
+            cursor,
+            ray,
+            ground,
+            over_ui,
+            shift,
+            just_pressed: buttons.just_pressed(MouseButton::Left),
+            pressed: buttons.pressed(MouseButton::Left),
+            just_released: buttons.just_released(MouseButton::Left),
+        };
+        layers::mouse(editor, &pointer, cam, cam_tf, &mut lock);
+        return;
+    }
     // Dropping a palette entry dragged from the panel: only the 3D area counts (egui
     // still owns the pointer while its drag lasts).
     let in_view = cursor.is_some_and(|c| dock.free.contains(egui::pos2(c.x, c.y)));
@@ -926,6 +1029,8 @@ fn click(
                 None => editor.select_only(None),
             }
         }
+        // The network and fluid tools belong to their layers (`layers.rs`).
+        Tool::Node | Tool::Edge(_) | Tool::FluidPlace(_) | Tool::FluidLink(_) => {}
     }
 }
 
@@ -934,10 +1039,22 @@ fn click(
 pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
     let view = &editor.view;
     let mut outlines: Vec<(usize, Color)> = Vec::new();
-    if let Some(i) = editor.selected.as_deref().and_then(|s| view.index_of(s)) {
+    // The object selection is only outlined in its own layer.
+    let objects = editor.layer == Layer::Objects;
+    if let Some(i) = editor
+        .selected
+        .as_deref()
+        .filter(|_| objects)
+        .and_then(|s| view.index_of(s))
+    {
         outlines.push((i, Color::srgb(1.0, 1.0, 1.0)));
     }
-    for i in editor.multi.iter().filter_map(|s| view.index_of(s)) {
+    for i in editor
+        .multi
+        .iter()
+        .filter(|_| objects)
+        .filter_map(|s| view.index_of(s))
+    {
         outlines.push((i, Color::srgb(0.45, 0.80, 1.0)));
     }
     if let Tool::Connect(from) = &editor.tool
@@ -961,6 +1078,7 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
         Some(editor.snap_step().map_or(1.0, |s| s as f32)),
     );
     scene::draw_network(&mut gizmos, &NetworkView::of(editor.doc.model()));
+    layers::draw(&editor, &mut gizmos);
     let placing = match (&editor.tool, editor.palette_drag) {
         (_, Some(id)) => Some(id),
         (Tool::Place(id), None) => Some(*id),
@@ -1243,6 +1361,26 @@ fn issues_ui(ui: &mut egui::Ui, issues: &[Issue], selected: &mut Option<String>)
     }
 }
 
+/// Warnings grouped by object, in yellow: the model runs, but probably not as meant.
+fn warnings_ui(ui: &mut egui::Ui, warnings: &[Issue], selected: &mut Option<String>) {
+    let yellow = egui::Color32::from_rgb(240, 200, 80);
+    for (object, messages) in group_issues(warnings) {
+        match object {
+            None => {
+                ui.strong("Modelo");
+            }
+            Some(name) => {
+                if ui.link(name.clone()).clicked() {
+                    *selected = Some(name);
+                }
+            }
+        }
+        for message in messages {
+            ui.colored_label(yellow, format!("- {message}"));
+        }
+    }
+}
+
 /// `Editar`: palette, properties of the selected object, connections and issues.
 pub fn edit_panels(
     mut contexts: EguiContexts,
@@ -1260,10 +1398,18 @@ pub fn edit_panels(
         .resizable(false)
         .exact_size(172.0)
         .show(&mut left, |ui| {
-            ui.heading("Biblioteca");
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, true])
-                .show(ui, |ui| palette_ui(ui, ed));
+            layers::layer_switch(ui, ed);
+            ui.separator();
+            if ed.layer == Layer::Objects {
+                ui.heading("Biblioteca");
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| palette_ui(ui, ed));
+            } else {
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| layers::tools_ui(ui, ed));
+            }
         });
     dock.free = left.available_rect_before_wrap();
     if let Some(id) = ed.palette_drag
@@ -1307,6 +1453,11 @@ pub fn edit_panels(
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     match ed.selected.clone() {
+                        _ if ed.layer != Layer::Objects => {
+                            for command in layers::properties_ui(ui, ed) {
+                                acts.push(Act::Exec(command));
+                            }
+                        }
                         None => {
                             ui.label("Selecione um bloco para editar suas propriedades.");
                             ui.separator();
@@ -1345,8 +1496,15 @@ pub fn edit_panels(
                     ui.strong(format!("Problemas ({})", ed.issues.len()));
                     let before = ed.selected.clone();
                     issues_ui(ui, &ed.issues, &mut ed.selected);
+                    if !ed.warnings.is_empty() {
+                        ui.separator();
+                        ui.strong(format!("Avisos ({})", ed.warnings.len()));
+                        warnings_ui(ui, &ed.warnings, &mut ed.selected);
+                    }
                     if ed.selected != before {
                         ed.multi.clear();
+                        ed.layer = Layer::Objects;
+                        ed.tool = Tool::Select;
                     }
                 });
         });
@@ -1362,6 +1520,7 @@ pub fn edit_panels(
         })
         .collect();
     labels.extend(capacity_labels(&NetworkView::of(ed.doc.model())));
+    labels.extend(layers::labels(ed));
     draw_labels(ctx, cam, cam_tf, &labels, dock.free);
 
     // Commands from the property panel may rename the selected object.
@@ -1375,6 +1534,7 @@ pub fn edit_panels(
     if let Some(sel) = ed.selected.clone() {
         ed.selected = Some(renamed(&property_commands, &sel));
     }
+    layers::follow_renames(ed, &property_commands);
     for act in acts {
         editor.run(act);
     }

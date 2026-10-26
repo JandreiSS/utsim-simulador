@@ -63,4 +63,6 @@ Cada nó aparece no relatório do bloco de fluidos:
 
 ## No visualizador
 
-No 3D (modo Simular), os tanques aparecem como cilindros translúcidos com o líquido azul na altura proporcional ao nível. Fontes, sumidouros, tubos e conversores têm formas próprias, e as ligações ficam ciano quando há vazão. A rede de fluidos é somente para visualização; não é editada no modo Editar. Se as posições dos nós são todas zero, eles são dispostos em camadas automaticamente.
+No 3D (modo Simular), os tanques aparecem como cilindros translúcidos com o líquido azul na altura proporcional ao nível. Fontes, sumidouros, tubos e conversores têm formas próprias, e as ligações ficam ciano quando há vazão. Se as posições dos nós são todas zero, eles são dispostos em camadas automaticamente.
+
+No modo Editar, a camada **Fluidos** mostra a rede com os níveis iniciais e permite montá-la: escolha o tipo de nó (Fonte, Tanque, Tubulação, Sumidouro, Itens em fluido, Fluido em itens) e clique no chão, ligue os nós com a ferramenta **Ligar** e ajuste os parâmetros no painel. Os conversores escolhem o objeto discreto numa lista. Ciclos e referências erradas aparecem na hora entre os problemas.

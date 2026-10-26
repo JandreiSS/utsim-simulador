@@ -101,6 +101,28 @@ pub enum Condicao {
     ObjetosComPrefixo(String, usize),
     /// Whether the connection `de -> para` exists.
     Ligado(String, String),
+    /// Layer of `Editar`: `"Objetos"`, `"Rede"` or `"Fluidos"`.
+    Camada(String),
+    /// Number of nodes of the path network.
+    NosIgual(usize),
+    /// Number of edges of the path network.
+    ArestasIgual(usize),
+    /// An edge between these nodes exists (stored either way round).
+    Aresta(String, String),
+    /// Model ground position `(x, y)` of a network node, tolerance 0.05.
+    NoEm(String, (f64, f64)),
+    /// Selection of the `Rede` or `Fluidos` layer: `"no:a"`, `"aresta:a->b"`,
+    /// `"fluido:tanque"` (`None`: nothing selected there).
+    SelecaoCamada(Option<String>),
+    /// Number of nodes of the fluid network.
+    NosFluidoIgual(usize),
+    /// Number of links of the fluid network.
+    LigacoesFluidoIgual(usize),
+    /// Number of warnings (`Avisos`).
+    AvisosIgual(usize),
+    /// Level of a tank at the current time (`Simular`; the initial level in `Editar`)
+    /// between `min` and `max`.
+    NivelEntre(String, f64, f64),
     Nao(Box<Condicao>),
 }
 
@@ -178,6 +200,18 @@ pub struct Estado {
     pub ativos: Vec<(String, Option<String>)>,
     /// Connections `(de, para)`.
     pub ligacoes_lista: Vec<(String, String)>,
+    pub camada: String,
+    /// Path network nodes and their model positions.
+    pub nos: Vec<(String, [f64; 3])>,
+    /// Path network edges `(from, to)` as stored.
+    pub arestas: Vec<(String, String)>,
+    /// Selection of the current network layer (see [`Condicao::SelecaoCamada`]).
+    pub selecao_camada: Option<String>,
+    pub nos_fluido: usize,
+    pub ligacoes_fluido: usize,
+    pub avisos: usize,
+    /// Tank levels now, by node name.
+    pub niveis: Vec<(String, f64)>,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -293,6 +327,50 @@ impl Estado {
                     Err(format!("não há ligação {a} -> {b}"))
                 }
             }
+            Condicao::Camada(c) => igual("camada", self.camada.as_str(), c.as_str()),
+            Condicao::NosIgual(n) => igual("nós da rede", self.nos.len(), *n),
+            Condicao::ArestasIgual(n) => igual("arestas da rede", self.arestas.len(), *n),
+            Condicao::Aresta(a, b) => {
+                if self
+                    .arestas
+                    .iter()
+                    .any(|(x, y)| (x == a && y == b) || (x == b && y == a))
+                {
+                    Ok(())
+                } else {
+                    Err(format!("não há aresta entre {a} e {b}"))
+                }
+            }
+            Condicao::NoEm(n, quer) => match self.nos.iter().find(|(m, _)| m == n) {
+                Some((_, p)) if (p[0] - quer.0).abs() <= 0.05 && (p[1] - quer.1).abs() <= 0.05 => {
+                    Ok(())
+                }
+                Some((_, p)) => Err(format!(
+                    "posição do nó {n}: esperado ({}, {}), encontrado ({}, {})",
+                    quer.0, quer.1, p[0], p[1]
+                )),
+                None => Err(format!("nó \"{n}\" não existe")),
+            },
+            Condicao::SelecaoCamada(s) => {
+                if &self.selecao_camada == s {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "seleção da camada: esperado {s:?}, encontrado {:?}",
+                        self.selecao_camada
+                    ))
+                }
+            }
+            Condicao::NosFluidoIgual(n) => igual("nós de fluido", self.nos_fluido, *n),
+            Condicao::LigacoesFluidoIgual(n) => {
+                igual("ligações de fluido", self.ligacoes_fluido, *n)
+            }
+            Condicao::AvisosIgual(n) => igual("avisos", self.avisos, *n),
+            Condicao::NivelEntre(n, min, max) => match self.niveis.iter().find(|(m, _)| m == n) {
+                Some((_, l)) if l >= min && l <= max => Ok(()),
+                Some((_, l)) => Err(format!("nível de {n}: {l:.3} fora de [{min}, {max}]")),
+                None => Err(format!("tanque \"{n}\" não existe")),
+            },
             Condicao::Nao(inner) => match self.verificar(inner) {
                 Ok(()) => Err(format!("a condição negada é verdadeira: {inner:?}")),
                 Err(_) => Ok(()),
@@ -320,13 +398,18 @@ impl Estado {
             .tempo
             .map_or(String::new(), |t| format!(" tempo={t:.3}"));
         format!(
-            "modo={} selecionado={} ferramenta={} objetos={} ligacoes={} problemas={} sujo={} titulo=\"{}\" status=\"{}\"{tempo}",
+            "modo={} camada={} selecionado={} ferramenta={} objetos={} ligacoes={} nos={} arestas={} fluidos={} problemas={} avisos={} sujo={} titulo=\"{}\" status=\"{}\"{tempo}",
             self.modo,
+            self.camada,
             self.selecionado.as_deref().unwrap_or("-"),
             self.ferramenta,
             self.objetos,
             self.ligacoes,
+            self.nos.len(),
+            self.arestas.len(),
+            self.nos_fluido,
             self.problemas,
+            self.avisos,
             self.sujo,
             self.titulo,
             self.status
@@ -427,7 +510,45 @@ mod tests {
                 ("maquina".into(), Some("maquina_kenney".into())),
             ],
             ligacoes_lista: vec![("fila".into(), "maquina".into())],
+            camada: "Rede".into(),
+            nos: vec![("a".into(), [1.0, 2.0, 0.0]), ("b".into(), [5.0, 2.0, 0.0])],
+            arestas: vec![("a".into(), "b".into())],
+            selecao_camada: Some("no:a".into()),
+            nos_fluido: 3,
+            ligacoes_fluido: 2,
+            avisos: 1,
+            niveis: vec![("tanque".into(), 12.5)],
         }
+    }
+
+    #[test]
+    fn network_and_fluid_assertions() {
+        let s = state();
+        let ok = |c: Condicao| assert!(s.verificar(&c).is_ok(), "{c:?}");
+        let bad = |c: Condicao| assert!(s.verificar(&c).is_err(), "{c:?}");
+        ok(Condicao::Camada("Rede".into()));
+        bad(Condicao::Camada("Fluidos".into()));
+        ok(Condicao::NosIgual(2));
+        ok(Condicao::ArestasIgual(1));
+        ok(Condicao::Aresta("b".into(), "a".into()));
+        bad(Condicao::Aresta("a".into(), "c".into()));
+        ok(Condicao::NoEm("b".into(), (5.0, 2.0)));
+        bad(Condicao::NoEm("b".into(), (5.5, 2.0)));
+        bad(Condicao::NoEm("z".into(), (0.0, 0.0)));
+        ok(Condicao::SelecaoCamada(Some("no:a".into())));
+        bad(Condicao::SelecaoCamada(None));
+        ok(Condicao::NosFluidoIgual(3));
+        ok(Condicao::LigacoesFluidoIgual(2));
+        ok(Condicao::AvisosIgual(1));
+        ok(Condicao::NivelEntre("tanque".into(), 10.0, 15.0));
+        bad(Condicao::NivelEntre("tanque".into(), 13.0, 15.0));
+        bad(Condicao::NivelEntre("nada".into(), 0.0, 1.0));
+        let steps = parse(
+            r#"[Afirmar(Camada("Rede")), Afirmar(NivelEntre("t", 0.0, 1.0)), Afirmar(SelecaoCamada(None))]"#,
+        )
+        .unwrap();
+        assert_eq!(steps.len(), 3);
+        assert!(s.resumo().contains("camada=Rede"));
     }
 
     #[test]

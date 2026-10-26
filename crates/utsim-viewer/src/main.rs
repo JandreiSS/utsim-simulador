@@ -6,6 +6,7 @@ mod camera;
 mod dock;
 mod editor;
 mod fluid_scene;
+mod layers;
 mod models;
 mod playback;
 mod scene;
@@ -256,8 +257,8 @@ fn configure(app: &mut App, editor: Editor, data: Data) -> &mut App {
                     .chain(),
                 scene::draw_sim.run_if(editor::in_sim),
                 fluid_scene::sync_fluids,
-                fluid_scene::update_fluids.run_if(editor::in_sim),
-                fluid_scene::draw_fluids.run_if(editor::in_sim),
+                fluid_scene::update_fluids,
+                fluid_scene::draw_fluids,
                 editor::draw_edit.run_if(editor::in_edit),
                 editor::title,
             )

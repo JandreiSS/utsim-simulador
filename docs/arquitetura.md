@@ -228,6 +228,26 @@ aplicado por um `Document` (`utsim-edit`, sem dependência de interface gráfica
   ajustes de um mesmo gesto (arrastar no seletor de cor) viram um passo de desfazer, que
   termina quando o botão do mouse é solto.
 - **Atalhos.** A janela "Atalhos" (F1) lista a tabela `editing::SHORTCUTS`, a mesma testada.
+- **Camadas** (`editing::Layer`): Objetos, Rede e Fluidos, com ferramentas, seleção e painel
+  próprios (`layers.rs` no binário, `properties::network` na biblioteca). Tudo o que antes só se
+  escrevia no `.ron` vira comando: `AddNode`, `MoveNode`, `RenameNode`, `RemoveNode` (leva as
+  arestas), `AddEdge`, `SetEdge` (sentido e `capacity`), `RemoveEdge`, e para fluidos
+  `AddFluidNode`, `MoveFluidNode`, `RenameFluidNode`, `SetFluidKind`, `RemoveFluidNode`,
+  `AddFluidLink`, `RemoveFluidLink` (`utsim_edit::network` e `utsim_edit::fluids`). A rede (ou a
+  rede de fluidos) nasce no primeiro nó e some quando fica vazia, então o arquivo salvo não muda à
+  toa. Os comandos recusam só referências quebradas (nó inexistente, aresta repetida, laço); o
+  resto (rede conexa, grafo acíclico, um `ToItems` por objeto, objeto do conversor) é validado ao
+  vivo pelo `Model::validate`. Renomear um objeto atualiza os conversores que apontam para ele.
+- **Rede no editor.** A ferramenta Aresta desenha caminhos clicando de nó em nó; um clique no chão
+  cria um nó já ligado. O conector tracejado de cada objeto atendido vai até o nó mais próximo
+  (`network::attachments`, mesma regra do roteador, empate para o nó listado primeiro). A base de
+  um transportador é escolhida entre os nós: o editor move o transportador para o nó e liga
+  `home` (sem campo novo no esquema).
+- **Fluidos no editor.** Os nós aparecem em `Editar` com os níveis iniciais, desenhados pelo mesmo
+  `fluid_scene.rs` do `Simular` (`editing::fluid_edit_view`). Se todos os nós estão na origem, o
+  primeiro arrasto ou nó novo grava antes o layout automático no modelo, no mesmo passo de desfazer.
+- **Avisos.** `Document::warnings` junta `Model::warnings` (só quando não há problemas) e os
+  recursos móveis que não atendem ninguém; o painel os mostra em amarelo, separados dos problemas.
 
 Lacunas: a área de transferência não passa entre janelas nem para outros programas; a seleção
 por caixa usa o centro do bloco, não a área inteira; alinhar não considera o tamanho dos
@@ -551,7 +571,7 @@ conversores de/para itens discretos, ligados num grafo **acíclico**.
 - **Rastro:** `TraceEvent::Fluid { node, level, rate }`, para o 3D.
 - **Métricas:** `custom_metrics` traz o nível médio e máximo de cada tanque e o volume
   total de cada nó.
-- **No visualizador 3D** (`utsim-view`, só reprodução, os nós de fluido não são editáveis).
+- **No visualizador 3D** (`utsim-view`; em `Editar` a camada Fluidos edita os nós, ver 4e).
   O `Replay` carrega o `FluidDef`; o bloco "Fluid" não vira caixa, e a rede é desenhada
   por `fluids.rs` (layout, formas) e `fluid_scene.rs` (cena).
   - **Layout:** as posições dos nós vêm do modelo. Se todas forem zero, os nós são

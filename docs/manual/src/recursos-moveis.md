@@ -146,9 +146,13 @@ Regras:
 
 Mão única pode alongar muito o caminho de volta. Veja `examples/rede_de_caminhos.ron`.
 
+No visualizador, a camada **Rede** do modo Editar desenha a rede sem escrever o arquivo: a ferramenta **Nó** coloca nós no chão, a ferramenta **Aresta** liga um nó ao outro (clicar no chão cria o nó já ligado), e o painel mostra o comprimento, o sentido e a capacidade da aresta selecionada. A linha tracejada de cada objeto atendido até um nó mostra por onde ele entra na rede. Veja [Primeiros passos](primeiros-passos.md).
+
 ## AGVs
 
 Com `agv: true`, o transportador segue a rede aresta por aresta. Se a próxima aresta tem `capacity` e está cheia, o AGV para (estado `blocked`) e entra numa fila por ordem de chegada. Quando o veículo da frente sai, o seguinte é liberado. Uma aresta de mão dupla com `capacity: Some(1)` vale para os dois sentidos juntos, então é uma pista única. Se os veículos se travarem mutuamente, a simulação para com a mensagem "impasse". Veja `examples/agvs.ron`.
+
+O AGV da biblioteca do editor já vem com `agv: true`, velocidade de 1,5 m/s, aceleração e desaceleração de 0,5, carga e descarga de 0,5 e `home: true`. Nas propriedades de qualquer transportador, o campo **Base (nó da rede)** escolhe um nó: o transportador passa a ficar nele e volta para lá quando está ocioso.
 
 ## A distância importa?
 

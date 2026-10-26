@@ -67,7 +67,7 @@ fn float_speed(v: f64) -> f64 {
 }
 
 /// A float box without lower bound.
-fn float(ui: &mut Ui, id: Id, value: &mut f64) -> bool {
+pub(crate) fn float(ui: &mut Ui, id: Id, value: &mut f64) -> bool {
     num(ui, id, value, float_speed(*value), f64::MIN)
 }
 
@@ -626,6 +626,48 @@ impl Editor<'_> {
             }
             Some(_) => {}
         }
+    }
+
+    /// Base of a transporter on the path network: choosing a node moves the transporter
+    /// onto it and turns `home` on (it starts there and goes back there when idle), in
+    /// one undo step. The current base is the node at the transporter's position.
+    fn home_node_field(&mut self, ui: &mut Ui, obj: &ObjectDef) {
+        let Some(net) = &self.doc.model().network else {
+            ui.weak("Sem rede de caminhos: a base é a posição do transportador.");
+            return;
+        };
+        let at = net
+            .nodes
+            .iter()
+            .find(|n| utsim_core::task::distance(n.position, obj.position) < 1e-6)
+            .map(|n| n.name.clone());
+        let mut chosen = None;
+        ui.horizontal(|ui| {
+            ui.label("Base (nó da rede)");
+            egui::ComboBox::from_id_salt(self.id("#base"))
+                .selected_text(at.as_deref().unwrap_or("fora da rede"))
+                .show_ui(ui, |ui| {
+                    for n in &net.nodes {
+                        let on = at.as_deref() == Some(n.name.as_str());
+                        if ui.selectable_label(on, &n.name).clicked() && !on {
+                            chosen = Some(n.position);
+                        }
+                    }
+                });
+        });
+        if let Some(position) = chosen {
+            self.out.push(Command::Batch(vec![
+                Command::Move {
+                    name: self.owner.clone(),
+                    position,
+                },
+                Command::Set {
+                    key: self.key("home"),
+                    value: "true".into(),
+                },
+            ]));
+        }
+        ui.weak("Escolher um nó põe o transportador nele e liga \"Voltar à base\".");
     }
 
     /// Combo over `(ron text, label)` options; `current` is the RON text of the value.
@@ -1431,6 +1473,9 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
         out,
     };
     editor.kind_fields(ui, &obj.kind);
+    if matches!(obj.kind, ObjectKind::Transporter { .. }) {
+        editor.home_node_field(ui, obj);
+    }
     ui.separator();
     if !utsim_model::is_mobile(&obj.kind) {
         editor.output_field(ui, obj);

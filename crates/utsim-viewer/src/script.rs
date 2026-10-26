@@ -36,7 +36,11 @@ use bevy_egui::{EguiFullOutput, EguiPostUpdateSet, egui};
 use utsim_viewer::layout;
 use utsim_viewer::roteiro::{Alvo, Botao, Estado, Passo};
 
-use crate::editor::{Editor, Mode, Tool};
+use utsim_viewer::editing::Layer;
+use utsim_viewer::fluids::NodeShape;
+
+use crate::editor::{Editor, Mode};
+use crate::layers::NetSel;
 use crate::playback::{Data, Playback};
 
 /// Frames the pointer needs to travel during `Arrastar`.
@@ -316,11 +320,7 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
         }
         .to_string(),
         selecionado: ed.selected.clone(),
-        ferramenta: match &ed.tool {
-            Tool::Select => "Selecionar".to_string(),
-            Tool::Place(k) => format!("Colocar:{k}"),
-            Tool::Connect(f) => format!("Ligar:{f}"),
-        },
+        ferramenta: ed.tool.script_name(),
         objetos: model.objects.len(),
         ligacoes: model.connections.len(),
         problemas: ed.issues.len(),
@@ -350,6 +350,53 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
             })
             .collect(),
         ligacoes_lista: model.connections.clone(),
+        camada: ed.layer.label().to_string(),
+        nos: model.network.as_ref().map_or_else(Vec::new, |n| {
+            n.nodes
+                .iter()
+                .map(|x| (x.name.clone(), x.position))
+                .collect()
+        }),
+        arestas: model.network.as_ref().map_or_else(Vec::new, |n| {
+            n.edges
+                .iter()
+                .map(|e| (e.from.clone(), e.to.clone()))
+                .collect()
+        }),
+        selecao_camada: match ed.layer {
+            Layer::Network => ed.net_sel.as_ref().map(|s| match s {
+                NetSel::Node(n) => format!("no:{n}"),
+                NetSel::Edge(a, b) => format!("aresta:{a}->{b}"),
+            }),
+            Layer::Fluids => ed.fluid_sel.as_ref().map(|n| format!("fluido:{n}")),
+            Layer::Objects => None,
+        },
+        nos_fluido: model.fluids.as_ref().map_or(0, |f| f.nodes.len()),
+        ligacoes_fluido: model.fluids.as_ref().map_or(0, |f| f.links.len()),
+        avisos: ed.warnings.len(),
+        niveis: match ed.mode {
+            Mode::Edit => ed
+                .fluid_view
+                .nodes
+                .iter()
+                .filter(|n| n.shape == NodeShape::Tank)
+                .map(|n| (n.name.clone(), n.initial))
+                .collect(),
+            Mode::Sim => world
+                .data
+                .fluid
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, n)| n.shape == NodeShape::Tank)
+                .map(|(i, n)| {
+                    (
+                        n.name.clone(),
+                        world.data.fluid_sample(i, world.playback.t).level,
+                    )
+                })
+                .collect(),
+        },
     }
 }
 

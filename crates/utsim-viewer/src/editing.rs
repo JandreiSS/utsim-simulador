@@ -215,6 +215,102 @@ pub fn connect_blocked(kind: &str) -> Option<&'static str> {
 
 pub use utsim_scene::network::{NetSeg, NetworkView};
 
+/// What `Editar` edits: the objects, the path network or the fluid network. Each
+/// layer has its own tools, selection and properties.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Layer {
+    #[default]
+    Objects,
+    Network,
+    Fluids,
+}
+
+impl Layer {
+    pub const ALL: [Layer; 3] = [Layer::Objects, Layer::Network, Layer::Fluids];
+
+    /// Portuguese label (the buttons and the scripts use it).
+    pub fn label(self) -> &'static str {
+        match self {
+            Layer::Objects => "Objetos",
+            Layer::Network => "Rede",
+            Layer::Fluids => "Fluidos",
+        }
+    }
+}
+
+/// Distance, in pixels, within which a click grabs a node.
+pub const NODE_PICK_PIXELS: f32 = 12.0;
+
+/// Index of the point closest to `p` (window pixels), if it is within `max` of it.
+pub fn nearest_point(p: [f32; 2], points: &[Option<[f32; 2]>], max: f32) -> Option<usize> {
+    points
+        .iter()
+        .enumerate()
+        .filter_map(|(i, q)| {
+            let q = (*q)?;
+            let d = ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt();
+            (d <= max).then_some((i, d))
+        })
+        .min_by(|x, y| x.1.total_cmp(&y.1))
+        .map(|(i, _)| i)
+}
+
+/// Dashed connectors of the editor: from each object a mobile resource travels to
+/// (see [`utsim_edit::network::served_objects`]) to the node it enters the network by,
+/// as `(object base, node)` in Bevy space.
+pub fn connector_segments(model: &Model) -> Vec<([f32; 3], [f32; 3])> {
+    let Some(net) = &model.network else {
+        return Vec::new();
+    };
+    utsim_edit::network::attachments(model)
+        .into_iter()
+        .filter_map(|(object, node)| {
+            let o = model.objects.iter().find(|o| o.name == object)?;
+            let n = net.nodes.iter().find(|n| n.name == node)?;
+            (o.position != n.position)
+                .then(|| (layout::to_bevy(o.position), layout::to_bevy(n.position)))
+        })
+        .collect()
+}
+
+/// The fluid network of the document laid out for `Editar` (converter lines go to the
+/// objects of `view`). Empty when the model has none.
+pub fn fluid_edit_view(model: &Model, view: &EditView) -> crate::fluids::FluidView {
+    let Some(def) = &model.fluids else {
+        return crate::fluids::FluidView::default();
+    };
+    let blocks: Vec<utsim_model::replay::ReplayBlock> = model
+        .objects
+        .iter()
+        .map(|o| utsim_model::replay::ReplayBlock {
+            name: o.name.clone(),
+            kind: kind_name(&o.kind).to_string(),
+            position: o.position,
+        })
+        .collect();
+    crate::fluids::FluidView::build(def, model.objects.len(), &blocks, &view.positions)
+}
+
+/// The moves that write the automatic layout of the fluid nodes into the model, needed
+/// before the first node is dragged when every node still sits at the origin (else the
+/// others would collapse back to the origin). `None` when the positions are the model's.
+pub fn fluid_positions_command(model: &Model, shown: &crate::fluids::FluidView) -> Option<Command> {
+    let def = model.fluids.as_ref()?;
+    let raw: Vec<[f64; 3]> = def.nodes.iter().map(|n| n.position).collect();
+    if def.nodes.len() < 2 || !layout::all_at_origin(&raw) {
+        return None;
+    }
+    let moves = shown
+        .nodes
+        .iter()
+        .map(|n| Command::MoveFluidNode {
+            name: n.name.clone(),
+            position: ground_to_model_snapped(n.pos[0], n.pos[2], Some(0.1)),
+        })
+        .collect();
+    Some(Command::Batch(moves))
+}
+
 /// Distance from point `p` to the segment `a`-`b`.
 pub fn point_segment_distance(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     let (abx, aby) = (b[0] - a[0], b[1] - a[1]);
@@ -724,6 +820,67 @@ mod tests {
         assert_eq!(view.segments[1].capacity, Some(2));
         assert_eq!(view.segments[0].b, [5.0, 0.0, -2.0]);
         assert_eq!(NetworkView::of(chain(true).model()), NetworkView::default());
+    }
+
+    #[test]
+    fn layers_have_labels_and_points_are_picked_within_reach() {
+        let labels: Vec<&str> = Layer::ALL.iter().map(|l| l.label()).collect();
+        assert_eq!(labels, vec!["Objetos", "Rede", "Fluidos"]);
+        assert_eq!(Layer::default(), Layer::Objects);
+        let pts = [Some([0.0, 0.0]), None, Some([10.0, 0.0])];
+        assert_eq!(nearest_point([7.0, 1.0], &pts, 12.0), Some(2));
+        assert_eq!(nearest_point([2.0, 0.0], &pts, 12.0), Some(0));
+        assert_eq!(nearest_point([50.0, 0.0], &pts, 12.0), None);
+    }
+
+    #[test]
+    fn served_objects_get_a_connector_to_their_nearest_node() {
+        let text = r#"Model(
+            name: "n", run: (stop_time: 10.0),
+            objects: [
+                (name: "q", kind: Queue(), transport: "v", position: (1.0, 1.0, 0.0)),
+                (name: "s", kind: Sink, position: (9.0, 0.0, 0.0)),
+                (name: "v", kind: Transporter(speed: 1.0), position: (0.0, 0.0, 0.0)),
+            ],
+            connections: [("q", "s")],
+            network: Some((
+                nodes: [(name: "a", position: (0.0, 0.0, 0.0)), (name: "b", position: (10.0, 0.0, 0.0))],
+                edges: [(from: "a", to: "b")],
+            )),
+        )"#;
+        let model = Model::parse(text).unwrap();
+        let segs = connector_segments(&model);
+        // q -> a and s -> b; v sits on its node, so it needs no connector.
+        assert_eq!(
+            segs,
+            vec![
+                ([1.0, 0.0, -1.0], [0.0, 0.0, 0.0]),
+                ([9.0, 0.0, 0.0], [10.0, 0.0, 0.0])
+            ]
+        );
+        assert!(connector_segments(chain(true).model()).is_empty());
+    }
+
+    #[test]
+    fn fluid_nodes_are_laid_out_for_editing_and_their_layout_can_be_kept() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/tanques.ron");
+        let doc = Document::open(path).unwrap();
+        let view = EditView::of(doc.model());
+        let shown = fluid_edit_view(doc.model(), &view);
+        assert_eq!(shown.nodes.len(), 5);
+        assert_eq!(shown.converters.len(), 2);
+        // Converters point at objects of the document, by index.
+        assert_eq!(view.names[shown.converters[0].block], "descarga");
+        let keep = fluid_positions_command(doc.model(), &shown).expect("all at origin");
+        let mut doc = doc;
+        doc.apply(keep).unwrap();
+        assert!(fluid_positions_command(doc.model(), &shown).is_none());
+        let again = fluid_edit_view(doc.model(), &EditView::of(doc.model()));
+        for (a, b) in again.nodes.iter().zip(&shown.nodes) {
+            assert!((a.pos[0] - b.pos[0]).abs() < 0.06 && (a.pos[2] - b.pos[2]).abs() < 0.06);
+        }
+        assert!(fluid_edit_view(chain(true).model(), &view).is_empty());
     }
 
     #[test]

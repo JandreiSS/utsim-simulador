@@ -7,6 +7,7 @@
 //! current value, distribution families) and [`ron_text`] (value to RON text), and
 //! is unit-tested without a GPU. [`panel`] only draws.
 
+pub mod network;
 pub(crate) mod panel;
 pub mod ron_text;
 pub mod spec;

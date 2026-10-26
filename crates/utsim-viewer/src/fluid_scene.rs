@@ -1,9 +1,11 @@
 //! Fluid networks (phase 7) in the 3D scene: tanks that fill and drain, small markers
 //! for the other nodes, pipes as arrows and dashed lines to the discrete objects that
-//! the converters read from or write to. Playback only (`Simular`).
+//! the converters read from or write to. In `Simular` the network of the replay is shown
+//! with its levels over time; in `Editar` the network of the document, with the initial
+//! levels, so it can be edited in the `Fluidos` layer (see `layers.rs`).
 
 use bevy::prelude::*;
-use utsim_viewer::fluids::{self, FluidNodeView, NodeShape};
+use utsim_viewer::fluids::{self, FluidNodeView, FluidView, NodeShape};
 use utsim_viewer::view;
 
 use crate::editor::{Editor, Mode};
@@ -16,6 +18,16 @@ pub struct FluidScene {
     entities: Vec<Entity>,
     /// `(liquid entity, node index)` of every tank.
     liquids: Vec<(Entity, usize)>,
+    /// The layout the entities were built for.
+    shown: FluidView,
+}
+
+/// The network shown in the current mode.
+fn shown<'a>(editor: &'a Editor, data: &'a Data) -> &'a FluidView {
+    match editor.mode {
+        Mode::Edit => &editor.fluid_view,
+        Mode::Sim => &data.fluid,
+    }
 }
 
 const SHELL: Color = Color::srgba(0.75, 0.85, 0.95, 0.22);
@@ -34,8 +46,8 @@ fn marker_color(shape: NodeShape) -> Color {
     }
 }
 
-/// Builds the entities of the network when the replay or the mode changes (and removes
-/// them in `Editar`, where fluid nodes are not shown).
+/// Builds the entities of the network when the mode, the replay (in `Simular`) or the
+/// document's network (in `Editar`) changes.
 pub fn sync_fluids(
     mut commands: Commands,
     editor: Res<Editor>,
@@ -45,7 +57,13 @@ pub fn sync_fluids(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut last_mode: Local<Option<Mode>>,
 ) {
-    if *last_mode == Some(editor.mode) && !(editor.mode == Mode::Sim && data.is_changed()) {
+    let view = shown(&editor, &data);
+    let same = *last_mode == Some(editor.mode)
+        && match editor.mode {
+            Mode::Sim => !data.is_changed(),
+            Mode::Edit => scene.shown == *view,
+        };
+    if same {
         return;
     }
     *last_mode = Some(editor.mode);
@@ -53,10 +71,8 @@ pub fn sync_fluids(
         commands.entity(e).despawn();
     }
     scene.liquids.clear();
-    if editor.mode != Mode::Sim {
-        return;
-    }
-    for (i, node) in data.fluid.nodes.iter().enumerate() {
+    scene.shown = view.clone();
+    for (i, node) in view.nodes.iter().enumerate() {
         let base = Vec3::from(node.pos);
         match node.shape {
             NodeShape::Tank => {
@@ -127,19 +143,25 @@ pub fn sync_fluids(
     }
 }
 
-/// Sets the height of every tank's liquid from its level at the current time.
+/// Sets the height of every tank's liquid from its level at the current time (the
+/// initial level in `Editar`).
 pub fn update_fluids(
+    editor: Res<Editor>,
     data: Res<Data>,
     pb: Res<Playback>,
     scene: Res<FluidScene>,
     mut transforms: Query<(&mut Transform, &mut Visibility)>,
 ) {
     for &(liquid, i) in &scene.liquids {
-        let Some(node) = data.fluid.nodes.get(i) else {
+        let Some(node) = scene.shown.nodes.get(i) else {
             continue;
         };
         let (_, h) = fluids::tank_dims(node.capacity);
-        let fill = fluids::fill_fraction(data.fluid_sample(i, pb.t).level, node.capacity);
+        let level = match editor.mode {
+            Mode::Sim => data.fluid_sample(i, pb.t).level,
+            Mode::Edit => node.initial,
+        };
+        let fill = fluids::fill_fraction(level, node.capacity);
         let height = fill * (h - 0.06);
         if let Ok((mut tr, mut vis)) = transforms.get_mut(liquid) {
             tr.scale.y = height.max(1e-3);
@@ -164,16 +186,20 @@ fn attach(node: &FluidNodeView, toward: Vec3) -> Vec3 {
     center + dir * reach
 }
 
-/// Links, converter lines and the selection outline.
+/// Links, converter lines and the selection outline (in `Editar` the layer draws the
+/// selection, and links show no flow).
 pub fn draw_fluids(
+    editor: Res<Editor>,
     data: Res<Data>,
     pb: Res<Playback>,
     selection: Res<FluidSelection>,
     mut gizmos: Gizmos,
 ) {
-    let nodes = &data.fluid.nodes;
+    let editing = editor.mode == Mode::Edit;
+    let fluid = shown(&editor, &data);
+    let nodes = &fluid.nodes;
     const EPS: f64 = 1e-9;
-    for &(a, b) in &data.fluid.links {
+    for &(a, b) in &fluid.links {
         let (na, nb) = (&nodes[a], &nodes[b]);
         let (ca, cb) = (
             Vec3::from(na.pos) + Vec3::Y * fluids::port_height(na),
@@ -181,7 +207,13 @@ pub fn draw_fluids(
         );
         // A link carries flow when the node that is not a tank moves fluid; between
         // tanks, when either one is filling or draining.
-        let rate = |i: usize| data.fluid_sample(i, pb.t).rate.abs();
+        let rate = |i: usize| {
+            if editing {
+                0.0
+            } else {
+                data.fluid_sample(i, pb.t).rate.abs()
+            }
+        };
         let pass: Vec<usize> = [a, b]
             .into_iter()
             .filter(|&i| nodes[i].shape != NodeShape::Tank)
@@ -200,10 +232,20 @@ pub fn draw_fluids(
         gizmos.line(s - side, e - side, color);
     }
 
-    for conv in &data.fluid.converters {
+    for conv in &fluid.converters {
         let node = &nodes[conv.node];
-        let h = data.geoms[conv.block].half[1];
-        let object = block_base_at(&data, conv.block, pb.t) + Vec3::Y * h;
+        let object = if editing {
+            let (Some(p), Some(g)) = (
+                editor.view.positions.get(conv.block),
+                editor.view.geoms.get(conv.block),
+            ) else {
+                continue;
+            };
+            Vec3::from(*p) + Vec3::Y * g.half[1]
+        } else {
+            let h = data.geoms[conv.block].half[1];
+            block_base_at(&data, conv.block, pb.t) + Vec3::Y * h
+        };
         let own = Vec3::from(node.pos) + Vec3::Y * 0.35;
         let (from, to) = if conv.into_fluid {
             (object, own)
@@ -219,7 +261,7 @@ pub fn draw_fluids(
             .with_tip_length(0.3);
     }
 
-    if let Some(node) = selection.0.and_then(|i| nodes.get(i)) {
+    if let Some(node) = selection.0.filter(|_| !editing).and_then(|i| nodes.get(i)) {
         let half = fluids::node_half(node);
         gizmos.cube(
             Transform {

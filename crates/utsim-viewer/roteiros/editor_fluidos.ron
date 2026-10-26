@@ -1,0 +1,110 @@
+// Roteiro da camada "Fluidos" do editor (fase 9), a partir de um modelo vazio.
+//   utsim-view --novo --roteiro crates/utsim-viewer/roteiros/editor_fluidos.ron --capturas %TEMP%\utsim_editor\fluidos
+// Coloca fonte, tanque, tubulação e sumidouro, liga os quatro com a ferramenta "Ligar",
+// ajusta a vazão da fonte e a capacidade do tanque pelo painel, confere a validação ao vivo
+// (um ciclo vira problema), exclui e desfaz, e simula: o tanque enche.
+[
+    Esperar(quadros: 20),
+    ClicarBotao("Fluidos"),
+    Afirmar(Camada("Fluidos")),
+    Captura("01_camada_fluidos"),
+
+    ClicarBotao("Fonte"),
+    Afirmar(Ferramenta("Fluido:Source")),
+    MoverPara(Mundo(-6.0, 0.0)),
+    Captura("02_fantasma"),
+    Clicar(Esquerdo),
+    ClicarBotao("Tanque"),
+    MoverPara(Mundo(-2.0, 0.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Tubulação"),
+    MoverPara(Mundo(2.0, 0.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Sumidouro"),
+    MoverPara(Mundo(6.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(NosFluidoIgual(4)),
+    Afirmar(Ferramenta("Selecionar")),
+
+    // Ligar de nó em nó.
+    ClicarBotao("Ligar"),
+    MoverPara(Mundo(-6.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(Ferramenta("Fluido:Ligar:fonte")),
+    MoverPara(Mundo(-2.0, 0.0)),
+    Clicar(Esquerdo),
+    MoverPara(Mundo(2.0, 0.0)),
+    Clicar(Esquerdo),
+    MoverPara(Mundo(6.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(LigacoesFluidoIgual(3)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("03_ligados"),
+
+    // Um ciclo é recusado pela validação ao vivo (e desfeito).
+    MoverPara(Mundo(-6.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(LigacoesFluidoIgual(4)),
+    Afirmar(ProblemasIgual(1)),
+    Captura("04_ciclo"),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(ProblemasIgual(0)),
+    Tecla("Esc"),
+    Tecla("Esc"),
+
+    // Vazão da fonte = 2 (o tubo deixa passar 1: o tanque enche a 1 por unidade de tempo).
+    MoverPara(Mundo(-6.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(SelecaoCamada(Some("fluido:fonte"))),
+    MoverPara(Deslocado(Botao("Vazão"), 45.0, 0.0)),
+    Clicar(Esquerdo),
+    Atalho(["Ctrl", "A"]),
+    Digitar("2"),
+    Tecla("Enter"),
+    Esperar(quadros: 3),
+    Captura("05_fonte"),
+
+    // Tanque: capacidade 60.
+    MoverPara(Mundo(-2.0, 0.0)),
+    Clicar(Esquerdo),
+    Afirmar(SelecaoCamada(Some("fluido:tanque"))),
+    MoverPara(Deslocado(Botao("Capacidade"), 60.0, 0.0)),
+    Clicar(Esquerdo),
+    Atalho(["Ctrl", "A"]),
+    Digitar("60"),
+    Tecla("Enter"),
+    Esperar(quadros: 3),
+    Afirmar(NivelEntre("tanque", 0.0, 0.0)),
+    Captura("06_tanque"),
+
+    // Excluir o tubo leva as duas ligações; desfazer traz de volta.
+    MoverPara(Mundo(2.0, 0.0)),
+    Clicar(Esquerdo),
+    Tecla("Delete"),
+    Afirmar(NosFluidoIgual(3)),
+    Afirmar(LigacoesFluidoIgual(1)),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(NosFluidoIgual(4)),
+    Afirmar(LigacoesFluidoIgual(3)),
+
+    // Arrastar o sumidouro.
+    Arrastar(de: Mundo(6.0, 0.0), para: Mundo(6.0, -3.0)),
+    Captura("07_arrastado"),
+
+    // Simular: o nível sobe.
+    ClicarBotao("▶ Simular"),
+    EsperarAte(Modo(Simular), 120.0),
+    Esperar(quadros: 30),
+    IrPara(0.0),
+    Esperar(quadros: 10),
+    Afirmar(NivelEntre("tanque", 0.0, 0.01)),
+    Captura("08_sim_t0"),
+    IrPara(30.0),
+    Esperar(quadros: 10),
+    Afirmar(NivelEntre("tanque", 29.0, 31.0)),
+    Captura("09_sim_t30"),
+    IrPara(80.0),
+    Esperar(quadros: 10),
+    Afirmar(NivelEntre("tanque", 59.9, 60.0)),
+    Captura("10_sim_cheio"),
+]

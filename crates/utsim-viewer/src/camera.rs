@@ -118,7 +118,9 @@ pub fn frame_scene(
         Mode::Edit => {
             let net = NetworkView::of(editor.doc.model());
             let halves: Vec<[f32; 3]> = editor.view.geoms.iter().map(|g| g.half).collect();
-            view::scene_bounds(&editor.view.positions, &halves, &net.nodes)
+            let mut points = net.nodes;
+            points.extend(editor.fluid_view.bounds_points());
+            view::scene_bounds(&editor.view.positions, &halves, &points)
         }
         Mode::Sim => {
             let halves: Vec<[f32; 3]> = data.geoms.iter().map(|g| g.half).collect();

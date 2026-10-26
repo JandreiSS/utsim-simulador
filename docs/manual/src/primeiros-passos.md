@@ -63,7 +63,29 @@ A paleta oferece: Chegada, Fila, Processo, Montagem, Desmontagem, Saída, Esteir
 
 O painel **Propriedades** (à direita) mostra os campos do objeto selecionado, a lista de ligações e os **Problemas** do modelo. Sem nenhum objeto selecionado, ele mostra as configurações da rodada (tempo de parada, aquecimento, semente e replicações).
 
-Os problemas aparecem enquanto você monta o modelo, e os objetos com problema ficam com contorno vermelho. O modelo só roda quando não sobra nenhum. As mensagens são as mesmas do comando `utsim check`.
+Os problemas aparecem enquanto você monta o modelo, e os objetos com problema ficam com contorno vermelho. O modelo só roda quando não sobra nenhum. As mensagens são as mesmas do comando `utsim check`. Abaixo deles, em amarelo, ficam os **Avisos**: coisas que não impedem a simulação mas provavelmente não são o que você quis (uma ligação longa e instantânea, um objeto longe da rede de caminhos, um transportador que não atende ninguém).
+
+### Camadas: Objetos, Rede e Fluidos
+
+No alto do painel da esquerda há três botões. **Objetos** é a biblioteca descrita acima. **Rede** edita a rede de caminhos dos recursos móveis e **Fluidos** edita a rede de fluidos. Cada camada tem as suas ferramentas, a sua seleção e o seu painel de propriedades; `Del`, `Esc`, `Ctrl+Z` e `Ctrl+S` valem em todas.
+
+| Camada Rede | Como |
+|---|---|
+| Colocar um nó | ferramenta **Nó** e clique no chão (encaixa na grade) |
+| Desenhar arestas | ferramenta **Aresta**: clique num nó e depois em outro. Clicar no chão cria um nó já ligado, então dá para desenhar um caminho inteiro de uma vez. `Esc` termina |
+| Mão única ou dupla | a caixa "Arestas novas de mão dupla"; numa aresta selecionada, o campo **Sentido** |
+| Limitar AGVs | numa aresta selecionada, "Limitar veículos (AGV)" e a capacidade |
+| Mover, renomear, excluir | arraste o nó; o painel tem nome e posição; `Del` exclui o nó com as suas arestas, ou a aresta selecionada |
+
+O painel mostra o comprimento da aresta (calculado pelas posições dos nós). Uma linha tracejada liga cada objeto atendido por um recurso móvel ao nó por onde ele entra na rede, o mais próximo.
+
+| Camada Fluidos | Como |
+|---|---|
+| Colocar um nó | escolha Fonte, Tanque, Tubulação, Sumidouro, Itens em fluido ou Fluido em itens e clique no chão |
+| Ligar | ferramenta **Ligar**: clique no nó de origem e depois no de destino (a vazão segue a seta) |
+| Parâmetros | vazões, capacidade, nível inicial, entrada e saída máximas e, nos conversores, o objeto discreto e o volume por item |
+
+Os tanques aparecem no nível inicial. A validação é imediata: um ciclo, dois conversores "Fluido em itens" no mesmo objeto ou um objeto inexistente viram problemas.
 
 ## Modo Simular
 
