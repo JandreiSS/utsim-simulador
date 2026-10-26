@@ -6,6 +6,8 @@ mod camera;
 mod dock;
 mod editor;
 mod fluid_scene;
+#[cfg(not(target_arch = "wasm32"))]
+mod icon;
 mod layers;
 mod models;
 mod playback;
@@ -335,6 +337,7 @@ fn main() -> ExitCode {
         primary_window: Some(window),
         ..default()
     }));
+    app.add_plugins(icon::IconPlugin);
     if let (Some(steps), Some(dir)) = (steps, cli.capturas.clone()) {
         app.add_plugins(script::ScriptPlugin { steps, dir });
     }
