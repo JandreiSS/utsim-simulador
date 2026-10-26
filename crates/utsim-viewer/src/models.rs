@@ -59,6 +59,16 @@ pub struct Library {
     tints: HashMap<(AssetId<StandardMaterial>, [u8; 3]), Handle<StandardMaterial>>,
 }
 
+/// A 1 x 1 light grey PNG, served in place of a texture a `.glb` names but that is not
+/// on disk.
+const GREY_PNG: [u8; 69] = [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xd8, 0xb2, 0xe3, 0x00,
+    0x00, 0x04, 0x50, 0x02, 0x2d, 0x22, 0xa9, 0x17, 0x28, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
+    0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
 /// File-name-safe key.
 fn safe(text: &str) -> String {
     text.chars()
@@ -82,12 +92,48 @@ impl Library {
         if let Some(h) = self.scenes.get(&key) {
             return Some(h.clone());
         }
-        let bytes = match source {
-            Source::Library(spec) => spec.glb(),
-            Source::File(path) => read_file(path)?,
+        let path = match source {
+            Source::Library(spec) => {
+                let path = format!("utsim/modelos/{key}.glb");
+                registry.insert_asset(PathBuf::from(&path), Path::new(&path), spec.glb());
+                path
+            }
+            Source::File(file) => {
+                // Each folder gets its own embedded folder, so the textures a `.glb`
+                // names by relative URI (`Textures/colormap.png`) resolve next to it.
+                let bytes = read_file(file)?;
+                let folder = file.parent().unwrap_or(Path::new(""));
+                let base = format!("utsim/arquivos/{}", safe(&folder.to_string_lossy()));
+                for uri in visual::relative_uris(&bytes) {
+                    let embedded = format!("{base}/{uri}");
+                    let image = read_optional(&folder.join(&uri)).or_else(|| {
+                        // A missing texture would keep the meshes from being drawn at
+                        // all: a flat grey one keeps the shape visible.
+                        warn!(
+                            "{}: textura {uri} não encontrada (usando cinza)",
+                            file.display()
+                        );
+                        uri.to_lowercase()
+                            .ends_with(".png")
+                            .then(|| GREY_PNG.to_vec())
+                    });
+                    if let Some(image) = image {
+                        registry.insert_asset(
+                            PathBuf::from(&embedded),
+                            Path::new(&embedded),
+                            image,
+                        );
+                    }
+                }
+                // The extension picks the glTF loader.
+                let name = file.file_stem().map_or("modelo.glb".into(), |n| {
+                    format!("{}.glb", safe(&n.to_string_lossy()))
+                });
+                let path = format!("{base}/{name}");
+                registry.insert_asset(PathBuf::from(&path), Path::new(&path), bytes);
+                path
+            }
         };
-        let path = format!("utsim/modelos/{key}.glb");
-        registry.insert_asset(PathBuf::from(&path), Path::new(&path), bytes);
         let handle: Handle<WorldAsset> =
             server.load(GltfAssetLabel::Scene(0).from_asset(format!("embedded://{path}")));
         self.scenes.insert(key, handle.clone());
@@ -129,6 +175,17 @@ fn read_file(path: &Path) -> Option<Vec<u8>> {
 
 #[cfg(target_arch = "wasm32")]
 fn read_file(_path: &Path) -> Option<Vec<u8>> {
+    None
+}
+
+/// A file next to a `.glb` (a texture), `None` when it is not there.
+#[cfg(not(target_arch = "wasm32"))]
+fn read_optional(path: &Path) -> Option<Vec<u8>> {
+    std::fs::read(path).ok()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn read_optional(_path: &Path) -> Option<Vec<u8>> {
     None
 }
 
@@ -342,7 +399,7 @@ pub fn spawn_block(
         .spawn((
             WorldAssetRoot(scene),
             Transform {
-                translation: Vec3::ZERO,
+                translation: Vec3::from(look.offset),
                 rotation: Quat::from_rotation_y(look.yaw),
                 scale: Vec3::splat(look.scale),
             },

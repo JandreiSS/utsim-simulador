@@ -14,6 +14,7 @@ pub mod flows_ui;
 pub mod properties;
 pub mod roteiro;
 pub mod source;
+pub mod terceiros;
 pub mod view;
 pub mod visual;
 

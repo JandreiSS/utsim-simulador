@@ -11,12 +11,14 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContexts, egui};
-use utsim_edit::{Command, Document, Issue, LIBRARY, template};
+use utsim_edit::arrange::{self, Align, Axis, Clipboard};
+use utsim_edit::{CATEGORIES, Command, Document, Issue, PALETTE, from_palette, palette_entry};
 use utsim_model::replay::Replay;
 use utsim_viewer::editing::{
-    EditView, LINE_PICK_PIXELS, NetworkView, auto_layout_command, connect_blocked, default_stop,
-    ground_to_model, group_issues, logical_flags, name_base, nearest_segment, needs_layout,
-    renamed, run_model,
+    EditView, LINE_PICK_PIXELS, NetworkView, SHORTCUTS, auto_layout_command, coalesce_key,
+    connect_blocked, default_stop, ground_to_model_snapped, group_issues, inside_box,
+    logical_flags, name_base, nearest_segment, needs_layout, palette_icon, paste_offset, renamed,
+    run_model, select_names, selection_of, toggle_selected,
 };
 use utsim_viewer::flows_ui::{self, FlowsState};
 use utsim_viewer::layout;
@@ -40,7 +42,7 @@ pub enum Mode {
 #[derive(Clone, PartialEq, Debug)]
 pub enum Tool {
     Select,
-    /// Place a new object of this kind (one of `LIBRARY`).
+    /// Place a new object of this palette entry (`utsim_edit::PALETTE`, by id).
     Place(&'static str),
     /// Connect this object to the next block clicked.
     Connect(String),
@@ -54,6 +56,15 @@ struct Press {
     /// Ground offset from the cursor to the block, so the block does not jump.
     grab: Vec2,
     moved: bool,
+    /// Objects dragged with the block and where they were when the press began.
+    starts: Vec<(String, [f64; 3])>,
+    /// Shift (or Ctrl) was held: a press on the floor draws a selection box, a click
+    /// on a block toggles it.
+    shift: bool,
+    /// The press already added its block to the selection (so the click does not undo it).
+    toggled: bool,
+    /// The press draws a selection box.
+    band: bool,
 }
 
 type RunResult = Result<Replay, String>;
@@ -68,8 +79,24 @@ pub struct Editor {
     pub pending_path: Option<PathBuf>,
     pub view: EditView,
     pub issues: Vec<Issue>,
+    /// The primary selected object (its properties are shown).
     pub selected: Option<String>,
+    /// The other selected objects (never the primary one).
+    pub multi: Vec<String>,
     pub tool: Tool,
+    /// Snap placed and dragged objects to the grid ("Encaixar na grade").
+    pub snap: bool,
+    /// Grid step, metres.
+    pub grid_step: f64,
+    clipboard: Clipboard,
+    /// Pastes of the current clipboard so far (each one lands further away).
+    pastes: u32,
+    /// Palette entry being dragged towards the floor.
+    pub palette_drag: Option<&'static str>,
+    /// Selection box being drawn (window points: start, current).
+    band: Option<(Vec2, Vec2)>,
+    /// The "Atalhos" window is open.
+    pub shortcuts_open: bool,
     press: Option<Press>,
     /// Snapped ground position under the cursor while placing.
     hover: Option<[f64; 3]>,
@@ -96,6 +123,13 @@ enum Act {
     Simulate,
     Edit,
     Delete,
+    Copy,
+    Cut,
+    Paste,
+    Duplicate,
+    SelectAll,
+    Align(Align),
+    Distribute(Axis),
     Exec(Command),
 }
 
@@ -135,7 +169,15 @@ impl Editor {
             view,
             issues: Vec::new(),
             selected: None,
+            multi: Vec::new(),
             tool: Tool::Select,
+            snap: true,
+            grid_step: utsim_viewer::editing::GRID,
+            clipboard: Clipboard::default(),
+            pastes: 0,
+            palette_drag: None,
+            band: None,
+            shortcuts_open: false,
             press: None,
             hover: None,
             status: String::new(),
@@ -165,6 +207,14 @@ impl Editor {
         {
             self.selected = None;
         }
+        let view = &self.view;
+        self.multi.retain(|n| view.index_of(n).is_some());
+        if self.selected.is_none() && !self.multi.is_empty() {
+            self.selected = Some(self.multi.remove(0));
+        }
+        if let Some(p) = &self.selected {
+            self.multi.retain(|n| n != p);
+        }
         if let Tool::Connect(from) = &self.tool
             && self.view.index_of(from).is_none()
         {
@@ -183,7 +233,8 @@ impl Editor {
     }
 
     fn exec(&mut self, command: Command) {
-        match self.doc.apply(command) {
+        let key = coalesce_key(&command);
+        match self.doc.apply_coalescing(command, key.as_deref()) {
             Ok(()) => self.status.clear(),
             Err(e) => self.status = e,
         }
@@ -202,10 +253,129 @@ impl Editor {
         }
     }
 
+    /// Every selected object, the primary one first.
+    pub fn selection(&self) -> Vec<String> {
+        selection_of(&self.selected, &self.multi)
+    }
+
+    /// Selects only `name` (or nothing).
+    pub fn select_only(&mut self, name: Option<String>) {
+        self.selected = name;
+        self.multi.clear();
+    }
+
+    /// Grid step used for snapping, when snapping is on.
+    pub fn snap_step(&self) -> Option<f64> {
+        (self.snap && self.grid_step > 0.0).then_some(self.grid_step)
+    }
+
+    /// Applies a multi-object command, if there is one.
+    fn exec_some(&mut self, command: Option<Command>) {
+        if let Some(c) = command {
+            self.exec(c);
+        }
+    }
+
     fn delete_selected(&mut self) {
-        if let Some(name) = self.selected.take() {
-            self.exec(Command::Remove { name });
+        let names = self.selection();
+        if let Some(c) = arrange::delete_command(&names) {
+            self.select_only(None);
+            self.exec(c);
+            if names.len() > 1 && self.status.is_empty() {
+                self.status = format!("{} objetos excluídos (Ctrl+Z desfaz)", names.len());
+            }
             self.tool = Tool::Select;
+        }
+    }
+
+    fn copy(&mut self) -> bool {
+        let names = self.selection();
+        if names.is_empty() {
+            self.status = "Nada selecionado para copiar".into();
+            return false;
+        }
+        self.clipboard = Clipboard::copy(self.doc.model(), &names);
+        self.pastes = 0;
+        self.status = format!(
+            "{} objeto(s) e {} ligação(ões) copiados",
+            self.clipboard.objects.len(),
+            self.clipboard.connections.len()
+        );
+        true
+    }
+
+    fn cut(&mut self) {
+        if self.copy() {
+            let n = self.clipboard.objects.len();
+            self.delete_selected();
+            self.status = format!("{n} objeto(s) recortados (Ctrl+V cola)");
+        }
+    }
+
+    /// Pastes `clip` moved by `offset` and selects the copies.
+    fn paste_clip(&mut self, clip: &Clipboard, offset: [f64; 3]) {
+        let Some((command, names)) = clip.paste(self.doc.model(), offset) else {
+            self.status = "A área de transferência está vazia (Ctrl+C copia)".into();
+            return;
+        };
+        self.exec(command);
+        if self.status.is_empty() {
+            self.status = format!("{} objeto(s) colados: {}", names.len(), names.join(", "));
+            let (mut p, mut o) = (None, Vec::new());
+            select_names(&mut p, &mut o, names, false);
+            self.selected = p;
+            self.multi = o;
+        }
+        self.tool = Tool::Select;
+    }
+
+    fn paste(&mut self) {
+        let clip = self.clipboard.clone();
+        // After a cut the first paste goes back where the objects were.
+        let gone = clip
+            .objects
+            .iter()
+            .all(|o| self.view.index_of(&o.name).is_none());
+        let offset = if gone && self.pastes == 0 {
+            [0.0; 3]
+        } else {
+            paste_offset(self.pastes + 1)
+        };
+        self.pastes += 1;
+        self.paste_clip(&clip, offset);
+    }
+
+    fn duplicate(&mut self) {
+        let names = self.selection();
+        if names.is_empty() {
+            self.status = "Nada selecionado para duplicar".into();
+            return;
+        }
+        let clip = Clipboard::copy(self.doc.model(), &names);
+        self.paste_clip(&clip, paste_offset(1));
+    }
+
+    fn select_all(&mut self) {
+        let names = self.view.names.clone();
+        select_names(&mut self.selected, &mut self.multi, names, false);
+    }
+
+    /// Moves the selection by `delta` metres (arrow keys).
+    fn nudge(&mut self, delta: [f64; 2]) {
+        let names = self.selection();
+        let command = arrange::move_command(self.doc.model(), &names, delta);
+        self.exec_some(command);
+    }
+
+    /// Places a new object of palette entry `id` at `at` (model ground position).
+    fn place(&mut self, id: &'static str, at: [f64; 3], keep_tool: bool) {
+        let name = self.doc.unique_name(name_base(id));
+        if let Some(object) = from_palette(id, &name, at) {
+            self.exec(Command::Add(Box::new(object)));
+            self.select_only(Some(name));
+            if !keep_tool {
+                self.tool = Tool::Select;
+            }
         }
     }
 
@@ -246,7 +416,7 @@ impl Editor {
     fn new_document(&mut self) {
         self.doc = Document::new("novo");
         self.pending_path = None;
-        self.selected = None;
+        self.select_only(None);
         self.tool = Tool::Select;
         self.confirm_new = false;
         self.stop_text = default_stop(self.doc.model().run.stop_time).to_string();
@@ -313,6 +483,23 @@ impl Editor {
             Act::Simulate => self.simulate(),
             Act::Edit => self.mode = Mode::Edit,
             Act::Delete => self.delete_selected(),
+            Act::Copy => {
+                self.copy();
+            }
+            Act::Cut => self.cut(),
+            Act::Paste => self.paste(),
+            Act::Duplicate => self.duplicate(),
+            Act::SelectAll => self.select_all(),
+            Act::Align(how) => {
+                let names = self.selection();
+                let command = arrange::align_command(self.doc.model(), &names, how);
+                self.exec_some(command);
+            }
+            Act::Distribute(axis) => {
+                let names = self.selection();
+                let command = arrange::distribute_command(self.doc.model(), &names, axis);
+                self.exec_some(command);
+            }
             Act::Exec(c) => self.exec(c),
         }
     }
@@ -397,11 +584,35 @@ pub fn keys(
             editor.run(Act::Save);
         } else if pressed(KeyCode::KeyN) {
             editor.run(Act::New);
+        } else if pressed(KeyCode::KeyC) {
+            editor.run(Act::Copy);
+        } else if pressed(KeyCode::KeyX) {
+            editor.run(Act::Cut);
+        } else if pressed(KeyCode::KeyV) {
+            editor.run(Act::Paste);
+        } else if pressed(KeyCode::KeyD) {
+            editor.run(Act::Duplicate);
+        } else if pressed(KeyCode::KeyA) {
+            editor.run(Act::SelectAll);
         }
         return;
     }
     if pressed(KeyCode::Delete) {
         editor.run(Act::Delete);
+    }
+    if pressed(KeyCode::F1) {
+        editor.shortcuts_open = !editor.shortcuts_open;
+    }
+    let step = editor.snap_step().unwrap_or(0.1);
+    for (key, delta) in [
+        (KeyCode::ArrowLeft, [-step, 0.0]),
+        (KeyCode::ArrowRight, [step, 0.0]),
+        (KeyCode::ArrowUp, [0.0, step]),
+        (KeyCode::ArrowDown, [0.0, -step]),
+    ] {
+        if pressed(key) {
+            editor.nudge(delta);
+        }
     }
     if pressed(KeyCode::KeyC)
         && let Some(sel) = editor.selected.clone()
@@ -410,6 +621,9 @@ pub fn keys(
     }
     if pressed(KeyCode::Escape) {
         editor.tool = Tool::Select;
+        editor.palette_drag = None;
+        editor.band = None;
+        editor.shortcuts_open = false;
         editor.save_prompt = None;
         editor.confirm_new = false;
         editor.show_blocked = false;
@@ -448,9 +662,13 @@ fn pick_block(view: &EditView, ray: Ray3d) -> Option<usize> {
     best.map(|(_, i)| i)
 }
 
-/// `Editar`: select, drag, place, connect and disconnect with the left button.
+/// `Editar`: select (Shift adds or removes, Shift-drag on the floor draws a box), drag
+/// the selection, place (also by dropping a palette entry), connect and disconnect with
+/// the left button.
+#[allow(clippy::too_many_arguments)] // Bevy system: each parameter is a resource or query
 pub fn mouse(
     buttons: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut editor: ResMut<Editor>,
@@ -458,6 +676,7 @@ pub fn mouse(
     dock: Res<Dock>,
     mut contexts: EguiContexts,
 ) {
+    let editor = &mut *editor;
     let over_ui = contexts
         .ctx_mut()
         .is_ok_and(|ctx| pointer_over_ui(ctx, &dock));
@@ -466,10 +685,32 @@ pub fn mouse(
     let ray = cursor.and_then(|c| cam.viewport_to_world(cam_tf, c).ok());
     let ground = ray.and_then(ray_ground);
 
-    editor.hover = match editor.tool {
-        Tool::Place(_) if !over_ui => ground.map(|g| ground_to_model(g.x, g.y)),
-        _ => None,
+    let shift = keys.any_pressed([
+        KeyCode::ShiftLeft,
+        KeyCode::ShiftRight,
+        KeyCode::ControlLeft,
+        KeyCode::ControlRight,
+    ]);
+    // Dropping a palette entry dragged from the panel: only the 3D area counts (egui
+    // still owns the pointer while its drag lasts).
+    let in_view = cursor.is_some_and(|c| dock.free.contains(egui::pos2(c.x, c.y)));
+    let step = editor.snap_step();
+    let ghost = editor.palette_drag.is_some() || matches!(editor.tool, Tool::Place(_));
+    editor.hover = if ghost && (in_view && (editor.palette_drag.is_some() || !over_ui)) {
+        ground.map(|g| ground_to_model_snapped(g.x, g.y, step))
+    } else {
+        None
     };
+    if buttons.just_released(MouseButton::Left)
+        && let Some(id) = editor.palette_drag.take()
+    {
+        if let (true, Some(at)) = (in_view, editor.hover) {
+            editor.place(id, at, false);
+        }
+        editor.press = None;
+        lock.0 = false;
+        return;
+    }
 
     if buttons.just_pressed(MouseButton::Left) {
         editor.press = None;
@@ -481,42 +722,82 @@ pub fn mouse(
                 block,
                 grab: Vec2::ZERO,
                 moved: false,
+                starts: Vec::new(),
+                shift,
+                toggled: false,
+                band: false,
             };
-            if let Some(i) = block
-                && editor.tool == Tool::Select
-            {
-                editor.selected = Some(editor.view.names[i].clone());
-                lock.0 = true;
-                if let Some(g) = ground {
-                    let p = editor.view.positions[i];
-                    press.grab = Vec2::new(p[0], p[2]) - g;
+            if editor.tool == Tool::Select {
+                match block {
+                    Some(i) => {
+                        let name = editor.view.names[i].clone();
+                        let mut chosen = editor.selection().contains(&name);
+                        if !chosen && shift {
+                            toggle_selected(&mut editor.selected, &mut editor.multi, &name);
+                            press.toggled = true;
+                            chosen = true;
+                        }
+                        if !chosen {
+                            editor.select_only(Some(name.clone()));
+                        }
+                        // The block drags the whole selection when it belongs to it.
+                        let group = if chosen {
+                            editor.selection()
+                        } else {
+                            vec![name.clone()]
+                        };
+                        // The dragged block first: its start is the reference.
+                        let mut names = vec![name.clone()];
+                        names.extend(group.into_iter().filter(|n| *n != name));
+                        press.starts = arrange::positions(editor.doc.model(), &names);
+                        lock.0 = true;
+                        if let Some(g) = ground {
+                            let p = editor.view.positions[i];
+                            press.grab = Vec2::new(p[0], p[2]) - g;
+                        }
+                    }
+                    None if shift => {
+                        press.band = true;
+                        lock.0 = true;
+                        editor.band = Some((start, start));
+                    }
+                    None => {}
                 }
             }
             editor.press = Some(press);
         }
     }
 
-    // Dragging the pressed block along the ground, one coalesced undo step.
     if buttons.pressed(MouseButton::Left)
         && editor.tool == Tool::Select
-        && let (Some(cursor), Some(g)) = (cursor, ground)
+        && let Some(cursor) = cursor
         && let Some(press) = editor.press.as_mut()
-        && let Some(i) = press.block
     {
         if cursor.distance(press.start) > 4.0 {
             press.moved = true;
         }
-        if press.moved {
-            let at = ground_to_model(g.x + press.grab.x, g.y + press.grab.y);
-            let name = editor.view.names[i].clone();
-            let current = editor.doc.model().objects[i].position;
-            if at[0] != current[0] || at[1] != current[1] {
-                let key = format!("mover:{name}");
-                let command = Command::Move {
-                    name,
-                    position: [at[0], at[1], current[2]],
-                };
-                if let Err(e) = editor.doc.apply_coalescing(command, Some(&key)) {
+        if press.band {
+            let start = press.start;
+            editor.band = Some((start, cursor));
+        } else if press.moved
+            && let (Some(g), Some((_, first))) = (ground, press.starts.first())
+        {
+            // Dragging the pressed block (and the selection with it) along the ground,
+            // one coalesced undo step; the dragged block lands on the grid.
+            let first = *first;
+            let at = ground_to_model_snapped(g.x + press.grab.x, g.y + press.grab.y, step);
+            let delta = [at[0] - first[0], at[1] - first[1]];
+            let command = arrange::moved_from(&press.starts, delta);
+            let name = press.starts[0].0.clone();
+            let current = editor
+                .doc
+                .model()
+                .objects
+                .iter()
+                .find(|o| o.name == name)
+                .map(|o| o.position);
+            if current.is_some_and(|c| c[0] != at[0] || c[1] != at[1]) {
+                if let Err(e) = editor.doc.apply_coalescing(command, Some("mover:selecao")) {
                     editor.status = e;
                 }
                 editor.refresh();
@@ -526,9 +807,35 @@ pub fn mouse(
 
     if buttons.just_released(MouseButton::Left) {
         lock.0 = false;
+        // Ends a look edit made in the panel (colour picker) as well as a drag.
+        editor.doc.end_gesture();
         let Some(press) = editor.press.take() else {
             return;
         };
+        if press.band {
+            editor.band = None;
+            if let Some(end) = cursor.filter(|_| press.moved) {
+                let points: Vec<Option<[f32; 2]>> = (0..editor.view.names.len())
+                    .map(|i| {
+                        let h = editor.view.geoms[i].half[1];
+                        let p = Vec3::from(editor.view.positions[i]) + Vec3::Y * h;
+                        cam.world_to_viewport(cam_tf, p).ok().map(|v| [v.x, v.y])
+                    })
+                    .collect();
+                let inside = inside_box(&points, [press.start.x, press.start.y], [end.x, end.y]);
+                let names: Vec<String> = inside
+                    .into_iter()
+                    .map(|i| editor.view.names[i].clone())
+                    .collect();
+                let n = names.len();
+                select_names(&mut editor.selected, &mut editor.multi, names, true);
+                editor.status = format!(
+                    "{n} objeto(s) na caixa, {} selecionado(s)",
+                    editor.selection().len()
+                );
+            }
+            return;
+        }
         if press.moved {
             editor.doc.end_gesture();
             return;
@@ -536,7 +843,7 @@ pub fn mouse(
         let Some(cursor) = cursor.filter(|c| c.distance(press.start) <= 4.0) else {
             return;
         };
-        click(&mut editor, cam, cam_tf, cursor, press.block, ground);
+        click(editor, cam, cam_tf, cursor, &press, ground);
     }
 }
 
@@ -546,18 +853,16 @@ fn click(
     cam: &Camera,
     cam_tf: &GlobalTransform,
     cursor: Vec2,
-    block: Option<usize>,
+    press: &Press,
     ground: Option<Vec2>,
 ) {
+    let block = press.block;
     match editor.tool.clone() {
-        Tool::Place(kind) => {
+        Tool::Place(id) => {
             let Some(g) = ground else { return };
-            let name = editor.doc.unique_name(name_base(kind));
-            if let Some(object) = template(kind, &name, ground_to_model(g.x, g.y)) {
-                editor.exec(Command::Add(Box::new(object)));
-                editor.selected = Some(name);
-                editor.tool = Tool::Select;
-            }
+            let at = ground_to_model_snapped(g.x, g.y, editor.snap_step());
+            // Shift keeps the tool, to place several in a row.
+            editor.place(id, at, press.shift);
         }
         Tool::Connect(from) => {
             if let Some(i) = block {
@@ -575,12 +880,23 @@ fn click(
                     from: from.clone(),
                     to,
                 });
-                editor.selected = Some(from);
+                editor.select_only(Some(from));
             }
             editor.tool = Tool::Select;
         }
         Tool::Select => {
-            if block.is_some() {
+            if let Some(i) = block {
+                let name = editor.view.names[i].clone();
+                if press.shift {
+                    if !press.toggled {
+                        toggle_selected(&mut editor.selected, &mut editor.multi, &name);
+                    }
+                } else {
+                    editor.select_only(Some(name));
+                }
+                return;
+            }
+            if press.shift {
                 return;
             }
             let mut screen = Vec::new();
@@ -607,7 +923,7 @@ fn click(
                     });
                     editor.status = format!("Ligação {from} -> {to} removida (Ctrl+Z desfaz)");
                 }
-                None => editor.selected = None,
+                None => editor.select_only(None),
             }
         }
     }
@@ -620,6 +936,9 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
     let mut outlines: Vec<(usize, Color)> = Vec::new();
     if let Some(i) = editor.selected.as_deref().and_then(|s| view.index_of(s)) {
         outlines.push((i, Color::srgb(1.0, 1.0, 1.0)));
+    }
+    for i in editor.multi.iter().filter_map(|s| view.index_of(s)) {
+        outlines.push((i, Color::srgb(0.45, 0.80, 1.0)));
     }
     if let Tool::Connect(from) = &editor.tool
         && let Some(i) = view.index_of(from)
@@ -639,11 +958,16 @@ pub fn draw_edit(editor: Res<Editor>, mut gizmos: Gizmos) {
         &view.connections,
         &view.logical,
         &outlines,
-        Some(1.0),
+        Some(editor.snap_step().map_or(1.0, |s| s as f32)),
     );
     scene::draw_network(&mut gizmos, &NetworkView::of(editor.doc.model()));
-    if let (Some(at), Tool::Place(kind)) = (editor.hover, &editor.tool) {
-        let (h, _) = style::extents(style::shape_of(kind));
+    let placing = match (&editor.tool, editor.palette_drag) {
+        (_, Some(id)) => Some(id),
+        (Tool::Place(id), None) => Some(*id),
+        _ => None,
+    };
+    if let (Some(at), Some(entry)) = (editor.hover, placing.and_then(palette_entry)) {
+        let (h, _) = style::extents(style::shape_of(entry.kind));
         let base = Vec3::from(layout::to_bevy(at));
         gizmos.cube(
             Transform::from_translation(base + Vec3::Y * h[1]).with_scale(Vec3::new(
@@ -744,6 +1068,13 @@ pub fn toolbar(
             {
                 ed.flows.open = !ed.flows.open;
             }
+            if ui
+                .selectable_label(ed.shortcuts_open, "Atalhos")
+                .on_hover_text("Atalhos de teclado e mouse (F1)")
+                .clicked()
+            {
+                ed.shortcuts_open = !ed.shortcuts_open;
+            }
             ui.separator();
             crate::models::toggle(ui, &mut visual);
             if running {
@@ -801,6 +1132,33 @@ pub fn toolbar(
                     }
                 });
             });
+    }
+
+    if ed.shortcuts_open {
+        let mut open = true;
+        egui::Window::new("Atalhos do editor")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                egui::Grid::new("atalhos")
+                    .num_columns(2)
+                    .striped(true)
+                    .spacing([18.0, 4.0])
+                    .show(ui, |ui| {
+                        for (keys, what) in SHORTCUTS {
+                            ui.strong(keys);
+                            ui.label(what);
+                            ui.end_row();
+                        }
+                    });
+                ui.separator();
+                ui.weak("F1 ou Esc fecha esta janela.");
+            });
+        if !open {
+            ed.shortcuts_open = false;
+        }
     }
 
     if ed.show_blocked {
@@ -900,20 +1258,44 @@ pub fn edit_panels(
     let mut left = dock.ui(ctx, "paleta");
     egui::Panel::left("paleta")
         .resizable(false)
-        .exact_size(150.0)
+        .exact_size(172.0)
         .show(&mut left, |ui| {
-            ui.heading("Paleta");
-            for (kind, label) in LIBRARY {
-                let on = ed.tool == Tool::Place(kind);
-                if ui.selectable_label(on, label).clicked() {
-                    ed.tool = if on { Tool::Select } else { Tool::Place(kind) };
-                }
-            }
-            ui.separator();
-            ui.weak("Escolha um tipo e clique no chão.");
-            ui.weak("Esc cancela.");
+            ui.heading("Biblioteca");
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, true])
+                .show(ui, |ui| palette_ui(ui, ed));
         });
     dock.free = left.available_rect_before_wrap();
+    if let Some(id) = ed.palette_drag
+        && let Some(entry) = palette_entry(id)
+        && let Some(p) = ctx.pointer_latest_pos()
+    {
+        // The entry follows the pointer while it is dragged to the floor.
+        egui::Area::new(egui::Id::new("paleta_arrasto"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(p + egui::vec2(14.0, 8.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.label(format!("{} {}", palette_icon(id), entry.label));
+                });
+            });
+    }
+    if let Some((a, b)) = ed.band {
+        let rect = egui::Rect::from_two_pos(egui::pos2(a.x, a.y), egui::pos2(b.x, b.y));
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            egui::Id::new("caixa_selecao"),
+        ));
+        let blue = egui::Color32::from_rgb(115, 205, 255);
+        painter.rect_filled(rect, 0.0, blue.gamma_multiply(0.12));
+        painter.rect_stroke(
+            rect,
+            0.0,
+            egui::Stroke::new(1.5, blue),
+            egui::StrokeKind::Inside,
+        );
+    }
 
     let mut right = dock.ui(ctx, "propriedades");
     egui::Panel::right("propriedades")
@@ -931,6 +1313,9 @@ pub fn edit_panels(
                             for command in run_panel(ui, &ed.doc) {
                                 acts.push(Act::Exec(command));
                             }
+                        }
+                        Some(name) if !ed.multi.is_empty() => {
+                            selection_ui(ui, ed, &name, &mut acts);
                         }
                         Some(name) => {
                             ui.horizontal(|ui| {
@@ -958,17 +1343,22 @@ pub fn edit_panels(
                     }
                     ui.separator();
                     ui.strong(format!("Problemas ({})", ed.issues.len()));
+                    let before = ed.selected.clone();
                     issues_ui(ui, &ed.issues, &mut ed.selected);
+                    if ed.selected != before {
+                        ed.multi.clear();
+                    }
                 });
         });
     dock.free = right.available_rect_before_wrap();
 
+    let chosen = ed.selection();
     let mut labels: Vec<Label> = (0..ed.view.names.len())
         .map(|i| Label {
             text: ed.view.names[i].clone(),
             position: ed.view.positions[i],
             height: ed.view.geoms[i].label_height(0),
-            selected: ed.selected.as_deref() == Some(ed.view.names[i].as_str()),
+            selected: chosen.contains(&ed.view.names[i]),
         })
         .collect();
     labels.extend(capacity_labels(&NetworkView::of(ed.doc.model())));
@@ -989,6 +1379,132 @@ pub fn edit_panels(
         editor.run(act);
     }
     Ok(())
+}
+
+/// The object library: every palette entry grouped by category (click, then click on
+/// the floor; or drag it to the floor), and the grid settings.
+fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
+    for category in CATEGORIES {
+        egui::CollapsingHeader::new(category)
+            .default_open(true)
+            .show(ui, |ui| {
+                for entry in PALETTE.iter().filter(|e| e.category == category) {
+                    let on = ed.tool == Tool::Place(entry.id) || ed.palette_drag == Some(entry.id);
+                    // Icon and label are separate texts, so scripts find the label exactly.
+                    let text = (palette_icon(entry.id), entry.label);
+                    let response = ui
+                        .add(
+                            egui::Button::selectable(on, text).sense(egui::Sense::click_and_drag()),
+                        )
+                        .on_hover_text(format!(
+                            "{}: clique e depois clique no chão, ou arraste até o chão",
+                            entry.kind
+                        ));
+                    if response.drag_started() {
+                        ed.palette_drag = Some(entry.id);
+                    }
+                    if response.clicked() {
+                        ed.tool = if on {
+                            Tool::Select
+                        } else {
+                            Tool::Place(entry.id)
+                        };
+                    }
+                }
+            });
+    }
+    ui.separator();
+    ui.checkbox(&mut ed.snap, "Encaixar na grade");
+    ui.horizontal(|ui| {
+        ui.label("Passo (m)");
+        ui.add_enabled(
+            ed.snap,
+            egui::DragValue::new(&mut ed.grid_step)
+                .range(0.1..=10.0)
+                .speed(0.05)
+                .max_decimals(2),
+        );
+    });
+    ui.separator();
+    ui.weak("Esc cancela. Shift + clique no chão coloca vários.");
+    ui.weak("Atalhos: F1.");
+}
+
+/// Right panel for several selected objects: actions on all of them, align and
+/// distribute, and the properties shared by objects of one kind (each edit applies to
+/// every selected object, as one undo step).
+fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Vec<Act>) {
+    let names = ed.selection();
+    ui.strong(format!("{} objetos selecionados", names.len()));
+    ui.label(names.join(", "));
+    ui.horizontal_wrapped(|ui| {
+        if ui.button("Copiar").on_hover_text("Ctrl+C").clicked() {
+            acts.push(Act::Copy);
+        }
+        if ui.button("Duplicar").on_hover_text("Ctrl+D").clicked() {
+            acts.push(Act::Duplicate);
+        }
+        if ui.button("Excluir todos").on_hover_text("Del").clicked() {
+            acts.push(Act::Delete);
+        }
+    });
+    ui.separator();
+    ui.strong("Alinhar");
+    ui.horizontal(|ui| {
+        for (label, how) in [
+            ("Esquerda", Align::Left),
+            ("Centro X", Align::CenterX),
+            ("Direita", Align::Right),
+        ] {
+            if ui.button(label).clicked() {
+                acts.push(Act::Align(how));
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        for (label, how) in [
+            ("Topo", Align::Top),
+            ("Centro Y", Align::CenterY),
+            ("Base", Align::Bottom),
+        ] {
+            if ui.button(label).clicked() {
+                acts.push(Act::Align(how));
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        let three = names.len() >= 3;
+        for (label, axis) in [("Distribuir em x", Axis::X), ("Distribuir em y", Axis::Y)] {
+            if ui
+                .add_enabled(three, egui::Button::new(label))
+                .on_hover_text("Espaça igualmente entre os dois extremos (3 objetos ou mais)")
+                .clicked()
+            {
+                acts.push(Act::Distribute(axis));
+            }
+        }
+    });
+    ui.separator();
+    if arrange::same_kind(ed.doc.model(), &names) {
+        ui.strong("Propriedades de todos");
+        ui.weak(format!(
+            "Os campos mostram os valores de {primary}; cada alteração vale para os {} objetos.",
+            names.len()
+        ));
+        ui.separator();
+        let edits: Vec<Command> = properties_panel(ui, &ed.doc, primary)
+            .into_iter()
+            .filter(|c| !matches!(c, Command::Rename { .. }))
+            .collect();
+        if let Some(c) = arrange::fan_out(&edits, primary, &names) {
+            acts.push(Act::Exec(c));
+        }
+    } else {
+        ui.weak(
+            "Objetos de tipos diferentes: selecione só objetos do mesmo tipo para editar \
+             uma propriedade de todos.",
+        );
+    }
 }
 
 fn connections_ui(ui: &mut egui::Ui, doc: &Document, name: &str, acts: &mut Vec<Act>) {

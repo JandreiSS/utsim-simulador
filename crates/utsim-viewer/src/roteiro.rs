@@ -91,6 +91,16 @@ pub enum Condicao {
     AtividadeSelecionada(Option<String>),
     /// Whether the Fluxos panel is open.
     PainelFluxos(bool),
+    /// Number of selected objects (the primary one and the others).
+    SelecionadosIgual(usize),
+    /// The object is among the selected ones.
+    SelecaoContem(String),
+    /// `visual.asset` of an object (`None`: the default look of its kind).
+    AtivoDe(String, Option<String>),
+    /// Number of objects whose name starts with this text.
+    ObjetosComPrefixo(String, usize),
+    /// Whether the connection `de -> para` exists.
+    Ligado(String, String),
     Nao(Box<Condicao>),
 }
 
@@ -114,6 +124,10 @@ pub enum Passo {
     Rolar(f32),
     Tecla(String),
     Atalho(Vec<String>),
+    /// Presses a key and keeps it down (e.g. `Segurar("Shift")` before a click or a
+    /// drag); `LargarTecla` releases it.
+    Segurar(String),
+    LargarTecla(String),
     Digitar(String),
     ClicarBotao(String),
     Captura(String),
@@ -158,6 +172,12 @@ pub struct Estado {
     /// Activity selected in the Fluxos panel.
     pub atividade: Option<String>,
     pub painel_fluxos: bool,
+    /// Every selected object, the primary one first.
+    pub selecionados: Vec<String>,
+    /// `visual.asset` by object name.
+    pub ativos: Vec<(String, Option<String>)>,
+    /// Connections `(de, para)`.
+    pub ligacoes_lista: Vec<(String, String)>,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -240,6 +260,39 @@ impl Estado {
                 }
             }
             Condicao::PainelFluxos(b) => igual("painel de fluxos aberto", self.painel_fluxos, *b),
+            Condicao::SelecionadosIgual(n) => igual("selecionados", self.selecionados.len(), *n),
+            Condicao::SelecaoContem(n) => {
+                if self.selecionados.contains(n) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "\"{n}\" não está na seleção {:?}",
+                        self.selecionados
+                    ))
+                }
+            }
+            Condicao::AtivoDe(n, quer) => match self.ativos.iter().find(|(m, _)| m == n) {
+                Some((_, tem)) if tem == quer => Ok(()),
+                Some((_, tem)) => Err(format!(
+                    "ativo de {n}: esperado {quer:?}, encontrado {tem:?}"
+                )),
+                None => Err(format!("objeto \"{n}\" não existe")),
+            },
+            Condicao::ObjetosComPrefixo(p, n) => igual(
+                &format!("objetos começando com \"{p}\""),
+                self.posicoes
+                    .iter()
+                    .filter(|(m, _)| m.starts_with(p.as_str()))
+                    .count(),
+                *n,
+            ),
+            Condicao::Ligado(a, b) => {
+                if self.ligacoes_lista.iter().any(|(x, y)| x == a && y == b) {
+                    Ok(())
+                } else {
+                    Err(format!("não há ligação {a} -> {b}"))
+                }
+            }
             Condicao::Nao(inner) => match self.verificar(inner) {
                 Ok(()) => Err(format!("a condição negada é verdadeira: {inner:?}")),
                 Err(_) => Ok(()),
@@ -368,7 +421,50 @@ mod tests {
             fluxos: vec![("recebimento".into(), 7)],
             atividade: Some("decide".into()),
             painel_fluxos: true,
+            selecionados: vec!["fila".into(), "maquina".into()],
+            ativos: vec![
+                ("fila".into(), None),
+                ("maquina".into(), Some("maquina_kenney".into())),
+            ],
+            ligacoes_lista: vec![("fila".into(), "maquina".into())],
         }
+    }
+
+    #[test]
+    fn selection_and_appearance_assertions() {
+        let s = state();
+        assert!(s.verificar(&Condicao::SelecionadosIgual(2)).is_ok());
+        assert!(s.verificar(&Condicao::SelecionadosIgual(1)).is_err());
+        assert!(
+            s.verificar(&Condicao::SelecaoContem("maquina".into()))
+                .is_ok()
+        );
+        assert!(s.verificar(&Condicao::SelecaoContem("x".into())).is_err());
+        let ativo = |n: &str, a: Option<&str>| Condicao::AtivoDe(n.into(), a.map(Into::into));
+        assert!(
+            s.verificar(&ativo("maquina", Some("maquina_kenney")))
+                .is_ok()
+        );
+        assert!(s.verificar(&ativo("fila", None)).is_ok());
+        assert!(s.verificar(&ativo("fila", Some("area"))).is_err());
+        assert!(s.verificar(&ativo("nada", None)).is_err());
+        assert!(
+            s.verificar(&Condicao::ObjetosComPrefixo("fi".into(), 1))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::Ligado("fila".into(), "maquina".into()))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::Ligado("maquina".into(), "fila".into()))
+                .is_err()
+        );
+        let steps = parse(
+            r#"[Segurar("Shift"), LargarTecla("Shift"), Afirmar(AtivoDe("p", Some("bancada_kenney")))]"#,
+        )
+        .unwrap();
+        assert_eq!(steps[0], Passo::Segurar("Shift".into()));
     }
 
     #[test]

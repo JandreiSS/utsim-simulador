@@ -1,0 +1,107 @@
+// Roteiro da seção "Aparência" do painel de propriedades, a partir de um modelo vazio.
+//   utsim-view --novo --roteiro crates/utsim-viewer/roteiros/editor_aparencia.ron --capturas %TEMP%\utsim_editor\aparencia
+// Coloca dois processos, um operador e uma empilhadeira e escolhe ativos de terceiros
+// (assets/terceiros/catalogo.ron) pelo seletor: a bancada para um processo, uma pessoa
+// para o operador, a empilhadeira CC-BY para a empilhadeira e um processo com escala.
+// Confere o modo realista, o "Restaurar padrão" e o desfazer.
+[
+    Esperar(quadros: 20),
+    // Shift + clique no chão mantém a ferramenta: dois processos seguidos.
+    ClicarBotao("Processo"),
+    Segurar("Shift"),
+    MoverPara(Mundo(-2.0, 0.0)),
+    Clicar(Esquerdo),
+    MoverPara(Mundo(2.0, 0.0)),
+    Clicar(Esquerdo),
+    LargarTecla("Shift"),
+    Afirmar(Ferramenta("Colocar:Processor")),
+    Tecla("Esc"),
+    ClicarBotao("Operador"),
+    MoverPara(Mundo(-2.0, -3.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Empilhadeira"),
+    MoverPara(Mundo(2.0, -3.0)),
+    Clicar(Esquerdo),
+    Afirmar(ObjetosIgual(4)),
+    Tecla("F"),
+    Esperar(quadros: 10),
+    Captura("01_padrao_realista"),
+
+    // Processo: a bancada de terceiros (miniatura levada ao tamanho real pelo catálogo).
+    MoverPara(Objeto("processo")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("processo"))),
+    MoverPara(Tela(1100.0, 450.0)),
+    Rolar(-30.0),
+    Esperar(quadros: 5),
+    Captura("02_secao_aparencia"),
+    MoverPara(Deslocado(Botao("Buscar"), 80.0, 0.0)),
+    Clicar(Esquerdo),
+    Digitar("bancada"),
+    Esperar(quadros: 3),
+    Captura("03_busca"),
+    ClicarBotao("bancada_kenney"),
+    Afirmar(AtivoDe("processo", Some("bancada_kenney"))),
+    Esperar(quadros: 30),
+    Captura("04_bancada_escolhida"),
+
+    // Restaurar padrão e desfazer.
+    ClicarBotao("Restaurar padrão"),
+    Afirmar(AtivoDe("processo", None)),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(AtivoDe("processo", Some("bancada_kenney"))),
+
+    // Segundo processo: a máquina do kit da Kenney.
+    MoverPara(Objeto("processo_2")),
+    Clicar(Esquerdo),
+    MoverPara(Tela(1100.0, 450.0)),
+    Rolar(-30.0),
+    Esperar(quadros: 5),
+    MoverPara(Deslocado(Botao("Buscar"), 80.0, 0.0)),
+    Clicar(Esquerdo),
+    Digitar("maquina_janela"),
+    Esperar(quadros: 3),
+    ClicarBotao("maquina_janela_kenney"),
+    Afirmar(AtivoDe("processo_2", Some("maquina_janela_kenney"))),
+
+    // Operador: uma pessoa de terceiros (pose de repouso por enquanto).
+    MoverPara(Objeto("operador")),
+    Clicar(Esquerdo),
+    MoverPara(Tela(1100.0, 450.0)),
+    Rolar(-30.0),
+    Esperar(quadros: 5),
+    MoverPara(Deslocado(Botao("Buscar"), 80.0, 0.0)),
+    Clicar(Esquerdo),
+    Digitar("mini_homem_a"),
+    Esperar(quadros: 3),
+    ClicarBotao("pessoa_mini_homem_a"),
+    Afirmar(AtivoDe("operador", Some("pessoa_mini_homem_a"))),
+
+    // Empilhadeira: o modelo CC-BY da KolosStudios (origem fora do centro no arquivo).
+    MoverPara(Objeto("empilhadeira")),
+    Clicar(Esquerdo),
+    MoverPara(Tela(1100.0, 450.0)),
+    Rolar(-30.0),
+    Esperar(quadros: 5),
+    MoverPara(Deslocado(Botao("Buscar"), 80.0, 0.0)),
+    Clicar(Esquerdo),
+    Digitar("kolos"),
+    Esperar(quadros: 3),
+    ClicarBotao("empilhadeira_kolosstudios"),
+    Afirmar(AtivoDe("empilhadeira", Some("empilhadeira_kolosstudios"))),
+    Esperar(quadros: 40),
+    Captura("05_terceiros_realista"),
+
+    // Aproximar a câmera para ver as medidas reais.
+    MoverPara(Mundo(0.0, -1.5)),
+    Rolar(6.0),
+    Esperar(quadros: 10),
+    Captura("06_terceiros_perto"),
+
+    // O modo simples mantém as formas simples; o salvamento guarda o nome do ativo.
+    ClicarBotao("simples"),
+    Esperar(quadros: 10),
+    Captura("07_modo_simples"),
+    ClicarBotao("realista"),
+    Esperar(quadros: 20),
+]

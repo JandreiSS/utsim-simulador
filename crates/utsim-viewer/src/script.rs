@@ -340,6 +340,16 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
             .collect(),
         atividade: ed.flows.activity.clone(),
         painel_fluxos: ed.flows.open,
+        selecionados: ed.selection(),
+        ativos: model
+            .objects
+            .iter()
+            .map(|o| {
+                let asset = o.visual.as_ref().and_then(|v| v.asset.clone());
+                (o.name.clone(), asset)
+            })
+            .collect(),
+        ligacoes_lista: model.connections.clone(),
     }
 }
 
@@ -701,6 +711,24 @@ fn advance(
                     }
                     Flow::Pending
                 }
+                _ => Flow::Done,
+            }
+        }
+        Passo::Segurar(name) | Passo::LargarTecla(name) => {
+            let Some((code, key)) = parse_key(name) else {
+                return Flow::Fail(format!("tecla desconhecida: \"{name}\""));
+            };
+            let state = if matches!(step, Passo::Segurar(_)) {
+                ButtonState::Pressed
+            } else {
+                ButtonState::Released
+            };
+            match n {
+                0 => {
+                    out.key(code, key, state, entity);
+                    Flow::Pending
+                }
+                1 => Flow::Pending,
                 _ => Flow::Done,
             }
         }

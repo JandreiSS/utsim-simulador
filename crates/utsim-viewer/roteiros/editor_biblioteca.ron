@@ -1,0 +1,129 @@
+// Roteiro da biblioteca de objetos e da edição de vários objetos, a partir de um modelo vazio.
+//   utsim-view --novo --roteiro crates/utsim-viewer/roteiros/editor_biblioteca.ron --capturas %TEMP%\utsim_editor\biblioteca
+// Coloca objetos pela biblioteca (clique e arrastar até o chão, com encaixe na grade), liga,
+// seleciona dois com a caixa (Shift + arrastar no chão), move os dois juntos, copia e cola
+// (nomes únicos e só a ligação interna), desfaz, seleciona com Shift + clique, alinha,
+// duplica, exclui e abre a janela de atalhos.
+[
+    Esperar(quadros: 20),
+    Captura("01_biblioteca"),
+    Afirmar(ObjetosIgual(0)),
+
+    // Clique na biblioteca e clique no chão (fora da grade: encaixa).
+    ClicarBotao("Chegada"),
+    Afirmar(Ferramenta("Colocar:Source")),
+    MoverPara(Mundo(-6.3, -1.8)),
+    Captura("02_fantasma"),
+    Clicar(Esquerdo),
+    Afirmar(PosicaoDe("chegada", (-6.0, -2.0))),
+
+    // Arrastar da biblioteca até o chão.
+    Arrastar(de: Botao("Fila"), para: Mundo(-3.2, -2.1)),
+    Afirmar(ObjetosIgual(2)),
+    Afirmar(PosicaoDe("fila", (-3.0, -2.0))),
+    Afirmar(Ferramenta("Selecionar")),
+    ClicarBotao("Processo"),
+    MoverPara(Mundo(0.0, -2.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Saída"),
+    MoverPara(Mundo(3.0, -4.0)),
+    Clicar(Esquerdo),
+    ClicarBotao("Operador"),
+    MoverPara(Mundo(0.0, -6.0)),
+    Clicar(Esquerdo),
+    Afirmar(ObjetosIgual(5)),
+    Afirmar(AtivoDe("operador", Some("operador"))),
+
+    // Ligações chegada -> fila -> processo -> saida.
+    MoverPara(Objeto("chegada")),
+    Clicar(Esquerdo),
+    Tecla("C"),
+    MoverPara(Objeto("fila")),
+    Clicar(Esquerdo),
+    MoverPara(Objeto("fila")),
+    Clicar(Esquerdo),
+    Tecla("C"),
+    MoverPara(Objeto("processo")),
+    Clicar(Esquerdo),
+    MoverPara(Objeto("processo")),
+    Clicar(Esquerdo),
+    Tecla("C"),
+    MoverPara(Objeto("saida")),
+    Clicar(Esquerdo),
+    Afirmar(LigacoesIgual(3)),
+    Captura("03_colocados"),
+
+    // Seleção por caixa: Shift + arrastar no chão em volta da fila e do processo.
+    Segurar("Shift"),
+    MoverPara(Mundo(-4.5, -0.6)),
+    Pressionar(Esquerdo),
+    MoverPara(Mundo(-1.0, -2.0)),
+    MoverPara(Mundo(1.3, -3.2)),
+    Captura("04_caixa_desenhando"),
+    Soltar(Esquerdo),
+    LargarTecla("Shift"),
+    Afirmar(SelecionadosIgual(2)),
+    Afirmar(SelecaoContem("fila")),
+    Afirmar(SelecaoContem("processo")),
+    Captura("04_caixa"),
+
+    // Arrastar um deles move os dois.
+    Arrastar(de: Mundo(-3.0, -2.0), para: Mundo(-3.0, 1.0)),
+    Afirmar(PosicaoDe("fila", (-3.0, 1.0))),
+    Afirmar(PosicaoDe("processo", (0.0, 1.0))),
+    Afirmar(SelecionadosIgual(2)),
+    Captura("05_movidos"),
+
+    // Copiar e colar: nomes novos, deslocados, só a ligação entre os dois copiados.
+    Atalho(["Ctrl", "C"]),
+    Afirmar(StatusContem("copiados")),
+    Atalho(["Ctrl", "V"]),
+    Afirmar(ObjetosIgual(7)),
+    Afirmar(PosicaoDe("fila_2", (-1.0, -1.0))),
+    Afirmar(PosicaoDe("processo_2", (2.0, -1.0))),
+    Afirmar(Ligado("fila_2", "processo_2")),
+    Afirmar(Nao(Ligado("chegada", "fila_2"))),
+    Afirmar(LigacoesIgual(4)),
+    Afirmar(SelecionadosIgual(2)),
+    Afirmar(SelecaoContem("fila_2")),
+    Captura("06_colados"),
+
+    // Desfazer a colagem e o movimento (um passo cada).
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(ObjetosIgual(5)),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(PosicaoDe("fila", (-3.0, -2.0))),
+    Afirmar(PosicaoDe("processo", (0.0, -2.0))),
+    Captura("07_desfeito"),
+
+    // Shift + clique e alinhar pelo topo.
+    MoverPara(Objeto("chegada")),
+    Clicar(Esquerdo),
+    Segurar("Shift"),
+    MoverPara(Objeto("saida")),
+    Clicar(Esquerdo),
+    LargarTecla("Shift"),
+    Afirmar(SelecionadosIgual(2)),
+    Captura("08_shift_clique"),
+    ClicarBotao("Topo"),
+    Afirmar(PosicaoDe("saida", (3.0, -2.0))),
+    Afirmar(PosicaoDe("chegada", (-6.0, -2.0))),
+    Captura("09_alinhados"),
+
+    // Duplicar e excluir a seleção (cada um é um passo de desfazer).
+    Atalho(["Ctrl", "D"]),
+    Afirmar(ObjetosIgual(7)),
+    Afirmar(ObjetoExiste("chegada_2")),
+    Afirmar(ObjetoExiste("saida_2")),
+    Tecla("Delete"),
+    Afirmar(ObjetosIgual(5)),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(ObjetosIgual(7)),
+    Atalho(["Ctrl", "Z"]),
+    Afirmar(ObjetosIgual(5)),
+
+    // Janela de atalhos.
+    Tecla("F1"),
+    Captura("10_atalhos"),
+    Tecla("Esc"),
+]

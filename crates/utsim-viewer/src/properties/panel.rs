@@ -8,10 +8,11 @@ use bevy_egui::egui::{self, Color32, Id, Ui, emath::Numeric};
 use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable};
 use utsim_edit::{Command, Document};
 use utsim_model::experiment::patch;
-use utsim_model::{ObjectDef, ObjectKind};
+use utsim_model::{ObjectDef, ObjectKind, VisualDef};
 
 use super::ron_text as ron;
 use super::spec::{self, FAMILIES};
+use crate::{terceiros, visual};
 
 pub(crate) const RED: Color32 = Color32::from_rgb(225, 80, 80);
 
@@ -1383,7 +1384,140 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
     }
     editor.downtime_field(ui, obj.downtime.as_ref());
     editor.shifts_field(ui, obj.shifts.as_ref());
-    editor.out
+    ui.separator();
+    let mut out = editor.out;
+    appearance_field(ui, obj, &mut out);
+    out
+}
+
+/// Text shown for "no asset": the default look of the kind.
+pub const DEFAULT_ASSET: &str = "(padrão do tipo)";
+
+/// The "Aparência" section: `visual` of the object (asset from the built-in library or
+/// the third-party catalogue, colour, scale, yaw) and "Restaurar padrão". Emits one
+/// `SetVisual` when something changed.
+fn appearance_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command>) {
+    let current = obj.visual.clone().unwrap_or_default();
+    let mut next = current.clone();
+    let id = |field: &str| Id::new(("utsim-props", &obj.name, "#visual", field));
+    egui::CollapsingHeader::new("Aparência")
+        .id_salt(id("secao"))
+        .default_open(true)
+        .show(ui, |ui| {
+            let shown = current.asset.as_deref().unwrap_or(DEFAULT_ASSET);
+            ui.horizontal(|ui| {
+                ui.label("Ativo:");
+                ui.strong(shown);
+            });
+            if let Some(e) = current.asset.as_deref().and_then(terceiros::by_name) {
+                ui.weak(format!("{}. {}", e.credit(), e.uso));
+                if !e.clipes.is_empty() {
+                    ui.weak("Clipes de animação ainda não são tocados: pose de repouso.");
+                }
+            }
+            let filter_id = id("busca");
+            let mut filter = temp::<String>(ui, filter_id).unwrap_or_default();
+            ui.horizontal(|ui| {
+                ui.label("Buscar");
+                let r = ui.add(egui::TextEdit::singleline(&mut filter).desired_width(150.0));
+                if r.changed() {
+                    set_temp(ui, filter_id, filter.clone());
+                }
+            });
+            let wanted = filter.trim().to_lowercase();
+            let matches = |n: &str| wanted.is_empty() || n.to_lowercase().contains(&wanted);
+            egui::ScrollArea::vertical()
+                .id_salt(id("lista"))
+                .max_height(180.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    if matches(DEFAULT_ASSET)
+                        && ui
+                            .selectable_label(current.asset.is_none(), DEFAULT_ASSET)
+                            .clicked()
+                    {
+                        next.asset = None;
+                    }
+                    ui.weak("Biblioteca do UTSim");
+                    for spec in utsim_assets::Spec::defaults() {
+                        let n = spec.name();
+                        if !matches(n) {
+                            continue;
+                        }
+                        let on = current.asset.as_deref() == Some(n);
+                        if ui
+                            .selectable_label(on, n)
+                            .on_hover_text("UTSim, GPL (gerado por utsim-assets)")
+                            .clicked()
+                        {
+                            next.asset = Some(n.to_string());
+                        }
+                    }
+                    ui.weak("Terceiros (assets/terceiros)");
+                    for e in terceiros::entries() {
+                        if !matches(&e.nome) {
+                            continue;
+                        }
+                        let on = current.asset.as_deref() == Some(e.nome.as_str());
+                        let size = e.real_size();
+                        let hint = format!(
+                            "{}\n{}\n{} ({:.2} x {:.2} x {:.2} m)",
+                            e.credit(),
+                            e.uso,
+                            e.arquivo,
+                            size[0],
+                            size[2],
+                            size[1]
+                        );
+                        if ui
+                            .selectable_label(on, &e.nome)
+                            .on_hover_text(hint)
+                            .clicked()
+                        {
+                            next.asset = Some(e.nome.clone());
+                        }
+                    }
+                });
+            ui.horizontal(|ui| {
+                let mut on = current.color.is_some();
+                if ui.checkbox(&mut on, "Cor").changed() {
+                    next.color = on.then(|| "#d08030".to_string());
+                }
+                if let Some(rgb) = current.color.as_deref().and_then(visual::parse_color) {
+                    let mut c = rgb.map(|v| (v * 255.0).round() as u8);
+                    if ui.color_edit_button_srgb(&mut c).changed() {
+                        next.color = Some(format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2]));
+                    }
+                    ui.weak(current.color.as_deref().unwrap_or(""));
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Escala");
+                let mut s = current.scale.unwrap_or(1.0);
+                if num(ui, id("escala"), &mut s, 0.01, 0.01) {
+                    next.scale = (s != 1.0).then_some(s);
+                }
+                ui.label("Giro (graus)");
+                let mut y = current.yaw.unwrap_or(0.0);
+                if num(ui, id("giro"), &mut y, 1.0, -360.0) {
+                    next.yaw = (y != 0.0).then_some(y);
+                }
+            });
+            let custom = obj.visual.is_some();
+            if ui
+                .add_enabled(custom, egui::Button::new("Restaurar padrão"))
+                .on_hover_text("Volta à aparência padrão do tipo de objeto")
+                .clicked()
+            {
+                next = VisualDef::default();
+            }
+        });
+    if next != current {
+        out.push(Command::SetVisual {
+            name: obj.name.clone(),
+            visual: Some(next),
+        });
+    }
 }
 
 /// Simulation settings (`run.*`).

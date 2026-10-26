@@ -4,9 +4,11 @@
 //! types: the binary (`src/models.rs`) only applies these numbers.
 //!
 //! # Default asset by role and kind
-//! - `visual.asset` wins: a library name ([`Spec::by_name`]) or a `.glb` file, relative
-//!   to the model file. Parametric library assets (rack, conveyor, floor area) still take
-//!   their size from the object's geometry.
+//! - `visual.asset` wins: a library name ([`Spec::by_name`]), a name of the third-party
+//!   catalogue ([`crate::terceiros`], placed at real size facing `+x` with the
+//!   catalogue's `escala_real` and `giro_y_graus`) or a `.glb` file, relative to the
+//!   model file. Parametric library assets (rack, conveyor, floor area) still take their
+//!   size from the object's geometry.
 //! - Transporters by [`MobileRole`]: `Forklift` → `empilhadeira`, `Agv` → `agv`,
 //!   `Person` → `operador_simples`, `Vehicle` → `paleteira` in a scene with pallet loads
 //!   (it has racks or forklifts), else `agv`.
@@ -24,6 +26,8 @@ use utsim_scene::geometry::Geom;
 use utsim_scene::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH, RACK_DEPTH};
 use utsim_scene::style::{self, Shape};
 use utsim_scene::{MobileRole, Motion};
+
+use crate::terceiros;
 
 /// Where an asset comes from.
 #[derive(Clone, Debug, PartialEq)]
@@ -58,6 +62,9 @@ pub struct Look {
     /// Colour of the `pintura` material (`visual.color`), sRGB.
     pub color: Option<[f32; 3]>,
     pub carry: Carry,
+    /// Translation of the glTF scene under the block's root (layout space): zero for
+    /// the library and user files, the catalogue centring for a third-party asset.
+    pub offset: [f32; 3],
 }
 
 /// Scene-wide choices.
@@ -168,6 +175,32 @@ pub fn look_of(
     model_dir: Option<&Path>,
 ) -> Option<Look> {
     let asset = visual.and_then(|v| v.asset.as_deref()).map(str::trim);
+    let user_scale = visual
+        .and_then(|v| v.scale)
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .map_or(1.0, |s| s as f32);
+    let user_yaw = visual
+        .and_then(|v| v.yaw)
+        .filter(|y| y.is_finite())
+        .map_or(0.0, |y| (y as f32).to_radians());
+    let color = visual
+        .and_then(|v| v.color.as_deref())
+        .and_then(parse_color);
+    // A third-party asset of the catalogue: real size, facing +x, centred.
+    if let Some(entry) = asset
+        .filter(|a| Spec::by_name(a).is_none())
+        .and_then(terceiros::by_name)
+    {
+        let p = entry.placement(user_scale, user_yaw);
+        return Some(Look {
+            source: Source::File(terceiros::file_of(entry)),
+            scale: p.scale,
+            yaw: p.yaw,
+            color,
+            carry: carry_of(None, role),
+            offset: p.offset,
+        });
+    }
     let source = match asset {
         Some(a) if a.to_lowercase().ends_with(".glb") => {
             let path = Path::new(a);
@@ -194,19 +227,45 @@ pub fn look_of(
     Some(Look {
         carry: carry_of(spec.as_ref(), role),
         source,
-        scale: visual
-            .and_then(|v| v.scale)
-            .filter(|s| s.is_finite() && *s > 0.0)
-            .map_or(1.0, |s| s as f32),
-        yaw: belt_yaw
-            + visual
-                .and_then(|v| v.yaw)
-                .filter(|y| y.is_finite())
-                .map_or(0.0, |y| (y as f32).to_radians()),
-        color: visual
-            .and_then(|v| v.color.as_deref())
-            .and_then(parse_color),
+        scale: user_scale,
+        yaw: belt_yaw + user_yaw,
+        color,
+        offset: [0.0; 3],
     })
+}
+
+/// Relative URIs a `.glb` names for its images and buffers (`Textures/colormap.png`),
+/// so they can be served next to it. Embedded data (`data:`), absolute URLs and
+/// malformed files give none.
+pub fn relative_uris(glb: &[u8]) -> Vec<String> {
+    let word = |at: usize| -> Option<usize> {
+        let b = glb.get(at..at + 4)?;
+        Some(u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
+    };
+    if glb.get(0..4) != Some(b"glTF".as_slice()) || word(16) != Some(0x4E4F_534A) {
+        return Vec::new();
+    }
+    let Some(json) = word(12).and_then(|n| glb.get(20..20 + n)) else {
+        return Vec::new();
+    };
+    let Ok(doc) = serde_json::from_slice::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    let mut uris = Vec::new();
+    for list in ["images", "buffers"] {
+        for item in doc[list].as_array().into_iter().flatten() {
+            if let Some(uri) = item["uri"].as_str()
+                && !uri.starts_with("data:")
+                && !uri.contains("://")
+                && !uri.starts_with('/')
+                && !uri.split(['/', '\\']).any(|part| part == "..")
+                && !uris.iter().any(|u| u == uri)
+            {
+                uris.push(uri.to_string());
+            }
+        }
+    }
+    uris
 }
 
 /// Length of one step of a walking person, metres (a full cycle is two steps).
@@ -541,6 +600,63 @@ mod tests {
     }
 
     #[test]
+    fn a_third_party_asset_is_placed_by_the_catalogue() {
+        let visual = VisualDef {
+            asset: Some("bancada_kenney".into()),
+            scale: Some(1.5),
+            yaw: Some(90.0),
+            ..VisualDef::default()
+        };
+        let l = look_of(
+            "Processor",
+            None,
+            Some(&visual),
+            &geom("Processor"),
+            Context::default(),
+            None,
+        )
+        .unwrap();
+        let entry = crate::terceiros::by_name("bancada_kenney").unwrap();
+        assert_eq!(l.source, Source::File(crate::terceiros::file_of(entry)));
+        // escala_real 4 times the user's 1.5; giro_y_graus 90 plus the user's 90.
+        assert!((l.scale - 6.0).abs() < 1e-6);
+        assert!((l.yaw - PI).abs() < 1e-5);
+        assert_eq!(l.offset, entry.placement(1.5, PI / 2.0).offset);
+        // A person of the catalogue carries in the hands like the library operator.
+        let visual = VisualDef {
+            asset: Some("pessoa_mini_homem_a".into()),
+            ..VisualDef::default()
+        };
+        let role = Some(MobileRole::Person);
+        let l = look_of(
+            "Transporter",
+            role,
+            Some(&visual),
+            &geom("Transporter"),
+            Context::default(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(l.carry, Carry::Hands);
+        // Library names win over the catalogue, and unknown names keep the default.
+        let visual = VisualDef {
+            asset: Some("nada_disso".into()),
+            ..VisualDef::default()
+        };
+        let l = look_of(
+            "Processor",
+            None,
+            Some(&visual),
+            &geom("Processor"),
+            Context::default(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(l.source, Source::Library(Spec::Maquina));
+        assert_eq!(l.offset, [0.0; 3]);
+    }
+
+    #[test]
     fn the_stance_foot_does_not_slide() {
         // Over a stance half-cycle the planted foot (hip + L sin(angle)) stays put.
         for k in 0..10 {
@@ -653,6 +769,31 @@ mod tests {
     fn wheels_roll_backwards_about_the_axle() {
         assert!((wheel_angle(0.33, 0.33) + 1.0).abs() < 1e-5);
         assert_eq!(wheel_angle(1.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn external_texture_uris_are_found_in_a_glb() {
+        let glb = |json: &str| {
+            let mut json = json.as_bytes().to_vec();
+            while !json.len().is_multiple_of(4) {
+                json.push(b' ');
+            }
+            let mut b = b"glTF".to_vec();
+            b.extend(2u32.to_le_bytes());
+            b.extend(((20 + json.len()) as u32).to_le_bytes());
+            b.extend((json.len() as u32).to_le_bytes());
+            b.extend(0x4E4F_534Au32.to_le_bytes());
+            b.extend(json);
+            b
+        };
+        let file = glb(
+            r#"{"images":[{"uri":"Textures/colormap.png"},{"uri":"data:image/png;base64,AA"},
+                {"uri":"../fora.png"},{"bufferView":0}],"buffers":[{"byteLength":4}]}"#,
+        );
+        assert_eq!(relative_uris(&file), vec!["Textures/colormap.png"]);
+        assert!(relative_uris(b"nada").is_empty());
+        // The library models embed everything.
+        assert!(relative_uris(&Spec::Maquina.glb()).is_empty());
     }
 
     #[test]
