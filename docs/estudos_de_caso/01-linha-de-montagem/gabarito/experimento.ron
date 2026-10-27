@@ -1,0 +1,38 @@
+// Estudo de caso 1: perguntas 1 e 2.
+// Pergunta 1: quantos inspetores por turno (2, 3 ou 4)?
+// Pergunta 2: onde colocar posições extras de buffer (com 3 inspetores)?
+// A janela de estatísticas tem 10 dias: divida expedicao.input por 10 para ter peças por dia.
+// Uso: utsim experiment docs/estudos_de_caso/01-linha-de-montagem/gabarito/experimento.ron
+Experiment(
+    name: "Linha de montagem: inspetores e buffer",
+    model: "modelo.ron",
+    scenarios: [
+        // ----- Pergunta 1: inspetores (buffers atuais, 2 posições em cada) -----
+        (name: "2 insp", set: { "inspetores.team": "[\"inspetor_1\", \"inspetor_2\"]" }),
+        (name: "3 insp"),
+        (name: "4 insp", set: { "inspetores.team": "[\"inspetor_1\", \"inspetor_2\", \"inspetor_3\", \"inspetor_4\"]" }),
+        // ----- Pergunta 2: 3 inspetores e +6 posições em um só lugar -----
+        (name: "+6 antes da solda", set: { "fila_solda.capacity": "8" }),
+        (name: "+6 depois da solda", set: { "fila_cal.capacity": "8" }),
+        (name: "+6 antes da inspecao", set: { "fila_insp.capacity": "8" }),
+        // ----- Quanto buffer antes da solda? -----
+        (name: "+4 antes da solda", set: { "fila_solda.capacity": "6" }),
+        (name: "+10 antes da solda", set: { "fila_solda.capacity": "12" }),
+    ],
+    measures: [
+        "expedicao.input",
+        "expedicao.time_in_system.mean",
+        "bases.state.blocked",
+        "solda.state.down",
+        "calibracao.state.idle",
+        "inspecao.content.mean",
+        "inspecao.state.waiting_operator",
+        "inspetor_1.state.utilize",
+        "inspetor_2.state.utilize",
+        "inspetor_3.state.utilize",
+        "fila_solda.content.mean",
+        "fila_cal.content.mean",
+        "fila_insp.content.mean",
+        "fila_retrabalho.staytime.mean",
+    ],
+)

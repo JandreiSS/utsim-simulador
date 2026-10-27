@@ -1,0 +1,38 @@
+// Estudo de caso 3: escala de pessoal por turno de custo mínimo.
+// Variáveis: médicos e enfermeiros de triagem de cada turno.
+// Custo por turno (R$): médico R$ 220/h (S1 e S2: 5 h = 1.100; S3: 4 h = 880) e
+// enfermeiro R$ 70/h (S1 e S2: 350; S3: 280).
+// Metas (médias do dia): espera na triagem até 8 min, espera de urgentes até 3 min, espera de
+// normais até 15 min e no máximo 2% de pacientes perdidos (sala cheia): pelo menos 6.468 dos
+// cerca de 6.600 pacientes da janela de 30 dias passam pela saída.
+// Uso: utsim otimizar docs/estudos_de_caso/03-clinica-com-turnos/gabarito/otimizacao.ron --html relatorio.html
+OptProblem(
+    name: "Clínica: escala de pessoal por turno",
+    model: "modelo.ron",
+    replications: 5,
+    variables: [
+        (key: "medicos_S1.capacity", domain: Integer(min: 4, max: 7)),
+        (key: "medicos_S2.capacity", domain: Integer(min: 4, max: 7)),
+        (key: "medicos_S3.capacity", domain: Integer(min: 2, max: 4)),
+        (key: "triagem_S1.capacity", domain: Integer(min: 2, max: 4)),
+        (key: "triagem_S2.capacity", domain: Integer(min: 2, max: 3)),
+        (key: "triagem_S3.capacity", domain: Integer(min: 1, max: 2)),
+    ],
+    objective: (
+        sense: Minimize,
+        terms: [],
+        costs: [
+            ("medicos_S1.capacity", 1100.0), ("medicos_S2.capacity", 1100.0), ("medicos_S3.capacity", 880.0),
+            ("triagem_S1.capacity", 350.0), ("triagem_S2.capacity", 350.0), ("triagem_S3.capacity", 280.0),
+        ],
+    ),
+    constraints: [
+        (metric: "sala_espera.staytime.mean", max: 8.0),
+        (metric: "fila_urgente.staytime.mean", max: 3.0),
+        (metric: "fila_normal.staytime.mean", max: 15.0),
+        (metric: "saida.input", min: 6468.0),
+    ],
+    algorithm: Grid,
+    budget: 600,
+    refine: (top: 6, replications: 30),
+)
