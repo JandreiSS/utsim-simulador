@@ -1,0 +1,34 @@
+// Estudo de caso 1: pergunta 3 (resumo das perguntas 1 e 2).
+// Menor custo de posições de buffer que cumpre: pelo menos 850 peças aprovadas por dia
+// (8.500 em 10 dias) e tempo médio de atravessamento de até 1.200 s.
+// Custo por posição: 40 antes da solda, 60 depois da solda e 50 antes da inspeção.
+// A equipe de inspetores entra como variável de escolha (não tem custo no arquivo, porque
+// variável de escolha não aceita custo: veja "Lacunas" no README).
+// Uso: utsim otimizar docs/estudos_de_caso/01-linha-de-montagem/gabarito/otimizacao.ron --html relatorio.html
+OptProblem(
+    name: "Linha de montagem: buffers e inspetores",
+    model: "modelo.ron",
+    replications: 10,
+    variables: [
+        (key: "inspetores.team", domain: Choice([
+            "[\"inspetor_1\", \"inspetor_2\"]",
+            "[\"inspetor_1\", \"inspetor_2\", \"inspetor_3\"]",
+            "[\"inspetor_1\", \"inspetor_2\", \"inspetor_3\", \"inspetor_4\"]",
+        ])),
+        (key: "fila_solda.capacity", domain: Integer(min: 2, max: 14, step: 2)),
+        (key: "fila_cal.capacity",   domain: Integer(min: 2, max: 6, step: 2)),
+        (key: "fila_insp.capacity",  domain: Integer(min: 2, max: 6, step: 2)),
+    ],
+    objective: (
+        sense: Minimize,
+        terms: [],
+        costs: [("fila_solda.capacity", 40.0), ("fila_cal.capacity", 60.0), ("fila_insp.capacity", 50.0)],
+    ),
+    constraints: [
+        (metric: "expedicao.input", min: 8500.0),
+        (metric: "expedicao.time_in_system.mean", max: 1200.0),
+    ],
+    algorithm: Grid,
+    budget: 200,
+    refine: (top: 4, replications: 30),
+)

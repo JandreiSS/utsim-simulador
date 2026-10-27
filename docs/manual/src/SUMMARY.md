@@ -44,3 +44,7 @@
 - [Formato `.ron`](referencia-ron.md)
 - [Comandos da linha de comando](referencia-cli.md)
 - [Glossário](glossario.md)
+
+# Apêndice
+
+- [Estudos de caso](estudos-de-caso.md)

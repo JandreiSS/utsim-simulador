@@ -1,0 +1,44 @@
+// Estudo de caso 2: frota de empilhadeiras, número de pickers e posição da embalagem.
+// "E3" é o modelo como está (3 empilhadeiras, 5 pickers, embalagem a 60 m do picking).
+// Embalagem "perto" = a 20 m do picking, mas então fica a 56 m da expedição (hoje 16 m).
+// Só as posições mudam; a rede de caminhos fica igual.
+// Uso: utsim experiment docs/estudos_de_caso/02-centro-de-distribuicao/gabarito/experimento.ron
+Experiment(
+    name: "Centro de distribuição: frota, pickers e embalagem",
+    model: "modelo.ron",
+    scenarios: [
+        // ----- Pergunta 1: empilhadeiras (5 pickers, embalagem longe) -----
+        (name: "E2", set: {"frota.team": "[\"emp_1\", \"emp_2\"]"}),
+        (name: "E3"),
+        (name: "E4", set: {"frota.team": "[\"emp_1\", \"emp_2\", \"emp_3\", \"emp_4\"]"}),
+        // ----- Pergunta 2: pickers com a embalagem longe (60 m do picking) -----
+        (name: "longe P6", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\"]"}),
+        (name: "longe P7", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\"]"}),
+        (name: "longe P8", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\", \"picker_8\"]"}),
+        (name: "longe P9", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\", \"picker_8\", \"picker_9\"]"}),
+        (name: "longe P10", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\", \"picker_8\", \"picker_9\", \"picker_10\"]"}),
+        // ----- Pergunta 3: embalagem perto (20 m do picking, 56 m da expedição) -----
+        (name: "perto P4", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\"]", "fila_embalagem.position": "(60.0, -42.0, 0.0)", "embalagem.position": "(60.0, -44.0, 0.0)"}),
+        (name: "perto P5", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\"]", "fila_embalagem.position": "(60.0, -42.0, 0.0)", "embalagem.position": "(60.0, -44.0, 0.0)"}),
+        (name: "perto P6", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\"]", "fila_embalagem.position": "(60.0, -42.0, 0.0)", "embalagem.position": "(60.0, -44.0, 0.0)"}),
+        (name: "perto P7", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\"]", "fila_embalagem.position": "(60.0, -42.0, 0.0)", "embalagem.position": "(60.0, -44.0, 0.0)"}),
+        (name: "perto P8", set: {"pickers.team": "[\"picker_1\", \"picker_2\", \"picker_3\", \"picker_4\", \"picker_5\", \"picker_6\", \"picker_7\", \"picker_8\"]", "fila_embalagem.position": "(60.0, -42.0, 0.0)", "embalagem.position": "(60.0, -44.0, 0.0)"}),
+    ],
+    measures: [
+        "expedicao.input",
+        "recebimento.staytime.mean",
+        "recebimento.content.max",
+        "porta_paletes.content.max",
+        "emp_1.state.idle",
+        "emp_2.state.idle",
+        "emp_3.state.idle",
+        "emp_1.state.blocked",
+        "fila_pedidos.staytime.mean",
+        "separacao.staytime.mean",
+        "fila_embalagem.staytime.mean",
+        "embalagem.content.mean",
+        "picker_1.state.idle",
+        "picker_4.state.idle",
+        "expedicao.time_in_system.mean",
+    ],
+)

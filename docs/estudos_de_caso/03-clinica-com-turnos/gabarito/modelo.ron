@@ -1,0 +1,87 @@
+// Estudo de caso 3: clínica com turnos. Tempo em minutos.
+//
+// O relógio começa às 07h00 (t = 0). Um dia tem 1440 min. A clínica recebe pacientes das 07h às 19h
+// (t = 0 a 720). O pessoal trabalha em três turnos: S1 07h-12h (t 0-300), S2 12h-17h (t 300-600) e
+// S3 17h-21h (t 600-840); o S3 fica até as 21h para esvaziar a fila depois do fim das chegadas.
+//
+// Chegadas que variam com a hora: seis fontes, cada uma ligada só dentro da sua faixa de horário
+// (fora dela a fonte tem turno "fora", e o relógio de chegadas fica pausado).
+//
+//   chegada_B1..B6 -> sala_espera -> triagem_S1/S2/S3 --(classe 1)--> fila_urgente --\
+//                                                    \--(classe 2)--> fila_normal  ---> medicos_S1/S2/S3 -> saida
+//
+// Prioridade: cada grupo de médicos liga primeiro a fila_urgente e depois a fila_normal; a ordem das
+// conexões de entrada é a prioridade de puxar, então urgentes sempre passam à frente (sem interromper
+// uma consulta em andamento).
+Model(
+    name: "Clínica com turnos",
+    description: "Pronto atendimento com chegadas por faixa de horário, triagem, prioridade para urgentes e três turnos",
+    run: (stop_time: 44640.0, warmup: 1440.0, seed: 2026, replications: 10),
+    objects: [
+        // ----- Chegadas por faixa de horário (pacientes/h na tabela do enunciado) -----
+        (name: "chegada_B1", kind: Source(interarrival: Exp(mean: 6.0000),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 60.0, duration: 1380.0)]), position: (0.0, 2.0, 0.0)),
+        (name: "chegada_B2", kind: Source(interarrival: Exp(mean: 2.3077),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 60.0), (start: 240.0, duration: 1200.0)]), position: (0.0, 4.0, 0.0)),
+        (name: "chegada_B3", kind: Source(interarrival: Exp(mean: 3.3333),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 240.0), (start: 300.0, duration: 1140.0)]), position: (0.0, 6.0, 0.0)),
+        (name: "chegada_B4", kind: Source(interarrival: Exp(mean: 5.0000),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 300.0), (start: 420.0, duration: 1020.0)]), position: (0.0, 8.0, 0.0)),
+        (name: "chegada_B5", kind: Source(interarrival: Exp(mean: 2.7273),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 420.0), (start: 600.0, duration: 840.0)]), position: (0.0, 10.0, 0.0)),
+        (name: "chegada_B6", kind: Source(interarrival: Exp(mean: 5.0000),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) }, on_blocked: Drop),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 600.0), (start: 720.0, duration: 720.0)]), position: (0.0, 12.0, 0.0)),
+        // ----- Sala de espera da triagem: 30 lugares -----
+        (name: "sala_espera", kind: Queue(capacity: 30), position: (6.0, 7.0, 0.0)),
+        // ----- Triagem: um grupo de enfermeiros por turno -----
+        (name: "triagem_S1", kind: Processor(capacity: 3, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: (period: 1440.0, off: [(start: 300.0, duration: 1140.0)]), position: (12.0, 2.0, 0.0)),
+        (name: "triagem_S2", kind: Processor(capacity: 2, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: (period: 1440.0, off: [(start: 0.0, duration: 300.0), (start: 600.0, duration: 840.0)]), position: (12.0, 4.0, 0.0)),
+        (name: "triagem_S3", kind: Processor(capacity: 2, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: (period: 1440.0, off: [(start: 0.0, duration: 600.0), (start: 840.0, duration: 600.0)]), position: (12.0, 6.0, 0.0)),
+        // ----- Filas da consulta: urgentes (classe 1) e normais (classe 2) -----
+        (name: "fila_urgente", kind: Queue(), position: (18.0, 3.0, 0.0)),
+        (name: "fila_normal", kind: Queue(), position: (18.0, 9.0, 0.0)),
+        // ----- Consultas: um grupo de médicos por turno -----
+        (name: "medicos_S1", kind: Processor(capacity: 6, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: (period: 1440.0, off: [(start: 300.0, duration: 1140.0)]), position: (24.0, 2.0, 0.0)),
+        (name: "medicos_S2", kind: Processor(capacity: 5, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 300.0), (start: 600.0, duration: 840.0)]), position: (24.0, 4.0, 0.0)),
+        (name: "medicos_S3", kind: Processor(capacity: 4, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: (period: 1440.0, off: [(start: 0.0, duration: 600.0), (start: 840.0, duration: 600.0)]), position: (24.0, 6.0, 0.0)),
+        (name: "saida", kind: Sink, position: (30.0, 6.0, 0.0)),
+    ],
+    connections: [
+        ("chegada_B1", "sala_espera"),
+        ("chegada_B2", "sala_espera"),
+        ("chegada_B3", "sala_espera"),
+        ("chegada_B4", "sala_espera"),
+        ("chegada_B5", "sala_espera"),
+        ("chegada_B6", "sala_espera"),
+        ("sala_espera", "triagem_S1"),
+        ("sala_espera", "triagem_S2"),
+        ("sala_espera", "triagem_S3"),
+        ("triagem_S1", "fila_urgente"),   // porta 1: classe 1
+        ("triagem_S1", "fila_normal"),    // porta 2: classe 2
+        ("triagem_S2", "fila_urgente"),   // porta 1: classe 1
+        ("triagem_S2", "fila_normal"),    // porta 2: classe 2
+        ("triagem_S3", "fila_urgente"),   // porta 1: classe 1
+        ("triagem_S3", "fila_normal"),    // porta 2: classe 2
+        ("fila_urgente", "medicos_S1"),   // entra primeiro: prioridade
+        ("fila_urgente", "medicos_S2"),   // entra primeiro: prioridade
+        ("fila_urgente", "medicos_S3"),   // entra primeiro: prioridade
+        ("fila_normal", "medicos_S1"),
+        ("fila_normal", "medicos_S2"),
+        ("fila_normal", "medicos_S3"),
+        ("medicos_S1", "saida"),
+        ("medicos_S2", "saida"),
+        ("medicos_S3", "saida"),
+    ],
+)
