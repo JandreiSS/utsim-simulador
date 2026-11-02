@@ -10,6 +10,9 @@
 pub mod network;
 pub(crate) mod panel;
 pub mod ron_text;
+pub mod schedule;
+mod schedule_ui;
+mod shifts_ui;
 pub mod spec;
 
 pub use panel::{properties_panel, run_panel};
@@ -19,9 +22,11 @@ mod tests {
     use std::path::Path;
 
     use bevy_egui::egui;
-    use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable};
+    use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftEnd, ShiftTable};
     use utsim_edit::{Command, Document};
-    use utsim_model::{Model, ObjectDef, ObjectKind};
+    use utsim_model::{
+        ArrivalPeriod, ArrivalSchedule, Model, ObjectDef, ObjectKind, PeriodArrivals, ShiftSpec,
+    };
 
     use super::spec::{self, FAMILIES};
     use super::*;
@@ -195,6 +200,7 @@ mod tests {
                     "max_arrivals",
                     "labels",
                     "on_blocked",
+                    "schedule",
                 ],
                 ObjectKind::Queue { .. } => &["capacity", "discipline", "batch"],
                 ObjectKind::Processor { .. } => &["capacity", "setup", "process", "operators"],
@@ -494,17 +500,84 @@ mod tests {
         apply_set(&mut doc, "maq.downtime", "None");
         assert_eq!(object(&doc, "maq").downtime, None);
 
-        let table = ShiftTable {
-            period: 100.0,
-            off: vec![OffWindow {
-                start: 10.0,
-                duration: 5.0,
-            }],
-        };
-        apply_set(&mut doc, "maq.shifts", &ron_text::shifts(&table));
-        assert_eq!(object(&doc, "maq").shifts, Some(table));
+        for on_end in [ShiftEnd::Pause, ShiftEnd::Finish] {
+            let table = ShiftTable {
+                period: 100.0,
+                off: vec![OffWindow {
+                    start: 10.0,
+                    duration: 5.0,
+                }],
+                on_end,
+            };
+            apply_set(&mut doc, "maq.shifts", &ron_text::shifts(&table));
+            assert_eq!(
+                object(&doc, "maq").shifts,
+                Some(ShiftSpec::Inline(table.clone()))
+            );
+            // A calendar of the model, with and without its own end-of-shift choice.
+            let mut cal = table.clone();
+            cal.period = 50.0;
+            apply_set(&mut doc, "calendars.turno \"a\"", &ron_text::shifts(&cal));
+            assert_eq!(doc.model().calendars["turno \"a\""], cal);
+            for own in [None, Some(ShiftEnd::Pause), Some(ShiftEnd::Finish)] {
+                let spec = ShiftSpec::Calendar {
+                    name: "turno \"a\"".into(),
+                    on_end: own,
+                };
+                apply_set(&mut doc, "maq.shifts", &ron_text::shift_spec(&spec));
+                assert_eq!(object(&doc, "maq").shifts, Some(spec.clone()));
+                assert_eq!(field(&doc, "maq", "shifts"), ron_text::shift_spec(&spec));
+            }
+        }
         apply_set(&mut doc, "maq.shifts", "None");
         assert_eq!(object(&doc, "maq").shifts, None);
+        apply_set(&mut doc, "calendars.turno \"a\"", "None");
+        assert!(doc.model().calendars.is_empty());
+
+        // Arrivals by period: every mode, labels per period, written and read back.
+        let schedule = ArrivalSchedule {
+            cycle: 1440.0,
+            periods: vec![
+                ArrivalPeriod {
+                    start: 0.0,
+                    end: 60.0,
+                    arrivals: PeriodArrivals::Default,
+                    labels: Default::default(),
+                },
+                ArrivalPeriod {
+                    start: 60.0,
+                    end: 420.5,
+                    arrivals: PeriodArrivals::Rate(0.25),
+                    labels: [("urgente".to_string(), Dist::Const(1.0))].into(),
+                },
+                ArrivalPeriod {
+                    start: 600.0,
+                    end: 700.0,
+                    arrivals: PeriodArrivals::Interarrival(Dist::Gamma {
+                        shape: 2.0,
+                        scale: 1.5,
+                    }),
+                    labels: Default::default(),
+                },
+                ArrivalPeriod {
+                    start: 700.0,
+                    end: 1440.0,
+                    arrivals: PeriodArrivals::Closed,
+                    labels: Default::default(),
+                },
+            ],
+        };
+        apply_set(&mut doc, "src.schedule", &ron_text::schedule(&schedule));
+        let ObjectKind::Source { schedule: got, .. } = object(&doc, "src").kind else {
+            panic!("src is a source");
+        };
+        assert_eq!(got.as_ref(), Some(&schedule));
+        assert_eq!(
+            field(&doc, "src", "schedule"),
+            ron_text::schedule(&schedule)
+        );
+        apply_set(&mut doc, "src.schedule", "None");
+        assert_eq!(field(&doc, "src", "schedule"), "None");
 
         let rules = [
             OutputRule::FirstAvailable,

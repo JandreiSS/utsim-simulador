@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use bevy_egui::egui::{self, Color32, Id, Ui, emath::Numeric};
-use utsim_core::{Dist, Downtime, OffWindow, OutputRule, ShiftTable, TransferDef, TransferPath};
+use utsim_core::{Dist, Downtime, OutputRule, TransferDef, TransferPath};
 use utsim_edit::{Command, Document};
 use utsim_model::experiment::patch;
 use utsim_model::{ObjectDef, ObjectKind, VisualDef};
@@ -169,7 +169,7 @@ fn parse_numbers(text: &str) -> Result<Vec<f64>, String> {
 // Distribution widgets (no document access)
 // ---------------------------------------------------------------------------
 
-fn mean_text(m: f64) -> String {
+pub(super) fn mean_text(m: f64) -> String {
     if m.is_finite() {
         format!("{}", (m * 1e4).round() / 1e4)
     } else {
@@ -334,7 +334,7 @@ pub(crate) fn dist_info(ui: &mut Ui, d: &Dist) {
 }
 
 /// A titled distribution editor; returns the new value when committed.
-fn dist_block(ui: &mut Ui, id: Id, title: &str, current: &Dist) -> Option<Dist> {
+pub(super) fn dist_block(ui: &mut Ui, id: Id, title: &str, current: &Dist) -> Option<Dist> {
     let mut d = current.clone();
     let mut changed = false;
     ui.group(|ui| {
@@ -352,25 +352,25 @@ fn dist_block(ui: &mut Ui, id: Id, title: &str, current: &Dist) -> Option<Dist> 
 /// Current RON text of a field of the edited owner.
 type Reader<'a> = Box<dyn Fn(&str) -> Option<String> + 'a>;
 
-struct Editor<'a> {
-    doc: &'a Document,
+pub(super) struct Editor<'a> {
+    pub(super) doc: &'a Document,
     /// Object name, or "run".
-    owner: String,
-    read: Reader<'a>,
-    out: Vec<Command>,
+    pub(super) owner: String,
+    pub(super) read: Reader<'a>,
+    pub(super) out: Vec<Command>,
 }
 
 impl Editor<'_> {
-    fn id(&self, field: &str) -> Id {
+    pub(super) fn id(&self, field: &str) -> Id {
         Id::new(("utsim-props", &self.owner, field))
     }
 
-    fn key(&self, field: &str) -> String {
+    pub(super) fn key(&self, field: &str) -> String {
         format!("{}.{field}", self.owner)
     }
 
     /// Emits `Set` only when the text differs from what the model holds.
-    fn set(&mut self, field: &str, text: String) {
+    pub(super) fn set(&mut self, field: &str, text: String) {
         if (self.read)(field).as_deref() != Some(text.as_str()) {
             self.out.push(Command::Set {
                 key: self.key(field),
@@ -380,7 +380,7 @@ impl Editor<'_> {
     }
 
     /// Whether the document would accept `text` for `field`.
-    fn check(&self, field: &str, text: &str) -> Result<(), String> {
+    pub(super) fn check(&self, field: &str, text: &str) -> Result<(), String> {
         let mut model = self.doc.model().clone();
         patch(&mut model, &self.key(field), text).map_err(|e| e.to_string())
     }
@@ -782,7 +782,12 @@ impl Editor<'_> {
         }
     }
 
-    fn labels_field(&mut self, ui: &mut Ui, field: &str, current: &BTreeMap<String, Dist>) {
+    pub(super) fn labels_field(
+        &mut self,
+        ui: &mut Ui,
+        field: &str,
+        current: &BTreeMap<String, Dist>,
+    ) {
         let id = self.id(field);
         let mut map = current.clone();
         let mut changed = false;
@@ -1117,71 +1122,6 @@ impl Editor<'_> {
         }
     }
 
-    fn shifts_field(&mut self, ui: &mut Ui, current: Option<&ShiftTable>) {
-        let field = "shifts";
-        let id = self.id(field);
-        let mut on = current.is_some();
-        if ui
-            .checkbox(&mut on, "Turnos (janelas fora de turno)")
-            .changed()
-        {
-            let default = ShiftTable {
-                period: 1440.0,
-                off: Vec::new(),
-            };
-            self.set(
-                field,
-                if on {
-                    ron::shifts(&default)
-                } else {
-                    "None".into()
-                },
-            );
-        }
-        let Some(table) = current else { return };
-        let mut t = table.clone();
-        let mut changed = false;
-        ui.indent(id, |ui| {
-            ui.horizontal(|ui| {
-                changed |= labeled_float(ui, id.with("period"), "período", &mut t.period);
-            });
-            let mut remove = None;
-            for (i, w) in t.off.iter_mut().enumerate() {
-                ui.horizontal(|ui| {
-                    changed |= labeled_float(ui, id.with(("s", i)), "início", &mut w.start);
-                    changed |= labeled_float(ui, id.with(("d", i)), "duração", &mut w.duration);
-                    if ui.small_button("remover").clicked() {
-                        remove = Some(i);
-                    }
-                });
-            }
-            if let Some(i) = remove {
-                t.off.remove(i);
-                changed = true;
-            }
-            if ui.small_button("adicionar janela").clicked() {
-                let start = t.off.last().map_or(0.0, |w| w.start + w.duration);
-                let duration = ((t.period - start) / 2.0).max(0.0);
-                t.off.push(OffWindow { start, duration });
-                changed = true;
-            }
-            match table.validate() {
-                Ok(()) => {
-                    ui.weak(format!(
-                        "fora de turno: {:.1}% do período",
-                        100.0 * table.off_fraction()
-                    ));
-                }
-                Err(e) => {
-                    ui.colored_label(RED, e);
-                }
-            }
-        });
-        if changed {
-            self.set(field, ron::shifts(&t));
-        }
-    }
-
     fn kind_fields(&mut self, ui: &mut Ui, kind: &ObjectKind) {
         match kind {
             ObjectKind::Source {
@@ -1190,6 +1130,7 @@ impl Editor<'_> {
                 max_arrivals,
                 labels,
                 on_blocked,
+                schedule,
             } => {
                 self.dist_field(ui, "Tempo entre chegadas", "interarrival", interarrival);
                 self.bool_field(
@@ -1209,6 +1150,8 @@ impl Editor<'_> {
                 ui.separator();
                 ui.strong("Rótulos");
                 self.labels_field(ui, "labels", labels);
+                ui.separator();
+                self.schedule_field(ui, interarrival, labels, schedule.as_ref());
             }
             ObjectKind::Queue {
                 capacity,
@@ -1644,5 +1587,8 @@ pub fn run_panel(ui: &mut Ui, doc: &Document) -> Vec<Command> {
     for issue in doc.issues().iter().filter(|i| i.object.is_none()) {
         ui.colored_label(RED, format!("Problema: {}", issue.message));
     }
-    editor.out
+    let mut out = editor.out;
+    ui.separator();
+    out.extend(super::shifts_ui::calendars_section(ui, doc));
+    out
 }
