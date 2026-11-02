@@ -32,6 +32,32 @@ pub(crate) fn clear_temp<T: Clone + Default + Send + Sync + 'static>(ui: &Ui, id
     ui.data_mut(|d| d.remove_temp::<T>(id));
 }
 
+/// Lists with more entries than this get a search box.
+const LONG_LIST: usize = 10;
+
+/// A search box at the top of a long list (drawn only when there are more than
+/// [`LONG_LIST`] entries); returns the lower-case text to filter by.
+pub(crate) fn list_filter(ui: &mut Ui, id: Id, entries: usize) -> String {
+    if entries <= LONG_LIST {
+        return String::new();
+    }
+    let mut text = temp::<String>(ui, id).unwrap_or_default();
+    let response = ui.add(
+        egui::TextEdit::singleline(&mut text)
+            .hint_text("Buscar")
+            .desired_width(160.0),
+    );
+    if response.changed() {
+        set_temp(ui, id, text.clone());
+    }
+    text.trim().to_lowercase()
+}
+
+/// Whether `name` passes the lower-case search text `wanted` (empty: everything).
+pub(crate) fn matches_filter(name: &str, wanted: &str) -> bool {
+    wanted.is_empty() || name.to_lowercase().contains(wanted)
+}
+
 /// A number box. Edits live in egui memory until committed (Enter, focus lost or
 /// drag released); returns true only at the commit, with `value` updated.
 pub(crate) fn num<N: Numeric + Default + PartialEq + Send + Sync + 'static>(
@@ -87,14 +113,24 @@ pub(crate) fn text_commit(
 ) -> Option<String> {
     let editing = temp::<String>(ui, id);
     let mut text = editing.unwrap_or_else(|| current.to_string());
+    // Text that does not parse stays in the box (also after the box loses focus or the
+    // panel shows another object) and is drawn in red, with the reason below it: the
+    // model keeps the previous value until the text is valid.
+    let invalid = temp::<String>(ui, id).is_some() && text != current && check(&text).is_err();
     let response = if multiline {
-        ui.add(
-            egui::TextEdit::multiline(&mut text)
-                .desired_width(f32::INFINITY)
-                .desired_rows(2),
-        )
+        let mut edit = egui::TextEdit::multiline(&mut text)
+            .desired_width(f32::INFINITY)
+            .desired_rows(2);
+        if invalid {
+            edit = edit.text_color(RED);
+        }
+        ui.add(edit)
     } else {
-        ui.add(egui::TextEdit::singleline(&mut text).desired_width(160.0))
+        let mut edit = egui::TextEdit::singleline(&mut text).desired_width(160.0);
+        if invalid {
+            edit = edit.text_color(RED);
+        }
+        ui.add(edit)
     };
     if response.changed() {
         set_temp(ui, id, text.clone());
@@ -106,7 +142,15 @@ pub(crate) fn text_commit(
         None
     };
     if let Some(error) = &error {
-        ui.colored_label(RED, error);
+        ui.colored_label(RED, format!("Texto inválido, não aplicado: {error}"));
+        if ui
+            .small_button("descartar texto")
+            .on_hover_text("Volta ao valor que está no modelo")
+            .clicked()
+        {
+            clear_temp::<String>(ui, id);
+            return None;
+        }
     }
     if pending && response.lost_focus() {
         if text == current {
@@ -185,7 +229,13 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
     egui::ComboBox::from_id_salt(id.with("family"))
         .selected_text(FAMILIES[index])
         .show_ui(ui, |ui| {
+            // Tight rows, so the whole list fits below the box on a normal screen.
+            ui.spacing_mut().item_spacing.y = 1.0;
             for (i, name) in FAMILIES.iter().enumerate() {
+                // The list is long: headings tell the groups apart at a glance.
+                if let Some(group) = spec::family_group(i) {
+                    ui.weak(group);
+                }
                 ui.selectable_value(&mut index, i, *name);
             }
         });
@@ -562,7 +612,8 @@ impl Editor<'_> {
                 egui::ComboBox::from_id_salt(id.with("team"))
                     .selected_text(if team.is_empty() { "(nenhuma)" } else { &team })
                     .show_ui(ui, |ui| {
-                        for name in &candidates {
+                        let wanted = list_filter(ui, id.with("team_busca"), candidates.len());
+                        for name in candidates.iter().filter(|n| matches_filter(n, &wanted)) {
                             if ui.selectable_label(*name == team, name).clicked() {
                                 new_team = name.clone();
                                 changed = true;
@@ -592,6 +643,7 @@ impl Editor<'_> {
 
     /// `transport`: which transporter/dispatcher carries items out of this object.
     fn transport_field(&mut self, ui: &mut Ui, field: &str, current: Option<&str>) {
+        let id = self.id(field);
         let candidates: Vec<String> = spec::mobile_names(&self.doc.model().objects)
             .into_iter()
             .map(str::to_string)
@@ -604,7 +656,8 @@ impl Editor<'_> {
                     if ui.selectable_label(current.is_none(), "nenhum").clicked() {
                         self.set(field, "None".into());
                     }
-                    for name in &candidates {
+                    let wanted = list_filter(ui, id.with("busca"), candidates.len());
+                    for name in candidates.iter().filter(|n| matches_filter(n, &wanted)) {
                         if ui
                             .selectable_label(current == Some(name.as_str()), name)
                             .clicked()
@@ -647,7 +700,12 @@ impl Editor<'_> {
             egui::ComboBox::from_id_salt(self.id("#base"))
                 .selected_text(at.as_deref().unwrap_or("fora da rede"))
                 .show_ui(ui, |ui| {
-                    for n in &net.nodes {
+                    let wanted = list_filter(ui, self.id("#base_busca"), net.nodes.len());
+                    for n in net
+                        .nodes
+                        .iter()
+                        .filter(|n| matches_filter(&n.name, &wanted))
+                    {
                         let on = at.as_deref() == Some(n.name.as_str());
                         if ui.selectable_label(on, &n.name).clicked() && !on {
                             chosen = Some(n.position);
@@ -706,9 +764,9 @@ impl Editor<'_> {
         ui.group(|ui| {
             ui.horizontal(|ui| {
                 ui.strong(label);
+                // The pending text is kept when switching modes, so invalid text is not lost.
                 if ui.checkbox(&mut raw, "editar como texto").changed() {
                     set_temp(ui, raw_id, raw);
-                    clear_temp::<String>(ui, id.with("text"));
                 }
             });
             if raw {
@@ -718,6 +776,8 @@ impl Editor<'_> {
                 let mut d = current.clone();
                 if dist_widget(ui, id, &mut d) {
                     new_text = Some(ron::dist(&d));
+                    // The boxes won over any text left pending in the text mode.
+                    clear_temp::<String>(ui, id.with("text"));
                 }
             }
             dist_info(ui, current);
@@ -931,14 +991,22 @@ impl Editor<'_> {
                 let mut w = weights.clone();
                 let mut changed = false;
                 ui.label("Peso de cada saída (na ordem das ligações):");
+                // The destination of each port, so the weights are not read blindly.
+                let dests: Vec<&String> = self
+                    .doc
+                    .model()
+                    .connections
+                    .iter()
+                    .filter(|(from, _)| *from == obj.name)
+                    .map(|(_, to)| to)
+                    .collect();
                 for (i, weight) in w.iter_mut().enumerate() {
                     ui.horizontal(|ui| {
-                        changed |= labeled_float(
-                            ui,
-                            id.with(("w", i)),
-                            &format!("saída {}", i + 1),
-                            weight,
-                        );
+                        let label = match dests.get(i) {
+                            Some(to) => format!("saída {} ({to})", i + 1),
+                            None => format!("saída {}", i + 1),
+                        };
+                        changed |= labeled_float(ui, id.with(("w", i)), &label, weight);
                     });
                 }
                 if w.len() != n_out {
@@ -1445,6 +1513,21 @@ fn name_field(ui: &mut Ui, doc: &Document, name: &str, out: &mut Vec<Command>) {
 ///
 /// When `selected` is not an object of the document, shows the run settings instead.
 pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Command> {
+    properties_panel_for(ui, doc, selected, true)
+}
+
+/// The same panel for several selected objects of one kind: what belongs to one object
+/// alone (its position and rotation) is left out.
+pub fn properties_panel_shared(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Command> {
+    properties_panel_for(ui, doc, selected, false)
+}
+
+fn properties_panel_for(
+    ui: &mut Ui,
+    doc: &Document,
+    selected: &str,
+    with_position: bool,
+) -> Vec<Command> {
     let Some(obj) = doc.model().objects.iter().find(|o| o.name == selected) else {
         return run_panel(ui, doc);
     };
@@ -1464,6 +1547,10 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
 
     name_field(ui, doc, &obj.name, &mut out);
     ui.weak(spec::kind_name(&obj.kind));
+    if with_position {
+        ui.separator();
+        super::position::position_field(ui, obj, &mut out);
+    }
     ui.separator();
 
     let mut editor = Editor {
@@ -1493,7 +1580,7 @@ pub fn properties_panel(ui: &mut Ui, doc: &Document, selected: &str) -> Vec<Comm
     editor.shifts_field(ui, obj.shifts.as_ref());
     ui.separator();
     let mut out = editor.out;
-    appearance_field(ui, obj, &mut out);
+    appearance_field(ui, obj, !with_position, &mut out);
     out
 }
 
@@ -1503,7 +1590,7 @@ pub const DEFAULT_ASSET: &str = "(padrão do tipo)";
 /// The "Aparência" section: `visual` of the object (asset from the built-in library or
 /// the third-party catalogue, colour, scale, yaw) and "Restaurar padrão". Emits one
 /// `SetVisual` when something changed.
-fn appearance_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command>) {
+fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<Command>) {
     let current = obj.visual.clone().unwrap_or_default();
     let mut next = current.clone();
     let id = |field: &str| Id::new(("utsim-props", &obj.name, "#visual", field));
@@ -1604,10 +1691,13 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command>) {
                 if num(ui, id("escala"), &mut s, 0.01, 0.01) {
                     next.scale = (s != 1.0).then_some(s);
                 }
-                ui.label("Giro (graus)");
-                let mut y = current.yaw.unwrap_or(0.0);
-                if num(ui, id("giro"), &mut y, 1.0, -360.0) {
-                    next.yaw = (y != 0.0).then_some(y);
+                // For one object the rotation lives in "Posição".
+                if with_yaw {
+                    ui.label("Giro (graus)");
+                    let mut y = current.yaw.unwrap_or(0.0);
+                    if num(ui, id("giro"), &mut y, 1.0, -360.0) {
+                        next.yaw = (y != 0.0).then_some(y);
+                    }
                 }
             });
             let custom = obj.visual.is_some();

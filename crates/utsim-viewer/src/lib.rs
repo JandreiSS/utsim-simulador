@@ -13,6 +13,7 @@ pub mod editing;
 pub mod flows;
 pub mod flows_ui;
 pub mod lod_rules;
+pub mod picking;
 pub mod properties;
 pub mod results;
 pub mod roteiro;

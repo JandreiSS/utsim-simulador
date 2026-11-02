@@ -77,6 +77,15 @@ pub fn frame_scene(
         // Framing is an orbit operation: leave follow, walk and ride.
         modes.request(utsim_viewer::cameras::CameraKind::Orbit);
     }
+    // Double click in the object list: bring that object to the centre of the view.
+    if let Some(name) = editor.focus_request.take()
+        && let Some(i) = editor.view.index_of(&name)
+    {
+        let half = editor.view.geoms[i].half;
+        cam.target = Vec3::from(editor.view.positions[i]) + Vec3::Y * half[1];
+        cam.dist = (half[0].max(half[2]) * 6.0).clamp(8.0, 40.0);
+        modes.request(utsim_viewer::cameras::CameraKind::Orbit);
+    }
     if request.0 == 0 || !dock.ready {
         return;
     }

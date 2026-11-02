@@ -162,8 +162,12 @@ pub fn paste_offset(n: u32) -> [f64; 3] {
 
 /// The keyboard and mouse shortcuts of `Editar`, as shown in the "Atalhos" window
 /// (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 29] = [
+pub const SHORTCUTS: [(&str, &str); 32] = [
     ("Clique", "seleciona o bloco (ou remove a ligação clicada)"),
+    (
+        "Clique repetido no mesmo ponto",
+        "alterna entre os objetos sobrepostos (uma dica mostra qual está selecionado)",
+    ),
     ("Shift + clique", "põe ou tira o bloco da seleção"),
     (
         "Shift + arrastar no chão",
@@ -172,7 +176,11 @@ pub const SHORTCUTS: [(&str, &str); 29] = [
     ("Arrastar um bloco", "move o bloco ou a seleção inteira"),
     ("Arrastar no chão", "desloca a vista"),
     ("Botão direito + arrastar", "gira a vista"),
-    ("Roda do mouse", "aproxima e afasta"),
+    ("Roda do mouse", "aproxima e afasta, em direção ao cursor"),
+    (
+        "Aba Objetos: clique, Shift + clique",
+        "seleciona, soma à seleção; o duplo clique enquadra o objeto",
+    ),
     (
         "Biblioteca: clique e clique no chão",
         "coloca um objeto (Shift mantém a ferramenta)",
@@ -212,6 +220,7 @@ pub const SHORTCUTS: [(&str, &str); 29] = [
     ("Ctrl + Z", "desfaz"),
     ("Ctrl + Y ou Ctrl + Shift + Z", "refaz"),
     ("Ctrl + S", "salva"),
+    ("Ctrl + Shift + S", "salva com outro nome (Salvar como)"),
     ("Ctrl + N", "novo modelo"),
 ];
 

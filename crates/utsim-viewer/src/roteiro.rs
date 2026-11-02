@@ -85,6 +85,20 @@ pub enum Condicao {
     PosicaoPerto(String, (f64, f64), f64),
     StatusContem(String),
     TituloContem(String),
+    /// Rotation (`visual.yaw`, degrees) of an object, tolerance 0.05.
+    GiroDe(String, f64),
+    /// The `n`-th output port (from 1) of the object leads to this destination.
+    PortaDe(String, usize, String),
+    /// The `n`-th input (from 1, by pull priority) of the object comes from this origin.
+    EntradaDe(String, usize, String),
+    /// Number of objects under the cursor that a click would walk through (0 or 2 and up).
+    PilhaSobCursor(usize),
+    /// Rows of the "Objetos" list with the current filters.
+    ListaObjetos(usize),
+    /// Tab of the left panel: `"Biblioteca"` or `"Objetos"`.
+    AbaEsquerda(String),
+    /// The file of the document (as saved) ends with this text.
+    CaminhoTermina(String),
     /// Current simulated time (in `Simular`) is at least this.
     TempoSimuladoMin(f64),
     /// Number of token flows in the model.
@@ -283,6 +297,20 @@ pub struct Estado {
     /// Distance from the camera to each block (`Simular`).
     pub camera_distancias: Vec<(String, f64)>,
     pub lod_ativo: bool,
+    /// State of the finishing touches of the editor (lists, order, rotation, file).
+    pub interface: InterfaceEstado,
+}
+
+/// Snapshot of the object list, the stack under the cursor, connection order and file.
+#[derive(Debug, Clone, Default)]
+pub struct InterfaceEstado {
+    /// `visual.yaw` by object name (0 when unset).
+    pub giros: Vec<(String, f64)>,
+    pub pilha_sob_cursor: usize,
+    pub lista_objetos: usize,
+    pub aba_esquerda: String,
+    /// Path of the document, when it has one.
+    pub caminho: Option<String>,
 }
 
 fn igual<T: PartialEq + std::fmt::Display>(rotulo: &str, tem: T, quer: T) -> Result<(), String> {
@@ -335,6 +363,52 @@ impl Estado {
                     Err(format!("status \"{}\" não contém \"{t}\"", self.status))
                 }
             }
+            Condicao::GiroDe(n, quer) => match self.interface.giros.iter().find(|(m, _)| m == n) {
+                Some((_, g)) if (g - quer).abs() <= 0.05 => Ok(()),
+                Some((_, g)) => Err(format!("giro de {n}: esperado {quer}, encontrado {g}")),
+                None => Err(format!("objeto \"{n}\" não existe")),
+            },
+            Condicao::PortaDe(n, porta, destino) => {
+                let saidas: Vec<&String> = self
+                    .ligacoes_lista
+                    .iter()
+                    .filter(|(a, _)| a == n)
+                    .map(|(_, b)| b)
+                    .collect();
+                match saidas.get(porta.wrapping_sub(1)) {
+                    Some(b) if *b == destino => Ok(()),
+                    other => Err(format!(
+                        "porta {porta} de {n}: esperado {destino:?}, encontrado {other:?} (saídas: {saidas:?})"
+                    )),
+                }
+            }
+            Condicao::EntradaDe(n, ordem, origem) => {
+                let entradas: Vec<&String> = self
+                    .ligacoes_lista
+                    .iter()
+                    .filter(|(_, b)| b == n)
+                    .map(|(a, _)| a)
+                    .collect();
+                match entradas.get(ordem.wrapping_sub(1)) {
+                    Some(a) if *a == origem => Ok(()),
+                    other => Err(format!(
+                        "entrada {ordem} de {n}: esperado {origem:?}, encontrado {other:?} (entradas: {entradas:?})"
+                    )),
+                }
+            }
+            Condicao::PilhaSobCursor(n) => {
+                igual("objetos sob o cursor", self.interface.pilha_sob_cursor, *n)
+            }
+            Condicao::ListaObjetos(n) => igual("linhas da lista", self.interface.lista_objetos, *n),
+            Condicao::AbaEsquerda(a) => igual(
+                "aba da esquerda",
+                self.interface.aba_esquerda.as_str(),
+                a.as_str(),
+            ),
+            Condicao::CaminhoTermina(fim) => match &self.interface.caminho {
+                Some(c) if c.replace('\\', "/").ends_with(&fim.replace('\\', "/")) => Ok(()),
+                other => Err(format!("caminho {other:?} não termina com \"{fim}\"")),
+            },
             Condicao::TituloContem(t) => {
                 if self.titulo.contains(t.as_str()) {
                     Ok(())
@@ -674,7 +748,43 @@ mod tests {
             camera_pos: [3.0, 6.5, -2.0],
             camera_distancias: vec![("empilhadeira_1".into(), 9.0), ("doca".into(), 40.0)],
             lod_ativo: true,
+            interface: InterfaceEstado {
+                giros: vec![("fila".into(), 90.0)],
+                pilha_sob_cursor: 2,
+                lista_objetos: 4,
+                aba_esquerda: "Objetos".into(),
+                caminho: Some("C:/tmp/novo.ron".into()),
+            },
         }
+    }
+
+    #[test]
+    fn interface_assertions() {
+        let s = state();
+        assert!(s.verificar(&Condicao::GiroDe("fila".into(), 90.0)).is_ok());
+        assert!(s.verificar(&Condicao::GiroDe("fila".into(), 0.0)).is_err());
+        assert!(
+            s.verificar(&Condicao::PortaDe("fila".into(), 1, "maquina".into()))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::PortaDe("fila".into(), 2, "maquina".into()))
+                .is_err()
+        );
+        assert!(
+            s.verificar(&Condicao::EntradaDe("maquina".into(), 1, "fila".into()))
+                .is_ok()
+        );
+        assert!(s.verificar(&Condicao::PilhaSobCursor(2)).is_ok());
+        assert!(s.verificar(&Condicao::ListaObjetos(4)).is_ok());
+        assert!(
+            s.verificar(&Condicao::AbaEsquerda("Objetos".into()))
+                .is_ok()
+        );
+        assert!(
+            s.verificar(&Condicao::CaminhoTermina("tmp/novo.ron".into()))
+                .is_ok()
+        );
     }
 
     #[test]

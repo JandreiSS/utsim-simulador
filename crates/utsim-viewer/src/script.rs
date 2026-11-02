@@ -80,6 +80,7 @@ impl Plugin for ScriptPlugin {
 
 /// Applies an `IrPara` (jump the clock) or `Focar` (aim the camera) step.
 fn apply_control(
+    editor: Res<Editor>,
     mut runner: ResMut<Runner>,
     mut pb: ResMut<Playback>,
     mut cam: ResMut<crate::camera::OrbitCam>,
@@ -112,10 +113,22 @@ fn apply_control(
             giro,
             inclinacao,
         }) => {
-            if let Some(b) = data.replay.blocks.iter().position(|b| b.name == objeto) {
+            // In `Editar` the object is where the model puts it; in `Simular`, where it is now.
+            let aim = if editor.mode == Mode::Edit {
+                editor.view.index_of(&objeto).map(|i| {
+                    let h = editor.view.geoms[i].half[1];
+                    Vec3::from(editor.view.positions[i]) + Vec3::Y * h
+                })
+            } else {
+                data.replay
+                    .blocks
+                    .iter()
+                    .position(|b| b.name == objeto)
+                    .map(|b| Vec3::from(data.base_at(b, pb.t)) + Vec3::Y * data.geoms[b].half[1])
+            };
+            if let Some(target) = aim {
                 modes.request(utsim_viewer::cameras::CameraKind::Orbit);
-                let h = data.geoms[b].half[1];
-                cam.target = Vec3::from(data.base_at(b, pb.t)) + Vec3::Y * h;
+                cam.target = target;
                 cam.dist = distancia.clamp(1.5, 5000.0);
                 if let Some(y) = giro {
                     cam.yaw = y;
@@ -187,6 +200,10 @@ impl TextLabels {
 
 /// Key by name (English or Portuguese): physical key code and logical key.
 fn parse_key(name: &str) -> Option<(KeyCode, Key)> {
+    // A lone space is a key, not padding to trim away (`Digitar` types it).
+    if name == " " {
+        return Some((KeyCode::Space, Key::Space));
+    }
     let n = name.trim();
     let lower = n.to_lowercase();
     if n.chars().count() == 1 {
@@ -436,6 +453,29 @@ fn snapshot(world: &World3, window: &Window) -> Estado {
             Vec::new()
         },
         lod_ativo: world.lod.settings.enabled,
+        interface: utsim_viewer::roteiro::InterfaceEstado {
+            giros: model
+                .objects
+                .iter()
+                .map(|o| {
+                    let yaw = o.visual.as_ref().and_then(|v| v.yaw).unwrap_or(0.0);
+                    (o.name.clone(), yaw)
+                })
+                .collect(),
+            pilha_sob_cursor: ed.stack_hover.len(),
+            lista_objetos: utsim_viewer::picking::filter_objects(
+                model,
+                &ed.list_filter,
+                ed.list_kind,
+            )
+            .len(),
+            aba_esquerda: match ed.left_tab {
+                crate::editor::LeftTab::Library => "Biblioteca",
+                crate::editor::LeftTab::Objects => "Objetos",
+            }
+            .to_string(),
+            caminho: ed.doc.path().map(|p| p.to_string_lossy().to_string()),
+        },
         niveis: match ed.mode {
             Mode::Edit => ed
                 .fluid_view
@@ -515,6 +555,27 @@ fn resolve(target: &Alvo, world: &World3, window: &Window) -> Result<Vec2, Strin
             };
             project(world, Vec3::from(base) + Vec3::Y * half[1], window)
         }
+    }
+}
+
+/// Like [`resolve`], but a block is the point of the ground under its centre instead of
+/// the middle of its top: the editor drags a block by the ground point under the cursor,
+/// so a drag that starts at the top of a block and ends on a ground target lands off by
+/// the perspective offset between the two.
+fn resolve_floor(target: &Alvo, world: &World3, window: &Window) -> Result<Vec2, String> {
+    match target {
+        Alvo::Objeto(name) if world.editor.mode == Mode::Edit => {
+            let i = world
+                .editor
+                .view
+                .index_of(name)
+                .ok_or_else(|| format!("objeto \"{name}\" não existe"))?;
+            project(world, Vec3::from(world.editor.view.positions[i]), window)
+        }
+        Alvo::Deslocado(inner, dx, dy) => {
+            Ok(resolve_floor(inner, world, window)? + Vec2::new(*dx, *dy))
+        }
+        other => resolve(other, world, window),
     }
 }
 
@@ -851,6 +912,12 @@ fn advance(
                     let Some((code, key)) = parse_key(&c.to_string()) else {
                         return Flow::Fail(format!("caractere não digitável: {c:?}"));
                     };
+                    // The typed text keeps its case (`parse_key` lowercases, which is
+                    // right for shortcuts but dropped the capitals of typed names).
+                    let key = match key {
+                        Key::Character(_) => Key::Character(c.to_string().as_str().into()),
+                        other => other,
+                    };
                     out.key(code, key.clone(), ButtonState::Pressed, entity);
                     out.key(code, key, ButtonState::Released, entity);
                 }
@@ -882,13 +949,17 @@ fn advance(
         Passo::Captura(name) => capture(runner, out, name, n),
         Passo::IrPara(_) | Passo::Focar { .. } => match n {
             0 => {
-                if let Passo::Focar { objeto, .. } = step
-                    && !world.data.replay.blocks.iter().any(|b| &b.name == objeto)
-                {
-                    return Flow::Fail(format!("bloco \"{objeto}\" não existe na simulação"));
-                }
-                if world.editor.mode != Mode::Sim {
-                    return Flow::Fail("IrPara/Focar exigem o modo Simular".into());
+                if let Passo::Focar { objeto, .. } = step {
+                    let exists = if world.editor.mode == Mode::Edit {
+                        world.editor.view.index_of(objeto).is_some()
+                    } else {
+                        world.data.replay.blocks.iter().any(|b| &b.name == objeto)
+                    };
+                    if !exists {
+                        return Flow::Fail(format!("objeto \"{objeto}\" não existe"));
+                    }
+                } else if world.editor.mode != Mode::Sim {
+                    return Flow::Fail("IrPara exige o modo Simular".into());
                 }
                 runner.control = Some(step.clone());
                 Flow::Pending
@@ -981,11 +1052,11 @@ fn drag(
 ) -> Flow {
     let n = runner.frame;
     if n == 0 {
-        let a = match resolve(from, world, window) {
+        let a = match resolve_floor(from, world, window) {
             Ok(p) => p,
             Err(e) => return Flow::Fail(format!("origem do arrasto: {e}")),
         };
-        let b = match resolve(to, world, window) {
+        let b = match resolve_floor(to, world, window) {
             Ok(p) => p,
             Err(e) => return Flow::Fail(format!("destino do arrasto: {e}")),
         };
@@ -1005,11 +1076,14 @@ fn drag(
         out.move_cursor(runner, window, a.lerp(b, k), entity);
         return Flow::Pending;
     }
-    if n == 2 + DRAG_FRAMES {
+    // The editor applies a drag from the cursor it saw at the start of the frame, so the
+    // pointer rests on the target for a frame before the button goes up; releasing at
+    // once left the block one step short (about a metre off, varying between runs).
+    if n == 3 + DRAG_FRAMES {
         out.button(MouseButton::Left, ButtonState::Released, entity);
         return Flow::Pending;
     }
-    if n <= 4 + DRAG_FRAMES {
+    if n <= 5 + DRAG_FRAMES {
         return Flow::Pending;
     }
     Flow::Done

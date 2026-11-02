@@ -289,6 +289,16 @@ pub const FAMILIES: [&str; 20] = [
     "Deslocada",
 ];
 
+/// Heading shown before family `i` in the family list (`None`: same group as before).
+pub fn family_group(i: usize) -> Option<&'static str> {
+    match i {
+        0 => Some("Contínuas"),
+        13 => Some("Discretas e empírica"),
+        19 => Some("Combinação"),
+        _ => None,
+    }
+}
+
 pub fn family_index(d: &Dist) -> usize {
     match d {
         Dist::Const(_) => 0,

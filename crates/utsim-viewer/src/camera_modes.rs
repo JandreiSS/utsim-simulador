@@ -49,6 +49,9 @@ pub struct CamInput {
     pub motion: Vec2,
     /// Mouse wheel, in lines (positive: away from the user).
     pub scroll: f32,
+    /// The point of the ground (Bevy space) under the cursor, when the cursor is over the
+    /// 3D view and the ray meets the ground.
+    pub cursor_ground: Option<Vec3>,
     /// Right button held, or the pointer is locked: the mouse looks around.
     pub look: bool,
     /// Left button held.
@@ -122,10 +125,24 @@ impl CameraController for OrbitCam {
                 self.target += (-right * d.x + forward * d.y) * k;
             }
             if input.scroll != 0.0 {
-                self.dist = (self.dist * (1.0 - 0.1 * input.scroll)).clamp(1.5, 5000.0);
+                self.zoom(input.scroll, input.cursor_ground);
             }
         }
         Some(self.transform())
+    }
+}
+
+impl OrbitCam {
+    /// Zooms by `scroll` lines (positive: closer). With a ground point under the cursor
+    /// the view scales about that point, so it stays under the cursor; without one it
+    /// zooms towards the centre of the view.
+    pub fn zoom(&mut self, scroll: f32, toward: Option<Vec3>) {
+        let dist = (self.dist * (1.0 - 0.1 * scroll)).clamp(1.5, 5000.0);
+        if let Some(p) = toward {
+            let k = dist / self.dist;
+            self.target = p + (self.target - p) * k;
+        }
+        self.dist = dist;
     }
 }
 
@@ -476,6 +493,8 @@ pub fn drive(
     scenery: Scenery,
     mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
     mut transform: Single<&mut Transform, With<Camera3d>>,
+    view: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    window: Single<&Window, With<PrimaryWindow>>,
 ) {
     let Inputs {
         buttons,
@@ -629,6 +648,10 @@ pub fn drive(
         over_ui: over_ui && !want_lock,
         motion: motion.delta,
         scroll: lines,
+        cursor_ground: window
+            .cursor_position()
+            .and_then(|c| view.0.viewport_to_world(view.1, c).ok())
+            .and_then(ground_point),
         look: buttons.pressed(MouseButton::Right) || want_lock,
         drag: buttons.pressed(MouseButton::Left),
         locked: lock.0,
@@ -686,6 +709,16 @@ pub fn drive(
     } else {
         wanted
     };
+}
+
+/// Where the ray meets the ground plane (`y = 0`), if it points down at it.
+fn ground_point(ray: Ray3d) -> Option<Vec3> {
+    let dir = *ray.direction;
+    if dir.y > -1e-4 {
+        return None;
+    }
+    let t = -ray.origin.y / dir.y;
+    (t > 0.0).then(|| ray.origin + dir * t)
 }
 
 /// The "Câmera" menu of the toolbar.
@@ -770,4 +803,41 @@ pub fn hud(
             });
         });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zooming_towards_a_point_keeps_it_on_the_same_line_of_sight() {
+        let mut cam = OrbitCam {
+            target: Vec3::new(2.0, 0.0, -3.0),
+            yaw: 0.4,
+            pitch: 0.8,
+            dist: 30.0,
+        };
+        let point = Vec3::new(9.0, 0.0, 4.0);
+        let before = cam.transform().translation;
+        cam.zoom(3.0, Some(point));
+        let after = cam.transform().translation;
+        // The camera moved along the line towards the point: same direction from it.
+        let (a, b) = ((before - point).normalize(), (after - point).normalize());
+        assert!(a.distance(b) < 1e-4, "{a} {b}");
+        assert!(after.distance(point) < before.distance(point));
+        assert!((cam.dist - 30.0 * 0.7).abs() < 1e-3);
+    }
+
+    #[test]
+    fn zooming_without_a_point_keeps_the_target() {
+        let mut cam = OrbitCam {
+            target: Vec3::new(1.0, 0.0, 1.0),
+            yaw: 0.0,
+            pitch: 0.7,
+            dist: 20.0,
+        };
+        cam.zoom(-2.0, None);
+        assert_eq!(cam.target, Vec3::new(1.0, 0.0, 1.0));
+        assert!((cam.dist - 24.0).abs() < 1e-3);
+    }
 }

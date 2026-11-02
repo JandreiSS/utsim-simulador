@@ -54,11 +54,30 @@ pub fn pointer_over_ui(ctx: &egui::Context, dock: &Dock) -> bool {
 }
 
 /// Start of every egui pass: the whole window is free again.
-pub fn begin(mut dock: ResMut<Dock>, mut contexts: EguiContexts) -> Result {
+pub fn begin(
+    mut dock: ResMut<Dock>,
+    mut contexts: EguiContexts,
+    mut styled: Local<bool>,
+) -> Result {
     let ctx = contexts.ctx_mut()?;
+    if !*styled {
+        *styled = true;
+        // Drop-down lists show up to this many points before they scroll (the default,
+        // 200, hid options such as "Pearson V" or the last team of a long list).
+        ctx.global_style_mut(|style| {
+            style.spacing.combo_height = COMBO_HEIGHT;
+            // A popup is laid out first inside this area size (default 600 x 400), and its
+            // list cannot grow past it: without this the lists stop at 400 points however
+            // tall `combo_height` allows.
+            style.spacing.default_area_size.y = COMBO_HEIGHT;
+        });
+    }
     dock.free = ctx.content_rect();
     Ok(())
 }
+
+/// Tallest a drop-down list gets before it scrolls, in egui points.
+pub const COMBO_HEIGHT: f32 = 560.0;
 
 /// Vertical field of view the scene is framed with (the free area behaves as if it
 /// were the whole view with this field of view).

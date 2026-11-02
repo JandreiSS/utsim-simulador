@@ -13,7 +13,7 @@
     Captura("01_simular_sem_painel"),
 
     // Botão "Fluxos" da barra de cima.
-    MoverPara(Tela(611.0, 12.0)),
+    MoverPara(Tela(707.0, 12.0)),
     Clicar(Esquerdo),
     Esperar(quadros: 6),
     Afirmar(PainelFluxos(true)),

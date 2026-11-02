@@ -9,10 +9,11 @@
 
 pub mod network;
 pub(crate) mod panel;
+mod position;
 pub mod ron_text;
 pub mod spec;
 
-pub use panel::{properties_panel, run_panel};
+pub use panel::{properties_panel, properties_panel_shared, run_panel};
 
 #[cfg(test)]
 mod tests {

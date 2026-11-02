@@ -1207,40 +1207,51 @@ fn scenarios_tab(
         ui.add(egui::TextEdit::singleline(&mut res.metric_filter).desired_width(200.0));
     });
     let rows = logic::comparison_rows(exp);
-    egui::Grid::new("cen_comparacao")
-        .striped(true)
-        .spacing([12.0, 3.0])
+    // Wide tables (many scenarios) scroll sideways instead of being cut off (drag the
+    // bar, or Shift + wheel).
+    egui::ScrollArea::horizontal()
+        .id_salt("cen_comparacao_rolagem")
+        .auto_shrink([false, true])
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
         .show(ui, |ui| {
-            ui.strong("Métrica");
-            for (i, s) in exp.scenarios.iter().enumerate() {
-                ui.strong(&s.name);
-                if i > 0 {
-                    ui.strong(format!("Δ vs {}", exp.scenarios[0].name));
-                }
-            }
-            ui.end_row();
-            for row in rows.iter().filter(|r| {
-                res.metric_filter.is_empty() || r.metric.contains(res.metric_filter.trim())
-            }) {
-                if ui
-                    .add(egui::Button::new(RichText::new(&row.metric).monospace()).frame(false))
-                    .on_hover_text("Mostrar no gráfico")
-                    .clicked()
-                {
-                    res.bar_metric = row.metric.clone();
-                }
-                for (i, c) in row.cells.iter().enumerate() {
-                    ui.label(c);
-                    if i > 0 {
-                        match &row.deltas[i] {
-                            Some((t, true)) => ui.label(RichText::new(t).color(HOT)),
-                            Some((t, false)) => ui.label(t),
-                            None => ui.label("-"),
-                        };
+            egui::Grid::new("cen_comparacao")
+                .striped(true)
+                .spacing([12.0, 3.0])
+                .show(ui, |ui| {
+                    ui.strong("Métrica");
+                    for (i, s) in exp.scenarios.iter().enumerate() {
+                        ui.strong(&s.name);
+                        if i > 0 {
+                            ui.strong(format!("Δ vs {}", exp.scenarios[0].name));
+                        }
                     }
-                }
-                ui.end_row();
-            }
+                    ui.end_row();
+                    for row in rows.iter().filter(|r| {
+                        res.metric_filter.is_empty() || r.metric.contains(res.metric_filter.trim())
+                    }) {
+                        if ui
+                            .add(
+                                egui::Button::new(RichText::new(&row.metric).monospace())
+                                    .frame(false),
+                            )
+                            .on_hover_text("Mostrar no gráfico")
+                            .clicked()
+                        {
+                            res.bar_metric = row.metric.clone();
+                        }
+                        for (i, c) in row.cells.iter().enumerate() {
+                            ui.label(c);
+                            if i > 0 {
+                                match &row.deltas[i] {
+                                    Some((t, true)) => ui.label(RichText::new(t).color(HOT)),
+                                    Some((t, false)) => ui.label(t),
+                                    None => ui.label("-"),
+                                };
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
         });
     ui.separator();
     let names = exp.metric_names();
@@ -1587,11 +1598,16 @@ fn optimize_tab(
                     (None, Some(b)) => format!("{metric} ≤ {b}"),
                     (None, None) => metric.clone(),
                 };
-                let mark = if *ok { "✓" } else { "✗" };
-                ui.label(format!(
-                    "{mark} {bound} (média observada: {})",
-                    logic::cell(s)
-                ));
+                // Words, not check marks: egui's fonts have no glyph for them.
+                ui.horizontal_wrapped(|ui| {
+                    let (word, color) = if *ok {
+                        ("atende", Color32::from_rgb(110, 200, 120))
+                    } else {
+                        ("não atende", RED)
+                    };
+                    ui.label(RichText::new(word).color(color).strong());
+                    ui.label(format!("{bound} (média observada: {})", logic::cell(s)));
+                });
             }
         }
         None => {
@@ -1641,7 +1657,11 @@ fn optimize_tab(
                 let point = RichText::new(&r.point).monospace();
                 ui.label(if r.is_best { point.color(HOT) } else { point });
                 ui.label(&r.objective);
-                ui.label(if r.feasible { "✓" } else { "✗" });
+                ui.label(if r.feasible {
+                    RichText::new("sim").color(Color32::from_rgb(110, 200, 120))
+                } else {
+                    RichText::new("não").color(RED)
+                });
                 let delta = if r.is_best {
                     "melhor".to_string()
                 } else if r.equivalent {

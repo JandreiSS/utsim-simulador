@@ -23,7 +23,8 @@ use utsim_viewer::editing::{
 use utsim_viewer::flows_ui::{self, FlowsState};
 use utsim_viewer::fluids::FluidView;
 use utsim_viewer::layout;
-use utsim_viewer::properties::{properties_panel, run_panel};
+use utsim_viewer::picking::{self, Cycle};
+use utsim_viewer::properties::{properties_panel, properties_panel_shared, run_panel};
 use utsim_viewer::style;
 use utsim_viewer::timeline::TransitSetting;
 
@@ -76,6 +77,16 @@ impl Tool {
             Tool::FluidLink(Some(n)) => format!("Fluido:Ligar:{n}"),
         }
     }
+}
+
+/// Tab of the left panel in `Editar` (objects layer).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum LeftTab {
+    /// The palette of objects to place.
+    #[default]
+    Library,
+    /// The list of the objects already in the model.
+    Objects,
 }
 
 /// A left-button gesture in progress.
@@ -145,6 +156,20 @@ pub struct Editor {
     band: Option<(Vec2, Vec2)>,
     /// The "Atalhos" window is open.
     pub shortcuts_open: bool,
+    /// Tab shown in the left panel.
+    pub left_tab: LeftTab,
+    /// Name filter of the object list.
+    pub list_filter: String,
+    /// Kind filter of the object list (Portuguese kind label).
+    pub list_kind: Option<&'static str>,
+    /// Object to bring into view (double-click in the list), consumed by the camera.
+    pub focus_request: Option<String>,
+    /// Selection cycle of repeated clicks over overlapping objects.
+    cycle: Option<Cycle>,
+    /// Objects under the cursor (nearest first) while it rests over the 3D view.
+    pub stack_hover: Vec<String>,
+    /// Object whose properties the right panel showed last (to rewind its scroll).
+    props_for: Option<String>,
     press: Option<Press>,
     /// Snapped ground position under the cursor while placing.
     pub hover: Option<[f64; 3]>,
@@ -168,6 +193,7 @@ enum Act {
     Undo,
     Redo,
     Save,
+    SaveAs,
     New,
     Frame,
     Simulate,
@@ -236,6 +262,13 @@ impl Editor {
             palette_drag: None,
             band: None,
             shortcuts_open: false,
+            left_tab: LeftTab::Library,
+            list_filter: String::new(),
+            list_kind: None,
+            focus_request: None,
+            cycle: None,
+            stack_hover: Vec::new(),
+            props_for: None,
             press: None,
             hover: None,
             status: String::new(),
@@ -468,6 +501,19 @@ impl Editor {
         };
     }
 
+    /// Opens the "Salvar como" dialog, proposing the current path.
+    fn save_as_prompt(&mut self) {
+        let current = self
+            .doc
+            .path()
+            .map(PathBuf::from)
+            .or_else(|| self.pending_path.clone());
+        self.save_prompt = Some(current.map_or_else(
+            || "modelo.ron".to_string(),
+            |p| p.to_string_lossy().to_string(),
+        ));
+    }
+
     fn save_as_text(&mut self, text: &str) {
         let mut path = PathBuf::from(text.trim());
         if path.as_os_str().is_empty() {
@@ -551,6 +597,7 @@ impl Editor {
                 self.refresh();
             }
             Act::Save => self.save(),
+            Act::SaveAs => self.save_as_prompt(),
             Act::New => self.request_new(),
             Act::Frame => self.frame_request = true,
             Act::Simulate => self.simulate(),
@@ -656,7 +703,7 @@ pub fn keys(
         } else if pressed(KeyCode::KeyY) {
             editor.run(Act::Redo);
         } else if pressed(KeyCode::KeyS) {
-            editor.run(Act::Save);
+            editor.run(if shift { Act::SaveAs } else { Act::Save });
         } else if pressed(KeyCode::KeyN) {
             editor.run(Act::New);
         }
@@ -684,7 +731,7 @@ pub fn keys(
         } else if pressed(KeyCode::KeyY) {
             editor.run(Act::Redo);
         } else if pressed(KeyCode::KeyS) {
-            editor.run(Act::Save);
+            editor.run(if shift { Act::SaveAs } else { Act::Save });
         } else if pressed(KeyCode::KeyN) {
             editor.run(Act::New);
         } else if pressed(KeyCode::KeyC) {
@@ -746,9 +793,9 @@ fn ray_ground(ray: Ray3d) -> Option<Vec2> {
     })
 }
 
-/// Nearest block hit by the ray.
-fn pick_block(view: &EditView, ray: Ray3d) -> Option<usize> {
-    let mut best: Option<(f32, usize)> = None;
+/// Every block hit by the ray, nearest first (ties keep the model order).
+fn pick_stack(view: &EditView, ray: Ray3d) -> Vec<usize> {
+    let mut hits: Vec<(f32, usize)> = Vec::new();
     for (i, geom) in view.geoms.iter().enumerate() {
         let h = geom.half;
         let center = Vec3::from(view.positions[i]) + Vec3::Y * h[1];
@@ -757,12 +804,12 @@ fn pick_block(view: &EditView, ray: Ray3d) -> Option<usize> {
             *ray.direction,
             center - Vec3::from(h),
             center + Vec3::from(h),
-        ) && best.is_none_or(|(bd, _)| d < bd)
-        {
-            best = Some((d, i));
+        ) {
+            hits.push((d, i));
         }
     }
-    best.map(|(_, i)| i)
+    hits.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    hits.into_iter().map(|(_, i)| i).collect()
 }
 
 /// `Editar`: select (Shift adds or removes, Shift-drag on the floor draws a box), drag
@@ -795,6 +842,7 @@ pub fn mouse(
         KeyCode::ControlRight,
     ]);
     if editor.layer != Layer::Objects {
+        editor.stack_hover.clear();
         let pointer = layers::Pointer {
             cursor,
             ray,
@@ -829,11 +877,34 @@ pub fn mouse(
         return;
     }
 
+    // Objects under the cursor, for the tooltip of overlapping objects.
+    let stack: Vec<usize> = match ray {
+        Some(ray) if !over_ui && in_view => pick_stack(&editor.view, ray),
+        _ => Vec::new(),
+    };
+    editor.stack_hover = if editor.tool == Tool::Select && stack.len() > 1 {
+        stack
+            .iter()
+            .map(|&i| editor.view.names[i].clone())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     if buttons.just_pressed(MouseButton::Left) {
         editor.press = None;
         lock.0 = false;
         if !over_ui && let (Some(start), Some(ray)) = (cursor, ray) {
-            let block = pick_block(&editor.view, ray);
+            let hits = pick_stack(&editor.view, ray);
+            let names: Vec<String> = hits.iter().map(|&i| editor.view.names[i].clone()).collect();
+            // A press on the spot of the last click keeps that click's object, so a
+            // drag moves what is highlighted, not whatever is on top.
+            let kept = editor
+                .cycle
+                .as_ref()
+                .filter(|c| c.holds([start.x, start.y], &names))
+                .and_then(|c| editor.view.index_of(c.current()));
+            let block = kept.or(hits.first().copied());
             let mut press = Press {
                 start,
                 block,
@@ -960,7 +1031,7 @@ pub fn mouse(
         let Some(cursor) = cursor.filter(|c| c.distance(press.start) <= 4.0) else {
             return;
         };
-        click(editor, cam, cam_tf, cursor, &press, ground);
+        click(editor, cam, cam_tf, cursor, &press, ground, ray);
     }
 }
 
@@ -972,6 +1043,7 @@ fn click(
     cursor: Vec2,
     press: &Press,
     ground: Option<Vec2>,
+    ray: Option<Ray3d>,
 ) {
     let block = press.block;
     match editor.tool.clone() {
@@ -1009,7 +1081,23 @@ fn click(
                         toggle_selected(&mut editor.selected, &mut editor.multi, &name);
                     }
                 } else {
-                    editor.select_only(Some(name));
+                    // Clicking again on the same spot walks through the objects there.
+                    let stack: Vec<String> = ray
+                        .map(|ray| pick_stack(&editor.view, ray))
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|k| editor.view.names[k].clone())
+                        .collect();
+                    if stack.len() > 1 {
+                        let at = [cursor.x, cursor.y];
+                        let cycle = Cycle::advance(editor.cycle.as_ref(), at, stack);
+                        let chosen = cycle.current().to_string();
+                        editor.cycle = Some(cycle);
+                        editor.select_only(Some(chosen));
+                    } else {
+                        editor.cycle = None;
+                        editor.select_only(Some(name));
+                    }
                 }
                 return;
             }
@@ -1177,6 +1265,13 @@ pub fn toolbar(
                     acts.push(Act::Save);
                 }
                 if ui
+                    .button("Salvar como...")
+                    .on_hover_text("Ctrl+Shift+S")
+                    .clicked()
+                {
+                    acts.push(Act::SaveAs);
+                }
+                if ui
                     .add_enabled(ed.doc.can_undo(), egui::Button::new("Desfazer"))
                     .on_hover_text("Ctrl+Z")
                     .clicked()
@@ -1241,12 +1336,25 @@ pub fn toolbar(
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 if let Some(text) = ed.save_prompt.as_mut() {
-                    ui.label("Nome do arquivo (.ron):");
-                    let field = ui.text_edit_singleline(text);
+                    ui.label(
+                        "Caminho do arquivo (.ron), relativo à pasta do programa ou completo:",
+                    );
+                    let field = ui.add(egui::TextEdit::singleline(text).desired_width(420.0));
                     if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         save = true;
                     }
                     field.request_focus();
+                    let mut target = PathBuf::from(text.trim());
+                    if target.extension().is_none() {
+                        target.set_extension("ron");
+                    }
+                    let same = ed.doc.path().is_some_and(|p| p == target.as_path());
+                    if !text.trim().is_empty() && target.exists() && !same {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(240, 200, 80),
+                            "Esse arquivo já existe e será sobrescrito.",
+                        );
+                    }
                 }
                 ui.horizontal(|ui| {
                     save |= ui.button("Salvar").clicked();
@@ -1461,10 +1569,25 @@ pub fn edit_panels(
             layers::layer_switch(ui, ed);
             ui.separator();
             if ed.layer == Layer::Objects {
-                ui.heading("Biblioteca");
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| palette_ui(ui, ed));
+                ui.horizontal(|ui| {
+                    for (tab, label) in [
+                        (LeftTab::Library, "Biblioteca"),
+                        (LeftTab::Objects, "Objetos"),
+                    ] {
+                        if ui.selectable_label(ed.left_tab == tab, label).clicked() {
+                            ed.left_tab = tab;
+                        }
+                    }
+                });
+                ui.separator();
+                match ed.left_tab {
+                    LeftTab::Library => {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false, true])
+                            .show(ui, |ui| palette_ui(ui, ed));
+                    }
+                    LeftTab::Objects => objects_ui(ui, ed),
+                }
             } else {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, true])
@@ -1509,64 +1632,68 @@ pub fn edit_panels(
         .size_range(260.0..=600.0)
         .show(&mut right, |ui| {
             ui.heading("Propriedades");
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    match ed.selected.clone() {
-                        _ if ed.layer != Layer::Objects => {
-                            for command in layers::properties_ui(ui, ed) {
-                                acts.push(Act::Exec(command));
-                            }
-                        }
-                        None => {
-                            ui.label("Selecione um bloco para editar suas propriedades.");
-                            ui.separator();
-                            for command in run_panel(ui, &ed.doc) {
-                                acts.push(Act::Exec(command));
-                            }
-                        }
-                        Some(name) if !ed.multi.is_empty() => {
-                            selection_ui(ui, ed, &name, &mut acts);
-                        }
-                        Some(name) => {
-                            ui.horizontal(|ui| {
-                                ui.strong(&name);
-                                if ui.button("Ligar (C)").clicked() {
-                                    ed.start_connect(name.clone());
-                                }
-                                if ui.button("Excluir (Del)").clicked() {
-                                    acts.push(Act::Delete);
-                                }
-                            });
-                            if matches!(ed.tool, Tool::Connect(_)) {
-                                ui.colored_label(
-                                    egui::Color32::from_rgb(255, 215, 80),
-                                    "Clique no bloco de destino (Esc cancela).",
-                                );
-                            }
-                            ui.separator();
-                            for command in properties_panel(ui, &ed.doc, &name) {
-                                acts.push(Act::Exec(command));
-                            }
-                            ui.separator();
-                            connections_ui(ui, &ed.doc, &name, &mut acts);
+            // Another object (or none) selected: start again at the top, where the name is.
+            let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
+            if ed.props_for != ed.selected {
+                ed.props_for = ed.selected.clone();
+                scroll = scroll.vertical_scroll_offset(0.0);
+            }
+            scroll.show(ui, |ui| {
+                match ed.selected.clone() {
+                    _ if ed.layer != Layer::Objects => {
+                        for command in layers::properties_ui(ui, ed) {
+                            acts.push(Act::Exec(command));
                         }
                     }
-                    ui.separator();
-                    ui.strong(format!("Problemas ({})", ed.issues.len()));
-                    let before = ed.selected.clone();
-                    issues_ui(ui, &ed.issues, &mut ed.selected);
-                    if !ed.warnings.is_empty() {
+                    None => {
+                        ui.label("Selecione um bloco para editar suas propriedades.");
                         ui.separator();
-                        ui.strong(format!("Avisos ({})", ed.warnings.len()));
-                        warnings_ui(ui, &ed.warnings, &mut ed.selected);
+                        for command in run_panel(ui, &ed.doc) {
+                            acts.push(Act::Exec(command));
+                        }
                     }
-                    if ed.selected != before {
-                        ed.multi.clear();
-                        ed.layer = Layer::Objects;
-                        ed.tool = Tool::Select;
+                    Some(name) if !ed.multi.is_empty() => {
+                        selection_ui(ui, ed, &name, &mut acts);
                     }
-                });
+                    Some(name) => {
+                        ui.horizontal(|ui| {
+                            ui.strong(&name);
+                            if ui.button("Ligar (C)").clicked() {
+                                ed.start_connect(name.clone());
+                            }
+                            if ui.button("Excluir (Del)").clicked() {
+                                acts.push(Act::Delete);
+                            }
+                        });
+                        if matches!(ed.tool, Tool::Connect(_)) {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 215, 80),
+                                "Clique no bloco de destino (Esc cancela).",
+                            );
+                        }
+                        ui.separator();
+                        for command in properties_panel(ui, &ed.doc, &name) {
+                            acts.push(Act::Exec(command));
+                        }
+                        ui.separator();
+                        connections_ui(ui, &ed.doc, &name, &mut acts);
+                    }
+                }
+                ui.separator();
+                ui.strong(format!("Problemas ({})", ed.issues.len()));
+                let before = ed.selected.clone();
+                issues_ui(ui, &ed.issues, &mut ed.selected);
+                if !ed.warnings.is_empty() {
+                    ui.separator();
+                    ui.strong(format!("Avisos ({})", ed.warnings.len()));
+                    warnings_ui(ui, &ed.warnings, &mut ed.selected);
+                }
+                if ed.selected != before {
+                    ed.multi.clear();
+                    ed.layer = Layer::Objects;
+                    ed.tool = Tool::Select;
+                }
+            });
         });
     dock.free = right.available_rect_before_wrap();
 
@@ -1592,6 +1719,21 @@ pub fn edit_panels(
     labels.extend(capacity_labels(&NetworkView::of(ed.doc.model())));
     labels.extend(layers::labels(ed));
     draw_labels(ctx, cam, cam_tf, &labels, dock.free);
+    if ed.stack_hover.len() > 1
+        && let Some(p) = ctx.pointer_latest_pos()
+    {
+        let hint = picking::stack_hint(&ed.stack_hover, ed.selected.as_deref());
+        egui::Area::new(egui::Id::new("pilha_sob_cursor"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(p + egui::vec2(16.0, 14.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_max_width(320.0);
+                    ui.label(hint);
+                });
+            });
+    }
 
     // Commands from the property panel may rename the selected object.
     let property_commands: Vec<Command> = acts
@@ -1722,7 +1864,7 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
             names.len()
         ));
         ui.separator();
-        let edits: Vec<Command> = properties_panel(ui, &ed.doc, primary)
+        let edits: Vec<Command> = properties_panel_shared(ui, &ed.doc, primary)
             .into_iter()
             .filter(|c| !matches!(c, Command::Rename { .. }))
             .collect();
@@ -1737,52 +1879,171 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
     }
 }
 
+/// The "Objetos" tab: every object of the model, filtered by name and kind. A click
+/// selects (Shift or Ctrl adds or removes), a double click also frames the object.
+fn objects_ui(ui: &mut egui::Ui, ed: &mut Editor) {
+    ui.add(
+        egui::TextEdit::singleline(&mut ed.list_filter)
+            .hint_text("Buscar por nome")
+            .desired_width(f32::INFINITY),
+    );
+    let mut kinds: Vec<&'static str> = ed
+        .doc
+        .model()
+        .objects
+        .iter()
+        .map(|o| utsim_viewer::properties::spec::kind_name(&o.kind))
+        .collect();
+    kinds.sort_unstable();
+    kinds.dedup();
+    if ed.list_kind.is_some_and(|k| !kinds.contains(&k)) {
+        ed.list_kind = None;
+    }
+    egui::ComboBox::from_id_salt("lista_tipo")
+        .width(ui.available_width() - 8.0)
+        .selected_text(ed.list_kind.unwrap_or("Todos os tipos"))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut ed.list_kind, None, "Todos os tipos");
+            for kind in kinds {
+                ui.selectable_value(&mut ed.list_kind, Some(kind), kind);
+            }
+        });
+    let shown = picking::filter_objects(ed.doc.model(), &ed.list_filter, ed.list_kind);
+    let total = ed.doc.model().objects.len();
+    ui.weak(format!("{} de {} objetos", shown.len(), total));
+    let multi_key = ui.input(|i| i.modifiers.shift || i.modifiers.command);
+    let chosen = ed.selection();
+    let red = egui::Color32::from_rgb(255, 120, 110);
+    let mut clicked: Option<(String, bool, bool)> = None;
+    egui::ScrollArea::vertical()
+        .id_salt("lista_objetos")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            for &i in &shown {
+                let object = &ed.doc.model().objects[i];
+                let on = chosen.contains(&object.name);
+                let broken = ed
+                    .issues
+                    .iter()
+                    .any(|x| x.object.as_deref() == Some(object.name.as_str()));
+                let name = if broken {
+                    egui::RichText::new(&object.name).color(red)
+                } else {
+                    egui::RichText::new(&object.name)
+                };
+                let kind = utsim_viewer::properties::spec::kind_name(&object.kind);
+                let response = ui
+                    .add(
+                        egui::Button::selectable(on, name)
+                            .min_size(egui::vec2(ui.available_width(), 0.0)),
+                    )
+                    .on_hover_text(format!(
+                        "{kind}. Clique seleciona, Shift soma à seleção, duplo clique enquadra"
+                    ));
+                if response.double_clicked() {
+                    clicked = Some((object.name.clone(), false, true));
+                } else if response.clicked() {
+                    clicked = Some((object.name.clone(), multi_key, false));
+                }
+            }
+        });
+    if let Some((name, add, frame)) = clicked {
+        if add {
+            toggle_selected(&mut ed.selected, &mut ed.multi, &name);
+        } else {
+            ed.select_only(Some(name.clone()));
+        }
+        ed.tool = Tool::Select;
+        if frame {
+            ed.focus_request = Some(name);
+        }
+    }
+}
+
+/// Labels of the buttons that move a connection in its order.
+const MOVE_UP: &str = "Subir";
+const MOVE_DOWN: &str = "Descer";
+
+/// One connection of the order lists: its label and the buttons to move it up or down
+/// (swapping with the neighbour in the same list) and to remove it.
+fn order_row(
+    ui: &mut egui::Ui,
+    list: &[&(String, String)],
+    k: usize,
+    label: String,
+    acts: &mut Vec<Act>,
+) {
+    let this = list[k];
+    ui.horizontal_wrapped(|ui| {
+        ui.label(label);
+        if ui
+            .add_enabled(k > 0, egui::Button::new(MOVE_UP).small())
+            .on_hover_text("Troca de lugar com a anterior (Ctrl+Z desfaz)")
+            .clicked()
+        {
+            acts.push(Act::Exec(Command::SwapConnections {
+                first: list[k - 1].clone(),
+                second: this.clone(),
+            }));
+        }
+        if ui
+            .add_enabled(k + 1 < list.len(), egui::Button::new(MOVE_DOWN).small())
+            .on_hover_text("Troca de lugar com a seguinte (Ctrl+Z desfaz)")
+            .clicked()
+        {
+            acts.push(Act::Exec(Command::SwapConnections {
+                first: this.clone(),
+                second: list[k + 1].clone(),
+            }));
+        }
+        if ui
+            .small_button("x")
+            .on_hover_text("Remover ligação")
+            .clicked()
+        {
+            acts.push(Act::Exec(Command::Disconnect {
+                from: this.0.clone(),
+                to: this.1.clone(),
+            }));
+        }
+    });
+}
+
+/// "Ligações" of the object: outputs in port order and inputs in pull-priority order,
+/// each with buttons to move it up or down and to remove it.
 fn connections_ui(ui: &mut egui::Ui, doc: &Document, name: &str, acts: &mut Vec<Act>) {
     let model = doc.model();
-    let outputs: Vec<&String> = model
+    let outputs: Vec<&(String, String)> = model
         .connections
         .iter()
         .filter(|(a, _)| a == name)
-        .map(|(_, b)| b)
         .collect();
-    let inputs: Vec<&String> = model
+    let inputs: Vec<&(String, String)> = model
         .connections
         .iter()
         .filter(|(_, b)| b == name)
-        .map(|(a, _)| a)
         .collect();
     ui.strong("Ligações");
     if outputs.is_empty() && inputs.is_empty() {
         ui.weak("Nenhuma. Use \"Ligar\" e clique no destino.");
+        return;
     }
-    for other in inputs {
-        ui.horizontal(|ui| {
-            ui.label(format!("{other} -> {name}"));
-            if ui
-                .small_button("x")
-                .on_hover_text("Remover ligação")
-                .clicked()
-            {
-                acts.push(Act::Exec(Command::Disconnect {
-                    from: other.clone(),
-                    to: name.to_string(),
-                }));
-            }
-        });
+    ui.weak(
+        "A ordem importa. Saídas: a ordem é o número da porta (1, 2, ...) que as regras de \
+         saída usam. Entradas: a primeira tem prioridade quando o objeto puxa um item.",
+    );
+    if !outputs.is_empty() {
+        ui.label("Saídas, por porta:");
     }
-    for other in outputs {
-        ui.horizontal(|ui| {
-            ui.label(format!("{name} -> {other}"));
-            if ui
-                .small_button("x")
-                .on_hover_text("Remover ligação")
-                .clicked()
-            {
-                acts.push(Act::Exec(Command::Disconnect {
-                    from: name.to_string(),
-                    to: other.clone(),
-                }));
-            }
-        });
+    for k in 0..outputs.len() {
+        let label = format!("porta {}: {name} -> {}", k + 1, outputs[k].1);
+        order_row(ui, &outputs, k, label, acts);
+    }
+    if !inputs.is_empty() {
+        ui.label("Entradas, por prioridade:");
+    }
+    for k in 0..inputs.len() {
+        let label = format!("{}a: {} -> {name}", k + 1, inputs[k].0);
+        order_row(ui, &inputs, k, label, acts);
     }
 }

@@ -1,0 +1,23 @@
+// Modelo do roteiro acabamento_interface.ron: três inspetores empilhados no mesmo ponto
+// (para a seleção por clique repetido) e uma fila com três saídas (para a ordem das ligações).
+Model(
+    name: "acabamento",
+    run: (stop_time: 200.0),
+    objects: [
+        (name: "chegada", position: (-9.0, 0.0, 0.0), kind: Source(interarrival: Exp(mean: 4.0))),
+        (name: "fila", position: (-4.0, 0.0, 0.0), output: Weighted([1.0, 2.0, 3.0]), kind: Queue()),
+        (name: "insp_a", position: (2.0, 0.0, 0.0), kind: Processor(process: Const(3.0))),
+        (name: "insp_b", position: (2.0, 0.0, 0.0), kind: Processor(process: Const(3.0))),
+        (name: "insp_c", position: (2.0, 0.0, 0.0), kind: Processor(process: Const(3.0))),
+        (name: "saida", position: (9.0, 0.0, 0.0), kind: Sink),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "insp_a"),
+        ("fila", "insp_b"),
+        ("fila", "insp_c"),
+        ("insp_a", "saida"),
+        ("insp_b", "saida"),
+        ("insp_c", "saida"),
+    ],
+)
