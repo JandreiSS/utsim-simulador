@@ -24,8 +24,8 @@ use utsim_model::experiment::{ExperimentResult, run_scenarios};
 use utsim_model::{Model, ModelError};
 use utsim_opt::{OptProblem, OptResult};
 use utsim_viewer::results::{
-    self as logic, Column, DomainKind, Method, OptForm, RunForm, ScenarioForm, VariableRow,
-    WhiskerBar,
+    self as logic, Column, DomainKind, Method, OptForm, RunForm, ScenarioForm, UtilKind,
+    VariableRow, WhiskerBar,
 };
 
 /// Orange of the bottleneck and of significant differences.
@@ -114,6 +114,7 @@ pub struct Results {
     sort: Option<(Column, bool)>,
     kind: Option<String>,
     chart: Chart,
+    util: UtilKind,
     object: Option<String>,
     tally: String,
     scenarios: ScenarioForm,
@@ -602,13 +603,14 @@ fn summary_tab(
                     }
                     _ => "",
                 };
-                if ui
-                    .add(
-                        egui::Button::new(RichText::new(format!("{}{mark}", c.label())).strong())
-                            .frame(false),
-                    )
-                    .clicked()
-                {
+                let mut button = ui.add(
+                    egui::Button::new(RichText::new(format!("{}{mark}", c.label())).strong())
+                        .frame(false),
+                );
+                if let Some(k) = c.util_kind() {
+                    button = button.on_hover_text(k.help());
+                }
+                if button.clicked() {
                     clicked = Some(c);
                 }
             }
@@ -630,9 +632,10 @@ fn summary_tab(
                 ui.label(text(logic::cell(&s.output)));
                 ui.label(text(logic::cell(&s.content)));
                 ui.label(text(logic::cell(&s.staytime)));
-                ui.label(text(
-                    s.utilization.as_ref().map(logic::pct).unwrap_or_default(),
-                ));
+                for c in &Column::ALL[6..] {
+                    let u = c.util_kind().and_then(|k| k.pick(s));
+                    ui.label(text(u.as_ref().map(logic::pct).unwrap_or_default()));
+                }
                 let states: Vec<String> = s
                     .states
                     .iter()
@@ -649,19 +652,32 @@ fn summary_tab(
             _ => (c, !matches!(c, Column::Name | Column::Kind)),
         });
     }
+    // Each tally gives its mean and, when the run recorded it, how many observations;
+    // `model.*` are the totals over every source that can lose items.
     let own: Vec<(String, Summary)> = run
         .stats
         .iter()
         .flat_map(|s| {
+            let counts = &run.metrics;
             s.extra
                 .iter()
-                .map(move |(k, v)| (format!("{}.{k}.mean", s.name), *v))
+                .flat_map(move |(k, v)| {
+                    let count = format!("{}.{k}.count", s.name);
+                    [
+                        Some((format!("{}.{k}.mean", s.name), *v)),
+                        counts.get(&count).map(|c| (count, *c)),
+                    ]
+                })
+                .flatten()
                 .chain(
                     s.custom
                         .iter()
+                        // `servers.*` only feed the utilisation columns.
+                        .filter(|(k, _)| !k.starts_with("servers."))
                         .map(move |(k, v)| (format!("{}.{k}", s.name), *v)),
                 )
         })
+        .chain(analysis::model_stats(&run.reports))
         .collect();
     if !own.is_empty() {
         ui.separator();
@@ -743,6 +759,7 @@ fn export_html(res: &mut Results) {
         title: &run.model.name,
         settings: run.form.describe(),
         stats: &run.stats,
+        reports: &run.reports,
         state_color: &color,
         state_label: &label,
         experiment: res.experiment.as_ref(),
@@ -774,14 +791,28 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
     ui.separator();
     match res.chart {
         Chart::Utilization => {
-            let bars = logic::utilization_bars(&run.stats);
+            let bars = logic::utilization_bars(&run.stats, res.util);
             if bars.is_empty() {
                 ui.weak("O modelo não tem processos nem recursos móveis.");
                 return;
             }
-            ui.label(
-                "Ocupação de cada recurso (%), com o intervalo de 95%. Em laranja, o gargalo.",
-            );
+            ui.horizontal(|ui| {
+                for k in UtilKind::ALL {
+                    if ui
+                        .selectable_label(res.util == k, k.label())
+                        .on_hover_text(k.help())
+                        .clicked()
+                    {
+                        res.util = k;
+                    }
+                }
+            });
+            ui.label(format!(
+                "{} de cada recurso (%), com o intervalo de 95%, nunca acima de 100% por \
+                 servidor. Em laranja, o gargalo (maior ocupação).",
+                res.util.label()
+            ));
+            ui.weak(res.util.help());
             whisker_chart(ui, "graf_ocupacao", &bars, 100.0, "%");
         }
         Chart::States => {

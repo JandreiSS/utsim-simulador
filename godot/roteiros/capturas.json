@@ -1,0 +1,59 @@
+{
+	"saida": "../capturas",
+	"modelos": [
+		{
+			"modelo": "../../examples/centro_de_distribuicao.ron",
+			"replicacoes": 1,
+			"capturas": [
+				{"nome": "cdd_01_visao_geral", "t": 2000.0},
+				{"nome": "cdd_02_porta_paletes", "t": 2000.0,
+				 "focar": {"objeto": "porta_paletes", "distancia": 16.0, "giro": 0.5, "inclinacao": 0.4}},
+				{"nome": "cdd_03_inspecao", "t": 2000.0,
+				 "focar": {"objeto": "inspecao", "distancia": 10.0, "giro": 0.7, "inclinacao": 0.35}},
+				{"nome": "cdd_04_curva_meio", "t": 1001.85,
+				 "focar": {"objeto": "empilhadeira_1", "distancia": 9.0, "giro": 0.8, "inclinacao": 0.9}},
+				{"nome": "cdd_05_descarga_25_subindo", "t": 1803.58,
+				 "focar": {"objeto": "empilhadeira_1", "distancia": 8.0, "giro": 0.9, "inclinacao": 0.3}},
+				{"nome": "cdd_06_descarga_antes_do_meio", "t": 1805.75,
+				 "focar": {"objeto": "empilhadeira_1", "distancia": 8.0, "giro": 0.9, "inclinacao": 0.3}},
+				{"nome": "cdd_07_descarga_depois_do_meio", "t": 1806.13,
+				 "focar": {"objeto": "empilhadeira_1", "distancia": 8.0, "giro": 0.9, "inclinacao": 0.3}}
+			],
+			"medir": {"t": 0.0, "segundos": 4.0, "velocidade": 200.0}
+		},
+		{
+			"modelo": "../../examples/agvs.ron",
+			"replicacoes": 1,
+			"capturas": [
+				{"nome": "agvs_01_visao_geral", "t": 0.0},
+				{"nome": "agvs_02_bloqueado_e_andando", "t": 30.0,
+				 "focar": {"objeto": "agv_2", "distancia": 16.0, "giro": 0.4, "inclinacao": 0.45}},
+				{"nome": "agvs_03_descarregando", "t": 36.0,
+				 "focar": {"objeto": "estacao_1", "distancia": 7.0, "giro": 0.5, "inclinacao": 0.4}},
+				{"nome": "agvs_04_virado_para_y", "t": 56.0,
+				 "focar": {"objeto": "agv_2", "distancia": 6.0, "giro": 0.9, "inclinacao": 0.5}}
+			],
+			"medir": {"t": 0.0, "segundos": 4.0, "velocidade": 20.0}
+		},
+		{
+			"modelo": "../../examples/pessoas_carregando.ron",
+			"replicacoes": 1,
+			"capturas": [
+				{"nome": "pessoas_01_visao_geral", "t": 14.0},
+				{"nome": "pessoas_02_andando_vazia", "t": 5.0,
+				 "focar": {"objeto": "ana", "distancia": 4.0, "giro": 1.3, "inclinacao": 0.2}},
+				{"nome": "pessoas_04_pegando_75", "t": 8.9,
+				 "focar": {"objeto": "estoque", "distancia": 5.0, "giro": 0.9, "inclinacao": 0.3}},
+				{"nome": "pessoas_05_carregando", "t": 14.0,
+				 "focar": {"objeto": "ana", "distancia": 4.0, "giro": 1.3, "inclinacao": 0.2}},
+				{"nome": "pessoas_07_carregando_de_lado", "t": 14.0,
+				 "focar": {"objeto": "ana", "distancia": 3.5, "giro": 0.0, "inclinacao": 0.25}},
+				{"nome": "pessoas_10_trabalhando", "t": 35.0,
+				 "focar": {"objeto": "montagem", "distancia": 5.0, "giro": 1.0, "inclinacao": 0.3}},
+				{"nome": "pessoas_11_correndo", "t": 55.0,
+				 "focar": {"objeto": "carla", "distancia": 4.5, "giro": 0.3, "inclinacao": 0.2}}
+			],
+			"medir": {"t": 0.0, "segundos": 4.0, "velocidade": 5.0}
+		}
+	]
+}

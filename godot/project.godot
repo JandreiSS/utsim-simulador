@@ -1,0 +1,50 @@
+; Projeto Godot da interface 3D do UTSim (fase G1: ponte e reprodução).
+; Ver docs/arquitetura.md, seção 4r, e docs/plano_godot.md.
+
+config_version=5
+
+[application]
+
+config/name="UTSim"
+config/description="Interface 3D do UTSim: abre um modelo, simula e reproduz a cena."
+run/main_scene="res://cenas/principal.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icone.svg"
+
+[autoload]
+
+Roteiro="*res://scripts/roteiro.gd"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+[editor_plugins]
+
+enabled=PackedStringArray()
+
+[filesystem]
+
+import/blender/enabled=false
+import/fbx2gltf/enabled=false
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=8192
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+
+[xr]
+
+; Pronto para a fase G4 (OpenXR), desligado por enquanto: a interface de mesa não abre um
+; runtime de realidade virtual. Para testar, ligue os dois itens abaixo.
+openxr/enabled=false
+shaders/enabled=false
+openxr/form_factor=0
+openxr/view_configuration=1
+openxr/reference_space=1
+openxr/environment_blend_mode=0
+openxr/foveation_level=0
+openxr/submit_depth_buffer=true

@@ -46,6 +46,29 @@ Outras observações do piloto, que não são lacunas:
 
 - **O `utsim fit` é rigoroso.** A primeira amostra do tempo de inspeção (300 observações de uma Gama verdadeira) teve todas as famílias rejeitadas, com p = 0,003 (o piso do bootstrap), e o programa recomendou a distribuição empírica; três das quatro primeiras amostras do tempo de triagem (Triangular verdadeira) rejeitaram a família verdadeira. Os CSVs usados nos casos vêm de sementes em que o ajuste escolhe uma família (veja `gerar_dados.py`). Quem aplicar o mesmo procedimento a dados reais pode esbarrar nisso.
 - **O refinamento da otimização trabalha.** Na linha de montagem, um ponto de 4 posições extras parecia viável com 10 replicações e virou inviável com 30. O relatório deixa isso claro.
-- **O arquivo de dados com coluna de numeração** exige `--coluna 2`; o manual avisa, mas é um tropeço fácil.
+- **O arquivo de dados com coluna de numeração** era um tropeço fácil: o `utsim fit` ajustava a numeração (1 a 250) e recomendava `Uniform(1, 250)`. Hoje o programa pula a coluna de numeração, diz qual coluna usou e por quê, e pede `--coluna` quando sobra mais de uma plausível (veja o [capítulo de ajuste](../manual/src/ajuste-de-distribuicoes.md)). `--coluna 2` continua valendo.
 - **As chegadas por hora** pediam 6 fontes (e as escalas pedem 6 grupos de profissionais). Agora uma fonte com `schedule` basta. Os turnos digitados objeto por objeto (no piloto, 88 campos de turno à mão) viram calendários do modelo (`calendars`, `shifts: Calendar("S1")`), que vários objetos usam; copiar e colar objetos no editor continua útil.
 - **Variância das rodadas.** O caso 2 tem rajadas (10 paletes por caminhão, 6 caixas por palete), o que dá intervalos de confiança largos para esperas em fila (±30% da média) mesmo com 30 replicações de 40 horas. O gabarito usa a diferença pareada com as mesmas sementes para decidir.
+
+## Números que parecem estranhos e não são erro
+
+O piloto com um usuário iniciante apontou dois números do caso 2 que pareciam defeito do motor. Foram investigados e **nenhum é erro**.
+
+### A fila da embalagem cresce com mais pickers, com as mesas "ociosas" 36% do tempo
+
+Com a embalagem a 20 m, a espera na fila da embalagem sobe de 16 s (6 pickers) para 94 s (7) e 122 s (8), apesar de as 5 mesas ficarem ocupadas só 50% do tempo. A investigação (10 replicações, mesmas sementes) mostrou:
+
+| Verificação | Resultado |
+|---|---|
+| A fila tem caixas enquanto há mesa livre? | Nunca. Em 57.600 instantes amostrados (a cada 5 s, 2 replicações com 8 pickers), todas as vezes em que a fila tinha caixas as 5 mesas estavam cheias. O motor puxa a caixa no instante em que a mesa libera |
+| A viagem pela esteira de saída segura a mesa? | Não. `embalagem.servers.blocked` é 0 e o conteúdo médio (2,50) é igual à média de mesas trabalhando (2,50). O item sai da mesa ao terminar; a esteira de saída (`transfer`) só reserva lugar no destino |
+| De onde vem a fila? | Das **rajadas**. Quando há palete esperando, as 6 faces de picking trabalham sem parar, e com 8 pickers entregam até 6/65 s = 0,092 caixa/s. As 5 mesas embalam no máximo 5/76,7 s = 0,065 caixa/s. Enquanto o atraso dos paletes é consumido, a fila sobe (chegou a 96 caixas) e depois esvazia. A fila fica vazia em 60% do tempo e a média de 4 caixas esconde os picos |
+| Confirmação por contraprova | 6 mesas: 18 s de espera; 7 mesas: 1,8 s; 8 mesas: 0,2 s. Com a embalagem 10 vezes mais rápida: 0 s. Com só 3 faces (a separação vira o limite): 0,7 s na embalagem e 690 s na fila de pedidos |
+
+Os 36% de "ocioso" do piloto (42% nas rodadas desta investigação) são o estado `idle` da embalagem como um todo (**nenhuma** mesa trabalhando), que só mostra que há períodos sem caixas. A ocupação por mesa é a média de mesas trabalhando dividida por 5 (50%), e é essa que `objeto.utilization` mede agora. Os dois números são verdadeiros ao mesmo tempo: a embalagem tem folga na média e fica saturada nos picos.
+
+Mais pickers deixam a separação mais rápida, e uma separação mais rápida entrega as caixas em rajadas maiores. O resultado é um comportamento do modelo, e uma conclusão útil para o caso: com 7 pickers ou mais, é preciso mais uma mesa de embalagem (6 mesas com 8 pickers deixam a espera em 18 s).
+
+### Caminhões em 40 h: 87,1 ± 3,2 contra 83,1 esperados com 30 replicações, mas 83,17 ± 1,03 com 300
+
+É variância, não erro. O número de chegadas de uma `Source` com `Exp(mean: 1732,4)` em 144.000 s é Poisson com média 83,12 e desvio de 9,1 por replicação. A média de 30 replicações tem erro padrão de 1,7 e meia-amplitude de uns 3,4: um intervalo de 95% deixa de cobrir o valor teórico em 1 de cada 20 rodadas, e 87,1 está a 2,4 erros padrão. Para conferir, rodei 40 sementes de 30 replicações com o modelo do gabarito: o intervalo cobriu 83,12 em 38 das 40 (95%). Com a semente do gabarito (2026), 30 replicações dão 80,2 ± 2,9 e 300 dão 82,8 ± 1,0, ambos coerentes com o valor teórico. A lição fica registrada: em validações, use um número de replicações que dê meia-amplitude pequena em relação ao que se confere.
