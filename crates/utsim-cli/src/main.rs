@@ -444,7 +444,7 @@ fn print_utilization(summary: &std::collections::BTreeMap<String, Summary>, firs
             "\n{:<14} {:>20} {:>20} {:>20} {:>20}",
             "ocupação", "trabalhando", "incl. bloqueio", "dentro do turno", "sem bloqueio"
         );
-        for n in resources {
+        for &n in &resources {
             let cell = |suffix: &str| {
                 summary
                     .get(&format!("{n}.{suffix}"))
@@ -457,6 +457,28 @@ fn print_utilization(summary: &std::collections::BTreeMap<String, Summary>, firs
                 cell("utilization_in_shift"),
                 cell("utilization_excl_blocked"),
             );
+        }
+        // The bottleneck overall and within shift: they differ when resources work
+        // different shifts.
+        let best = |suffix: &str| {
+            resources
+                .iter()
+                .filter_map(|n| {
+                    let s = summary
+                        .get(&format!("{n}.{suffix}"))
+                        .or_else(|| summary.get(&format!("{n}.utilization")))?;
+                    (s.mean > 0.0).then_some((*n, s))
+                })
+                .fold(None::<(&str, &Summary)>, |acc, (n, s)| match acc {
+                    Some((_, b)) if b.mean >= s.mean => acc,
+                    _ => Some((n, s)),
+                })
+        };
+        if let Some((n, s)) = best("utilization") {
+            println!("gargalo (geral): {n} ({})", fmt_pct(s));
+        }
+        if let Some((n, s)) = best("utilization_in_shift") {
+            println!("gargalo (dentro do turno): {n} ({})", fmt_pct(s));
         }
     }
     if let (Some(lost), Some(fraction)) = (

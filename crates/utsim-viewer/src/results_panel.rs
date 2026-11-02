@@ -555,11 +555,26 @@ fn summary_tab(
     if let Some(i) = hot {
         let s = &run.stats[i];
         ui.horizontal(|ui| {
-            ui.label("Gargalo:");
+            ui.label("Gargalo (geral):");
             ui.label(RichText::new(&s.name).color(HOT).strong());
             ui.label(format!(
                 "(ocupação {}; a maior entre processos e recursos)",
                 logic::pct(&s.utilization.unwrap_or(s.content))
+            ));
+        });
+    }
+    if let Some(i) = analysis::bottleneck_in_shift(&run.stats) {
+        let s = &run.stats[i];
+        ui.horizontal(|ui| {
+            ui.label("Gargalo (dentro do turno):");
+            ui.label(RichText::new(&s.name).color(HOT).strong());
+            ui.label(format!(
+                "(ocupação {} no tempo em turno)",
+                logic::pct(
+                    &s.utilization_in_shift
+                        .or(s.utilization)
+                        .unwrap_or(s.content)
+                )
             ));
         });
     }
