@@ -83,7 +83,20 @@ quem alimenta A.
     bloqueio. Cada perda registra `lost` na Source (use o campo `count` da tally, aparece
     em `RunReport`); itens perdidos não contam em `output`. Serve para M/M/1/K e Erlang
     de perda.
-- Estados: `generating`, `blocked`, `idle` (quando atinge `max_arrivals`).
+- Estados: `generating`, `blocked`, `idle` (quando atinge `max_arrivals`), `off_shift`
+  (fora do horário das chegadas por período).
+- **Chegadas por período** (`schedule: (cycle, periods: [(start, end, arrivals, labels)])`).
+  A Source guarda as marcas do ciclo (inícios e fins dos períodos, com o fim igual ao ciclo
+  virando 0) e agenda um evento próprio em cada marca. Na marca, o período em vigor muda:
+  a chegada pendente é cancelada e uma nova é sorteada a partir da marca com o processo do
+  novo período (`Default` usa `interarrival`, `Interarrival(Dist)`, `Rate(r)` sorteia
+  `Exp(1/r)`, `Closed` e as lacunas não agendam nada e mostram `off_shift`). Dois períodos
+  seguidos com o mesmo processo mantêm a chegada pendente. Como cada período recomeça do
+  zero, um período `Rate` é um processo de Poisson não homogêneo exato, com taxa constante
+  por trechos (falta de memória da exponencial), sem distorção nas fronteiras. A marca é
+  agendada no início do período anterior, então vem antes de qualquer chegada do mesmo
+  instante. Rótulos do período substituem os rótulos padrão de mesmo nome. Sem `schedule`
+  nada muda (mesmos sorteios e eventos).
 
 ### Queue
 - Capacidade opcional, FIFO ou LIFO. Libera cada item ao entrar.
@@ -136,6 +149,29 @@ sinalizador. Assim a ordem dos dois eventos simultâneos não importa.
 
 > **Nosso jeito:** o MTBF das quebras corre no relógio também fora do turno. Uma opção
 > "só conta tempo trabalhado" fica para depois.
+
+**Fim de turno com `Finish`** (`shifts.on_end`, padrão `Pause`). Quando a janela começa e
+o bloco está rodando, o kernel não para o bloco: marca-o como **fechando** (`closing`),
+fecha as entradas (`find_destination` e `Inject` recusam o bloco) e o põe numa lista.
+Depois de cada evento, o kernel pergunta a cada bloco da lista
+`Behavior::work_in_progress`; quando não há mais trabalho, aplica o motivo de parada
+`OFF_SHIFT` normalmente. O padrão de `work_in_progress` é "há item não liberado que não
+espera transporte" (`Ctx::unreleased_count`); Queue e Rack respondem `false` (guardam,
+não trabalham), o Combiner só durante preparação e processamento e o Transporter enquanto
+tem uma viagem ou um posto em andamento. O `ShiftOn` continua no horário da tabela: se o
+bloco ainda está fechando, ele só reabre as entradas. Um bloco fechando também não pega
+trabalho novo por conta própria (`Ctx::is_closing`): o Transporter não começa a próxima
+viagem e não se anuncia livre ao despachante, e o Dispatcher pula membros fechando ou fora
+de turno com `Finish` (`Ctx::away_on_finish`). Com `Pause`, nada disso roda: a lista fica
+vazia e os resultados são os mesmos de antes, byte a byte.
+
+**Calendários.** `Model.calendars` é um mapa de nome para `ShiftTable`. O `shifts` de um
+objeto é um `ShiftSpec`: a tabela no próprio objeto ou `Calendar("nome")` (opcionalmente
+com o `on_end` do objeto). O modelo resolve a referência ao montar a simulação
+(`Model::shift_table`), então o kernel só vê tabelas e os resultados são idênticos aos das
+janelas escritas no objeto. O `ShiftSpec` tem leitura própria (o RON lido sem tipo perde o
+nome antes dos parênteses), que aceita a tabela, `Calendar("x")`, `Calendar("x", Finish)`
+e `(calendar: "x", on_end: ...)`.
 
 ### Itens contêiner
 `ctx.pack(contêiner, item)` tira o item do conteúdo do bloco e o coloca dentro do
@@ -290,7 +326,9 @@ membro informa a posição atual e avisa com `MSG_IDLE` quando fica livre.
   pedidos simultâneos (um lote liberado, por exemplo) possam dividir a viagem.
 - **Quebras e turnos:** pausam viagem, carga e descarga. A retomada continua do ponto
   onde parou. O rastro registra o trecho restante, com posição linear no tempo, o que é
-  aproximado quando há aceleração.
+  aproximado quando há aceleração. Com `shifts.on_end: Finish`, o fim do turno espera a
+  viagem (ou o trabalho no posto) em andamento terminar; a próxima tarefa da fila fica
+  para o turno seguinte.
 - **`home: true`:** ocioso, o transportador volta à sua posição de origem. Uma tarefa
   nova interrompe a volta e parte do ponto alcançado.
 

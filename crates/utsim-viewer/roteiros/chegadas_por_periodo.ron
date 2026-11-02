@@ -1,0 +1,63 @@
+// Chegadas por período e calendários sobre uma cópia do modelo da clínica com uma fonte só:
+//   utsim-view docs/estudos_de_caso/03-clinica-com-turnos/gabarito/modelo_por_periodo.ron \
+//       --roteiro crates/utsim-viewer/roteiros/chegadas_por_periodo.ron --capturas %TEMP%\utsim_periodos
+// Seleciona a fonte, rola até a tabela "Chegadas por período" (12 horas, taxa por hora,
+// esperado por período e por dia), copia o padrão num período, acrescenta um período,
+// desfaz, mostra a seção Turnos de um grupo de médicos (usar calendário) e a seção
+// Calendários do painel Simulação.
+[
+    Esperar(quadros: 20),
+    Afirmar(Modo(Editar)),
+    Afirmar(ProblemasIgual(0)),
+
+    MoverPara(Objeto("chegada")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("chegada"))),
+    Esperar(quadros: 3),
+    Captura("01_fonte_selecionada"),
+
+    // A tabela fica depois dos rótulos: rola o painel de propriedades.
+    MoverPara(Botao("Rótulos")),
+    Rolar(-6.0),
+    Esperar(quadros: 5),
+    Captura("02_tabela_de_periodos"),
+    Rolar(-6.0),
+    Esperar(quadros: 5),
+    Captura("03_esperado_por_dia"),
+
+    // "copiar do padrão" no último período visível vira "distribuição" com o padrão.
+    ClicarBotao("copiar do padrão"),
+    Esperar(quadros: 5),
+    Afirmar(Sujo(true)),
+    Afirmar(ProblemasIgual(0)),
+    Captura("04_copiado_do_padrao"),
+
+    // Um período novo depois do último (19h00 a 20h00).
+    ClicarBotao("adicionar período"),
+    Esperar(quadros: 5),
+    Afirmar(ProblemasIgual(0)),
+    Captura("05_periodo_novo"),
+
+    Atalho(["Ctrl", "Z"]),
+    Atalho(["Ctrl", "Z"]),
+    Esperar(quadros: 3),
+    Afirmar(Sujo(false)),
+
+    // Turnos de um grupo de médicos: usa o calendário S1, com o fim do turno dele.
+    MoverPara(Objeto("medicos_S1")),
+    Clicar(Esquerdo),
+    Afirmar(Selecionado(Some("medicos_S1"))),
+    Esperar(quadros: 3),
+    MoverPara(Botao("Nome")),
+    Rolar(-12.0),
+    Esperar(quadros: 5),
+    Captura("06_turnos_por_calendario"),
+
+    // Nada selecionado: painel Simulação com a seção Calendários.
+    Tecla("Esc"),
+    MoverPara(Mundo(14.0, 14.0)),
+    Clicar(Esquerdo),
+    Esperar(quadros: 5),
+    Afirmar(Selecionado(None)),
+    Captura("07_calendarios"),
+]

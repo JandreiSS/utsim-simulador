@@ -13,7 +13,7 @@ Os tempos (`interarrival`, `process`, `setup` e outros) são [distribuições](d
 | `output` | `FirstAvailable` | regra de escolha da porta de saída. Veja [Conexões e regras de saída](conexoes.md) |
 | `position` | `(0.0, 0.0, 0.0)` | posição `(x, y, z)` no layout, em metros |
 | `downtime` | nenhum | quebras aleatórias. Veja [Quebras e turnos](quebras-e-turnos.md) |
-| `shifts` | nenhum | janelas fora de turno. Veja [Quebras e turnos](quebras-e-turnos.md) |
+| `shifts` | nenhum | janelas fora de turno, ou um calendário do modelo (`Calendar("nome")`). Veja [Quebras e turnos](quebras-e-turnos.md) |
 | `transport` | nenhum | transportador ou despachante que leva os itens que saem deste objeto |
 | `transfer` | nenhum | tempo de viagem (`speed`, `delay`, `path`) das ligações diretas que saem deste objeto. Veja [Recursos móveis](recursos-moveis.md) |
 | `on_entry` | nenhum | script executado quando um item entra. Veja [Fluxos de tokens e scripts](fluxos-e-scripts.md) |
@@ -34,13 +34,55 @@ Cria itens. É por aqui que o trabalho entra no modelo.
 | `max_arrivals` | sem limite | número máximo de itens criados |
 | `labels` | vazio | rótulos sorteados para cada item, por exemplo `{ "tipo": Discrete([(1.0, 0.7), (2.0, 0.3)]) }` |
 | `on_blocked` | `Wait` | o que fazer com o item que não consegue sair no instante em que nasce |
+| `schedule` | nenhuma | chegadas por período: a taxa ou o tempo entre chegadas muda com a hora (veja abaixo) |
 
 Os dois valores de `on_blocked`:
 
 - `Wait`: a fonte segura o item e para de gerar até ele sair. O próximo intervalo só começa quando o item sai. Para ter chegadas "puras", ponha uma fila logo depois da fonte.
 - `Drop`: o item é descartado e contado como perdido, e o relógio de chegadas continua. Serve para modelar clientes que vão embora quando a sala de espera está cheia.
 
-**Use** uma Source para cada fluxo de entrada independente (um tipo de peça, um cliente, um caminhão). Estados: `generating`, `blocked` e `idle` (quando chega a `max_arrivals`).
+**Use** uma Source para cada fluxo de entrada independente (um tipo de peça, um cliente, um caminhão). Estados: `generating`, `blocked`, `idle` (quando chega a `max_arrivals`) e `off_shift` (fora do horário das chegadas por período, ou fora de turno).
+
+### Chegadas por período (`schedule`)
+
+Quando o ritmo de chegada muda ao longo do dia (a manhã é cheia, o almoço é calmo), uma fonte só basta: dê a ela uma tabela de períodos que se repete a cada ciclo.
+
+```ron
+(name: "chegada", kind: Source(
+    interarrival: Exp(mean: 4.0),
+    labels: { "classe": Discrete([(1.0, 0.1), (2.0, 0.9)]) },
+    schedule: (cycle: 1440.0, periods: [
+        (start: 0.0, end: 60.0, arrivals: Rate(0.1667)),                   // 10 por hora
+        (start: 60.0, end: 240.0, arrivals: Rate(0.4333)),                 // 26 por hora
+        (start: 240.0, end: 300.0),                                        // igual ao padrão
+        (start: 300.0, end: 420.0, arrivals: Interarrival(Uniform(min: 3.0, max: 7.0))),
+        (start: 420.0, end: 600.0, arrivals: Closed),                      // sem chegadas
+        (start: 600.0, end: 720.0, labels: { "classe": Discrete([(1.0, 0.3), (2.0, 0.7)]) }),
+    ]),
+))
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `cycle` | obrigatório | tamanho do ciclo que se repete (1440 para um dia em minutos, 10080 para uma semana) |
+| `periods` | obrigatório | períodos `[start, end)` dentro do ciclo, em ordem e sem sobreposição |
+| `periods[].arrivals` | `Default` | `Default` (igual ao padrão: usa o `interarrival` da fonte), `Interarrival(Dist)` (tempo entre chegadas próprio), `Rate(r)` (chegadas de Poisson com `r` chegadas por unidade de tempo) ou `Closed` (sem chegadas) |
+| `periods[].labels` | `{}` | rótulos do período: substituem os rótulos padrão de mesmo nome; os outros rótulos padrão continuam |
+
+Regras:
+
+- **Fora de qualquer período não há chegadas**, assim como num período `Closed`. A fonte mostra o estado `off_shift` ("fora do horário"). No exemplo acima não chega ninguém de 12h00 às 07h00.
+- **Taxa (`Rate`).** As chegadas formam um processo de Poisson com a taxa do período. A taxa é por unidade de tempo do modelo: 26 por hora num modelo em minutos é `Rate(0.4333)` (26 / 60). A troca de taxa na fronteira é exata (o processo de Poisson não tem memória), então a contagem esperada em cada período é `taxa x duração`, também nos primeiros e nos últimos minutos.
+- **Troca de período.** Quando um período começa, a chegada que estava marcada é descartada e uma nova é sorteada a partir do início do período, com o processo do novo período. Nada passa de um período para o outro. A exceção são dois períodos seguidos com o mesmo processo (por exemplo, dois `Default`, ou a mesma taxa): a chegada marcada continua valendo.
+- **Rótulos** são sorteados com os do período em que o item nasce.
+- `first_at_zero` só cria o item em t = 0 se um período com chegadas começar em 0.
+- Um item que espera para sair da fonte (`Wait`) na troca de período não é afetado: o próximo intervalo é sorteado quando ele sai, com o processo do período em vigor.
+- Uma quebra ou um turno da própria fonte (`downtime`, `shifts`) continua pausando o relógio de chegadas, como sem tabela.
+- Os erros apontam o período, contado a partir de 1: `chegada: schedule[2]: começa em 40 antes do fim do período anterior (50); os períodos precisam estar em ordem e sem sobreposição`. A taxa precisa ser maior que 0 (para não ter chegadas, use `Closed`).
+
+No editor, a seção **Chegadas por período** das propriedades da fonte mostra a tabela: ciclo, uma linha por período com início, fim, modo (igual ao padrão, distribuição, taxa ou sem chegadas) e valor, o botão "copiar do padrão" e o número esperado de chegadas por período e por ciclo, para conferir com os dados. Com ciclo de 1440 (um dia em minutos) os horários aparecem e são digitados como hh:mm e as taxas são por hora; com 10080 (uma semana) como "dia N hh:mm". O modelo não tem unidade de tempo própria: com outros ciclos os horários e as taxas ficam na unidade do modelo.
+
+Nos experimentos, as chaves `chegada.schedule`, `chegada.schedule.cycle`, `chegada.schedule[n]` e `chegada.schedule[n].<campo>` (`start`, `end`, `arrivals`, `rate`, `interarrival`, `labels`) mudam a tabela; por exemplo `"chegada.schedule[2].rate": "0.5"`.
 
 ## Queue (Fila)
 
