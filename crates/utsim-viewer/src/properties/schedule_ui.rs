@@ -197,7 +197,7 @@ impl Editor<'_> {
                             changed = true;
                         }
                         if ui
-                            .small_button("✕")
+                            .small_button("x")
                             .on_hover_text("remover o período")
                             .clicked()
                         {

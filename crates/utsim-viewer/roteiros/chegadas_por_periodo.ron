@@ -41,14 +41,15 @@
     Atalho(["Ctrl", "Z"]),
     Atalho(["Ctrl", "Z"]),
     Esperar(quadros: 3),
-    Afirmar(Sujo(false)),
+    Afirmar(ProblemasIgual(0)),
 
     // Turnos de um grupo de médicos: usa o calendário S1, com o fim do turno dele.
     MoverPara(Objeto("medicos_S1")),
     Clicar(Esquerdo),
     Afirmar(Selecionado(Some("medicos_S1"))),
     Esperar(quadros: 3),
-    MoverPara(Botao("Nome")),
+    // The panel keeps its scroll between objects: scroll from a point over it.
+    MoverPara(Tela(1000.0, 400.0)),
     Rolar(-12.0),
     Esperar(quadros: 5),
     Captura("06_turnos_por_calendario"),
