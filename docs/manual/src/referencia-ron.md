@@ -28,6 +28,7 @@ Model(
     network: Some((...)),
     flows: [ ... ],
     fluids: Some((...)),
+    spans: [ ... ],
 )
 ```
 
@@ -42,6 +43,7 @@ Model(
 | `network` | nenhuma | rede de caminhos para recursos móveis |
 | `flows` | `[]` | fluxos de tokens |
 | `fluids` | nenhuma | rede de fluidos |
+| `spans` | `[]` | tempo entre dois pontos do fluxo: `(name, from, to)`. Veja [Resultados](resultados.md) |
 
 ## `run`
 

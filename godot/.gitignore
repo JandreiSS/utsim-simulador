@@ -1,0 +1,6 @@
+# Gerados por scripts/godot.sh: a biblioteca da ponte e as cópias dos modelos .glb.
+bin/
+importados/
+# Cache de importação do Godot.
+.godot/
+capturas/

@@ -1,0 +1,52 @@
+// Estudo de caso 3: compara a escala atual, a escala ótima e uma escala enxuta demais, e testa
+// o que acontece se a demanda crescer 15% (cada tempo entre chegadas dividido por 1,15).
+// Uso: utsim experiment docs/estudos_de_caso/03-clinica-com-turnos/gabarito/experimento.ron
+Experiment(
+    name: "Clínica: escala atual, ótima e com mais demanda",
+    model: "modelo.ron",
+    replications: 20,
+    scenarios: [
+        // Escala atual (o modelo como está): médicos 6/5/4 e triagem 3/2/2.
+        (name: "atual"),
+        // Resultado da otimização: médicos 5/5/3 e triagem 3/2/2.
+        (name: "otima", set: {
+            "medicos_S1.capacity": "5", "medicos_S2.capacity": "5", "medicos_S3.capacity": "3",
+        }),
+        // Enxuta demais: médicos 4/4/2 e triagem 2/2/1.
+        (name: "enxuta", set: {
+            "medicos_S1.capacity": "4", "medicos_S2.capacity": "4", "medicos_S3.capacity": "2",
+            "triagem_S1.capacity": "2", "triagem_S3.capacity": "1",
+        }),
+        // Escala ótima, mas sem prioridade para urgentes: a triagem manda todo mundo para a primeira
+        // fila (FirstAvailable), que passa a ser uma fila única FIFO. A espera de TODOS os pacientes
+        // aparece então em fila_urgente.staytime.mean (fila_normal fica vazia).
+        (name: "otima sem prioridade", set: {
+            "medicos_S1.capacity": "5", "medicos_S2.capacity": "5", "medicos_S3.capacity": "3",
+            "triagem_S1.output": "FirstAvailable", "triagem_S2.output": "FirstAvailable", "triagem_S3.output": "FirstAvailable",
+        }),
+        // Escala ótima com 15% mais pacientes.
+        (name: "otima +15%", set: {
+            "medicos_S1.capacity": "5", "medicos_S2.capacity": "5", "medicos_S3.capacity": "3",
+            "chegada_B1.interarrival": "Exp(mean: 5.2174)",
+            "chegada_B2.interarrival": "Exp(mean: 2.0067)",
+            "chegada_B3.interarrival": "Exp(mean: 2.8986)",
+            "chegada_B4.interarrival": "Exp(mean: 4.3478)",
+            "chegada_B5.interarrival": "Exp(mean: 2.3715)",
+            "chegada_B6.interarrival": "Exp(mean: 4.3478)",
+        }),
+    ],
+    measures: [
+        "saida.input",
+        "sala_espera.staytime.mean",
+        "sala_espera.content.max",
+        "fila_urgente.staytime.mean",
+        "fila_normal.staytime.mean",
+        "fila_normal.content.max",
+        "medicos_S1.state.processing",
+        "medicos_S2.state.processing",
+        "medicos_S3.state.processing",
+        "triagem_S1.state.processing",
+        "triagem_S2.state.processing",
+        "triagem_S3.state.processing",
+    ],
+)

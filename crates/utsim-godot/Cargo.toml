@@ -1,0 +1,24 @@
+[package]
+name = "utsim-godot"
+description = "GDExtension bridge: loads, runs and plays UTSim models inside the Godot interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "utsim_godot"
+# cdylib: the library Godot loads; rlib: so the pure modules are unit-tested and linted
+# like any crate.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+utsim-scene.workspace = true
+utsim-assets.workspace = true
+serde.workspace = true
+ron.workspace = true
+# Only the core classes are generated (no `__codegen-full`): the bridge returns plain data
+# (dictionaries and packed arrays) and every node is built in GDScript, which keeps the
+# build short. `api-4-7` matches Godot 4.7; GDExtension is forward compatible.
+godot = { version = "=0.5.5", default-features = false, features = ["api-4-7"] }

@@ -10,14 +10,13 @@ A simulação não muda. O 3D realista é **apresentação**: cada motor lê a m
 como desenhar. Por isso dá para ter, ao mesmo tempo:
 
 - o visualizador Bevy (desktop e navegador), com modelos glTF e animações;
-- um cliente Unreal com visual de alta qualidade e realidade virtual pelo OpenXR;
-- no futuro, realidade virtual no próprio Bevy, quando o suporte a OpenXR acompanhar a
-  versão do Bevy que usamos.
+- o cliente Godot, com visual de alta qualidade, realidade virtual e realidade aumentada
+  pelo OpenXR nativo do Godot.
 
 ```
 modelo .ron ─► simulação ─► rastro ─► utsim-scene ─┬─► Bevy (desktop / web)
-                                                   ├─► utsim cena (arquivo .jsonl) ─► Unreal (VR)
-                                                   └─► socket ao vivo (emulação) ─► Unreal / VR
+                                                   ├─► utsim cena (arquivo .jsonl) ─► Godot (3D, RV, RA)
+                                                   └─► socket ao vivo (emulação) ─► Godot ao vivo
 ```
 
 ## Como os objetos 3D serão feitos
@@ -67,7 +66,7 @@ Ainda falta, nas fases abaixo:
 | A3D-2 | Gerador de `.glb` articulados (empilhadeira, paleteira, AGV, porta-paletes, esteira, palete, caixa, tanque) e carga de glTF no Bevy pelo `visual.asset` (**feito**, ver abaixo) | 4–6 h |
 | A3D-3 | Pessoas animadas (CC0), máquina de estados visual, itens presos às mãos e garfos, garfos subindo até o nível, rodas, giro suave nas curvas, sombras (**feito**, ver abaixo) | 5–8 h |
 | A3D-4 | Câmeras: seguir um recurso, primeira pessoa (andar pela planta), do recurso; níveis de detalhe para modelos grandes (**feito**: `camera_modes.rs`, `lod.rs`, `docs/arquitetura.md` 4p e `docs/desempenho.md`; os itens já compartilham malha e material, então não foram precisas instâncias) | 3–4 h |
-| A3D-5 | Cliente Unreal + realidade virtual (OpenXR), lendo `utsim-scene/1` de arquivo e depois ao vivo | 6–10 h (sessão separada) |
+| A3D-5 | Cliente Godot: 3D, realidade virtual e aumentada (OpenXR), lendo `utsim-scene/1` de arquivo e ao vivo | ver o plano Godot |
 | A3D-6 | Fluxo de cena ao vivo (socket) a partir da emulação, para RV em tempo real conectada ao CLP (**feito**: `--cena-porta`, `utsim cena --servir`, TCP e WebSocket, comandos de volta) | 2–3 h |
 
 ## Biblioteca de modelos (A3D-2, feita)
@@ -234,49 +233,6 @@ Como personalizar:
 
 ## Pedidos prontos para outras sessões
 
-### Sessão 1: cliente Unreal com realidade virtual (rodar depois que A3D-1 estiver integrada)
-
-> Crie, numa pasta **fora** do repositório do UTSim (por exemplo
-> `C:\Users\Jandrei\Documents\Codes\UTSimUnreal`), um projeto Unreal Engine 5 (C++),
-> a partir do template de realidade virtual (OpenXR), chamado `UTSimUnreal`. Ele
-> reproduz em 3D uma rodada do UTSim, lendo o fluxo de cena `utsim-scene/1` descrito em
-> `C:\Users\Jandrei\Documents\Codes\UTSim\crates\utsim-scene\src\lib.rs` e em
-> `docs/arquitetura.md`, seção 4p. Gere um arquivo de exemplo com
-> `utsim cena examples/agvs.ron --fps 20 --saida agvs.jsonl`.
-> 1. Um plugin C++ `UTSimLink` lê o `.jsonl`:
->    - a primeira linha é o `Header`;
->    - cada linha seguinte é um `Frame`;
->    - converte metros com Z para cima em centímetros do Unreal: `(100x, -100y, 100z)`, e
->      `yaw` em radianos anti-horário em graus do Unreal com o sinal invertido.
-> 2. Um ator `AUTSimPlayer` cria um ator por entidade da cena estática e, a cada frame
->    do jogo, interpola entre os dois quadros que cercam o tempo de reprodução.
->    Mapeamento:
->    - `MobileRole::Person` → personagem com Animation Blueprint (parado, andando,
->      carregando, trabalhando; velocidade vinda de `Motion::Moving`);
->    - `Forklift` → empilhadeira com componente do garfo na altura `lift`;
->    - `Agv` e `Vehicle` → veículos;
->    - itens → caixas presas ao `parent`;
->    - tanques → cilindro com nível `fill`.
->    Use primitivas e o Mannequin do Unreal por enquanto. Os `.glb` do UTSim podem ser
->    importados depois.
-> 3. Controles: reproduzir, pausar e velocidade, com um widget 3D na mão (RV) e teclado
->    no desktop. Na RV, teleporte e movimento livre. O jogador começa na altura dos olhos,
->    a 160 cm.
-> 4. Implemente também o modo ao vivo, que já existe no servidor: `utsim emular
->    modelo.ron --cena-porta 7878` (ou `utsim cena modelo.ron --servir 7878`) serve o mesmo
->    fluxo por TCP (um JSON por linha) e por WebSocket (um JSON por mensagem), na mesma
->    porta. Conecte, leia o `Header`, depois os quadros (20 por segundo de relógio; o
->    campo `time` é o tempo simulado, então interpole entre os dois últimos quadros). Linhas
->    com o campo `"tipo"` são extensões: `aviso`, `fim`; ignore as desconhecidas. Para
->    "apertar um botão" numa máquina, envie
->    `{"tipo":"comando","variavel":"<bloco>.Parar","valor":true}` (`false` retoma;
->    `Velocidade` com um número muda a velocidade). Não há autenticação: use na rede local.
->    Veja `crates/utsim-scene/examples/cliente_cena.rs` e `web/cena_ao_vivo.html`.
->
-> Teste no desktop (sem óculos) com `agvs.jsonl`. O projeto Unreal fica fora do
-> repositório do UTSim, porque o conteúdo da Epic segue a licença do Unreal. A comunicação é
-> só pelo protocolo.
-
 ### Sessão 2: gerador de modelos articulados (A3D-2; pode rodar depois que A3D-1 estiver integrada)
 
 > No repositório UTSim (`C:\Users\Jandrei\Documents\Codes\UTSim`, branch `feat/fase-1`),
@@ -298,5 +254,3 @@ Como personalizar:
 
 - Autorizar o download dos personagens CC0 da Quaternius (Universal Animation Library 2),
   para versioná-los em `assets/terceiros/` com a licença.
-- Instalar o Unreal Engine 5 pelo Epic Launcher, se quiser o cliente Unreal. Hoje há só
-  as pastas de configuração e o launcher, sem o motor instalado.

@@ -154,7 +154,7 @@ Numa planta com muitos objetos, o visualizador troca o que está longe por algo 
 
 ## Cena 3D para outros motores
 
-O comando `utsim cena` grava onde cada objeto, item e recurso móvel está, e o que está fazendo, ao longo de uma rodada. É o mesmo conteúdo que o visualizador desenha, num formato que clientes em outros motores (Unreal, Unity, realidade virtual) podem ler.
+O comando `utsim cena` grava onde cada objeto, item e recurso móvel está, e o que está fazendo, ao longo de uma rodada. É o mesmo conteúdo que o visualizador desenha, num formato que o cliente Godot (3D, realidade virtual e aumentada) pode ler.
 
 ```bash
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
