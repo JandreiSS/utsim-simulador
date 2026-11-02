@@ -648,7 +648,7 @@ nunca discordam sobre onde as coisas estão:
 - o visualizador Bevy;
 - a página web;
 - um modo de realidade virtual;
-- motores externos (Unreal, Unity, Godot).
+- o cliente Godot (3D, realidade virtual e aumentada).
 
 - **Cena estática** (`StaticScene`), enviada uma vez: blocos, recursos móveis, nós de
   fluido, trechos da rede e o `visual` de cada objeto.
@@ -666,7 +666,7 @@ nunca discordam sobre onde as coisas estão:
   - escala real, para uma câmera de realidade virtual na altura dos olhos (~1,6 m) ver a
     planta no tamanho certo;
   - Bevy converte `(x, y, z)` em `(x, z, -y)`;
-  - Unreal converte em `(100x, -100y, 100z)`, em cm.
+  - Godot usa a mesma conversão do Bevy: `(x, z, -y)`, em metros.
 - **Fluxo de cena** (protocolo `utsim-scene/1`):
   - formato JSON em linhas: um cabeçalho (`Header`) e depois um quadro por linha;
   - `SceneSink` abstrai o destino: arquivo, socket, runtime de realidade virtual ou teste;
@@ -850,8 +850,8 @@ As esperas para a realidade virtual:
 3. O protocolo é versionado.
 4. Há um ponto de saída único (`SceneSink`).
 
-Com isso, um cliente de realidade virtual (OpenXR no Bevy, ou o Unreal com o OpenXR
-nativo) só precisa ler a cena e desenhar.
+Com isso, o cliente Godot (com o OpenXR nativo para realidade virtual e aumentada) só
+precisa ler a cena e desenhar.
 
 ### Biblioteca de modelos 3D (`utsim-assets`)
 
