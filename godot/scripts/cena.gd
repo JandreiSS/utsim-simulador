@@ -37,6 +37,9 @@ var _last_label: Array = []
 var _pallets := false
 var _clips2: AnimationLibrary
 var labels_visible := true
+## Editar draws its own connections (arrows, port numbers) and floor.
+var show_connections := true
+var show_floor := true
 ## Time spent in the last `frame()` call of the bridge and in applying it, microseconds.
 var last_bridge_us := 0
 var last_apply_us := 0
@@ -48,14 +51,17 @@ static func skeletal_available() -> bool:
 	return ResourceLoader.exists(UAL1) and ResourceLoader.exists(UAL2)
 
 
-func clear() -> void:
+## Removes everything built. `keep_templates`: keep the loaded models for the next build
+## (the editor rebuilds the scene after every edit).
+func clear(keep_templates := false) -> void:
 	for c in get_children():
 		c.queue_free()
-	for t in _templates.values():
-		if t is Node:
-			(t as Node).free()
-	_templates.clear()
-	_materials.clear()
+	if not keep_templates:
+		for t in _templates.values():
+			if t is Node:
+				(t as Node).free()
+		_templates.clear()
+		_materials.clear()
 	blocks.clear()
 	rigs.clear()
 	items.clear()
@@ -75,8 +81,8 @@ func _notification(what: int) -> void:
 
 
 ## Builds everything static of `pb` (a UtsimPlayback).
-func build(pb: Object) -> void:
-	clear()
+func build(pb: Object, keep_templates := false) -> void:
+	clear(keep_templates)
 	playback = pb
 	info = pb.static_scene()
 	_pallets = info.get("pallets", false)
@@ -332,7 +338,10 @@ func _draw_lines() -> void:
 	ground.material_override = _plain(Color(0.30, 0.31, 0.32), 0.95)
 	ground.position = Vector3((lo.x + hi.x) * 0.5, -0.004, (lo.z + hi.z) * 0.5)
 	ground.name = "Piso"
-	add_child(ground)
+	if show_floor:
+		add_child(ground)
+	else:
+		ground.free()
 	var im := ImmediateMesh.new()
 	var lines := MeshInstance3D.new()
 	lines.mesh = im
@@ -352,7 +361,7 @@ func _draw_lines() -> void:
 		im.surface_add_vertex(net[k] + up)
 		im.surface_set_color(c)
 		im.surface_add_vertex(net[k + 1] + up)
-	var con: PackedInt32Array = info.get("connections", PackedInt32Array())
+	var con: PackedInt32Array = info.get("connections", PackedInt32Array()) if show_connections else PackedInt32Array()
 	var lift := Vector3(0, 0.05, 0)
 	for k in range(0, con.size() - 1, 2):
 		var a: Dictionary = blocks[con[k]]
@@ -518,6 +527,20 @@ func block_index(name: String) -> int:
 func block_focus(i: int) -> Vector3:
 	var root: Node3D = rigs[i]["root"]
 	return root.global_position + Vector3(0, (blocks[i]["size"] as Vector3).y * 0.5, 0)
+
+
+## Draws everything see-through and without shadows (the ghost of the object being placed).
+func set_ghost(opacity: float) -> void:
+	var stack: Array[Node] = [self]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is Label3D:
+			(n as Label3D).visible = false
+		elif n is GeometryInstance3D:
+			var g := n as GeometryInstance3D
+			g.transparency = 1.0 - opacity
+			g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func set_labels_visible(on: bool) -> void:
