@@ -1,0 +1,92 @@
+// Estudo de caso 3: clínica com turnos, montada com chegadas por período e calendários.
+// Tempo em minutos. Mesmo processo de modelo.ron, com três diferenças de montagem:
+//
+// 1. Uma fonte só, com a tabela de chegadas por hora do enunciado (`schedule`, 12 períodos
+//    de uma hora com a taxa de cada hora, em pacientes por minuto). Das 19h às 07h não há
+//    período: a fonte fica "fora do horário" e não cria pacientes. Em modelo.ron eram seis
+//    fontes, cada uma ligada só na sua faixa por `shifts`.
+// 2. Os três turnos (S1 07h-12h, S2 12h-17h, S3 17h-21h) são calendários do modelo
+//    (`calendars`); triagem e médicos de cada turno usam `Calendar("S1")` etc. em vez de
+//    repetir as janelas em cada objeto.
+// 3. Os calendários usam `on_end: Finish`: no fim do turno o profissional não chama mais
+//    pacientes, termina a consulta ou triagem em andamento (hora extra) e só então sai,
+//    como pede o enunciado. Com `Pause` (o padrão, como em modelo.ron) a consulta das 11h59
+//    ficaria parada até as 07h do dia seguinte.
+//
+// O teste crates/utsim-model/tests/chegadas_e_turnos.rs compara este modelo com modelo.ron.
+Model(
+    name: "Clínica com turnos (chegadas por período)",
+    description: "Pronto atendimento com uma fonte de chegadas por hora, triagem, prioridade para urgentes e três turnos em calendários",
+    run: (stop_time: 44640.0, warmup: 1440.0, seed: 2026, replications: 10),
+    calendars: {
+        // Fora de turno no resto do dia; o ciclo é de um dia (1440 min) começando às 07h.
+        "S1": (period: 1440.0, off: [(start: 300.0, duration: 1140.0)], on_end: Finish),
+        "S2": (period: 1440.0, off: [(start: 0.0, duration: 300.0), (start: 600.0, duration: 840.0)], on_end: Finish),
+        "S3": (period: 1440.0, off: [(start: 0.0, duration: 600.0), (start: 840.0, duration: 600.0)], on_end: Finish),
+    },
+    objects: [
+        // ----- Chegadas: uma fonte, taxa por hora (pacientes/h ÷ 60 = pacientes por minuto) -----
+        (name: "chegada", kind: Source(
+                // Não é usado: todos os períodos têm taxa própria (média do dia: 720 / 220).
+                interarrival: Exp(mean: 3.2727),
+                labels: { "classe": Discrete([(1.0, 0.12), (2.0, 0.88)]) },
+                on_blocked: Drop,
+                schedule: (cycle: 1440.0, periods: [
+                    (start: 0.0, end: 60.0, arrivals: Rate(0.166667)),     // 07h-08h: 10/h
+                    (start: 60.0, end: 120.0, arrivals: Rate(0.433333)),   // 08h-09h: 26/h
+                    (start: 120.0, end: 180.0, arrivals: Rate(0.433333)),  // 09h-10h: 26/h
+                    (start: 180.0, end: 240.0, arrivals: Rate(0.433333)),  // 10h-11h: 26/h
+                    (start: 240.0, end: 300.0, arrivals: Rate(0.3)),       // 11h-12h: 18/h
+                    (start: 300.0, end: 360.0, arrivals: Rate(0.2)),       // 12h-13h: 12/h
+                    (start: 360.0, end: 420.0, arrivals: Rate(0.2)),       // 13h-14h: 12/h
+                    (start: 420.0, end: 480.0, arrivals: Rate(0.366667)),  // 14h-15h: 22/h
+                    (start: 480.0, end: 540.0, arrivals: Rate(0.366667)),  // 15h-16h: 22/h
+                    (start: 540.0, end: 600.0, arrivals: Rate(0.366667)),  // 16h-17h: 22/h
+                    (start: 600.0, end: 660.0, arrivals: Rate(0.2)),       // 17h-18h: 12/h
+                    (start: 660.0, end: 720.0, arrivals: Rate(0.2)),       // 18h-19h: 12/h
+                ]),
+            ),
+            position: (0.0, 7.0, 0.0)),
+        // ----- Sala de espera da triagem: 30 lugares -----
+        (name: "sala_espera", kind: Queue(capacity: 30), position: (6.0, 7.0, 0.0)),
+        // ----- Triagem: um grupo de enfermeiros por turno -----
+        (name: "triagem_S1", kind: Processor(capacity: 3, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: Calendar("S1"), position: (12.0, 2.0, 0.0)),
+        (name: "triagem_S2", kind: Processor(capacity: 2, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: Calendar("S2"), position: (12.0, 4.0, 0.0)),
+        (name: "triagem_S3", kind: Processor(capacity: 2, process: Triangular(min: 3.278, mode: 4.9, max: 8.822)),
+            output: ByLabel("classe"), shifts: Calendar("S3"), position: (12.0, 6.0, 0.0)),
+        // ----- Filas da consulta: urgentes (classe 1) e normais (classe 2) -----
+        (name: "fila_urgente", kind: Queue(), position: (18.0, 3.0, 0.0)),
+        (name: "fila_normal", kind: Queue(), position: (18.0, 9.0, 0.0)),
+        // ----- Consultas: um grupo de médicos por turno -----
+        (name: "medicos_S1", kind: Processor(capacity: 6, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: Calendar("S1"), position: (24.0, 2.0, 0.0)),
+        (name: "medicos_S2", kind: Processor(capacity: 5, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: Calendar("S2"), position: (24.0, 4.0, 0.0)),
+        (name: "medicos_S3", kind: Processor(capacity: 4, process: PearsonV(shape: 4.8206, scale: 50.4039)),
+            shifts: Calendar("S3"), position: (24.0, 6.0, 0.0)),
+        (name: "saida", kind: Sink, position: (30.0, 6.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "sala_espera"),
+        ("sala_espera", "triagem_S1"),
+        ("sala_espera", "triagem_S2"),
+        ("sala_espera", "triagem_S3"),
+        ("triagem_S1", "fila_urgente"),   // porta 1: classe 1
+        ("triagem_S1", "fila_normal"),    // porta 2: classe 2
+        ("triagem_S2", "fila_urgente"),
+        ("triagem_S2", "fila_normal"),
+        ("triagem_S3", "fila_urgente"),
+        ("triagem_S3", "fila_normal"),
+        ("fila_urgente", "medicos_S1"),   // entra primeiro: prioridade
+        ("fila_urgente", "medicos_S2"),
+        ("fila_urgente", "medicos_S3"),
+        ("fila_normal", "medicos_S1"),
+        ("fila_normal", "medicos_S2"),
+        ("fila_normal", "medicos_S3"),
+        ("medicos_S1", "saida"),
+        ("medicos_S2", "saida"),
+        ("medicos_S3", "saida"),
+    ],
+)

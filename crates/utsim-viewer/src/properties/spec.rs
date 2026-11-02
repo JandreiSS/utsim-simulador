@@ -34,6 +34,8 @@ pub enum Widget {
     Operators,
     /// Transporter/dispatcher that carries items out of the object (`None` = instant).
     TransportRef,
+    /// Arrivals by period of a source (`None` = the default interarrival all the time).
+    Schedule,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +75,7 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("max_arrivals", "Máximo de chegadas", OptUInt),
             spec("on_blocked", "Se a saída estiver bloqueada", Choice),
             spec("labels", "Rótulos", Labels),
+            spec("schedule", "Chegadas por período", Schedule),
         ],
         ObjectKind::Queue { .. } => vec![
             spec("capacity", "Capacidade", OptUInt),
@@ -204,7 +207,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
     match key {
         "output" => return Some(ron::output(&obj.output)),
         "downtime" => return Some(ron::option(&obj.downtime, ron::downtime)),
-        "shifts" => return Some(ron::option(&obj.shifts, ron::shifts)),
+        "shifts" => return Some(ron::option(&obj.shifts, ron::shift_spec)),
         "transport" => return Some(ron::option(&obj.transport, |t| ron::string(t))),
         "transfer" => return Some(ron::option(&obj.transfer, ron::transfer)),
         "on_entry" => return Some(ron::option(&obj.on_entry, |s| ron::string(s))),
@@ -245,6 +248,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         }
         (ObjectKind::Source { labels, .. }, "labels") => ron::labels(labels),
         (ObjectKind::Source { on_blocked, .. }, "on_blocked") => ron::debug(on_blocked),
+        (ObjectKind::Source { schedule, .. }, "schedule") => ron::option(schedule, ron::schedule),
         (ObjectKind::Queue { capacity, .. }, "capacity") => {
             ron::option(capacity, |v| v.to_string())
         }

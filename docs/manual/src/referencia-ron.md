@@ -23,6 +23,7 @@ Model(
     name: "Meu modelo",
     description: "Texto livre",
     run: (stop_time: 1000.0),
+    calendars: { "S1": (period: 1440.0, off: [...]) },
     objects: [ ... ],
     connections: [ ... ],
     network: Some((...)),
@@ -38,6 +39,7 @@ Model(
 | `name` | obrigatório | nome do modelo |
 | `description` | `""` | descrição |
 | `run` | obrigatório | configurações da rodada |
+| `calendars` | `{}` | calendários de turno com nome (mapa de nome para tabela de turnos), usados com `shifts: Calendar("nome")` |
 | `objects` | obrigatório | lista de objetos. Um modelo vazio (sem objetos, fluxos nem fluidos) é recusado |
 | `connections` | `[]` | pares `(origem, destino)`. A ordem define portas e prioridades |
 | `network` | nenhuma | rede de caminhos para recursos móveis |
@@ -71,7 +73,7 @@ Model(
 | `output` | `FirstAvailable` | `FirstAvailable`, `RoundRobin`, `Random`, `ByLabel("r")`, `Weighted([..])` ou `Script("..")` |
 | `position` | `(0.0, 0.0, 0.0)` | `(x, y, z)` |
 | `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)` |
-| `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...])` |
+| `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...], on_end: Pause)` ou `Calendar("nome")` (veja abaixo) |
 | `transport` | nenhum | nome de um `Transporter` ou `Dispatcher` que leva os itens que saem do objeto |
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |
 | `on_entry` | nenhum | script executado na entrada de cada item |
@@ -93,6 +95,17 @@ transfer: (speed: 1.0, delay: 0.5, path: Straight)
 
 Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md).
 
+### `shifts`
+
+| Forma | Significado |
+|---|---|
+| `(period: n, off: [(start: n, duration: n), ...])` | janelas fora de turno no próprio objeto |
+| `(period: n, off: [...], on_end: Finish)` | o mesmo, terminando o trabalho em andamento no fim do turno |
+| `Calendar("nome")` | usa o calendário `nome` de `calendars`, com o `on_end` dele |
+| `Calendar("nome", Finish)` ou `(calendar: "nome", on_end: Finish)` | usa o calendário com outro `on_end` |
+
+`on_end`: `Pause` (padrão; o trabalho congela e continua quando o turno volta) ou `Finish` (fecha a entrada, termina o trabalho em andamento e só então sai de turno). Também valem `ao_fim_do_turno`, `Pausar`, `Terminar` e `Calendario`. Veja [Quebras e turnos](quebras-e-turnos.md).
+
 ### `visual`
 
 | Campo | Padrão | Significado |
@@ -113,6 +126,9 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `max_arrivals` | sem limite |
 | `labels` | `{}` (mapa de nome para `Dist`) |
 | `on_blocked` | `Wait` (ou `Drop`) |
+| `schedule` | nenhuma: `(cycle: n, periods: [(start: n, end: n, arrivals: ..., labels: {...}), ...])` |
+
+Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
 
 ### `Queue`
 
@@ -259,6 +275,8 @@ Tipos de nó: `Source(rate)`, `Tank(capacity, initial: 0, max_in: nenhum, max_ou
 | `scenarios` | obrigatório: `(name, set)`, com `set` padrão `{}` |
 | `measures` | `[]` (todas) |
 
+Chaves de `set` além de `<objeto>.<campo>` e `run.<campo>`: `<fonte>.schedule.cycle`, `<fonte>.schedule[n]` e `<fonte>.schedule[n].start`, `.end`, `.arrivals`, `.rate`, `.interarrival`, `.labels` (períodos contados a partir de 1); `<objeto>.shifts.on_end`; `calendars.<nome>` (a tabela inteira, ou `None` para apagar) e `calendars.<nome>.on_end`.
+
 ## Arquivo de otimização (`OptProblem`)
 
 | Campo | Padrão |
@@ -285,6 +303,8 @@ Domínios: `Integer(min, max, step: 1)`, `Continuous(min, max, template: "{x}", 
 - conexão para objeto que não existe;
 - parâmetros fora do limite (`Exp exige mean > 0`);
 - `Combiner` com número de entradas errado;
+- períodos de `schedule` fora do ciclo, fora de ordem ou com taxa menor ou igual a 0;
+- `shifts: Calendar("x")` com um calendário que não existe;
 - `transport` apontando para algo que não é `Transporter` nem `Dispatcher`;
 - usar `transport` e `transfer` no mesmo objeto;
 - rede de caminhos em que algum nó não alcança os outros;

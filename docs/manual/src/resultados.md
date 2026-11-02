@@ -241,3 +241,14 @@ Experimentos, otimização e testes referem-se às métricas por nome, no format
 ## Quanto confiar em um modelo
 
 Um bom hábito é a **validação**: compare a simulação com algo que você conhece. Pode ser uma fórmula (como a de uma fila M/M/1 no tutorial 01), pode ser um dado real da fábrica (vazão por turno, tempo de atravessamento). Se o modelo não reproduz o que já se mede, não use-o para prever o que ainda não se mede.
+
+### Gargalo geral e dentro do turno
+
+O UTSim mostra dois gargalos:
+
+- **Geral:** o recurso com a maior ocupação no tempo todo.
+- **Dentro do turno:** o recurso com a maior ocupação contando só o tempo em que ele está
+  trabalhando no turno. Um posto que funciona meio dia pode parecer folgado no geral e estar
+  saturado enquanto funciona; esse segundo critério mostra isso.
+
+Quando todos os recursos têm os mesmos turnos, os dois costumam apontar o mesmo objeto.
