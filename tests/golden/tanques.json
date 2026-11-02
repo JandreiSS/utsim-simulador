@@ -14,6 +14,7 @@
       "descarga.input": 506.0,
       "descarga.output": 0.0,
       "descarga.staytime.mean": 0.0,
+      "descarga.time_in_system.count": 506.0,
       "descarga.time_in_system.mean": 0.0,
       "events": 13369.0,
       "expedicao.content.max": 1.0,
@@ -21,6 +22,7 @@
       "expedicao.input": 6064.0,
       "expedicao.output": 0.0,
       "expedicao.staytime.mean": 0.0,
+      "expedicao.time_in_system.count": 6064.0,
       "expedicao.time_in_system.mean": 0.20000000000001522,
       "fila_garrafas.content.max": 1.0,
       "fila_garrafas.content.mean": 0.0,
@@ -51,10 +53,17 @@
       "rotuladora.content.mean": 0.6382910526440945,
       "rotuladora.input": 6063.0,
       "rotuladora.output": 6064.0,
+      "rotuladora.servers.blocked": 0.0,
+      "rotuladora.servers.busy": 0.6382910526440945,
+      "rotuladora.servers.capacity": 1.0,
       "rotuladora.state.blocked": 0.0,
       "rotuladora.state.idle": 0.3617089473559055,
       "rotuladora.state.processing": 0.6382910526440945,
-      "rotuladora.staytime.mean": 0.20000000000001522
+      "rotuladora.staytime.mean": 0.20000000000001522,
+      "rotuladora.utilization": 0.6382910526440945,
+      "rotuladora.utilization_excl_blocked": 0.6382910526440945,
+      "rotuladora.utilization_in_shift": 0.6382910526440945,
+      "rotuladora.utilization_incl_blocked": 0.6382910526440945
     },
     {
       "caminhoes.content.max": 1.0,
@@ -69,6 +78,7 @@
       "descarga.input": 466.0,
       "descarga.output": 0.0,
       "descarga.staytime.mean": 0.0,
+      "descarga.time_in_system.count": 466.0,
       "descarga.time_in_system.mean": 0.0,
       "events": 12486.0,
       "expedicao.content.max": 1.0,
@@ -76,6 +86,7 @@
       "expedicao.input": 5586.0,
       "expedicao.output": 0.0,
       "expedicao.staytime.mean": 0.0,
+      "expedicao.time_in_system.count": 5586.0,
       "expedicao.time_in_system.mean": 0.20000000000001705,
       "fila_garrafas.content.max": 1.0,
       "fila_garrafas.content.mean": 0.0,
@@ -106,10 +117,17 @@
       "rotuladora.content.mean": 0.5880983725037102,
       "rotuladora.input": 5586.0,
       "rotuladora.output": 5586.0,
+      "rotuladora.servers.blocked": 0.0,
+      "rotuladora.servers.busy": 0.5880983725037102,
+      "rotuladora.servers.capacity": 1.0,
       "rotuladora.state.blocked": 0.0,
       "rotuladora.state.idle": 0.41190162749628983,
       "rotuladora.state.processing": 0.5880983725037102,
-      "rotuladora.staytime.mean": 0.20000000000001705
+      "rotuladora.staytime.mean": 0.20000000000001705,
+      "rotuladora.utilization": 0.5880983725037102,
+      "rotuladora.utilization_excl_blocked": 0.5880983725037102,
+      "rotuladora.utilization_in_shift": 0.5880983725037102,
+      "rotuladora.utilization_incl_blocked": 0.5880983725037102
     }
   ]
 }

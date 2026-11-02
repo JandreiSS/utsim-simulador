@@ -224,7 +224,8 @@ A aba **Otimização** da janela Resultados monta o mesmo problema pela interfac
 
 ### Limitações
 
-- As métricas `<bloco>.lost.*` ainda não servem como objetivo (só `.mean` é exposto e vale sempre 1). Para contar clientes perdidos, use a vazão (por exemplo, `saida.input`) como restrição ou como termo do objetivo.
+- Para perdas, use `<fonte>.lost.count` (itens perdidos), `<fonte>.loss_fraction` (perdidos sobre perdidos mais entrados) ou os totais `model.lost.count` e `model.loss_fraction`, que valem como objetivo e como restrição (por exemplo, `model.loss_fraction` com máximo `0.02`). A média `<fonte>.lost.mean` vale sempre 1 e não serve.
+- A ocupação também tem nome estável: `<objeto>.utilization`, `<objeto>.utilization_in_shift`, `<objeto>.utilization_excl_blocked` e `<objeto>.utilization_incl_blocked`, e o tempo entre dois pontos do fluxo (`spans`) vira `<medicao>.value.mean`. Veja [Resultados e estatística](resultados.md).
 - A otimização só mexe em valores numéricos ou de lista que o `set` consegue escrever. Não cria objetos novos.
 
 O [tutorial 06](tutoriais/06-experimento-e-otimizacao.md) usa as duas ferramentas no mesmo modelo.

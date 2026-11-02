@@ -11,8 +11,20 @@ O [tutorial 05](tutoriais/05-ajuste.md) percorre um caso completo.
 ## Que dados servem
 
 - Arquivo **CSV** ou **TXT**, com separador `,`, `;` ou tabulação. O cabeçalho e a vírgula decimal são detectados sozinhos.
-- Por padrão o programa usa a **primeira coluna numérica**. Para escolher outra, use `--coluna nome` ou `--coluna 3` (posição a partir de 1).
-- Se a coluna traz **instantes crescentes** (a hora de cada chegada, por exemplo), use `--timestamps`: o ajuste é feito sobre os intervalos entre eles. Cuidado: se o arquivo tem uma coluna de numeração antes do instante, indique a coluna certa com `--coluna`, senão o programa usa a numeração (1, 2, 3...) e acha que todos os intervalos valem 1.
+- Para escolher a coluna, use `--coluna nome` ou `--coluna 3` (posição a partir de 1). Quando você nomeia a coluna, o programa usa exatamente ela.
+- Sem `--coluna`, o programa escolhe sozinho e **diz qual escolheu e por quê** (uma linha `coluna: ...` antes do relatório). Ele **pula as colunas de numeração**: uma coluna de inteiros que começa em 0 ou 1 e sobe de 1 em 1 (a numeração das linhas), ou uma coluna cujo cabeçalho é `n`, `id`, `#`, `índice`, `item`, `linha`, `seq`, `ordem`, `amostra` e parecidos. Antes, o `utsim fit` ajustava essa numeração e devolvia algo sem sentido, como `Uniform(1, 250)`.
+- Se, depois de pular a numeração, ainda sobrar **mais de uma coluna numérica plausível**, o programa não chuta: para com um erro que lista as colunas (`1 ('espera'), 2 ('servico')`) e pede `--coluna`. Se sobrar uma só, ela é usada.
+- Se a única coluna numérica parece numeração (um arquivo só com 1, 2, 3...), ela é usada mesmo assim, com um aviso: confira se são mesmo os dados.
+- Se a coluna traz **instantes crescentes** (a hora de cada chegada, por exemplo), use `--timestamps`: o ajuste é feito sobre os intervalos entre eles. Com `--timestamps`, o programa procura a coluna de **instantes que nunca diminuem**, ignorando a numeração. Se houver duas colunas assim, vence a que tem no cabeçalho um nome de instante (`instante`, `hora`, `chegada`, `timestamp`...); se ainda restar dúvida, ele pede `--coluna`. Se nenhuma coluna cresce, o erro diz isso.
+
+Exemplo, com um arquivo `medida;tempo_s` (numeração e depois os tempos):
+
+```text
+$ utsim fit tempos_calibracao.csv
+coluna: usando 'tempo_s' (é a única coluna numérica que não parece numeração)
+coluna: ignorada por parecer numeração: 'medida'
+Ajuste de distribuições: tempos_calibracao.csv (tempo_s)
+```
 
 Quanto mais dados, melhor. Com menos de 30 observações os testes têm pouca força; com 100 ou mais, o ajuste fica confiável.
 
@@ -20,7 +32,7 @@ Quanto mais dados, melhor. Com menos de 30 observações os testes têm pouca fo
 
 | Opção | Significado |
 |---|---|
-| `--coluna <nome ou n>` | coluna a usar |
+| `--coluna <nome ou n>` | coluna a usar (sem ela, o programa escolhe, pulando a numeração, e explica a escolha) |
 | `--timestamps` | a coluna são instantes; ajusta os intervalos |
 | `--alpha 0.05` | nível de significância dos testes (padrão 0,05) |
 | `--bootstrap 300` | réplicas do bootstrap paramétrico para os p-valores (padrão 300) |
