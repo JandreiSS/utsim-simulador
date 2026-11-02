@@ -931,6 +931,171 @@ A janela **Resultados** do `utsim-view` roda replicações, cenários e otimiza�
 - `utsim-viewer::results` (biblioteca, sem egui): configurações da rodada, ordenação e filtro da tabela, dados dos gráficos (cores de estado de `style::state_color`), cenários montados das linhas da grade, problema de otimização montado do formulário e o comando de "Aplicar ao modelo" (um `Command::Batch` de `Set`, um passo de desfazer).
 - `results_panel.rs` (binário): a janela, com os gráficos em `egui_plot` 0.37 (a versão feita para o egui 0.36 do `bevy_egui` 0.43). Os trabalhos rodam numa thread no aplicativo de mesa e no próprio quadro no navegador; o progresso volta por um canal e "Cancelar" liga um `AtomicBool`. Arquivos (CSV, HTML, experimento `.ron`) só no aplicativo de mesa.
 
+## 4r. Interface Godot (fase G1: ponte e reprodução)
+
+A interface 3D da versão 0.2 (e depois a realidade virtual e aumentada) é feita no Godot 4.7.
+O editor e visualizador Bevy (`utsim-viewer`) continua sendo o da versão 0.1. O Godot não
+reimplementa nada da simulação nem da cena: uma biblioteca em Rust, carregada como
+GDExtension, roda o modelo e entrega ao GDScript os mesmos quadros que o `utsim cena` grava.
+O plano das fases G1 a G5 está em `docs/plano_godot.md`.
+
+**Ponte** (`crates/utsim-godot`, biblioteca `cdylib` com o godot-rust gdext, crate `godot`
+0.5.5 com a feature `api-4-7`). Fica fora de `default-members` e dos passos do
+`verificar.sh` sem `UTSIM_GODOT=1`. Só as classes do núcleo do Godot são geradas (sem
+`__codegen-full`), porque a ponte devolve dados simples e todo nó é criado no GDScript; o
+build da ponte leva cerca de 1 min. Duas classes, ambas `RefCounted`:
+
+| Classe | Métodos |
+|---|---|
+| `UtsimModel` | `load(caminho)` lê e valida o `.ron` e devolve `{ok, errors, warnings, name, objects, replications, stop_time}`; `run(n)` roda `n` replicações em paralelo e devolve `{ok, replications, metrics}`, com `metrics["bloco.métrica"] = {mean, half_width, std_dev, n}` (os números do `utsim run`); `playback(rep, pessoas_animadas)` grava o replay de uma replicação e devolve um `UtsimPlayback` (ou `null`, com `last_error()`) |
+| `UtsimPlayback` | `static_scene()` (uma vez), `frame(t)` (a cada quadro), `end()`, `next_event(t)`, `prev_event(t)`, `glb(chave)`, `person_clips()`, `set_clip_durations(...)` |
+
+O núcleo da ponte não tem tipos do Godot e é testado sem o motor (`cargo test -p utsim-godot`):
+
+- `coords`: conversão de coordenadas, com testes;
+- `looks`: escolha do modelo de cada entidade e regras dos clipes, das cargas e das luzes,
+  portadas de `crates/utsim-viewer/src/visual.rs`, porque o `utsim-viewer` traz o Bevy junto;
+- `catalogue`: catálogo de terceiros;
+- `playback`: a `Scene` e o empacotamento dos quadros.
+
+**Fluxo de dados:**
+
+1. O GDScript chama `UtsimModel.load` e `run`; a simulação e as replicações rodam no Rust.
+2. `playback(0, ...)` grava o rastro da replicação 0 e monta a `Scene` com o modelo
+   (`SceneOptions.model`), como o `utsim cena` faz.
+3. `static_scene()` devolve um dicionário: blocos com nome, tipo, papel, posição da base,
+   tamanho, forma simples e, quando há modelo realista, o ativo (`{source, name, key, path}`),
+   a escala, o giro, o deslocamento, a cor, o modo de carregar (`forks`, `hands`, `deck`) e se
+   é o boneco animado. Também a rede de caminhos, as ligações, os nós de fluido e os limites.
+4. `frame(t)` devolve arrays empacotados (`PackedVector3Array`, `PackedFloat32Array`,
+   `PackedInt32Array`, `PackedColorArray`), um elemento por bloco e um por item desenhado:
+   - por bloco: `position`, `yaw`, `lift`, `motion` (código), `param` (velocidade ou
+     progresso), `color` (cor do estado, ou a luz do AGV pelo movimento), `rolled`
+     (distância andada sobre a escala, para as rodas), `clip` e `clip_time` (pessoas),
+     `label`;
+   - por item: `item_id`, `item_position`, `item_yaw`, `item_scale`, `item_color`,
+     `item_carrier` e `item_stack`.
+
+   Não há um dicionário por entidade, então o custo cresce pouco com centenas de itens.
+5. O GDScript (`godot/scripts/cena.gd`) só move as raízes dos recursos móveis e os nós
+   articulados, e troca cores e rótulos quando mudam.
+
+**Coordenadas:** toda posição sai da ponte já no espaço do Godot: o `(x, y, z)` do modelo (Z
+para cima) vira `(x, z, -y)` (Y para cima), em metros, e o `yaw` vira rotação em torno de `+Y`
+(um rumo `(cos, sin, 0)` vira `(cos, 0, -sin)`, que é `Basis(UP, yaw) * RIGHT`). É a mesma
+conversão do Bevy, porque os dois motores usam Y para cima com a mão direita; por isso o espaço
+de layout interno da `utsim-scene` (`layout::to_bevy`) já é o espaço do Godot, e os testes de
+`coords` conferem as duas coisas.
+
+**O que a ponte calcula e o que o GDScript faz:**
+
+- **Ponte:** a pose desenhada de cada móvel, como o `models::drawn_pose` do Bevy (veículos
+  fora das máquinas, operador na frente do posto); onde fica cada carga (nos garfos, no
+  deque do AGV, nas mãos, no chão da área da fila); o clipe e o tempo dentro dele (andar,
+  correr, andar carregando, pegar, trabalhar, parado segurando a caixa), com a passada
+  medida de `people.rs`, de modo que o pé não desliza; a cor da luz.
+- **GDScript:** aplica os números aos nós com nome da biblioteca:
+  - `carro` na altura `lift` (garfos);
+  - rodas `roda*` com o ângulo `-(rolled / raio)`;
+  - material próprio no nó `luz`, com emissão.
+
+  O boneco (`godot/scripts/pessoa.gd`) usa uma `AnimationTree` em modo manual: dois espaços
+  (o clipe que entra e o que sai, com transição de 0,25 s de tempo real), cada um com um
+  `TimeSeek` e uma camada filtrada de tronco e braços para "parado segurando a caixa". Os
+  clipes do segundo arquivo (`pessoa_operador_carga`) entram como a biblioteca de animações
+  `ual2`; os caminhos das trilhas são iguais nos dois arquivos. O item carregado vai para o
+  ponto médio dos ossos `hand_l` e `hand_r`. O importador do Godot tira o sufixo `_Loop` dos
+  clipes cíclicos (`Idle_Loop` vira `Idle`), e `pessoa.gd` resolve os dois nomes.
+
+**Ativos:**
+
+- **Biblioteca com parâmetros padrão:** os `.glb` de `assets/modelos/` são importados pelo
+  Godot.
+- **Biblioteca com tamanho próprio:** um porta-paletes com seus vãos e níveis, ou uma esteira
+  do seu comprimento, é gerado pela ponte com o `utsim-assets` (`UtsimPlayback.glb(chave)`, os
+  mesmos bytes que o Bevy gera em memória) e carregado com `GLTFDocument` em tempo de
+  execução.
+- **Boneco animado:** os arquivos UAL de `assets/terceiros/quaternius_ual*` são importados.
+- **Outros itens do catálogo e arquivos do usuário** (`visual.asset` com `.glb`): lidos do
+  disco com `GLTFDocument`.
+
+**Compartilhamento dos `.glb`:** o `scripts/godot.sh` copia os arquivos para
+`godot/importados/` (fora do git) e roda `godot --headless --import`. Os `.import` e o cache
+ficam no projeto Godot, e `assets/` continua só com os originais. Foi escolhida a cópia em vez
+de link simbólico ou junção porque funciona igual no Windows sem permissão de administrador e
+no Linux, e o Godot não suja `assets/` com arquivos `.import`. Os originais continuam a única
+fonte: rodar o script de novo atualiza as cópias.
+
+**Projeto** (`godot/`):
+
+- `project.godot`: Forward+, OpenXR configurado e desligado, pronto para a fase G4;
+- `utsim.gdextension`: Windows `bin/utsim_godot.dll`, Linux `bin/libutsim_godot.so`;
+- `cenas/principal.tscn` com `scripts/principal.gd`, que monta tudo em código:
+  - luz direcional com sombras em quatro cascatas, dimensionadas pela cena;
+  - ambiente com a cor de fundo do Bevy, piso cinza e a grade do Bevy (cerca de 40 células,
+    passo de 1, 2 ou 5 × 10^k m);
+  - câmera de órbita (`camera_orbita.gd`), com as convenções do `OrbitCam` do Bevy;
+  - painel: abrir modelo (FileDialog), replicações, "Simular", lista de blocos (clique foca a
+    câmera), rótulos, sombras e resumo dos resultados;
+  - barra de reprodução: reproduzir ou pausar, velocidade, linha do tempo, evento anterior e
+    seguinte.
+
+**Como compilar e rodar:**
+
+```bash
+bash scripts/godot.sh            # ponte (debug), cópias dos .glb e importação
+bash scripts/godot.sh --release  # ponte otimizada
+bash scripts/godot.sh --abrir    # e abre o projeto no Godot (F5 roda)
+bash scripts/godot_teste.sh      # teste sem janela: extensão, 3 exemplos até o fim
+```
+
+O executável do Godot vem de `GODOT`, de `godot` no `PATH` ou de `~/Documents/Godot_v4.7*`.
+Os modelos de exportação do Godot só entram na fase G5.
+
+**Teste sem janela** (`godot/testes/teste.gd`): confere que a extensão registrou as duas
+classes e que cada modelo carrega, roda duas replicações, monta a cena (com quantos blocos
+têm modelo e quantas pessoas animadas) e é reproduzido do início ao fim em 400 passos. Falha
+se um recurso móvel nunca sai do lugar, se nenhum item aparece, se uma pessoa ficou sem
+animação ou se o Godot imprimir um erro.
+
+**Capturas roteirizadas** (o autoload `godot/scripts/roteiro.gd`), para o controle visual:
+
+```bash
+godot --path godot -- --utsim-roteiro=roteiros/capturas.json --utsim-capturas=<pasta>
+```
+
+O roteiro JSON lista modelos e, para cada um:
+
+- capturas: instante, nome e, opcional, `focar` com os números do passo `Focar` dos roteiros
+  do Bevy (objeto, distância, giro, inclinação), o que permite comparar as mesmas vistas;
+- uma medida opcional: reproduz por alguns segundos e grava os tempos em `log.txt`.
+
+**Custo por quadro** (médias de duas rodadas do roteiro de capturas, reproduzindo 4 s; ponte em
+debug, RTX 4070 Ti, sincronismo vertical em 144 Hz):
+
+| Modelo | `frame(t)` na ponte | aplicar no GDScript | quadros por segundo |
+|---|---|---|---|
+| `centro_de_distribuicao.ron` | 0,17 a 0,57 ms | 0,19 a 0,62 ms | 125 a 145 |
+| `agvs.ron` | 0,20 a 0,46 ms | 0,08 a 0,16 ms | 139 a 145 |
+| `pessoas_carregando.ron` | 0,18 a 0,21 ms | 0,25 a 0,28 ms | 145 |
+
+No teste sem janela (sem desenhar, 401 saltos pelo replay inteiro), a média é de 0,07 a 0,44 ms
+na ponte e de 0,04 a 1,3 ms no GDScript; o maior valor é o do centro de distribuição, em que cada
+salto cria e apaga muitos nós de itens (palete com oito caixas), coisa que a reprodução contínua
+quase não faz.
+
+**Lacunas da G1:**
+
+- as regras de aparência estão duplicadas entre `utsim-viewer/src/visual.rs` e
+  `utsim-godot/src/looks.rs` (a G2 deve mover as regras puras para uma crate sem Bevy);
+- o `operador_simples` (sem o boneco) não mexe braços e pernas no Godot;
+- os nós de fluido são cilindros simples, sem nível;
+- os rótulos não têm o limite por distância do Bevy (A3D-4);
+- só há a câmera de órbita;
+- o replay é sempre o da replicação 0;
+- `run` bloqueia o quadro enquanto as replicações rodam (a G2 deve usar uma thread com
+  progresso).
+
 ## 5. Estatísticas
 
 Coletadas automaticamente pelo motor para todo bloco:
