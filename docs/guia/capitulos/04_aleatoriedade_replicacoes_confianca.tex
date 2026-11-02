@@ -1,0 +1,127 @@
+\chapter{Aleatoriedade, replicações e confiança}
+\label{cap-aleatoriedade}
+
+\epigrafe{Uma rodada é uma observação. Só várias rodadas dizem quanto confiar nela.}{}
+
+Os tempos de um processo real quase nunca são fixos. Duas peças iguais levam tempos diferentes na mesma máquina, e os clientes não chegam em intervalos regulares. Para reproduzir esse comportamento, o modelo não usa um número único para cada tempo. Ele usa uma distribuição de probabilidade e, a cada vez que precisa de um tempo, sorteia um valor dela.
+
+Como os valores são sorteados, o resultado de uma rodada da simulação depende da sorte dos sorteios. Uma rodada isolada mostra uma possibilidade entre muitas, e tirar conclusões dela seria o mesmo que decidir pela medida de um único dia de produção. A solução é repetir a simulação várias vezes, com sorteios independentes, e resumir os resultados com uma média e uma medida de incerteza.
+
+Este capítulo apresenta as ideias que tornam isso possível. Primeiro as distribuições e as sementes, depois as replicações, o aquecimento e o intervalo de confiança de 95\%. Ao final, a lei de Little aparece como uma conferência simples de qualquer relatório. O tratamento estatístico completo pode ser lido em \textcite{law2015}.
+
+\section{Distribuições e sementes}
+
+No arquivo do modelo, um tempo é escrito com o nome da distribuição e seus parâmetros. A distribuição exponencial, por exemplo, serve de ponto de partida para o tempo entre chegadas de clientes independentes. A uniforme descreve um tempo que varia entre um mínimo e um máximo. A constante descreve um tempo fixo, como um ciclo automático. A triangular permite descrever um tempo com apenas três números, o menor, o mais comum e o maior, quando não há dados medidos.
+
+Os números aleatórios vêm de um gerador determinístico, que parte de uma semente. Com a mesma semente, a sequência de sorteios é idêntica, e o resultado da simulação se repete exatamente. Isso é uma vantagem, porque permite reproduzir um resultado e comparar cenários. No UTSim, cada objeto tem o seu próprio gerador, derivado da semente, da replicação e da posição do objeto. Alterar o tempo de uma máquina não muda os sorteios dos outros objetos, e é isso que torna a comparação entre cenários justa.
+
+\section{Replicações}
+
+\begin{definicao}{Replicação}
+Uma execução completa da simulação, do tempo 0 até o tempo de parada, com sorteios independentes das outras execuções. O resultado de cada replicação é uma observação da medida de interesse.
+\end{definicao}
+
+O UTSim executa um número configurável de replicações, em paralelo, e calcula a média das medidas entre elas. Quanto mais replicações, mais a média se estabiliza, e mais estreito fica o intervalo que expressa a incerteza. A Figura~\ref{fig-replicacoes} mostra o princípio. Cada ponto é o resultado de uma replicação e a linha é a média acumulada. A faixa em torno da média é o intervalo de confiança, que estreita à medida que as replicações se acumulam. Os valores do esquema são ilustrativos.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1.15cm,y=1.35cm]
+  % eixos
+  \draw[eixo] (0.3,1.2) -- (0.3,5.2) node[above,font=\footnotesize] {medida};
+  \draw[eixo] (0.3,1.2) -- (11,1.2) node[right,font=\footnotesize] {replicações};
+  \foreach \n in {1,2,...,10}{
+    \draw (\n,1.2) -- (\n,1.12);
+    \node[font=\footnotesize,text=inkgray] at (\n,0.9) {\n};
+  }
+  % faixa do intervalo (n = 2 a 10)
+  \fill[light!35] (2,4.67) -- (3,4.34) -- (4,4.275) -- (5,4.06) -- (6,4.06) -- (7,4.01)
+    -- (8,3.93) -- (9,3.88) -- (10,3.86) -- (10,2.72) -- (9,2.68) -- (8,2.65) -- (7,2.65)
+    -- (6,2.60) -- (5,2.46) -- (4,2.475) -- (3,2.26) -- (2,2.13) -- cycle;
+  % média acumulada
+  \draw[primary,very thick] (1,2.9) -- (2,3.4) -- (3,3.3) -- (4,3.375) -- (5,3.26)
+    -- (6,3.33) -- (7,3.33) -- (8,3.29) -- (9,3.28) -- (10,3.29);
+  % valores das replicações
+  \foreach \n/\v in {1/2.9,2/3.9,3/3.1,4/3.6,5/2.8,6/3.4,7/3.3,8/3.0,9/3.2,10/3.4}{
+    \fill[accent] (\n,\v) circle (2.2pt);
+  }
+  % legenda
+  \fill[accent] (7.2,5.05) circle (2.2pt) node[right=3pt,font=\footnotesize,text=inkgray] {replicação};
+  \draw[primary,very thick] (7.2,4.75) -- (7.6,4.75) node[right=2pt,font=\footnotesize,text=inkgray] {média acumulada};
+  \fill[light!35] (7.2,4.4) rectangle (7.6,4.6);
+  \node[right=2pt,font=\footnotesize,text=inkgray] at (7.6,4.5) {intervalo de 95\%};
+\end{tikzpicture}
+\caption{Replicações de uma medida. Cada ponto é o resultado de uma replicação, a linha é a média acumulada e a faixa é o intervalo de confiança de 95\%, que se estreita com o número de replicações.}
+\label{fig-replicacoes}
+\end{figure}
+
+\section{O aquecimento}
+
+No início da rodada, o sistema está vazio. Esse estado inicial não representa a rotina da fábrica, e as primeiras observações puxam as médias para baixo. Para evitar esse viés, o modelo pode definir um período de aquecimento, durante o qual a simulação roda normalmente mas as medições são descartadas. A contagem das estatísticas só começa no instante do aquecimento, e os itens que já estavam no sistema continuam lá.
+
+Nem todo modelo precisa de aquecimento. Um turno de trabalho que começa vazio e termina vazio deve ser medido desde o começo, porque o início faz parte do que se quer observar. Já um sistema contínuo, que opera sem parar, precisa de um aquecimento suficiente para sair do estado vazio. A Figura~\ref{fig-aquecimento} mostra a ideia numa série do número de itens na fila.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.9cm,y=0.9cm]
+  \draw[eixo] (0,0) -- (0,3.6) node[above,font=\footnotesize] {itens na fila};
+  \draw[eixo] (0,0) -- (11,0) node[right,font=\footnotesize] {$t$};
+  \fill[accent!20] (0,0) rectangle (3,3.4);
+  \node[rotulo] at (1.5,3.0) {aquecimento\\(descartado)};
+  \draw[primary,thick] (0,0.1) .. controls (0.7,0.5) and (1.4,1.5) .. (2,1.6)
+    .. controls (2.5,1.7) and (2.8,2.0) .. (3.2,2.1)
+    -- (3.6,1.8) -- (4.1,2.3) -- (4.6,1.9) -- (5.2,2.4) -- (5.7,2.0) -- (6.3,2.2)
+    -- (6.9,1.8) -- (7.4,2.3) -- (8,2.0) -- (8.6,2.2) -- (9.2,1.9) -- (10,2.1);
+  \draw[tracejada] (3,0) -- (3,3.4);
+  \node[rotulo] at (6.5,0.5) {estatísticas contadas};
+  \draw[decorate,decoration={brace,amplitude=4pt,mirror},color=inkgray] (3.1,-0.15) -- (10,-0.15);
+\end{tikzpicture}
+\caption{Série do conteúdo de uma fila. O trecho inicial, em que o sistema sai do estado vazio, é descartado, e as estatísticas valem a partir do fim do aquecimento.}
+\label{fig-aquecimento}
+\end{figure}
+
+Um teste prático é rodar duas vezes com aquecimentos diferentes e comparar os resultados. Se não mudarem, o aquecimento é suficiente.
+
+\section{O intervalo de confiança de 95\%}
+
+O UTSim apresenta cada número como uma média seguida de uma meia-amplitude, na forma $\text{média} \pm \text{meia-amplitude}$. A meia-amplitude é calculada a partir das replicações pela expressão
+
+\begin{equation}
+h = t_{n-1}\,\frac{s}{\sqrt{n}},
+\end{equation}
+
+em que $n$ é o número de replicações, $s$ é o desvio padrão das observações e $t_{n-1}$ é o valor da distribuição t de Student para $n-1$ graus de liberdade. Com 10 replicações esse valor é 2,262. Com uma única replicação não há como calcular o intervalo, e o programa mostra apenas a média.
+
+A interpretação usual é a seguinte. Se o experimento fosse repetido muitas vezes, em cerca de 95\% delas o intervalo calculado cobriria o valor verdadeiro. Na prática, o valor verdadeiro provavelmente está dentro do intervalo. Como a meia-amplitude diminui com a raiz de $n$, reduzi-la à metade exige quadruplicar o número de replicações. Uma meta comum é obter uma meia-amplitude de 5\% da média ou menos.
+
+Um exemplo vem de uma fila de um servidor cuja teoria é conhecida, com taxa de chegada 1 e taxa de serviço 1,25. A teoria dá 3,2 itens na fila. Com 10 replicações, o UTSim informa $3{,}2147 \pm 0{,}1019$, e o valor teórico está dentro do intervalo. Esse tipo de conferência contra uma fórmula conhecida é a forma mais direta de validar o motor.
+
+\section{A lei de Little como conferência}
+
+\begin{definicao}{Lei de Little}
+Em regime estável, o número médio de itens num sistema é igual à taxa média de chegada multiplicada pelo tempo médio que cada item passa nele, isto é, $L = \lambda W$. A relação foi demonstrada por \textcite{little1961} e vale para o sistema todo ou para qualquer parte dele.
+\end{definicao}
+
+A lei fornece uma verificação independente de qualquer relatório. No exemplo de um caixa em que chega um cliente a cada 5 minutos, a taxa é $\lambda = 0{,}2$ por minuto. A Tabela~\ref{tab-little} compara o produto $\lambda W$ com o conteúdo médio informado pelo relatório.
+
+\begin{table}[ht]
+\centering
+\caption{Conferência pela lei de Little num caixa com $\lambda = 0{,}2$ cliente por minuto.}
+\label{tab-little}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Parte do sistema} & \textbf{Permanência $W$ (min)} & \textbf{$\lambda W$} & \textbf{Conteúdo $L$} \\
+\midrule
+Fila    & 16,54 & 3,31 & 3,31 \\
+Caixa   & 4,01  & 0,80 & 0,80 \\
+Sistema & 20,55 & 4,11 & 4,11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Se a conta não fecha, algo está errado. As causas mais comuns são um aquecimento curto demais, um sistema instável ou um erro de modelagem. Um sistema é instável quando a taxa de chegada supera a capacidade de atendimento. Nesse caso a fila cresce sem parar, as médias dependem do tempo simulado e os intervalos de confiança ficam enormes. Utilização próxima de 100\% e fila que só cresce na série temporal são sinais dessa situação.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+Os tempos do modelo vêm de distribuições, sorteadas a partir de uma semente que torna o resultado reproduzível. Uma rodada é apenas uma observação, e por isso o UTSim executa várias replicações independentes e informa a média com o intervalo de confiança de 95\%. O aquecimento descarta o começo da rodada quando o sistema precisa sair do estado vazio. A lei de Little confere o relatório, e uma conta que não fecha indica aquecimento curto, instabilidade ou erro de modelo.
+\end{sintese}

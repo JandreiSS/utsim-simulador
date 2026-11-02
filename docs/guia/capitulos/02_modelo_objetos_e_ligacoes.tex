@@ -1,0 +1,126 @@
+\chapter{O modelo, objetos e ligações}
+\label{cap-modelo}
+
+\epigrafe{Um modelo começa quando se decide o que entra, o que sai e por onde passa.}{}
+
+Um modelo do UTSim descreve um fluxo de itens. Os itens são as coisas que se movem pelo processo, como peças, paletes, clientes ou pacientes. Eles nascem em algum ponto, passam por etapas e terminam em outro ponto. O modelo diz quais são as etapas, como elas se conectam e quanto tempo cada uma leva.
+
+Para isso, o programa usa dois elementos básicos. Os objetos representam as etapas, e as ligações indicam por onde os itens andam de um objeto ao seguinte. Com apenas esses dois elementos já se montam linhas de produção, filas de atendimento e redes de distribuição. Os recursos que andam, como operadores e empilhadeiras, entram no Capítulo~\ref{cap-moveis}.
+
+Este capítulo apresenta a estrutura mínima de um modelo, o ciclo que toda transferência segue e as regras que escolhem o destino de um item quando há mais de uma saída. O objetivo é fixar o vocabulário, e não listar todos os tipos de objeto disponíveis.
+
+\section{Os quatro objetos básicos}
+
+A menor linha útil tem quatro objetos. A chegada cria os itens, a fila guarda os que esperam, o processo trabalha sobre um item de cada vez e a saída recebe os itens prontos. Em inglês, que é o idioma dos nomes dentro do arquivo, esses objetos se chamam \texttt{Source}, \texttt{Queue}, \texttt{Processor} e \texttt{Sink}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=12mm]
+  \node[obj] (c) {Chegada};
+  \node[obj,right=of c] (f) {Fila};
+  \node[obj,right=of f] (p) {Processo};
+  \node[obj,right=of p] (s) {Saída};
+  \draw[seta] (c) -- (f);
+  \draw[seta] (f) -- (p);
+  \draw[seta] (p) -- (s);
+  \node[item] (i1) at ($(f.north)+(-0.35,0.65)$) {};
+  \node[item] (i2) at ($(f.north)+(0.05,0.65)$) {};
+  \node[item] (i3) at ($(f.north)+(0.45,0.65)$) {};
+  \node[item] at ($(p.north)+(0,0.65)$) {};
+  \node[rotulo] at ($(f.north)+(0,1.1)$) {itens esperando};
+  \node[rotulo] at ($(p.north)+(0,1.1)$) {item em serviço};
+  \node[rotulo,below=2mm of c] {cria itens};
+  \node[rotulo,below=2mm of s] {recebe itens};
+\end{tikzpicture}
+\caption{Linha mínima com chegada, fila, processo e saída. Os quadrados representam itens.}
+\label{fig-linha}
+\end{figure}
+
+O modelo da Figura~\ref{fig-linha} existe como texto. A listagem a seguir mostra o arquivo de uma fila clássica de um servidor, que o projeto traz como exemplo.
+
+\begin{lstlisting}[language={}]
+objects: [
+    (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0))),
+    (name: "fila",    kind: Queue()),
+    (name: "maquina", kind: Processor(process: Exp(mean: 0.8))),
+    (name: "saida",   kind: Sink),
+],
+connections: [
+    ("chegada", "fila"),
+    ("fila", "maquina"),
+    ("maquina", "saida"),
+],
+\end{lstlisting}
+
+Cada objeto tem um nome único, um tipo e os parâmetros do tipo. As ligações são pares de nomes, na forma origem e destino. O tempo entre chegadas e o tempo de processamento são escritos como distribuições de probabilidade, assunto do Capítulo~\ref{cap-aleatoriedade}. O programa verifica o modelo antes de rodar e recusa, por exemplo, um objeto sem saída conectada, porque os itens ficariam presos.
+
+\section{Como uma transferência acontece}
+
+O ciclo de qualquer objeto fixo tem quatro passos, mostrados na Figura~\ref{fig-ciclo-objeto}. O objeto recebe um item quando a sua entrada está aberta, em geral quando há espaço. Em seguida ele processa o item, e cada tipo decide quanto tempo isso leva. A fila libera na hora, enquanto o processo segura o item durante o setup e o processamento. Depois o objeto libera o item, declarando-o pronto para sair. Nesse instante a regra de saída escolhe a porta. Por fim ocorre a transferência, que só anda quando os dois lados estão abertos, isto é, existe um item liberado na origem e o destino aceita recebê-lo.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=9mm]
+  \node[obj] (a) {1. Receber};
+  \node[obj,right=of a] (b) {2. Processar};
+  \node[obj,right=of b] (c) {3. Liberar};
+  \node[obj,right=of c] (d) {4. Transferir};
+  \draw[seta] (a) -- (b);
+  \draw[seta] (b) -- (c);
+  \draw[seta] (c) -- (d);
+  \node[rotulo,below=2mm of a] {entrada\\aberta};
+  \node[rotulo,below=2mm of b] {tempo do\\objeto};
+  \node[rotulo,below=2mm of c] {regra de\\saída};
+  \node[rotulo,below=2mm of d] {origem pronta,\\destino aceita};
+\end{tikzpicture}
+\caption{Ciclo de todo objeto fixo, da entrada do item à transferência para o objeto seguinte.}
+\label{fig-ciclo-objeto}
+\end{figure}
+
+Uma característica importante é que a transferência entre dois objetos fixos ligados diretamente é, por padrão, instantânea. Ela não consome tempo, mesmo que os objetos estejam desenhados a muitos metros de distância. O tempo de transporte aparece apenas quando se usa uma esteira, um veículo ou a transferência por distância, assunto do Capítulo~\ref{cap-moveis}.
+
+\section{Portas, prioridade e regras de saída}
+
+Quando um objeto tem mais de uma ligação de saída, cada uma é uma porta, numerada pela ordem em que as ligações foram escritas. Quando um objeto tem mais de uma ligação de entrada, a ordem delas define a prioridade de puxar. Se duas filas alimentam a mesma máquina, a que foi ligada primeiro tem preferência quando a máquina fica livre.
+
+A escolha da porta de saída é feita por uma regra, definida uma vez no instante em que o item é liberado. A regra padrão escolhe a primeira porta aberta. Outras regras repartem os itens em rodízio, ao acaso, por pesos ou conforme um rótulo do item. A Tabela~\ref{tab-regras} resume as principais.
+
+\begin{table}[ht]
+\centering
+\caption{Regras de saída mais usadas.}
+\label{tab-regras}
+\begin{tabular}{@{}p{3.6cm}p{9.6cm}@{}}
+\toprule
+\textbf{Regra} & \textbf{Comportamento} \\
+\midrule
+\texttt{FirstAvailable} & Vence a primeira porta aberta, na ordem das portas. É o padrão. \\
+\texttt{RoundRobin} & Uma porta de cada vez, em rodízio. O item espera aquela porta. \\
+\texttt{Weighted} & Porta sorteada com pesos relativos, um por porta. \\
+\texttt{ByLabel} & Usa o número de um rótulo do item como porta. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Os rótulos são valores que acompanham o item desde o seu nascimento. Uma chegada pode sortear o rótulo \texttt{tipo} com 60\% de peças do tipo 1 e 40\% do tipo 2. Uma fila de triagem com a regra por rótulo envia cada tipo para a sua célula. A Figura~\ref{fig-rotulo} ilustra esse desvio.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=12mm]
+  \node[obj] (t) {Triagem};
+  \node[obj,right=24mm of t,yshift=9mm] (a) {Célula A};
+  \node[obj,right=24mm of t,yshift=-9mm] (b) {Célula B};
+  \draw[seta] (t.east) -- node[rotulo,above,sloped] {porta 1, tipo 1} (a.west);
+  \draw[seta] (t.east) -- node[rotulo,below,sloped] {porta 2, tipo 2} (b.west);
+  \node[item,left=8mm of t] (x) {};
+  \draw[setaf] (x) -- (t);
+  \node[rotulo,above=1mm of x] {rótulo};
+\end{tikzpicture}
+\caption{Desvio por rótulo. O número do rótulo do item indica a porta de saída da triagem.}
+\label{fig-rotulo}
+\end{figure}
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+Um modelo é um conjunto de objetos ligados por conexões. A linha mínima tem chegada, fila, processo e saída. Todo objeto recebe, processa, libera e transfere. A transferência direta é instantânea, salvo quando se usa esteira, veículo ou transferência por distância. Quando há várias saídas, uma regra escolhe a porta, e a ordem das ligações define portas e prioridades.
+\end{sintese}

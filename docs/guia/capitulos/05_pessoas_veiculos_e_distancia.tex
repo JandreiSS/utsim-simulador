@@ -1,0 +1,119 @@
+\chapter{Pessoas, veículos e distância}
+\label{cap-moveis}
+
+\epigrafe{Um corredor mais longo é um tempo de viagem mais longo.}{}
+
+Até aqui os itens andaram sozinhos de um objeto ao próximo. Em fábricas e armazéns reais, boa parte do trabalho é feita por pessoas e veículos que se deslocam, como operadores que atendem máquinas, empilhadeiras que levam paletes e veículos autoguiados que seguem trajetos fixos. O UTSim chama esses elementos de recursos móveis.
+
+Um recurso móvel não faz parte do fluxo de itens. Ele não é ligado por conexões. Os outros objetos apontam para ele quando precisam do seu trabalho, seja para levar um item, seja para operar uma máquina. A distância percorrida vem das posições dos objetos no layout, e o tempo de viagem vem dessa distância e da velocidade do recurso.
+
+Este capítulo trata de duas perguntas que costumam gerar dúvida. A primeira é como um recurso móvel se desloca, em linha reta ou por uma rede de caminhos. A segunda é em que situações a distância entre os objetos realmente pesa no resultado, e em quais não pesa.
+
+\section{Como um recurso móvel é usado}
+
+Um objeto pode pedir um transporte para os itens que saem dele. Quando o destino aceita o item, o motor reserva o lugar, o item fica na origem à espera do veículo, o veículo viaja até a origem, carrega, viaja até o destino, descarrega e entrega. Também é possível exigir pessoas durante o preparo ou o processamento de uma máquina. Nesse caso, a máquina pede operadores a uma equipe, e eles caminham até o posto antes de a fase começar.
+
+Quando há vários veículos, um despachante reparte o serviço entre eles. Ele pode escolher o primeiro membro livre, os livres em rodízio ou o mais próximo do ponto onde o serviço começa. Se todos estão ocupados, o serviço espera na fila do despachante.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=14mm]
+  \node[obj] (o) {Origem};
+  \node[obj,right=60mm of o] (d) {Destino};
+  \node[objd,below=16mm of $(o)!0.5!(d)$] (v) {Empilhadeira};
+  \draw[seta] (o) -- node[rotulo,above] {itens (fluxo)} (d);
+  \draw[tracejada] (v.west) -| node[rotulo,left,pos=0.8] {1. vai até\\a origem} (o.south);
+  \draw[tracejada] (o.south east) -- node[rotulo,above,sloped,pos=0.5] {2. leva o item} (v.north);
+  \draw[tracejada] (v.east) -| node[rotulo,right,pos=0.8] {3. entrega\\no destino} (d.south);
+\end{tikzpicture}
+\caption{Transporte por um veículo. O item espera na origem, o veículo chega, carrega, viaja e entrega no destino.}
+\label{fig-servico}
+\end{figure}
+
+\section{Tempo de viagem}
+
+Sem aceleração, o tempo de uma viagem é a distância dividida pela velocidade. Com aceleração $a$ e desaceleração $d$, e quando a distância é longa o bastante para atingir a velocidade máxima $v$, o tempo é
+
+\begin{equation}
+T = \frac{D}{v} + \frac{v}{2}\left(\frac{1}{a} + \frac{1}{d}\right).
+\end{equation}
+
+Por exemplo, 40 m a 2 m/s com $a = d = 0{,}5$ m/s² levam $40/2 + 1\cdot(2+2) = 24$ s. Se a distância for curta, o veículo faz uma rampa triangular e nem chega à velocidade máxima.
+
+\section{Linha reta ou rede de caminhos}
+
+Sem rede de caminhos, os veículos andam em linha reta entre dois pontos. Isso é adequado quando o piso é livre. Em armazéns com corredores, estantes e vias de mão única, o trajeto reto atravessaria obstáculos. Para esses casos o modelo declara uma rede de nós e arestas. O comprimento de cada aresta é a distância entre os seus nós, e as viagens seguem o menor caminho pela rede. Um ponto fora da rede entra e sai pelo nó mais próximo.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+  % estantes
+  \fill[light!35] (2,1.0) rectangle (4,2.0);
+  \fill[light!35] (5.2,1.0) rectangle (7.2,2.0);
+  \node[rotulo] at (3,1.5) {estante};
+  \node[rotulo] at (6.2,1.5) {estante};
+  % nós
+  \coordinate (n1) at (0.5,0);
+  \coordinate (n2) at (3,0);
+  \coordinate (n3) at (6.2,0);
+  \coordinate (n4) at (8.5,0);
+  \coordinate (n5) at (8.5,3);
+  \coordinate (n6) at (0.5,3);
+  % arestas
+  \draw[primary,thick] (n1) -- (n2) -- (n3) -- (n4);
+  \draw[primary,thick,-{Stealth[length=2.4mm]}] (n4) -- (n5);
+  \draw[primary,thick,-{Stealth[length=2.4mm]}] (n5) -- (n6);
+  \draw[primary,thick,-{Stealth[length=2.4mm]}] (n6) -- (n1);
+  \foreach \p in {n1,n2,n3,n4,n5,n6}{\node[evento,fill=primary] at (\p) {};}
+  % origem e destino
+  \node[item,minimum size=4.5mm] at (n1) {};
+  \node[rotulo,below=2mm of n1] {origem};
+  \node[objd,minimum width=12mm,minimum height=6mm,font=\scriptsize,right=3mm of n5] {destino};
+  % rota reta
+  \draw[tracejada] (n1) -- (n5);
+  \node[rotulo] at (4.3,2.5) {linha reta};
+  % rota pela rede
+  \draw[accent,ultra thick,-{Stealth[length=2.6mm]}] (0.5,-0.25) -- (8.75,-0.25) -- (8.75,2.75);
+  \node[rotulo,anchor=north] at (4.5,-0.35) {rota pela rede};
+  \node[rotulo,anchor=west] at (0.8,3.3) {mão única};
+\end{tikzpicture}
+\caption{Rede de caminhos de um armazém com duas estantes. A rota segue as arestas do menor caminho, e a linha reta tracejada atravessaria as estantes.}
+\label{fig-rede}
+\end{figure}
+
+Quando a rede tem arestas de mão única, o caminho de volta pode ficar muito mais longo que o de ida, como no desenho acima. O programa recusa uma rede em que não seja possível ir de qualquer nó a qualquer outro. Para veículos autoguiados, cada aresta pode ter capacidade limitada, e um veículo para antes de entrar numa aresta cheia. Uma aresta de mão dupla com capacidade 1 funciona como pista única para os dois sentidos.
+
+\section{A distância importa?}
+
+Esta é a dúvida mais comum, e a resposta depende de onde a distância é usada pelo modelo. Ela entra na conta em três situações. O deslocamento de qualquer recurso móvel leva a distância dividida pela velocidade, com as posições dos objetos em metros. Uma esteira leva o item de uma ponta à outra em comprimento dividido pela velocidade. E uma ligação direta passa a ter tempo de viagem quando o modelo liga a transferência por distância.
+
+Ela não entra na conta numa ligação direta entre dois objetos fixos sem transferência. Essa ligação é instantânea, esteja a distância em 1 metro ou em 500. As posições, nesse caso, servem apenas ao desenho no 3D.
+
+A transferência por distância é o recurso mais simples quando não há veículo nem esteira. Ela é configurada com uma velocidade do item, um atraso fixo opcional e o modo de trajeto, em linha reta ou pela rede. Durante a viagem o item não pertence a nenhum dos dois objetos, mas o lugar no destino fica reservado. Por isso uma máquina de capacidade 1 fica ocupada desde o instante em que o item sai da origem, e uma distância maior pode reduzir a vazão.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=10mm]
+  % ligação instantânea
+  \node[obj,minimum width=14mm] (a1) {Fila};
+  \node[obj,minimum width=14mm,right=30mm of a1] (b1) {Máquina};
+  \draw[seta] (a1) -- node[rotulo,above] {$t = 0$} (b1);
+  \node[rotulo,below=1mm of $(a1)!0.5!(b1)$,yshift=-4mm] {ligação direta, sem transferência};
+  % com transferência
+  \node[obj,minimum width=14mm,below=18mm of a1] (a2) {Fila};
+  \node[obj,minimum width=14mm,right=30mm of a2] (b2) {Máquina};
+  \draw[seta,color=accent!80!black] (a2) -- node[rotulo,above] {$t = d/v$} (b2);
+  \node[item] at ($(a2)!0.45!(b2)+(0,-0.35)$) {};
+  \node[rotulo,below=1mm of $(a2)!0.5!(b2)$,yshift=-4mm] {com transferência por distância};
+\end{tikzpicture}
+\caption{Dois casos para uma ligação direta. Sem transferência o item passa na hora. Com transferência o item leva a distância dividida pela velocidade.}
+\label{fig-transferencia}
+\end{figure}
+
+Um exemplo do projeto roda a mesma linha em dois layouts, com 1 m e com 5 m entre os objetos, e velocidade do item de 1 m por unidade de tempo. A vazão é a mesma, mas o tempo no sistema passa de 8,8 s no layout compacto para 33,1 s no espalhado. Afastar duas máquinas que se alimentam por ligação direta, sem transferência, não muda nada no resultado. Afastar duas máquinas que dependem do mesmo operador muda muito.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+Recursos móveis são pessoas e veículos que se deslocam, e os objetos apontam para eles quando precisam de transporte ou de operadores. O tempo de viagem vem da distância e do perfil de velocidade, em linha reta ou pela rede de caminhos. Uma ligação direta entre objetos fixos é instantânea, a menos que se use esteira, veículo ou transferência por distância. Por isso a distância só pesa nos pontos em que o modelo a usa.
+\end{sintese}

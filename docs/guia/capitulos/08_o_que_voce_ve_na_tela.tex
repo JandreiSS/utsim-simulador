@@ -1,0 +1,77 @@
+\chapter{O que você vê na tela}
+\label{cap-tela}
+
+\epigrafe{Ver o processo funcionar ajuda a confiar no modelo, desde que se saiba de onde vem o que se vê.}{}
+
+Os capítulos anteriores trataram do que o UTSim calcula. Este trata do que ele mostra. O programa tem um editor com visualização em 3D, em que o modelo é montado com o mouse e a simulação pode ser assistida como uma animação, com itens, operadores e veículos em movimento.
+
+A pergunta que interessa a quem usa a ferramenta é de onde vem essa animação. Se ela fosse calculada à parte, poderia divergir dos números do relatório. No UTSim isso não ocorre, porque a animação não é calculada. Ela é desenhada a partir do registro do que a simulação fez.
+
+Este capítulo explica esse caminho, do registro à cena e da cena à tela, descreve os dois modos do editor e indica onde continuar o estudo depois deste guia.
+
+\section{O rastro e a cena}
+
+Quando a simulação roda com o registro ligado, o motor anota um evento de rastro para cada criação de item, movimento, empacotamento, destruição e mudança de estado, com o instante em que ocorreu. Esse registro é somente leitura. Rodar com ou sem rastro dá exatamente o mesmo resultado numérico, e há teste automático para isso.
+
+Uma etapa separada transforma o rastro na cena. Para cada instante, ela diz onde está cada entidade, em que direção aponta, se está parada, andando, carregando ou trabalhando, e qual é o nível de cada tanque. Essa cena não depende do motor gráfico. O visualizador de mesa, a página no navegador e outros clientes consomem a mesma cena e, por isso, nunca discordam sobre onde as coisas estão.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=13mm]
+  \node[obj] (m) {Simulação\\(motor)};
+  \node[obj,right=of m] (t) {Rastro\\de eventos};
+  \node[obj,right=of t] (c) {Cena\\por instante};
+  \node[obj,right=of c] (v) {Tela 3D};
+  \draw[seta] (m) -- (t);
+  \draw[seta] (t) -- (c);
+  \draw[seta] (c) -- (v);
+  \node[rotulo,below=2mm of m] {calcula};
+  \node[rotulo,below=2mm of t] {registra};
+  \node[rotulo,below=2mm of c] {interpreta};
+  \node[rotulo,below=2mm of v] {desenha};
+  \node[obj,fill=accent!25,draw=accent!80!black,below=14mm of t] (r) {Relatório\\com números};
+  \draw[seta] (m.south) |- (r.west);
+\end{tikzpicture}
+\caption{Do motor à tela. O relatório e o rastro nascem da mesma simulação, e a cena é derivada do rastro.}
+\label{fig-rastro}
+\end{figure}
+
+Como a cena vem do rastro, o que se vê é a rodada que o relatório descreve. Se o relatório informa que uma fila chegou a doze itens, a animação mostra essa fila com doze itens no mesmo instante.
+
+\section{Editar e simular}
+
+O editor tem dois modos. No modo Editar, o modelo é montado. Os objetos são escolhidos numa paleta e colocados no chão, as ligações são traçadas de um objeto a outro, e um painel de propriedades mostra os campos do objeto selecionado. Os problemas do modelo aparecem enquanto ele é montado, e os objetos com problema ficam com contorno vermelho. O modelo só roda quando nenhum problema resta, e as mensagens são as mesmas do comando de verificação. Há ainda camadas próprias para a rede de caminhos dos recursos móveis e para a rede de fluidos.
+
+No modo Simular, a rodada gravada é tocada como uma animação. É possível pausar, mudar a velocidade e pular de evento em evento, e clicar num objeto mostra as suas estatísticas. A simulação nunca é conduzida pela janela. O botão de simular roda o motor em outra tarefa, e a janela apenas lê o resultado gravado. A mesma rodada também pode ser gravada num arquivo de replay pelo comando \texttt{utsim replay} e assistida depois, sem o modelo.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=22mm]
+  \node[objf,minimum width=26mm,minimum height=13mm] (e) {Modo\\Editar};
+  \node[objf,minimum width=26mm,minimum height=13mm,right=of e] (s) {Modo\\Simular};
+  \draw[seta] (e.north east) to[bend left=30] node[rotulo,above] {Simular} (s.north west);
+  \draw[seta] (s.south west) to[bend left=30] node[rotulo,below] {Editar} (e.south east);
+  \node[rotulo,below=7mm of e,text width=3.6cm] {monta objetos, ligações e parâmetros};
+  \node[rotulo,below=7mm of s,text width=3.6cm] {toca a rodada gravada e mostra estatísticas};
+\end{tikzpicture}
+\caption{Os dois modos do editor. A passagem de Editar para Simular roda o motor e grava a rodada.}
+\label{fig-modos}
+\end{figure}
+
+O editor também reúne a análise. Uma janela de resultados roda as replicações em segundo plano e mostra a tabela de resumo, os gráficos de ocupação e de estados, os cenários e a otimização, com os mesmos números do comando de linha. Uma exportação grava os resultados em arquivos CSV e num relatório HTML.
+
+\section{Aparência e números}
+
+A aparência dos objetos no 3D é apresentação. Existem formas simples, feitas de caixas e cilindros coloridos, e modelos articulados da biblioteca, como empilhadeiras e paleteiras. A escolha é feita por uma chave na barra superior ou por um campo opcional de cada objeto. Trocar a aparência nunca muda os números do relatório. A câmera também tem modos, que vão da órbita sobre a planta até a visão em primeira pessoa e a visão do assento do operador de uma empilhadeira.
+
+\section{Para continuar}
+
+Este guia apresentou as ideias do UTSim. O próximo passo é a prática. O manual do usuário descreve cada objeto, cada campo do arquivo de modelo e cada comando, e traz seis tutoriais passo a passo, cada um com um modelo pronto na pasta de exemplos. O primeiro tutorial monta uma fila e um caixa e confere o resultado com a teoria. Os demais tratam de gargalo, de operadores, de armazém, do ajuste de distribuições e de experimento e otimização. Há também estudos de caso maiores, escritos para quem já domina os tutoriais, em fábrica, logística e serviço.
+
+Para o fundamento teórico, as referências deste guia são o ponto de partida. A simulação a eventos discretos está em \textcite{law2015} e em \textcite{banks2010}, a lei de Little em \textcite{little1961} e o planejamento de experimentos de simulação em \textcite{kleijnen2008}.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+A animação em 3D é desenhada a partir do rastro da simulação, e não calculada à parte, de modo que o que se vê é a rodada que o relatório descreve. O editor tem o modo Editar, para montar o modelo, e o modo Simular, para tocar a rodada gravada, além de uma janela de resultados com tabelas, gráficos, cenários e otimização. A aparência não altera os números. Depois deste guia, o caminho é o manual do usuário e os seis tutoriais.
+\end{sintese}
