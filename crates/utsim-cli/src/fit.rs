@@ -31,6 +31,9 @@ pub fn run(args: Args) -> Result<(), String> {
     for w in &loaded.warnings {
         eprintln!("aviso: {w}");
     }
+    for n in &loaded.notes {
+        eprintln!("coluna: {n}");
+    }
     let mut config = FitConfig {
         alpha: args.alpha,
         ..FitConfig::default()

@@ -128,6 +128,7 @@ pub fn kind_label(kind: &str) -> &'static str {
         "rack" => "Porta-paletes",
         "flow" => "Fluxo",
         "fluid" => "Fluidos",
+        "span" => "Medição de tempo",
         _ => "Outro",
     }
 }
@@ -153,10 +154,73 @@ pub enum Column {
     Content,
     Staytime,
     Utilization,
+    UtilizationBlocked,
+    UtilizationShift,
+    UtilizationFree,
+}
+
+/// Which utilisation the chart shows (the table has a column for each).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum UtilKind {
+    /// Time working (processing, setup), never above 100% per server.
+    #[default]
+    Work,
+    /// Working plus holding a finished item that cannot leave.
+    InclBlocked,
+    /// Working over the time on shift.
+    InShift,
+    /// Working over the time not blocked.
+    ExclBlocked,
+}
+
+impl UtilKind {
+    pub const ALL: [UtilKind; 4] = [
+        UtilKind::Work,
+        UtilKind::InclBlocked,
+        UtilKind::InShift,
+        UtilKind::ExclBlocked,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            UtilKind::Work => "Ocupação",
+            UtilKind::InclBlocked => "Incluindo bloqueado",
+            UtilKind::InShift => "Dentro do turno",
+            UtilKind::ExclBlocked => "Sem o tempo bloqueado",
+        }
+    }
+
+    /// What the figure means, for hover texts and captions.
+    pub fn help(self) -> &'static str {
+        match self {
+            UtilKind::Work => {
+                "Fração do tempo trabalhando (em processo ou preparação). Com capacidade maior \
+                 que 1, é a média de servidores ocupados dividida pela capacidade."
+            }
+            UtilKind::InclBlocked => {
+                "Ocupação mais o tempo em que o recurso segura um item pronto que não pode sair."
+            }
+            UtilKind::InShift => {
+                "Ocupação sobre o tempo em turno: o tempo fora de turno sai do denominador."
+            }
+            UtilKind::ExclBlocked => {
+                "Ocupação sobre o tempo não bloqueado: mostra a carga própria do recurso."
+            }
+        }
+    }
+
+    pub fn pick(self, s: &ObjectStats) -> Option<Summary> {
+        match self {
+            UtilKind::Work => s.utilization,
+            UtilKind::InclBlocked => s.utilization_incl_blocked,
+            UtilKind::InShift => s.utilization_in_shift,
+            UtilKind::ExclBlocked => s.utilization_excl_blocked,
+        }
+    }
 }
 
 impl Column {
-    pub const ALL: [Column; 7] = [
+    pub const ALL: [Column; 10] = [
         Column::Name,
         Column::Kind,
         Column::Input,
@@ -164,6 +228,9 @@ impl Column {
         Column::Content,
         Column::Staytime,
         Column::Utilization,
+        Column::UtilizationBlocked,
+        Column::UtilizationShift,
+        Column::UtilizationFree,
     ];
 
     pub fn label(self) -> &'static str {
@@ -175,6 +242,20 @@ impl Column {
             Column::Content => "Conteúdo médio",
             Column::Staytime => "Permanência média",
             Column::Utilization => "Ocupação",
+            Column::UtilizationBlocked => "c/ bloqueio",
+            Column::UtilizationShift => "no turno",
+            Column::UtilizationFree => "s/ bloqueio",
+        }
+    }
+
+    /// The utilisation this column shows, if it is one.
+    pub fn util_kind(self) -> Option<UtilKind> {
+        match self {
+            Column::Utilization => Some(UtilKind::Work),
+            Column::UtilizationBlocked => Some(UtilKind::InclBlocked),
+            Column::UtilizationShift => Some(UtilKind::InShift),
+            Column::UtilizationFree => Some(UtilKind::ExclBlocked),
+            _ => None,
         }
     }
 
@@ -185,7 +266,10 @@ impl Column {
             Column::Output => Some(s.output.mean),
             Column::Content => Some(s.content.mean),
             Column::Staytime => Some(s.staytime.mean),
-            Column::Utilization => s.utilization.map(|u| u.mean),
+            Column::Utilization
+            | Column::UtilizationBlocked
+            | Column::UtilizationShift
+            | Column::UtilizationFree => self.util_kind().and_then(|k| k.pick(s)).map(|u| u.mean),
         }
     }
 }
@@ -262,14 +346,15 @@ fn whisker(label: String, s: &Summary, hot: bool) -> WhiskerBar {
     }
 }
 
-/// Utilisation bars of every resource, in report order; the bottleneck is hot.
-pub fn utilization_bars(stats: &[ObjectStats]) -> Vec<WhiskerBar> {
+/// Bars of one kind of utilisation for every resource, in report order; the bottleneck
+/// (by plain utilisation) is hot.
+pub fn utilization_bars(stats: &[ObjectStats], kind: UtilKind) -> Vec<WhiskerBar> {
     let hot = bottleneck(stats);
     stats
         .iter()
         .enumerate()
         .filter_map(|(i, s)| {
-            s.utilization
+            kind.pick(s)
                 .map(|u| whisker(s.name.clone(), &u, hot == Some(i)))
         })
         .collect()
@@ -961,7 +1046,7 @@ mod tests {
             ["fila", "fila2"]
         );
         assert_eq!(kinds(&s), ["source", "queue", "processor", "sink"]);
-        let bars = utilization_bars(&s);
+        let bars = utilization_bars(&s, UtilKind::Work);
         assert_eq!(bars.len(), 2);
         assert!(bars.iter().find(|b| b.label == "furacao").unwrap().hot);
         assert!(bars.iter().all(|b| b.lo <= b.mean && b.mean <= b.hi));

@@ -163,7 +163,8 @@ enum Cmd {
     /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
     Fit {
         file: PathBuf,
-        /// Coluna: nome do cabeçalho ou posição (a partir de 1); padrão: primeira numérica
+        /// Coluna: nome do cabeçalho ou posição (a partir de 1); sem ela, escolhe a única coluna
+        /// numérica que não parece numeração (1, 2, 3...) e recusa se restar mais de uma
         #[arg(long)]
         coluna: Option<String>,
         /// A coluna traz instantes crescentes; ajusta os intervalos entre eles
@@ -382,6 +383,8 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
         );
     }
 
+    print_utilization(&summary, first);
+
     println!();
     for b in &first.blocks {
         let n = &b.name;
@@ -392,15 +395,22 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
             .filter(|(_, s)| s.mean > 0.0)
             .map(|(state, s)| format!("{state} {}", fmt_pct(s)))
             .collect();
+        // A tally shows its mean; `lost` is always 1 per item, so it shows how many
+        // items were lost per replication instead.
         let extras: Vec<String> = b
             .extra
             .keys()
-            .map(|k| format!("{k} {}", cell(format!("{n}.{k}.mean"))))
+            .map(|k| match k.as_str() {
+                "lost" => format!("lost {} por replicação", cell(format!("{n}.lost.count"))),
+                _ => format!("{k} {}", cell(format!("{n}.{k}.mean"))),
+            })
             .collect();
         // Metrics computed by the block itself (e.g. tank levels of a fluid network).
         let custom: Vec<String> = b
             .custom
             .keys()
+            // `servers.*` only feed the utilisation table above.
+            .filter(|k| !k.starts_with("servers."))
             .map(|k| format!("{k} {}", cell(format!("{n}.{k}"))))
             .collect();
         if !states.is_empty() || !extras.is_empty() {
@@ -417,6 +427,47 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
         for m in custom {
             println!("{n:<14} {m}");
         }
+    }
+}
+
+/// Utilisation of every resource (processes, assemblies, mobile resources) and the
+/// model-wide loss of sources that drop items. Nothing is printed without them.
+fn print_utilization(summary: &std::collections::BTreeMap<String, Summary>, first: &RunReport) {
+    let resources: Vec<&str> = first
+        .blocks
+        .iter()
+        .filter(|b| summary.contains_key(&format!("{}.utilization", b.name)))
+        .map(|b| b.name.as_str())
+        .collect();
+    if !resources.is_empty() {
+        println!(
+            "\n{:<14} {:>20} {:>20} {:>20} {:>20}",
+            "ocupação", "trabalhando", "incl. bloqueio", "dentro do turno", "sem bloqueio"
+        );
+        for n in resources {
+            let cell = |suffix: &str| {
+                summary
+                    .get(&format!("{n}.{suffix}"))
+                    .map_or_else(|| "-".to_string(), fmt_pct)
+            };
+            println!(
+                "{n:<14} {:>20} {:>20} {:>20} {:>20}",
+                cell("utilization"),
+                cell("utilization_incl_blocked"),
+                cell("utilization_in_shift"),
+                cell("utilization_excl_blocked"),
+            );
+        }
+    }
+    if let (Some(lost), Some(fraction)) = (
+        summary.get("model.lost.count"),
+        summary.get("model.loss_fraction"),
+    ) {
+        println!(
+            "\nperdas do modelo (fontes com Drop): {} perdidos por replicação, fração perdida {}",
+            fmt(lost),
+            fmt_pct(fraction)
+        );
     }
 }
 

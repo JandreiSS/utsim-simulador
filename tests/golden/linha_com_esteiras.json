@@ -30,15 +30,23 @@
       "expedicao.input": 1651.0,
       "expedicao.output": 0.0,
       "expedicao.staytime.mean": 0.0,
+      "expedicao.time_in_system.count": 1651.0,
       "expedicao.time_in_system.mean": 31.515219496929536,
       "maquina.content.max": 1.0,
       "maquina.content.mean": 0.6350693605406187,
       "maquina.input": 1650.0,
       "maquina.output": 1650.0,
+      "maquina.servers.blocked": 0.030764193411951333,
+      "maquina.servers.busy": 0.6043051671286673,
+      "maquina.servers.capacity": 1.0,
       "maquina.state.blocked": 0.030764193411951333,
       "maquina.state.idle": 0.36493063945938126,
       "maquina.state.processing": 0.6043051671286673,
-      "maquina.staytime.mean": 1.7320073469289603
+      "maquina.staytime.mean": 1.7320073469289603,
+      "maquina.utilization": 0.6043051671286673,
+      "maquina.utilization_excl_blocked": 0.6234862177203007,
+      "maquina.utilization_in_shift": 0.6043051671286673,
+      "maquina.utilization_incl_blocked": 0.6350693605406187
     },
     {
       "entrada.content.max": 1.0,
@@ -69,15 +77,23 @@
       "expedicao.input": 1659.0,
       "expedicao.output": 0.0,
       "expedicao.staytime.mean": 0.0,
+      "expedicao.time_in_system.count": 1659.0,
       "expedicao.time_in_system.mean": 31.364660906885643,
       "maquina.content.max": 1.0,
       "maquina.content.mean": 0.630371012346736,
       "maquina.input": 1659.0,
       "maquina.output": 1658.0,
+      "maquina.servers.blocked": 0.03401751209934661,
+      "maquina.servers.busy": 0.5963535002473894,
+      "maquina.servers.capacity": 1.0,
       "maquina.state.blocked": 0.03401751209934661,
       "maquina.state.idle": 0.369628987653264,
       "maquina.state.processing": 0.5963535002473894,
-      "maquina.staytime.mean": 1.7093607674221207
+      "maquina.staytime.mean": 1.7093607674221207,
+      "maquina.utilization": 0.5963535002473894,
+      "maquina.utilization_excl_blocked": 0.6173543596462397,
+      "maquina.utilization_in_shift": 0.5963535002473894,
+      "maquina.utilization_incl_blocked": 0.630371012346736
     }
   ]
 }

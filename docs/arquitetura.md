@@ -80,9 +80,11 @@ quem alimenta A.
   - `Wait` (padrão): o comportamento acima, a Source espera e para de gerar.
   - `Drop` (**nosso jeito**): o item é destruído e o próximo intervalo
     começa na hora, então as chegadas formam um processo de renovação independente do
-    bloqueio. Cada perda registra `lost` na Source (use o campo `count` da tally, aparece
-    em `RunReport`); itens perdidos não contam em `output`. Serve para M/M/1/K e Erlang
-    de perda.
+    bloqueio. Cada perda registra `lost` na Source (a tally; a média vale sempre 1) e entra
+    nas métricas `lost.count`, `entered.count` e `loss_fraction`, sempre presentes numa
+    Source com `Drop` e zeradas na virada do aquecimento; itens perdidos não contam em
+    `output`. Serve para M/M/1/K e Erlang de perda. `RunReport::metrics` soma as fontes em
+    `model.lost.count`, `model.entered.count` e `model.loss_fraction`.
 - Estados: `generating`, `blocked`, `idle` (quando atinge `max_arrivals`).
 
 ### Queue
@@ -95,6 +97,10 @@ quem alimenta A.
 - Estados: `idle`, `setup`, `processing`, `blocked` (terminou e o destino está fechado).
 - Com `n > 1`, o estado reportado é o mais produtivo entre os itens presentes
   (processing > setup > blocked > idle).
+- Publica `servers.busy` (média de itens em `setup` ou `processing`, zero com o bloco
+  parado), `servers.blocked` (itens prontos que não saem) e `servers.capacity`. Com várias
+  máquinas o estado `processing` (há pelo menos um) não serve de ocupação; estas médias
+  servem. Os acumuladores zeram em `on_warmup`.
 
 ### Sink
 - Aceita tudo, registra `time_in_system` (agora − criação) e destrói o item.
@@ -136,6 +142,15 @@ sinalizador. Assim a ordem dos dois eventos simultâneos não importa.
 
 > **Nosso jeito:** o MTBF das quebras corre no relógio também fora do turno. Uma opção
 > "só conta tempo trabalhado" fica para depois.
+
+### Medições de tempo entre dois pontos (`spans`)
+O campo `spans: [(name, from, to)]` do modelo mede, por item, o tempo entre sair de `from`
+e entrar em `to`. O kernel guarda o instante de saída no próprio item (`Item::marks`, por
+índice de medição, em `Simulation::add_meter`) e, na chegada a `to`, registra a diferença
+na tally `value` de um bloco `span` criado só para isso (depois dos objetos, fluxos e
+fluidos). Fica no kernel, e não numa mensagem de assinatura, porque a `Sink` destrói o
+item ao receber e a mensagem chegaria tarde demais. O relatório trata o bloco como
+qualquer outro: média, IC, histograma e as métricas `<nome>.value.mean` e `.count`.
 
 ### Itens contêiner
 `ctx.pack(contêiner, item)` tira o item do conteúdo do bloco e o coloca dentro do
@@ -924,7 +939,7 @@ sincronismo vertical, com os níveis de detalhe do A3D-4): 548 quadros por segun
 
 A janela **Resultados** do `utsim-view` roda replicações, cenários e otimizações do modelo aberto e mostra as estatísticas sem a linha de comando. A divisão segue a do resto do editor: números num lugar só, lógica pura testável e um painel fino.
 
-- `utsim-model::analysis`: uma linha por objeto (`ObjectStats`, cada coluna um `Summary` entre replicações, os mesmos números de `summarize`), a ocupação (conteúdo médio / capacidade nas estações; fração do tempo em viagem, carga, descarga ou trabalho nos transportadores), o gargalo (maior ocupação entre os recursos), a série temporal média entre replicações, os histogramas das replicações reunidos numa grade comum e a diferença pareada (`paired_difference`, `delta_cell` com `≈`).
+- `utsim-model::analysis`: uma linha por objeto (`ObjectStats`, cada coluna um `Summary` entre replicações, os mesmos números de `summarize`), a ocupação (`BlockReport::utilization` em `utsim-core`: fração do tempo em `processing` e `setup` nas estações, e média de servidores ocupados sobre a capacidade quando há vários; o conteúdo **não** entra, porque uma montagem guarda componentes à espera; fração do tempo em viagem, carga, descarga ou trabalho nos transportadores) com as variantes incluindo bloqueio, dentro do turno e sem bloqueio, o gargalo (maior ocupação entre os recursos), a série temporal média entre replicações, os histogramas das replicações reunidos numa grade comum e a diferença pareada (`paired_difference`, `delta_cell` com `≈`).
 - `Model::run_replications_with(progress)` e `experiment::run_scenarios(.., progress)` avisam cada replicação concluída; quando o aviso responde `false`, nenhuma replicação nova começa e o resultado é `ModelError::Cancelled`. `utsim_opt::optimize_with` faz o mesmo por ponto avaliado. Os resultados são idênticos aos das versões sem progresso.
 - `ScenarioResult::per_replication` guarda o valor de cada métrica por replicação (fora do JSON), para a diferença pareada com o primeiro cenário, que o `utsim experiment` também passou a imprimir.
 - `utsim-model::csv` (vindo do `utsim-cli`) e `utsim-model::html` geram os arquivos exportados: os CSV do `utsim run --csv`, mais `objetos.csv`, e um relatório HTML autocontido com SVG em linha.

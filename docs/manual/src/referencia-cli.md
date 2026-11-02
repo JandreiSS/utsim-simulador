@@ -145,7 +145,9 @@ Arguments:
   <FILE>  
 
 Options:
-      --coluna <COLUNA>        Coluna: nome do cabeçalho ou posição (a partir de 1); padrão: primeira numérica
+      --coluna <COLUNA>        Coluna: nome do cabeçalho ou posição (a partir de 1); sem ela, escolhe a
+                               única coluna numérica que não parece numeração (1, 2, 3...) e recusa se
+                               restar mais de uma
       --timestamps             A coluna traz instantes crescentes; ajusta os intervalos entre eles
       --alpha <ALPHA>          Nível de significância dos testes [default: 0.05]
       --bootstrap <BOOTSTRAP>  Réplicas do bootstrap paramétrico (p-valores de KS e Anderson-Darling) [default: 300]
