@@ -378,13 +378,19 @@ enum Cmd {
 }
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("erro: {e}");
-            ExitCode::FAILURE
-        }
-    }
+    // The argument parser for all subcommands is large; in debug builds it overflows the 1 MB
+    // main-thread stack of Windows, so the program runs on a thread with a bigger stack.
+    let worker = std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| match run(Cli::parse()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("erro: {e}");
+                ExitCode::FAILURE
+            }
+        })
+        .expect("thread principal do utsim");
+    worker.join().unwrap_or(ExitCode::FAILURE)
 }
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
