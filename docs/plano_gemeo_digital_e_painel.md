@@ -83,8 +83,24 @@ digital (modo sombra)"; arquitetura, seção 4t).* Notas da implementação:
   TLS no MQTT, login por usuário no OPC UA, assistente de mapeamento, alvos `Param`,
   `Label` e `Measure` (medida livre), transformação `Threshold`, testes KS/AD/Mann-Whitney
   de distribuições de tempos, menor desvio detectável, `TwinFrontend` no `utsim-emu`
-  (o laço do gêmeo é próprio: no modo sombra o modelo não roda junto), modos sincronizado
-  e previsão.
+  (o laço do gêmeo é próprio: no modo sombra o modelo não roda junto) e modo sincronizado.
+- [x] T6 previsão (`utsim-twin::forecast`, `utsim gemeo --previsao`, `utsim prever`;
+  manual "Gêmeo digital", seção "Previsão"; arquitetura, seção 4u): instantâneo do estado
+  observado a cada intervalo (tempo do gêmeo) ou sob pedido (`POST /api/gemeo/previsao`),
+  `R` replicações até o horizonte (`Time`, `Hours` ou `EndOfShift`) em fios próprios, fora
+  do laço principal; por KPI média, IC da média, P5–P95 e probabilidade da meta com Wilson e
+  semáforo 90 %/50 % (decisão D10, reaproveitando `utsim_dash::kpi::Kpi`); leque no tempo
+  (P5, P25, P50, P75, P95, média com IC) da produção, do WIP e dos objetos acompanhados;
+  probabilidade e instantes (P5, P50, P95) do cruzamento de limites de conteúdo; cenários
+  "e se" com as chaves do `Experiment`, a partir do mesmo estado e com as mesmas sementes,
+  com a diferença pareada e se melhora; seção `forecast` do `.gemeo.ron` validada; página
+  `/gemeo/previsao` com o texto "precisão da média" × "faixa do que pode acontecer" (E1);
+  sementes `seed_for(semente, instante)` e linhas `previsao` na gravação, de modo que a
+  reprodução refaz previsões idênticas. Sem `rayon` (fios do `std`, como o `simdist`).
+- [ ] Da T6 ficou de fora: `run.start_at` (no lugar dele, `start_clock` na seção da
+  previsão), gargalo previsto por instante (só o gargalo do horizonte), avaliação das
+  previsões contra o real (E3: cobertura, PIT, pinball, CRPS), alertas de previsão (D7),
+  calibração contínua das taxas para a previsão (RF-218).
 
 Ligar um modelo `.ron` a dados reais (sensores, CLPs, MES, historiadores) para:
 
@@ -1143,7 +1159,7 @@ estatística P1–P3) e `utsim-emu/src/runner.rs` (T3/T4).
 | Tarefa | Modelo | Depende de |
 |---|---|---|
 | T4 modo sincronizado | Opus | T3, T5 |
-| T6 previsão à frente + E3 | Opus | T5 |
+| T6 previsão à frente + E3 — **feito** (sem a avaliação do E3) | Opus | T5 |
 | T8 desvio | Opus | T3, E4, E7 |
 | T7 calibração | Opus | T3, `utsim-fit` |
 | D6, D7 ao vivo e alertas | Sonnet | D4/D5, T8 |

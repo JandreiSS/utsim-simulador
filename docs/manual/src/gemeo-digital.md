@@ -1,14 +1,16 @@
-# Gêmeo digital (modo sombra)
+# Gêmeo digital (sombra e previsão)
 
 O gêmeo digital liga um modelo `.ron` aos dados da fábrica: lê sensores e CLPs por OPC UA,
 MQTT ou Sparkplug B, monta o **estado observado** da planta, calcula os KPIs reais em
 janelas de tempo e compara cada um com o que o modelo diz que deveria acontecer. Quando o
 real sai do esperado, o gêmeo dá um **alerta de desvio** apontando o objeto e o indicador.
 
-Esta primeira entrega é o **modo sombra**: o gêmeo só observa. Nada do real altera a
-simulação, e nada é escrito no equipamento. Os modos sincronizado (o modelo corrigido pelo
-real) e previsão (olhar as próximas horas a partir do estado atual) vêm depois; o estado
-observado já é guardado no formato do [estado inicial](estado-inicial.md) para isso.
+O gêmeo tem dois modos nesta versão. O **modo sombra** só observa: nada do real altera a
+simulação, e nada é escrito no equipamento. A **previsão** (com `--previsao`) parte do
+estado observado e roda replicações à frente para dizer o que deve acontecer nas próximas
+horas: a produção até o fim do turno, a chance de cumprir a meta, quando uma fila deve
+passar de um limite, e o que muda com mais um operador ou outra regra (seção
+[Previsão](#previsão)). O modo sincronizado (o modelo corrigido pelo real) vem depois.
 
 ## Experimente com a fábrica sintética
 
@@ -208,6 +210,10 @@ computador acessa. As rotas da API:
 | `/api/gemeo` | relatório completo em JSON |
 | `/api/gemeo/estado` | o mesmo, com o estado observado como estado inicial |
 | `/api/gemeo/estado.ron` | o estado observado em `.ron` |
+| `/gemeo/previsao` | a página da previsão (com `--previsao`) |
+| `/api/gemeo/previsao` | situação da previsão (ligada, próxima, na fila, erros) e a última previsão |
+| `/api/gemeo/previsoes` | todas as previsões guardadas (até 200) |
+| `POST /api/gemeo/previsao` | pede uma previsão agora (exige o cabeçalho `X-UTSim`, que o botão da página envia) |
 
 ## Gravação e reprodução
 
@@ -252,9 +258,146 @@ restante é removida.
   cargas MQTT acima de 256 KiB são descartadas; um conector com problema reconecta sem
   derrubar os outros.
 
+## Previsão
+
+Com `--previsao`, o gêmeo tira um **instantâneo** do estado observado a cada intervalo (e
+quando alguém clica em **Prever agora** na página `/gemeo/previsao`), monta com ele um
+[estado inicial](estado-inicial.md) e roda `R` replicações do modelo até o **horizonte**,
+cada uma com sua semente. A previsão roda num fio à parte: o gêmeo continua lendo a planta
+enquanto ela calcula.
+
+```bash
+utsim gemeo examples/gemeo/linha.ron --previsao --painel 8080 --gravar gravacoes
+# Painel do gêmeo em http://127.0.0.1:8080/gemeo ; previsão em http://127.0.0.1:8080/gemeo/previsao
+```
+
+A configuração fica na seção `forecast` (ou `previsao`) do `.gemeo.ron`; sem ela valem os
+padrões. O mesmo conteúdo, num arquivo próprio `Forecast(...)`, serve ao `utsim prever
+--config`:
+
+```ron
+Forecast(
+    every: 15.0,                          // a cada 15 unidades do gêmeo (aqui, 15 min); 0 = só sob pedido
+    horizon: EndOfShift(ends: [480.0, 960.0, 1440.0], period: 1440.0),  // turnos que acabam às 8 h, 16 h e 24 h; ou Hours(4.0), Time(240.0)
+    replications: 40,
+    time_unit: Minutes,                   // padrão: a do <modelo>.painel.ron, senão segundos
+    start_clock: 360.0,                   // minuto do dia no início do gêmeo (aqui, 06h00)
+    targets: {"producao": AtLeast(450.0), "lead_time": AtMost(30.0)},
+    limits: [(object: "fila", above: 20.0)],
+    watch: ["fila"],
+    scenarios: [
+        (name: "mais um operador", set: {"equipe.team": "[\"op1\", \"op2\", \"op3\"]"}),
+        (name: "operador mais próximo", set: {"equipe.rule": "Nearest"}),
+    ],
+    thresholds: (green: 0.9, yellow: 0.5),
+    points: 48,
+)
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `every` (`a_cada`) | 15 min na unidade do modelo | intervalo entre previsões, em tempo do gêmeo; `0` só sob pedido |
+| `horizon` (`horizonte`) | `Hours(4.0)` | `Time(t)` em unidades do modelo, `Hours(h)` ou `EndOfShift(ends, period)`: até o próximo fim de turno a partir do relógio do estado |
+| `replications` (`replicacoes`) | 40 | replicações por previsão (e por cenário) |
+| `seed` (`semente`) | a do modelo | semente base |
+| `time_unit` (`unidade_tempo`) | a do painel, senão `Seconds` | o que vale uma unidade de tempo do modelo (`Seconds`, `Minutes`, `Hours`, `Unit`) |
+| `start_clock` (`relogio_inicio`) | 0 | instante do calendário no tempo 0 do gêmeo (turnos e `EndOfShift`) |
+| `targets` (`metas`) | as do painel | metas por indicador: `AtLeast(v)` ou `AtMost(v)` |
+| `limits` (`limites`) | nenhum | `(object, above: v)` ou `(object, below: v)`: quando o conteúdo deve passar do limite |
+| `watch` (`acompanhar`) | nenhum | objetos cujo conteúdo aparece no tempo e no horizonte |
+| `compare` (`comparar`) | metas, produção, vazão, WIP, lead time | indicadores comparados nos cenários |
+| `scenarios` (`cenarios`) | nenhum | variações "e se", com as mesmas chaves `objeto.campo` de um [experimento](experimentos-e-otimizacao.md) |
+| `level` (`nivel`), `thresholds` (`limiares`) | 95 %; 90 % e 50 % | nível dos intervalos; limites do semáforo |
+| `points` (`pontos`) | 48 | instantes amostrados no horizonte (para a faixa no tempo e os limites) |
+
+O arquivo é conferido ao iniciar: objeto inexistente em `limits` ou `watch`, limite sem
+`above`/`below`, cenário que não se aplica ao modelo, menos de 2 replicações, horizonte em
+horas com unidade abstrata.
+
+### O que a previsão mostra
+
+| Indicador | Cálculo, por replicação |
+|---|---|
+| `producao` | itens que chegam às `Sink` entre o instante da previsão e o horizonte |
+| `vazao`, `lead_time`, `lead_time_p90`, `wip`, `utilizacao_gargalo`, ... | os mesmos do [painel](painel.md), no período da previsão |
+| `conteudo_final:<obj>` | conteúdo do objeto acompanhado no horizonte |
+
+Para cada indicador: a **média** com a **precisão da média** (intervalo de confiança de 95 %),
+a **faixa do que pode acontecer** (P5 a P95 entre as replicações) e, quando há meta, a
+**probabilidade de cumprir** (fração das replicações que cumprem, com o intervalo de Wilson)
+e o **semáforo** por essa probabilidade: verde a partir de 90 %, amarelo de 50 % a 90 %,
+vermelho abaixo.
+
+> **Precisão da média ou faixa do que pode acontecer?** São perguntas diferentes. A
+> precisão da média responde "quanto produzo, em média, a partir deste estado?" e encolhe
+> quando se rodam mais replicações. A faixa responde "quanto vou produzir neste turno?": em
+> 9 de cada 10 turnos que começassem assim, o resultado fica nela. Ela não encolhe com mais
+> replicações, porque mede a variação da própria fábrica. Uma meta pode estar fora da
+> precisão da média e ainda assim dentro da faixa: a fábrica a cumpre às vezes.
+
+No tempo, a página desenha o **leque** da produção acumulada, do WIP e do conteúdo dos
+objetos acompanhados: P5 a P95 em tom claro, P25 a P75 em tom mais forte, a mediana, a
+média com a precisão e a linha da meta.
+
+Para cada limite, a previsão dá a probabilidade de ele ser passado antes do horizonte (com
+Wilson) e, entre as replicações em que isso acontece, o instante P5, P50 e P95 ("a fila
+deve passar de 20 por volta de t = 1 230, entre 1 150 e 1 340"). O instante é procurado
+nos `points` instantes amostrados.
+
+### "E se"
+
+Cada cenário roda a partir do **mesmo estado** e com as **mesmas sementes** do "como está"
+(números aleatórios comuns): a replicação 3 do cenário vê as mesmas chegadas e os mesmos
+sorteios que a replicação 3 do "como está". A diferença é calculada replicação a
+replicação, com o seu intervalo de confiança; quando o intervalo não contém zero, a
+diferença é **significativa** e a tabela diz se **melhora** ou **piora** (pela meta; sem
+meta, mais produção e vazão é melhor, mais WIP e lead time é pior). `≈` quer dizer que a
+diferença não se distingue do acaso. Um cenário que não cabe no estado (por exemplo,
+capacidade menor que o conteúdo observado) aparece com o erro, sem derrubar a previsão.
+
+### Sementes e reprodução
+
+A semente de uma previsão mistura a semente base com o instante do instantâneo: duas
+previsões em instantes diferentes são independentes, e a mesma previsão sai sempre igual.
+Com `--gravar`, cada instantâneo vira uma linha `{"tipo":"previsao","t":…,"pedido":…}` na
+gravação, no ponto exato da sequência de leituras. `utsim gemeo reproduzir pasta
+--previsao` tira os instantâneos nessas linhas (não pelo relógio) e refaz as previsões,
+idênticas às da sessão; sem linhas gravadas, faz uma previsão no fim. Com `--json`, o
+relatório traz as previsões em `previsoes`.
+
+### Sem gêmeo: `utsim prever`
+
+A mesma previsão a partir de um arquivo de estado (ou do sistema vazio), útil para
+"simular a partir de segunda às 6 h" sem a fábrica ligada:
+
+```bash
+utsim prever examples/turnos.ron --estado examples/estados/turnos_21h30.ron \
+    --horizonte 2h --unidade min -n 40 --meta "producao>=10" \
+    --cenarios examples/estados/turnos_cenarios.ron --json previsao.json
+```
+
+| Opção | Efeito |
+|---|---|
+| `--estado arquivo.ron` | estado de partida (padrão: o sistema vazio) |
+| `--horizonte` | `4h`, `30min`, `90s` ou um número em unidades do modelo |
+| `-n` | replicações (padrão 40) |
+| `--unidade` | `s`, `min`, `h` ou `u` (padrão: a do `<modelo>.painel.ron`, senão segundos) |
+| `--meta` | `KPI>=valor` ou `KPI<=valor`, repetível |
+| `--cenarios` | lista RON `[(name: "...", set: {...})]` ou um arquivo de [experimento](experimentos-e-otimizacao.md) |
+| `--config` | arquivo `Forecast(...)` com todos os campos acima |
+| `--seed`, `--json` | semente; previsão completa em JSON |
+
+Aqui a semente é a do modelo, sem mistura: a previsão repete, replicação a replicação, o
+`utsim run modelo.ron --estado estado.ron --stop H`.
+
 ## Limitações desta entrega
 
-- Só o modo sombra: sem sincronizado, sem previsão e sem calibração automática.
+- Sem o modo sincronizado nem calibração automática; a previsão parte do estado observado
+  (contagens, quebras em curso, posições), sem a idade de cada item nem a fase de cada
+  estação, que entram como no [estado inicial](estado-inicial.md) por contagem.
+- O instante em que um limite é passado é procurado só nos instantes amostrados
+  (`points`); a avaliação das previsões passadas contra o real (cobertura, PIT) ainda não
+  existe.
 - Sem leitura de histórico (OPC UA HistoryRead) nem conector de arquivo, SQL ou Modbus.
 - Sem TLS no MQTT e sem login por usuário no OPC UA.
 - Contra a emulação muito acelerada, o intervalo mínimo de publicação do servidor OPC UA
