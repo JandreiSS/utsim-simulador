@@ -74,10 +74,9 @@ Model(
         ), position: (60.0, 0.0, 0.0)),
         (name: "fila_saida", kind: Queue(), position: (66.0, 0.0, 0.0)),
         // Separação de pedidos: 80 s por palete, com pausa de 15 min a cada 4 h.
-        (name: "separacao", kind: Processor(
-            process: Exp(mean: 80.0),
-            shifts: Some((period: 14400.0, off: [(start: 9000.0, duration: 900.0)])),
-        ), position: (72.0, 0.0, 0.0)),
+        (name: "separacao", kind: Processor(process: Exp(mean: 80.0)),
+            shifts: (period: 14400.0, off: [(start: 9000.0, duration: 900.0)]),
+            position: (72.0, 0.0, 0.0)),
         // Esteira de saída sem acúmulo: quando a expedição trava, a esteira inteira para.
         (name: "esteira_saida", kind: Conveyor(length: 10.0, speed: 0.5, item_length: 1.0, accumulating: false),
             position: (78.0, 0.0, 0.0)),

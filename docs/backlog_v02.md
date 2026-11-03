@@ -106,5 +106,6 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 | Testes de regressão visual do cliente Godot (capturas comparadas) | Sonnet |
 | Desempenho com modelos grandes (10 mil objetos, perfis do kernel e da ponte) | Opus |
 | Fuzzing do leitor de modelos `.ron` e da migração de formato | Sonnet |
+| Avisar campos desconhecidos no `.ron` (hoje um `shifts:` dentro de `Processor(...)` é ignorado em silêncio) | Sonnet |
 | Relatório de erros opcional, sem custo de servidor | Sonnet |
 | Reduzir o tamanho do pacote Linux | Haiku |
