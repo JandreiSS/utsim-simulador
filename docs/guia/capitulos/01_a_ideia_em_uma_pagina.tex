@@ -1,0 +1,83 @@
+\chapter{A ideia em uma página}
+\label{cap-ideia}
+
+\epigrafe{Todos os modelos estão errados, mas alguns são úteis.}{George E. P. Box}
+
+Este guia explica como o UTSim funciona. Ele não é um manual de consulta, que descreve cada objeto e cada botão, e sim um percurso em passos curtos, com esquemas simples, para quem precisa entender as ideias antes de usar a ferramenta. O público previsto são engenheiros de produção, estudantes e testadores que recebem a versão 0.1 do programa.
+
+O UTSim é um simulador de processos produtivos por eventos discretos. Ele serve para fábricas, armazéns e serviços, ou seja, para qualquer lugar em que itens (peças, caixas, clientes, pacientes) passam por etapas e esperam por recursos. Em vez de calcular o resultado por uma fórmula fechada, o programa reproduz o funcionamento do processo no computador, repetidas vezes, e mede o que aconteceu.
+
+Este primeiro capítulo apresenta a ideia inteira em uma página. Os capítulos seguintes abrem cada parte do percurso. A base teórica geral pode ser consultada em \textcite{law2015} e em \textcite{banks2010}, que são as referências clássicas da área e orientam a terminologia usada aqui.
+
+\section{O ciclo do estudo de simulação}
+
+Todo estudo de simulação segue o mesmo ciclo. Parte-se de um processo real, constrói-se um modelo dele, executa-se a simulação, leem-se os resultados e toma-se uma decisão. A decisão altera o processo real, e o ciclo recomeça quando surge uma nova pergunta. A Figura~\ref{fig-ciclo} mostra essas etapas.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=14mm]
+  \node[obj] (real) {Processo\\real};
+  \node[obj,right=of real] (modelo) {Modelo};
+  \node[obj,right=of modelo] (sim) {Simulação};
+  \node[obj,right=of sim] (res) {Resultados};
+  \node[objd,below=12mm of sim] (dec) {Decisão};
+  \draw[seta] (real) -- node[rotulo,above] {observar} (modelo);
+  \draw[seta] (modelo) -- node[rotulo,above] {executar} (sim);
+  \draw[seta] (sim) -- node[rotulo,above] {medir} (res);
+  \draw[seta] (res.south) |- (dec.east);
+  \draw[seta] (dec.west) -| node[rotulo,below,pos=0.25] {mudar o processo} (real.south);
+\end{tikzpicture}
+\caption{Ciclo de um estudo de simulação, do processo real à decisão e de volta ao processo.}
+\label{fig-ciclo}
+\end{figure}
+
+O UTSim cobre as quatro etapas do meio do ciclo. O modelo é um arquivo de texto com a extensão \texttt{.ron}, que pode ser escrito à mão ou montado no editor 3D. A simulação roda no motor do programa. Os resultados saem em tabelas, gráficos e arquivos. A decisão continua sendo da pessoa, mas o programa oferece comparação de cenários e otimização para apoiá-la.
+
+\section{O que é simulação a eventos discretos}
+
+\begin{definicao}{Simulação a eventos discretos}
+Técnica em que o estado de um sistema só muda em instantes bem definidos, chamados eventos. Entre dois eventos consecutivos nada muda, e por isso o simulador pode saltar de um evento ao seguinte sem percorrer o tempo intermediário.
+\end{definicao}
+
+Considere uma linha em que uma peça chega, espera numa fila, é usinada e sai. O número de peças na fila e o estado da máquina mudam quando uma peça chega, quando a usinagem termina ou quando a máquina quebra. Cada um desses instantes é um evento. O Capítulo~\ref{cap-relogio} mostra com detalhe como o relógio do simulador trabalha.
+
+\begin{analogia}
+Uma partida de xadrez jogada por correspondência avança de jogada em jogada. Ninguém precisa acompanhar o tabuleiro minuto a minuto, porque nada acontece entre uma carta e a seguinte. O simulador faz o mesmo com a fábrica.
+\end{analogia}
+
+\section{Por que não basta uma planilha}
+
+Uma planilha trabalha com médias. Se os clientes chegam em média a cada 5 minutos e o atendimento leva em média 4 minutos, a conta de média indica que o caixa tem folga e que ninguém espera. O resultado simulado é outro. Como os tempos variam de cliente para cliente, às vezes chegam dois seguidos e às vezes o atendimento demora, e uma fila se forma. No modelo de um caixa com essas médias, a espera média na fila passa de 16 minutos, mesmo com o caixa ocupado apenas 80\% do tempo.
+
+A Figura~\ref{fig-media} resume o contraste. A planilha prevê espera nula porque a capacidade média supera a demanda média. A simulação reproduz a variabilidade e mostra a espera real.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+  \draw[eixo] (0,0) -- (0,4.2) node[above,font=\footnotesize] {espera média na fila (min)};
+  \draw[eixo] (0,0) -- (6.2,0);
+  \foreach \y/\t in {0/0,1/4,2/8,3/12,4/16}{
+    \draw[inkgray] (-0.08,\y) -- (0.08,\y) node[left=3pt,font=\footnotesize,text=inkgray] {\t};
+  }
+  \fill[light] (1,0) rectangle (2.4,0.04);
+  \fill[accent] (3.6,0) rectangle (5,4.0);
+  \node[rotulo] at (1.7,-0.55) {Planilha\\(médias)};
+  \node[rotulo] at (4.3,-0.55) {Simulação\\(variabilidade)};
+  \node[rotulo] at (1.7,0.4) {0};
+  \node[rotulo] at (4.3,4.35) {16,5};
+\end{tikzpicture}
+\caption{Espera média na fila de um caixa com chegadas a cada 5 min e atendimento de 4 min, em média, calculada com médias e por simulação.}
+\label{fig-media}
+\end{figure}
+
+A variabilidade, portanto, não é um detalhe a ser ignorado. Ela é a causa de filas, de ociosidade e de atrasos em sistemas cuja capacidade média parece suficiente. Por isso o UTSim trata os tempos como distribuições de probabilidade e repete a simulação várias vezes, como o Capítulo~\ref{cap-aleatoriedade} explica.
+
+\section{Como ler o restante do guia}
+
+Cada capítulo traz uma ideia e um ou dois esquemas. O Capítulo~\ref{cap-modelo} descreve o modelo, feito de objetos e ligações. O Capítulo~\ref{cap-relogio} explica o relógio e a lista de eventos. O Capítulo~\ref{cap-aleatoriedade} trata de sorteios, replicações e confiança. O Capítulo~\ref{cap-moveis} traz as pessoas e os veículos, e a distância que eles percorrem. O Capítulo~\ref{cap-dados} mostra como obter distribuições a partir de dados reais. O Capítulo~\ref{cap-decisao} leva dos resultados à decisão, e o Capítulo~\ref{cap-tela} apresenta o que se vê no editor e no 3D.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+Um estudo de simulação percorre o ciclo processo real, modelo, simulação, resultados e decisão. A simulação a eventos discretos salta de evento em evento e, por isso, é rápida. Médias sozinhas escondem o efeito da variabilidade, que é a principal causa de filas em sistemas com folga aparente. O UTSim reproduz essa variabilidade e informa o resultado com uma medida de incerteza.
+\end{sintese}

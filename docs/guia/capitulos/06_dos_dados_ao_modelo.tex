@@ -1,0 +1,125 @@
+\chapter{Dos dados ao modelo}
+\label{cap-dados}
+
+\epigrafe{Os tempos do modelo devem vir do processo, e não da memória de quem o conhece.}{}
+
+Um modelo só é tão bom quanto os tempos que ele usa. Se o tempo de atendimento é escrito de cabeça, com uma distribuição escolhida por hábito, a simulação herda esse palpite e o devolve com aparência de resultado. Sempre que existirem medições, o caminho correto é ajustar uma distribuição a elas.
+
+Ajustar uma distribuição significa escolher, entre várias famílias possíveis, a que melhor descreve os dados, e estimar os seus parâmetros. Isso envolve estimar, testar e comparar. O UTSim faz o trabalho pelo comando \texttt{utsim fit}, que recebe uma coluna de números, avalia vinte famílias e entrega uma recomendação com a justificativa.
+
+Este capítulo mostra o raciocínio do ajuste, a regra que escolhe a vencedora e os cuidados com os dados. Em seguida trata de um caso à parte, o das chegadas que mudam ao longo do dia, para as quais uma única distribuição não basta.
+
+\section{O que o ajuste recebe e entrega}
+
+A entrada é um arquivo CSV ou TXT com uma coluna de medições, por exemplo os tempos de atendimento de cem clientes. Se a coluna traz os instantes das chegadas, e não as durações, o programa trabalha sobre os intervalos entre eles. A saída é um relatório com as estatísticas dos dados, um diagnóstico, uma tabela de candidatas, uma explicação por candidata e, no fim, a linha pronta para colar no modelo.
+
+O primeiro passo do relatório é descrever os dados. Número de observações, média, mediana, desvio padrão e coeficiente de variação dão uma primeira pista. Um coeficiente de variação perto de 1 sugere a exponencial. Bem abaixo de 1 sugere a gama ou a Erlang. Acima de 1 sugere caudas longas.
+
+O segundo passo é o diagnóstico. Os testes estatísticos supõem observações independentes e identicamente distribuídas. O programa verifica se há dependência na ordem, tendência ao longo da coleta e autocorrelação, além de valores atípicos. Uma tendência, por exemplo, indica que o processo mudou durante a coleta, e o ajuste deve ser reavaliado.
+
+\section{Candidatas e testes}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.8cm,y=0.9cm]
+  % barras do histograma
+  \foreach \i/\h in {0/0.3,1/1.2,2/2.0,3/2.4,4/2.3,5/1.9,6/1.4,7/1.0,8/0.6,9/0.35,10/0.2,11/0.1}{
+    \fill[light!45] (\i,0) rectangle (\i+1,\h);
+    \draw[light] (\i,0) rectangle (\i+1,\h);
+  }
+  \draw[eixo] (0,0) -- (12.8,0) node[right,font=\footnotesize] {tempo};
+  \draw[eixo] (0,0) -- (0,3.4) node[above,font=\footnotesize] {frequência};
+  % gama
+  \draw[primary,very thick] plot[smooth] coordinates {(0,0) (0.5,0.35) (1.5,1.2) (2.5,2.05) (3.5,2.35) (4.5,2.2) (5.5,1.85) (6.5,1.4) (7.5,1.0) (8.5,0.65) (9.5,0.38) (10.5,0.2) (12,0.05)};
+  % exponencial
+  \draw[accent,very thick] plot[smooth] coordinates {(0,2.9) (2,2.0) (4,1.4) (6,0.95) (9,0.5) (12,0.2)};
+  % lognormal
+  \draw[secondary,thick,dashed] plot[smooth] coordinates {(0,0) (1,1.1) (2,2.2) (3,2.45) (4,2.1) (5,1.7) (6,1.35) (8,0.8) (10,0.45) (12,0.25)};
+  % legenda
+  \draw[primary,very thick] (7.8,3.2) -- (8.5,3.2) node[right,font=\footnotesize,text=inkgray] {Gama};
+  \draw[accent,very thick] (7.8,2.8) -- (8.5,2.8) node[right,font=\footnotesize,text=inkgray] {Exponencial};
+  \draw[secondary,thick,dashed] (7.8,2.4) -- (8.5,2.4) node[right,font=\footnotesize,text=inkgray] {Lognormal};
+\end{tikzpicture}
+\caption{Histograma de tempos de atendimento com três curvas candidatas. A gama acompanha a forma dos dados, e a exponencial não reproduz o pico inicial. As curvas são ilustrativas.}
+\label{fig-histograma}
+\end{figure}
+
+O relatório compara as famílias com a mesma régua. Cada candidata tem os parâmetros estimados por máxima verossimilhança e passa por testes de aderência. O teste de Kolmogorov e Smirnov mede a maior distância entre a curva acumulada dos dados e a da família. O teste de Anderson e Darling \cite{anderson1952} é parecido, mas dá mais peso às caudas. O qui-quadrado compara a contagem de dados em faixas de igual probabilidade com a contagem esperada. Como os parâmetros foram estimados dos próprios dados, os p-valores dos dois primeiros testes vêm de um bootstrap paramétrico, em que o programa simula amostras da família ajustada, reajusta cada uma e conta com que frequência o teste dá pior.
+
+Além dos testes, cada candidata recebe o critério de informação de Akaike \cite{akaike1974}, o AIC, que mede o ajuste com um desconto pelo número de parâmetros. Quanto menor o AIC, melhor o compromisso entre ajuste e simplicidade. O que importa é a diferença para o menor valor, chamada $\Delta$AIC.
+
+\section{A regra de escolha}
+
+A regra que escolhe a vencedora é a mesma em todo relatório e segue uma sequência de passos.
+
+\begin{enumerate}
+  \item Famílias que não se aplicam aos dados ficam por último.
+  \item Uma família é rejeitada se algum teste de aderência der p menor que o nível de significância, em geral 0,05.
+  \item Entre as não rejeitadas vence a de menor AIC.
+  \item Famílias aceitas com $\Delta$AIC menor que 2 são equivalentes, e entre elas vence a de menos parâmetros.
+  \item Se todas forem rejeitadas, recomenda-se a distribuição empírica, que usa os próprios dados.
+\end{enumerate}
+
+Duas consequências valem a atenção. A primeira é que o menor AIC nem sempre vence. Se a gama tem AIC 409,3 e a exponencial tem 410,6, as duas descrevem os dados igualmente bem, e a regra prefere a exponencial por ter um parâmetro só. A segunda é que uma família com AIC baixo pode ser rejeitada por um teste, por exemplo quando a forma da cauda é diferente. A Tabela~\ref{tab-candidatas} mostra um quadro com valores ilustrativos.
+
+\begin{table}[ht]
+\centering
+\caption{Exemplo ilustrativo de tabela de candidatas, com a situação de cada família.}
+\label{tab-candidatas}
+\begin{tabular}{@{}lccl@{}}
+\toprule
+\textbf{Família} & \textbf{Parâmetros} & $\Delta$\textbf{AIC} & \textbf{Situação} \\
+\midrule
+Gama        & 2 & 0,0 & escolhida \\
+Weibull     & 2 & 0,8 & aceita, equivalente, mesmo número de parâmetros \\
+Lognormal   & 2 & 1,5 & rejeitada pelo qui-quadrado \\
+Exponencial & 1 & 9,4 & rejeitada pelo teste de Kolmogorov e Smirnov \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O relatório inclui ainda uma frase por candidata explicando por que ela foi escolhida, rejeitada ou aceita e superada. Os gráficos do relatório HTML completam a leitura. Os testes dizem se a família serve ou não. Os gráficos mostram onde ela falha.
+
+\section{Cuidados com os dados}
+
+Quanto mais dados, melhor. Com menos de 30 observações os testes têm pouca força, e com 100 ou mais o ajuste fica confiável. Dados arredondados enfraquecem os testes, e o programa avisa. Não se deve ajustar uma única distribuição a dados que misturam situações diferentes, como o turno da manhã e o da noite, ou dois tipos de peça. Cada situação merece o seu ajuste. Os dados de tempo de atendimento devem conter só o atendimento, sem a espera na fila. E o ajuste não substitui o bom senso, pois uma família com justificativa física, como a Erlang para etapas em série, deve ser preferida quando estiver entre as equivalentes.
+
+\section{Chegadas por período}
+
+Um caso comum em que uma distribuição só não serve é o das chegadas que mudam com a hora. A manhã é cheia e o almoço é calmo. Para isso, a chegada aceita uma tabela de períodos que se repete a cada ciclo, em geral um dia. Cada período tem a sua taxa de chegadas, ou a sua distribuição do tempo entre chegadas, ou pode ser marcado como fechado, sem chegadas.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.5cm,y=1cm]
+  \draw[eixo] (0,0) -- (25,0) node[right,font=\footnotesize] {hora do dia};
+  \draw[eixo] (0,0) -- (0,3.2) node[above,font=\footnotesize] {chegadas por hora};
+  \fill[accent!35] (0,0) rectangle (6,0.02);
+  \fill[light!60] (6,0) rectangle (10,1.4);
+  \fill[secondary!70] (10,0) rectangle (12,2.4);
+  \fill[light!60] (12,0) rectangle (14,0.8);
+  \fill[secondary!70] (14,0) rectangle (18,2.0);
+  \fill[light!60] (18,0) rectangle (22,1.1);
+  \fill[accent!35] (22,0) rectangle (24,0.02);
+  \foreach \x in {0,6,10,12,14,18,22,24}{
+    \draw[inkgray,dashed] (\x,0) -- (\x,2.8);
+    \node[font=\footnotesize,text=inkgray] at (\x,-0.35) {\x};
+  }
+  \node[rotulo,font=\scriptsize] at (3,0.45) {fechado};
+  \node[rotulo] at (8,1.75) {baixa};
+  \node[rotulo,font=\scriptsize] at (11,2.75) {alta};
+  \node[rotulo,font=\scriptsize] at (13,1.15) {calma};
+  \node[rotulo] at (16,2.35) {alta};
+  \node[rotulo] at (20,1.45) {média};
+  \node[rotulo,font=\scriptsize] at (23,0.5) {fech.};
+\end{tikzpicture}
+\caption{Dia dividido em períodos, cada um com a sua taxa de chegadas. A tabela se repete a cada ciclo de 24 horas.}
+\label{fig-periodos}
+\end{figure}
+
+Dentro de cada período com taxa, as chegadas formam um processo de Poisson. A troca de taxa na fronteira entre dois períodos é exata, porque esse processo não tem memória. Fora de qualquer período não há chegadas, e a chegada mostra o estado fora do horário. Os rótulos dos itens também podem mudar por período, o que permite, por exemplo, que a mistura de tipos de cliente seja diferente de manhã e à tarde.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+Os tempos do modelo devem vir de dados, ajustando-se uma distribuição a eles. O comando \texttt{utsim fit} testa vinte famílias, aplica testes de aderência e o critério de Akaike e escolhe a vencedora por uma regra fixa, preferindo a mais simples entre as equivalentes. O relatório explica a escolha e entrega a linha pronta para o modelo. Quando o ritmo de chegada muda com a hora, a chegada por período divide o dia em faixas com taxas próprias.
+\end{sintese}

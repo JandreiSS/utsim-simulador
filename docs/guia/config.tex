@@ -1,0 +1,112 @@
+% Configuração do guia "Como o UTSim funciona"
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[brazilian]{babel}
+\usepackage{csquotes}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage[a4paper,margin=2.4cm,headheight=14pt]{geometry}
+\usepackage[table]{xcolor}
+
+% Paleta industrial
+\definecolor{primary}{HTML}{1F4E5F}
+\definecolor{secondary}{HTML}{2E7D8C}
+\definecolor{light}{HTML}{5FA8B8}
+\definecolor{accent}{HTML}{E8A23B}
+\definecolor{cream}{HTML}{FAF7F0}
+\definecolor{inkgray}{HTML}{4A5560}
+
+\pagecolor{cream}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds,decorations.pathreplacing}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\usepackage[style=numeric,backend=biber,sorting=none]{biblatex}
+\DeclareFieldFormat{labelnumber}{\color{primary}\textbf{#1}}
+\addbibresource{referencias.bib}
+
+\usepackage[colorlinks=true,linkcolor=primary,citecolor=secondary,urlcolor=secondary,
+  pdftitle={Como o UTSim funciona},pdfauthor={Jandrei}]{hyperref}
+
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0.2em}
+\setstretch{1.04}
+\setlist{nosep}
+
+% Títulos
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\color{primary}}
+  {\mdseries\Large\scshape\color{secondary}Capítulo \thechapter}
+  {0.5em}
+  {\Huge}
+  [\vspace{0.3em}{\color{accent}\titlerule[2pt]}]
+\titlespacing*{\chapter}{0pt}{-10pt}{18pt}
+\titleformat{\section}{\Large\bfseries\color{primary}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{secondary}}{\thesubsection}{0.7em}{}
+
+% Cabeçalho e rodapé
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{inkgray}\nouppercase{\leftmark}}
+\fancyhead[R]{\small\color{inkgray}\nouppercase{\rightmark}}
+\fancyfoot[C]{\small\color{primary}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\color{primary}\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% Legendas
+\captionsetup{font=small,labelfont={bf,color=primary},labelsep=period,justification=centering}
+
+% Epígrafe
+\newcommand{\epigrafe}[2]{%
+  \begin{flushright}
+    \begin{minipage}{0.7\textwidth}
+      \raggedleft\itshape\color{inkgray} #1\par
+      \vspace{0.3em}\upshape\small\scshape\color{secondary} #2
+    \end{minipage}
+  \end{flushright}
+  \vspace{1.2em}}
+
+% Caixas
+\newtcolorbox{sintese}{enhanced,breakable,colback=white,colframe=primary,
+  coltitle=white,colbacktitle=primary,fonttitle=\bfseries,title={Em resumo},
+  boxrule=0.6pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,
+  borderline west={3pt}{0pt}{accent}}
+\newtcolorbox{analogia}{enhanced,breakable,colback=white,colframe=light,
+  coltitle=primary,colbacktitle=light!35,fonttitle=\bfseries,title={Uma comparação},
+  boxrule=0.6pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt}
+\newtcolorbox[auto counter,number within=chapter]{definicao}[1]{enhanced,breakable,
+  colback=white,colframe=secondary,coltitle=white,colbacktitle=secondary,
+  fonttitle=\bfseries,title={Definição~\thetcbcounter\ (#1)},
+  boxrule=0.6pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt}
+
+% Listagens
+\lstdefinestyle{ron}{basicstyle=\ttfamily\small,backgroundcolor=\color{white},
+  frame=single,rulecolor=\color{light},xleftmargin=0.5em,xrightmargin=0.5em,
+  keywordstyle=\color{primary}\bfseries,commentstyle=\color{inkgray}\itshape,
+  columns=fullflexible,breaklines=true,showstringspaces=false,aboveskip=0.8em,belowskip=0.8em}
+\lstset{style=ron}
+
+% Estilos TikZ
+\tikzset{
+  obj/.style={draw=primary,fill=white,thick,rounded corners=2pt,minimum height=9mm,
+    minimum width=18mm,font=\small,align=center,text=primary},
+  objf/.style={obj,fill=light!25},
+  objd/.style={obj,fill=accent!25,draw=accent!80!black},
+  item/.style={draw=accent!80!black,fill=accent,rectangle,minimum size=3.2mm,inner sep=0pt},
+  seta/.style={-{Stealth[length=2.6mm]},thick,color=primary},
+  setaf/.style={-{Stealth[length=2.4mm]},semithick,color=secondary},
+  tracejada/.style={-{Stealth[length=2.4mm]},semithick,dashed,color=inkgray},
+  rotulo/.style={font=\footnotesize,text=inkgray,align=center},
+  eixo/.style={-{Stealth[length=2.2mm]},thick,color=inkgray},
+  evento/.style={circle,draw=primary,fill=white,minimum size=2.2mm,inner sep=0pt,thick},
+}

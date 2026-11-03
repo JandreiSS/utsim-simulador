@@ -148,6 +148,10 @@ Objetivo: montar e alterar um modelo no Godot, como no editor Bevy, com desfazer
   - a biblioteca da ponte em release ao lado do executável;
   - os `.glb` importados dentro do `.pck`;
   - o catálogo de terceiros com os créditos (`assets/terceiros/CREDITOS.md`).
+- **Abertura e avisos:** a tela de abertura é a do UTSim (`godot/abertura.png`, configurada em
+  `application/boot_splash`), sem o logo do motor. A licença MIT do Godot pede só o aviso de
+  copyright acessível ao usuário: a tela "Sobre" mostra `Engine.get_license_text()` e
+  `Engine.get_copyright_info()`, ao lado dos créditos dos ativos.
 - **Instaladores:**
   - integrar ao instalador do Windows (NSIS) e ao `.deb` e `.tar.gz` da fase 12, com o
     `utsim` e o `utsim-view`;

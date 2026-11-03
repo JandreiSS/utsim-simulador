@@ -1,0 +1,90 @@
+\chapter{O relógio da simulação}
+\label{cap-relogio}
+
+\epigrafe{Entre dois eventos nada acontece, e é por isso que o relógio pode saltar.}{}
+
+A simulação de um processo não percorre o tempo segundo a segundo. Se uma peça leva 40 minutos para ser usinada, não há razão para atualizar o estado 2400 vezes durante a usinagem, porque nada muda nesse intervalo. O que importa são os instantes em que algo muda, e o simulador trabalha apenas com eles.
+
+Para isso, o motor mantém um relógio e uma lista dos eventos que ainda vão acontecer. A cada passo, ele retira da lista o evento mais próximo, avança o relógio até o instante desse evento e atualiza o estado do sistema. A atualização pode criar novos eventos futuros, que entram na lista. O processo termina quando a lista esvazia ou quando o tempo de parada é alcançado.
+
+É por esse mecanismo que o UTSim simula semanas de uma fábrica em frações de segundo. Este capítulo mostra o mecanismo num exemplo pequeno, com quatro itens e um servidor, que pode ser acompanhado à mão. A descrição geral do método está em \textcite{law2015} e em \textcite{banks2010}.
+
+\section{Eventos e a lista de eventos futuros}
+
+\begin{definicao}{Lista de eventos futuros}
+Conjunto ordenado pelo instante dos eventos já agendados e ainda não executados. O evento do início da lista é sempre o próximo a ocorrer. O relógio da simulação assume o instante desse evento no momento em que ele é executado.
+\end{definicao}
+
+No exemplo de uma fila com um servidor, há três tipos de evento. A chegada de um item cria o item e agenda a chegada do seguinte. O início do serviço ocorre quando o servidor está livre e há um item esperando, e agenda o fim do serviço. O fim do serviço libera o servidor e leva o item para a saída. Em cada execução o evento pode agendar novos eventos, e é assim que a simulação se sustenta sozinha a partir de um primeiro agendamento.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.9cm]
+  \draw[eixo] (-0.3,0) -- (13.6,0) node[right,font=\footnotesize] {$t$};
+  % marcas do tempo
+  \foreach \x in {0,2,4,6,8,10,12,14}{
+    \draw (\x*0.9,0.08) -- (\x*0.9,-0.08);
+  }
+  % chegadas (acima), alternando a altura dos rótulos
+  \foreach \x/\n/\h/\anc in {2/1/1.1/east,3/2/2.0/west,7/3/1.1/east,8/4/2.0/west}{
+    \draw[setaf] (\x*0.9,\h) -- (\x*0.9,0.12);
+    \node[rotulo,anchor=\anc] at (\x*0.9,\h) {cheg. \n\ ($t=\x$)};
+  }
+  % fins (abaixo), alternando a altura dos rótulos
+  \foreach \x/\n/\h in {6/1/-0.8,9/2/-1.6,11/3/-0.8,14/4/-1.6}{
+    \draw[tracejada] (\x*0.9,\h) -- (\x*0.9,-0.12);
+    \node[rotulo,below] at (\x*0.9,\h) {fim \n\ ($t=\x$)};
+  }
+  % servidor ocupado
+  \fill[accent!70] (2*0.9,-0.07) rectangle (14*0.9,0.07);
+  \node[rotulo] at (11*0.9,0.4) {servidor ocupado};
+\end{tikzpicture}
+\caption{Linha do tempo de quatro itens num servidor. O relógio salta entre os instantes marcados e não passa por nenhum outro.}
+\label{fig-linha-tempo}
+\end{figure}
+
+\section{Um exemplo passo a passo}
+
+Quatro itens chegam nos instantes 2, 3, 7 e 8 minutos. Os tempos de serviço são 4, 3, 2 e 3 minutos, respectivamente. Há um servidor e a fila é de ordem de chegada. Os tempos são fixos aqui para que a conta caiba na mão, mas no UTSim cada um deles seria sorteado de uma distribuição.
+
+A Tabela~\ref{tab-eventos} registra cada passo da simulação. As colunas mostram o relógio, o evento executado, o estado da fila e do servidor depois do evento, e o conteúdo da lista de eventos futuros. Observe como o relógio vai de 0 a 2, de 2 a 3 e de 3 a 6, sem visitar os instantes intermediários.
+
+\begin{table}[ht]
+\centering
+\caption{Execução à mão de quatro itens num servidor. A fila lista os itens esperando, e a lista de eventos futuros mostra instante e evento.}
+\label{tab-eventos}
+\small
+\begin{tabular}{@{}cclccl@{}}
+\toprule
+\textbf{Passo} & \textbf{Relógio} & \textbf{Evento executado} & \textbf{Fila} & \textbf{Servidor} & \textbf{Eventos futuros} \\
+\midrule
+0 & 0  & início da simulação          & vazia & livre   & cheg1@2 \\
+1 & 2  & chegada do item 1, serviço começa & vazia & item 1 & cheg2@3, fim1@6 \\
+2 & 3  & chegada do item 2            & 2     & item 1  & fim1@6, cheg3@7 \\
+3 & 6  & fim do item 1, serviço do 2 começa & vazia & item 2 & cheg3@7, fim2@9 \\
+4 & 7  & chegada do item 3            & 3     & item 2  & cheg4@8, fim2@9 \\
+5 & 8  & chegada do item 4            & 3, 4  & item 2  & fim2@9 \\
+6 & 9  & fim do item 2, serviço do 3 começa & 4  & item 3  & fim3@11 \\
+7 & 11 & fim do item 3, serviço do 4 começa & vazia & item 4 & fim4@14 \\
+8 & 14 & fim do item 4                & vazia & livre   & vazia \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A tabela termina quando a lista de eventos futuros fica vazia. Nesse exemplo foram nove passos para cobrir quatorze minutos, e o tempo de cada passo no computador não depende de quanto tempo simulado ele representa. Numa fábrica com milhares de itens o princípio é o mesmo, apenas com mais eventos na lista.
+
+\section{O que se mede a partir dos eventos}
+
+As medidas saem do registro dos eventos. A espera de cada item é a diferença entre o instante em que o serviço começa e o instante da chegada. No exemplo, os itens esperam 0, 3, 2 e 3 minutos, o que dá uma espera média de 2 minutos. O servidor trabalhou 12 dos 14 minutos, uma ocupação de cerca de 86\%.
+
+O conteúdo médio da fila é uma média ponderada pelo tempo. Houve um item esperando de 3 a 6, um de 7 a 8, dois de 8 a 9 e um de 9 a 11, o que soma 8 minutos de item em fila. Dividido pelos 14 minutos simulados, o resultado é aproximadamente 0,57 item. Esse número é coerente com a espera média, como o Capítulo~\ref{cap-aleatoriedade} mostra ao tratar da lei de Little.
+
+\begin{analogia}
+A lista de eventos funciona como uma agenda. O simulador abre a agenda, vai direto ao próximo compromisso, anota o que aconteceu e marca os compromissos novos que resultaram dele. Os dias vazios entre os compromissos não ocupam tempo de trabalho.
+\end{analogia}
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+O motor mantém um relógio e uma lista de eventos futuros. A cada passo ele executa o evento mais próximo, avança o relógio até ele e agenda os eventos que resultam. Nada é calculado entre dois eventos, e por isso a simulação é rápida. Com os eventos registrados obtêm-se esperas, ocupações e conteúdos médios ponderados pelo tempo.
+\end{sintese}

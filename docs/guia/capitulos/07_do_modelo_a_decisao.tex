@@ -1,0 +1,117 @@
+\chapter{Do modelo à decisão}
+\label{cap-decisao}
+
+\epigrafe{Vale mais uma resposta aproximada à pergunta certa do que uma resposta exata à pergunta errada.}{John W. Tukey}
+
+Um modelo validado e alimentado com dados reais está pronto para responder às perguntas de decisão. Quantas máquinas são necessárias para dar conta da demanda? Onde está o gargalo? Vale a pena comprar mais uma empilhadeira? O que muda se duas estações forem afastadas?
+
+O UTSim organiza as respostas em três níveis. O primeiro é o relatório de uma rodada, que mostra o estado do modelo atual. O segundo é a comparação de cenários, em que algumas alternativas escolhidas pelo analista são postas lado a lado. O terceiro é a otimização, em que o programa procura sozinho a melhor combinação de parâmetros dentro de limites definidos.
+
+Este capítulo percorre os três níveis. Em todos eles vale a mesma disciplina estatística do Capítulo~\ref{cap-aleatoriedade}, pois uma diferença só tem valor quando é maior que a incerteza das medidas.
+
+\section{Ler o relatório de resultados}
+
+O relatório do \texttt{utsim run} traz uma linha por objeto, com as entradas, as saídas, o conteúdo médio e a permanência média, sempre como média e meia-amplitude do intervalo de 95\%. Numa fila, o conteúdo médio é o tamanho médio da fila e a permanência é a espera. Numa chegada, as entradas são nulas, e numa saída as saídas são nulas. A Tabela~\ref{tab-relatorio} reproduz o resultado da fila de um servidor usada como exemplo no projeto.
+
+\begin{table}[ht]
+\centering
+\caption{Trecho do relatório de uma fila de um servidor, com 10 replicações. A teoria prevê 3,2 itens na fila, espera de 3,2 e tempo no sistema de 4,0.}
+\label{tab-relatorio}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+\textbf{Objeto} & \textbf{Tipo} & \textbf{Conteúdo médio} & \textbf{Permanência média} \\
+\midrule
+fila    & queue     & $3{,}2147 \pm 0{,}1019$ & $3{,}2152 \pm 0{,}0975$ \\
+maquina & processor & $0{,}8000 \pm 0{,}0020$ & $0{,}8001 \pm 0{,}0015$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Além da tabela, o relatório traz a fração do tempo em cada estado de cada objeto. O recurso que trabalha fica no estado de processamento, o ocioso fica parado, e o que segura um item pronto que não consegue sair fica bloqueado. A ocupação resume isso numa medida só. Ela é a fração do tempo em que o recurso trabalha e nunca passa de 100\% por servidor. Num processo com vários servidores, o estado de processamento engana, porque basta um servidor ocupado para ele contar. A ocupação divide a média de servidores ocupados pela capacidade.
+
+\subsection{O gargalo}
+
+O gargalo é o recurso de maior ocupação entre processos, montagens, desmontagens e transportadores. O UTSim mostra dois. O gargalo geral considera o tempo todo. O gargalo dentro do turno considera apenas o tempo em que o recurso está de serviço. Um posto que funciona meio dia pode parecer folgado na visão geral e estar saturado enquanto funciona, e o segundo critério revela isso. Quando todos os recursos têm os mesmos turnos, os dois critérios costumam apontar o mesmo objeto.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[y=0.75cm,x=0.07cm]
+  \draw[tracejada] (100,-0.5) -- (100,-4.5);
+  \foreach \i/\nome/\v/\cor in {1/Recebimento/45/light,2/Usinagem/92/accent,3/Pintura/63/light,4/Embalagem/38/light}{
+    \node[font=\footnotesize,anchor=east,text=inkgray] at (-2,-\i) {\nome};
+    \fill[\cor] (0,-\i-0.28) rectangle (\v,-\i+0.28);
+    \node[font=\footnotesize,anchor=west,text=inkgray,fill=cream,inner sep=1pt] at (\v+2,-\i) {\v\%};
+  }
+  \draw[eixo] (0,-0.4) -- (0,-4.7);
+  \node[rotulo] at (100,-4.9) {100\%};
+\end{tikzpicture}
+\caption{Ocupação de quatro recursos de uma linha hipotética. O recurso de maior ocupação, destacado, é o gargalo.}
+\label{fig-gargalo}
+\end{figure}
+
+\section{Comparar cenários}
+
+Um experimento parte de um modelo e lista cenários, cada um com alterações em relação ao modelo base. Um cenário pode trocar a distribuição do tempo de uma máquina, aumentar a capacidade de uma estação ou mudar a posição de um objeto. O programa roda as replicações de cada cenário e apresenta as medidas lado a lado.
+
+O ponto técnico mais importante é o uso das mesmas sementes em todos os cenários. A replicação 1 de um cenário usa os mesmos sorteios da replicação 1 dos outros, e assim por diante. Dessa forma a diferença entre dois cenários vem da decisão, e não da sorte do sorteio. Essa técnica se chama números aleatórios comuns, e é tratada em \textcite{kleijnen2008} e em \textcite{law2015}. Como as observações dos cenários ficam emparelhadas, o programa calcula a diferença replicação a replicação, a diferença pareada, e o intervalo dessa diferença costuma ser bem mais estreito que o de cada média.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+  \draw[eixo] (0,0) -- (0,4.3) node[above,font=\footnotesize] {fila média};
+  \draw[eixo] (0,0) -- (8.2,0);
+  \foreach \y in {0,1,2,3,4}{
+    \draw (-0.07,\y) -- (0.07,\y) node[left=3pt,font=\footnotesize,text=inkgray] {\y};
+  }
+  % cenários: base 3,21 ± 0,10; rápida 1,63 ± 0,04; duas 0,15 ± 0,004
+  \foreach \x/\m/\h/\nome in {1.3/3.2147/0.1019/{A. base},4.1/1.6344/0.0365/{B. máquina rápida},6.9/0.1519/0.0042/{C. duas máquinas}}{
+    \fill[light!70] (\x-0.5,0) rectangle (\x+0.5,\m);
+    \draw[primary,thick] (\x,\m-\h) -- (\x,\m+\h);
+    \draw[primary,thick] (\x-0.12,\m-\h) -- (\x+0.12,\m-\h);
+    \draw[primary,thick] (\x-0.12,\m+\h) -- (\x+0.12,\m+\h);
+    \node[rotulo] at (\x,-0.6) {\nome};
+  }
+  \node[rotulo] at (1.3,3.7) {$3{,}21 \pm 0{,}10$};
+  \node[rotulo] at (4.1,2.1) {$1{,}63 \pm 0{,}04$};
+  \node[rotulo] at (6.9,0.6) {$0{,}15 \pm 0{,}004$};
+\end{tikzpicture}
+\caption{Conteúdo médio da fila em três cenários. As barras são as médias e os traços verticais são os intervalos de confiança de 95\%. Os valores vêm do exemplo de comparação do projeto.}
+\label{fig-cenarios}
+\end{figure}
+
+Nos cenários da Figura~\ref{fig-cenarios}, os intervalos não se tocam, e a conclusão é clara. A diferença pareada entre a máquina rápida e o cenário base é $-1{,}58 \pm 0{,}08$, e entre as duas máquinas e o base é $-3{,}06 \pm 0{,}10$. Em ambos os casos o intervalo está longe de zero. O programa marca com um sinal de aproximação as diferenças cujo intervalo contém zero, e nelas não se pode afirmar que os cenários diferem. Quando os intervalos de duas médias se sobrepõem, não se deve concluir nada olhando apenas para eles. A diferença pareada é o instrumento adequado.
+
+Uma boa prática é mudar uma coisa por vez, para saber a causa de cada diferença, e dar nomes curtos aos cenários. Os experimentos servem para comparar poucas alternativas escolhidas pelo analista. Para explorar muitas combinações, a otimização é o caminho.
+
+\section{Otimização}
+
+Na otimização, o analista descreve o que pode variar e o que se quer minimizar ou maximizar, e o programa procura a melhor combinação. O problema tem quatro partes. As variáveis de decisão são os parâmetros que podem mudar, cada uma com o seu domínio, que pode ser um conjunto de inteiros, um intervalo contínuo ou uma lista de opções. O objetivo é uma soma de métricas ponderadas e de custos por unidade das variáveis, como o custo de cada máquina. As restrições são limites sobre métricas, por exemplo uma ocupação máxima de 95\%. O método de busca pode ser a grade, que testa todas as combinações, o recozimento simulado ou o algoritmo genético, que servem a problemas com muitos valores possíveis.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=9mm]
+  \node[obj] (v) {Variáveis\\e domínios};
+  \node[obj,right=of v] (b) {Busca\\(grade, recozimento,\\genético)};
+  \node[obj,right=of b] (s) {Simulação\\com replicações};
+  \node[obj,right=of s] (r) {Melhor\\ponto};
+  \draw[seta] (v) -- (b);
+  \draw[seta] (b.east) -- (s.west);
+  \draw[seta] (s.north) to[bend right=35] node[rotulo,above] {objetivo e restrições} (b.north);
+  \draw[seta] (s) -- (r);
+  \node[obj,below=8mm of s,minimum width=30mm] (ref) {Refinamento\\dos melhores};
+  \draw[seta] (s.south) -- (ref.north);
+  \draw[seta] (ref.east) -| (r.south);
+\end{tikzpicture}
+\caption{Fluxo da otimização. A busca propõe pontos, a simulação avalia cada um com replicações e devolve o objetivo e as restrições. Os melhores pontos são simulados de novo com mais replicações.}
+\label{fig-otimizacao}
+\end{figure}
+
+Todos os métodos guardam os pontos já simulados, de modo que nenhum ponto é avaliado duas vezes, e o orçamento conta pontos distintos. Ao final, os melhores pontos viáveis podem ser simulados de novo com mais replicações e as mesmas sementes. Isso corrige o caso de pontos que pareciam bons apenas por sorte nas poucas replicações iniciais.
+
+O relatório mostra o melhor ponto, o valor do objetivo e a verificação das restrições. Ele traz também o cenário pronto para colar num arquivo de experimento, e as tabelas de pontos com a diferença de cada um para o melhor. Os pontos que não se distinguem estatisticamente do melhor aparecem marcados. Se vários pontos são equivalentes, escolhe-se o mais barato ou o mais simples, ou aumentam-se as replicações para separá-los. A otimização só mexe em valores que um cenário consegue escrever e não cria objetos novos.
+
+\section{Síntese do Capítulo}
+
+\begin{sintese}
+O relatório de uma rodada mostra conteúdos, esperas, estados e ocupações, e aponta o gargalo geral e o gargalo dentro do turno. A comparação de cenários usa as mesmas sementes em todos eles e apresenta a diferença pareada, com o intervalo que permite saber se a diferença é real. A otimização procura a melhor combinação de parâmetros dentro de restrições e refina os melhores pontos com mais replicações. Em todos os casos, a decisão depende de diferenças maiores que a incerteza.
+\end{sintese}
