@@ -16,6 +16,7 @@
   - [Movimentação e obstáculos](movimentacao.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)
 - [Quebras e turnos](quebras-e-turnos.md)
+  - [Manutenção de máquinas e OEE](manutencao.md)
 - [Fluxos de tokens e scripts](fluxos-e-scripts.md)
 - [Fluidos](fluidos.md)
 - [Planta CAD (DXF)](planta-cad.md)

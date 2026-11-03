@@ -49,6 +49,7 @@ Os tempos são sempre **decorridos** (quanto já passou), na unidade do modelo. 
 | `Transporter` | `position` (parado ali; com `home`, volta para casa) |
 | rede de fluidos (pelo nome em `fluids.name`) | `levels` por tanque |
 | qualquer objeto com `downtime` | `down` (quebrado há tanto tempo) ou `up` (funcionando há tanto tempo desde o último reparo) |
+| objeto com [manutenção](manutencao.md) | também `age` (idade da máquina) e `preventive` (quanto falta para cada plano de preventiva) |
 | qualquer objeto com `shifts` | `off_shift`, só como conferência: quem decide é o calendário no `clock` |
 
 `Combiner`, `Separator`, `Sink`, `Dispatcher` e os fluxos de tokens ainda não aceitam estado: aparecer com itens no arquivo é um erro. Um estado incompatível com o modelo é recusado antes de rodar, com o objeto e o motivo (objeto inexistente, mais itens que a capacidade, fase `Setup` num processador sem setup, `down` num objeto sem quebras, esteira com itens sobrepostos, campo que o tipo não aceita, nível de tanque fora da capacidade).

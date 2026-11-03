@@ -184,6 +184,48 @@ janelas escritas no objeto. O `ShiftSpec` tem leitura própria (o RON lido sem t
 nome antes dos parênteses), que aceita a tabela, `Calendar("x")`, `Calendar("x", Finish)`
 e `(calendar: "x", on_end: ...)`.
 
+### Manutenção de máquinas (`utsim_core::maintenance`, `engine/maint.rs`)
+O `downtime` do modelo é um `utsim_model::DowntimeDef`: `mtbf` e `mttr` (que o kernel recebe
+como o `Downtime` de sempre, por `set_downtime`) mais os campos opcionais `repair_crew`,
+`wear`, `basis`, `repair`, `preventive`, `cost` e `oee`. Só quando algum deles aparece o
+modelo chama `Simulation::set_maintenance` com um `Maintenance` (nomes já resolvidos em
+`BlockId`, calendários já resolvidos em `ShiftTable`, ciclo ideal já calculado). Sem eles o
+bloco segue o caminho das quebras simples, intocado: os golden não mudam.
+
+- **Idade.** Por bloco, `MaintState` guarda a idade virtual e o tempo de uso, acumulados por
+  intervalos (`age_since`, `busy_since`). `Core::maint_refresh` compara o que deveria estar
+  correndo com o que está (relógio: sem quebra nem preventiva; uso: estado de trabalho e
+  sem parada; ciclos: nunca contínuo) e só quando muda reagenda o evento de falha e os
+  planos `Hours`. É chamado em `set_block_state`, no fim de `stop` e de `resume`, então
+  cobre toda troca de estado sem passo de tempo. Ciclos contam em `leave`.
+- **Falha.** A idade na próxima falha é sorteada no fim de cada reparo ou preventiva
+  (Weibull condicionada à idade, ou `idade + mtbf` sem desgaste), do mesmo *stream* de
+  quebras do bloco. Com `β = 1` e reparo perfeito o sorteio é bit a bit o do `Exp`.
+- **Equipe.** Na falha o kernel abre um `Ctx` do bloco e pede `TaskKind::Operate` à equipe
+  (prioridade `CORRECTIVE_PRIORITY` = 20; preventiva 10; operadores 0). O `MSG_ARRIVED`
+  cujo `payload` é o pedido em curso do bloco é interceptado em `run_op` e nunca chega ao
+  `Behavior`; no fim o kernel manda `MSG_RELEASE` ao técnico que chegou. Despachante e
+  transportador já ordenam as filas por prioridade, então nada mudou neles.
+- **Motivos de parada e estados.** O bit novo `MAINTENANCE` (8) se soma a `BREAKDOWN`,
+  `OFF_SHIFT` e `EXTERNAL`. O estado mostrado vem de `Core::maint_shown`: `waiting_repair`
+  enquanto o técnico não chega (corretiva ou preventiva), `down` no reparo, `maintenance` na
+  preventiva. Precedência: quebra, preventiva, comando externo, fora do turno.
+- **Preventiva sem interromper a peça.** Devida, a preventiva entra numa fila do bloco e o
+  bloco passa a **drenar** (`draining`): `find_destination` e `Inject` o recusam e
+  `Ctx::is_closing` diz verdade, como no fim de turno com `Finish`. Depois de cada evento,
+  `maint_check_drains` para o bloco quando `work_in_progress` é falso e não há itens a
+  caminho (`incoming == 0`). Fora do turno a preventiva também começa se não há trabalho
+  pausado; quebrada, espera o reparo. Durações das preventivas vêm de um *stream* próprio
+  (`MAINTENANCE_STREAMS + bloco`).
+- **Métricas.** Contadores e tempos por episódio (recortados no início da janela,
+  zerados no aquecimento) viram `custom` do bloco em `report` (`oee*`, `maintenance.*`,
+  lista em `maintenance::METRICS`), e daí `RunReport::metrics`, `ObjectStats::custom`,
+  `utsim run`, CSV, JSON e o painel sem código novo. Peças e refugos contam em `try_send`,
+  quando o destino é conhecido (refugo: destino em `reject_to` ou rótulo `reject_label`).
+- **Estado.** `BlockState` ganhou `age` e `preventive` (o que falta para cada plano).
+  `save_state` grava a idade, o que falta de cada plano e `down`/`up`; `maint_start`
+  aplica os dois no início, antes de sortear a próxima falha condicionada à idade.
+
 ### Medições de tempo entre dois pontos (`spans`)
 O campo `spans: [(name, from, to)]` do modelo mede, por item, o tempo entre sair de `from`
 e entrar em `to`. O kernel guarda o instante de saída no próprio item (`Item::marks`, por
