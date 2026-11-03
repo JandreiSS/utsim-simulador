@@ -527,7 +527,9 @@ func _target(t: Variant) -> Variant:
 	if d.has("aba"):
 		var tabs := _control(String(d["aba"][0])) as TabContainer
 		if tabs == null or not tabs.is_visible_in_tree():
-			return null
+			# The tabs of an egui window: one widget per tab, `<abas>_<título>`.
+			var r := _widget("%s_%s" % [d["aba"][0], d["aba"][1]])
+			return r.get_center() if r.has_area() else null
 		var bar := tabs.get_tab_bar()
 		for i in tabs.get_tab_count():
 			if tabs.get_tab_title(i) == String(d["aba"][1]):
@@ -717,7 +719,7 @@ func _accept_dialog(path: String, k: int) -> void:
 ## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
 ## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
 ## the document), `ocupado` (a run on the bridge's thread), `grafico` ({controle,
-## maior_que}: things drawn by a `Grafico`), `fluidos` ({nos, tanques, nivel_entre: [a,
+## maior_que}: things drawn by an egui chart), `fluidos` ({nos, tanques, nivel_entre: [a,
 ## b], altura_no_maximo: metres of the network as drawn, enquadrados: the whole network
 ## on screen}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que, legivel: boxes
 ## apart, text whole, zoom legible}), `pert` ({modo, caixas_maior_que, tem_histograma}),
@@ -943,8 +945,10 @@ func _check(c: Dictionary, k: int) -> void:
 			"ocupado":
 				report.call("ocupado", _main.busy() == bool(want), str(_main.busy()))
 			"grafico":
-				var g := _control(String(want["controle"])) as Grafico
-				var n := g.count() if g != null else -1
+				# An egui chart: it records how many things it draws.
+				var n := -1
+				if _widget_visible(String(want["controle"])):
+					n = int(_egui().widget_info(String(want["controle"])).get("count", -1))
 				report.call("gráfico %s" % want["controle"], n > int(want.get("maior_que", 0)), str(n))
 			"fluidos":
 				var cena: CenaUtsim = _main.cena
@@ -979,21 +983,22 @@ func _check(c: Dictionary, k: int) -> void:
 								out += 1
 					report.call("fluidos inteiros na tela", not box.is_empty() and out == 0, "%d canto(s) fora; caixa %s" % [out, box])
 			"fluxos":
-				var panel: PainelFluxos = _main._flows_panel
-				var acts := 0
-				if not panel.flows.is_empty():
-					acts = (panel.flows[panel.flow]["nodes"] as Array).size()
+				# The egui graph records "atividades= pico= sobreposicoes= cortadas= zoom=".
+				var info := {}
+				for part in String(_egui().widget_info("Fluxos_Grafo").get("text", "")).split(" "):
+					info[part.get_slice("=", 0)] = part.get_slice("=", 1)
+				var acts := int(info.get("atividades", "0"))
 				report.call("atividades do fluxo", acts > int(want.get("atividades_maior_que", 0)), str(acts))
 				if want.has("tokens_pico_maior_que"):
-					report.call("pico de tokens", panel.peak_tokens() > int(want["tokens_pico_maior_que"]), str(panel.peak_tokens()))
+					var peak := int(info.get("pico", "0"))
+					report.call("pico de tokens", peak > int(want["tokens_pico_maior_que"]), str(peak))
 				if want.get("legivel", false):
-					var graph: PainelFluxos.Grafo = panel._graph
-					report.call("caixas do fluxo sem sobreposição", graph.overlaps() == 0, str(graph.overlaps()))
-					report.call("texto do fluxo sem corte", graph.clipped() == 0, str(graph.clipped()))
-					report.call("zoom do fluxo legível", graph.zoom >= PainelFluxos.Grafo.MIN_FIT - 1e-3, str(graph.zoom))
+					report.call("caixas do fluxo sem sobreposição", info.get("sobreposicoes", "?") == "0", str(info.get("sobreposicoes")))
+					report.call("texto do fluxo sem corte", info.get("cortadas", "?") == "0", str(info.get("cortadas")))
+					report.call("zoom do fluxo legível", float(info.get("zoom", "0")) >= 0.75 - 1e-3, str(info.get("zoom")))
 			"pert":
-				var panel: PainelPert = _main._pert_panel
-				var d: Dictionary = panel.data
+				var pd = _egui().pert_data() if _egui() != null else null
+				var d: Dictionary = pd if pd is Dictionary else {}
 				if want.has("modo"):
 					report.call("modo do PERT", d.get("mode", "") == want["modo"], str(d.get("mode", "(nenhum)")))
 				if want.has("caixas_maior_que"):
@@ -1063,11 +1068,14 @@ func _check(c: Dictionary, k: int) -> void:
 				if want.has("analisado"):
 					report.call("análise de %s" % want["campo"], (typeof(entry.get("view")) == TYPE_DICTIONARY) == bool(want["analisado"]), "")
 			"grafico_dados":
-				var mini := _control(String(want["controle"])) as MiniHistograma
-				var bars := mini.bars() if mini != null else -1
+				# The egui mini histogram records "barras=<n> curva=<m>".
+				var info: Dictionary = _egui().widget_info(String(want["controle"])) if _egui() != null else {}
+				var parts := String(info.get("text", "")).split(" ")
+				var bars := int(parts[0].get_slice("=", 1)) if parts.size() > 1 else -1
+				var curve := int(parts[1].get_slice("=", 1)) if parts.size() > 1 else 0
 				report.call("barras de %s" % want["controle"], bars > int(want.get("barras_maior_que", 0)), str(bars))
 				if want.get("curva", false):
-					report.call("curva de %s" % want["controle"], mini != null and mini.curve_points() > 1, "")
+					report.call("curva de %s" % want["controle"], curve > 1, str(curve))
 			"pode_desfazer":
 				report.call("pode desfazer", doc.can_undo() == bool(want), str(doc.can_undo()))
 			"pode_refazer":

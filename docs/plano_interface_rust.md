@@ -81,8 +81,8 @@ campo, menu, texto, ajuda, erro, aviso, selo), os tamanhos (corpo 15, títulos 1
 Segoe UI no Windows e Noto Sans ou DejaVu Sans no Linux, lida de onde o sistema a guarda,
 sem ir no pacote, com as fontes do egui como reserva) e dois widgets: o botão primário
 ("Aplicar") e o controle segmentado (Editar | Simular). As cores são as do tema Godot
-(`godot/tema/utsim.tres`), então os painéis egui e os painéis Godot que ainda restam ficam
-iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
+(`godot/tema/utsim.tres`, removido no passo 5), então os painéis egui e os painéis Godot
+ficaram iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
 (`crates/utsim-lss-app`) passam a usar este tema** (`utsim_ui_tema::install(&ctx)`) quando
 forem mexidos; não foram tocados nesta frente.
 
@@ -120,8 +120,9 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 2a | Barra superior em egui, com grupos e menu "Mais" | 2–3 h | **feito** |
 | 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | **feito** |
 | 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | **feito** |
-| 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | a fazer |
-| 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
+| 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
+| 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | **feito** (5a) |
+| 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | a fazer |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
@@ -216,6 +217,91 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   novo a cada `set_edit_state`); "Desmontagem" saía cortada na biblioteca (ícone e margens
   menores); as listas cortadas não mostravam que rolam (alça fina visível em repouso); a
   biblioteca ocupa até 60 % do painel.
+
+### Passo 4 (Resultados), como foi feito
+
+- `ui_results.rs` (puro, testado com corridas de verdade de `servidores.ron`): a janela cobre a
+  área livre central (o retângulo vem do host, `Host::results_rect`, e não mais de
+  `LEFT_WIDTH`/`BOTTOM_HEIGHT`), com as cinco abas. A ponte recebe a corrida uma vez
+  (`UtsimUi.set_results(res, pode_rodar, pasta_csv)`) e guarda os formulários e as análises
+  feitas em `ResultsMemory`; uma corrida nova mantém os formulários e o objeto do gráfico.
+- **Resumo**: cartões (replicações e semente, tempo de parada e aquecimento, gargalo geral e no
+  turno com a ocupação, saídas por replicação), a tabela por objeto desenhada à mão (cabeçalho,
+  números à direita, linhas alternadas, o gargalo com fundo e marca amarelos e o selo
+  "gargalo") e a exportação CSV, feita na ponte (`results_export`).
+- **Gráficos** com `egui_plot =0.37.0` (o da mesma versão do egui): barras de ocupação com o IC,
+  estados empilhados com as cores da cena, série e histograma; a legenda e o nome do eixo y
+  ficam numa linha acima do gráfico (dentro, cobriam as curvas; um nome longo no eixo passava
+  por cima do texto); a faixa do y é calculada (`y_range`: uma curva plana do egui ia a
+  ±2000). Os gráficos não aproximam nem arrastam: a roda rola a janela.
+- **Análise, Cenários, Otimização**: cada botão vira `resultados:trabalho:<tipo>`; o
+  `principal.gd` pede a corrida à ponte (`results_job`, montada de `ui_results::task` com o
+  que os formulários têm, ou o motivo de não começar), roda com `start_job` (progresso e
+  Cancelar) e devolve o trabalho pronto (`results_done`), que guarda a tabela e dá a linha de
+  status. "Rodar mais" passa a corrida nova por `on_results` antes.
+- Outras ações: `resultados:fechar`, `resultados:exportar`, `resultados:ligar_amostras`,
+  `resultados:aplicar_aquecimento:<t>`.
+- Nomes mantidos para o `g3_resultados.json` (`PainelResultados`, `Res_Fechar`, `Res_Resumo`,
+  `Res_Tabela`, `Res_TipoGrafico`, `Res_Grafico`, `Res_AquecAnalisar`, `Res_Precisao`...). As
+  abas são widgets `Res_Abas_<título>` e o passo `{"clicar": {"aba": ["Res_Abas", "Gráficos"]}}`
+  do `roteiro.gd` acha o widget quando não há `TabContainer`; cada gráfico registra quantas
+  coisas desenha (`count` no `widget_info`) para o `grafico`. O registro guarda também o
+  texto dos widgets rolados para fora da vista (`Registry::read`), e o resumo de uma aba não
+  mostrada continua legível, como numa aba Godot oculta.
+- Removidos: `resultados.gd`. `grafico.gd` e `mini_histograma.gd` ficam para o PERT/CPM, os
+  fluxos e os dados reais (passo 5).
+- Fila com o visual de esteira (relato do dono, com vídeo): a fila usava os lugares da forma
+  simples (caixa baixa de 0,3 m, três faixas, camadas a cada 0,32 m) e a ponte só baixava os
+  itens ao chão, então as caixas ficavam no chão dentro da armação da esteira e as que
+  sobravam subiam em escada ao lado. Agora `utsim_look::visual::queue_belt` dá a esteira de
+  verdade da aparência (comprimento, largura e altura do topo dos rolos da `ConveyorSpec`) e
+  os itens em repouso ficam numa linha em cima dos rolos, com uma segunda camada por cima e o
+  resto contado no rótulo ("+N"); um item voando para a fila ou saindo dela não afunda nos
+  rolos. Testes: todos os lugares sobre o topo e dentro da área da esteira
+  (`utsim-look`) e os itens de um replay de verdade em cima da esteira (`playback.rs`).
+- Conferência com janela a 1600×900 e 1280×720 (`g3_resultados.json` inteiro e uma fila com
+  esteira de 27 e 231 itens). Achados e correções: os cartões saíam altos e com o texto em linha
+  (o conteúdo herdava o layout horizontal); a legenda cobria as barras dos estados e as curvas;
+  o eixo da ocupação ia a 120 %; o nome longo do eixo do aquecimento passava sobre o texto; a
+  série plana tinha o eixo y de -2000 a 2000.
+- Achado no caminho: um `
+` dentro de uma cadeia do `roteiro.gd` (o `digitar` com quebras de
+  linha) quebra se o arquivo for gravado com CRLF; os arquivos ficam com LF (`.gitattributes`).
+
+### Passo 5a (PERT/CPM, fluxos, painéis das ferramentas, dados reais, janelas), como foi feito
+
+- **PERT/CPM** (`ui_pert.rs`): a mesma janela sobre a área livre (uma janela por vez com
+  Resultados), com os modos Simulado, Clássico e Monte Carlo, prazo (Enter recalcula),
+  sorteios, exportação HTML e CSV e as abas Rede (caixas e setas na disposição da ponte, o
+  caminho crítico em vermelho, setas mais grossas com a criticidade), Gantt, Distribuição
+  (histograma com o prazo), Tabela e Texto. O `principal.gd` só abre (`open_pert`), pede o
+  cálculo (`pert_calculate`, com `pert_form`) e devolve o resultado (`set_pert`); as
+  conferências leem `pert_data()`.
+- **Fluxos de tokens** (`ui_flows.rs`): o grafo de cada fluxo (caixas da largura do texto,
+  colunas da ponte, setas para a frente e de volta por baixo), zoom com −, +, Ajustar e
+  Ctrl + roda, e as contagens ao longo da rodada com a linha do instante. A ponte calcula as
+  séries uma vez (`set_flows_playback`) e as contagens no instante (`flows_time`).
+- **Painéis das ferramentas** (`ui_form.rs`): Rede, Corredor e a ligação selecionada são
+  linhas que o `principal.gd` descreve em JSON (`show_form`: título, texto, ajuda, aviso, erro,
+  caixa, número, linha, escolha, botão) e que voltam como `form:<ação>:<valor>`. Os nomes dos
+  controles continuam (`Rede_TrechoCapacidade`, `Corredor_NovoTipo`, `Ligacao_Remover`...).
+- **Dados reais** (`ui_props.rs`): "Fonte: Dados reais" abre o formulário no próprio painel
+  (origem, arquivo com Escolher..., coluna lida do arquivo, valores colados, instantes,
+  escolha, critério, Aplicar) e, aplicado, o selo "dados", o resultado, os parâmetros, o
+  mini-histograma com a curva, os avisos, as candidatas e o relatório. As ações voltam como
+  `dados	<ação>	<campo>	<rascunho JSON>` e o `principal.gd` usa as mesmas funções de antes.
+- **Janelas**: a confirmação de descarte e os atalhos (F1) são modais do egui
+  (`show_dialog`); a linha de desempenho (F3) é desenhada pelo egui sobre a vista. As janelas
+  de arquivo são as do sistema (`FileDialog.use_native_dialog`); sem tela, ou com um roteiro
+  rodando, ficam as do Godot, que o passo `dialogo` responde.
+- Removidos: `painel_propriedades.gd`, `dados_reais.gd`, `mini_histograma.gd`, `pert.gd`,
+  `fluxos.gd`, `grafico.gd` e o tema `godot/tema/` (o projeto não tem mais tema Godot). No
+  GDScript ficam só a vista e as ferramentas 3D (`principal.gd`, `editor.gd`, `cena.gd`,
+  `rede.gd`, `corredores.gd`, `camera_orbita.gd`, `pessoa.gd`) e o `roteiro.gd`.
+- Conferência com janela a 1600×900 e 1280×720 (`g3_pert`, `g3_dados_reais`, `g3_rede`,
+  `g4_corredores`, `g3_cena` e um roteiro das janelas). Achados e correções: o texto das caixas
+  do PERT passava da borda de baixo; a nota dos fluxos falava de uma linha amarela que é azul;
+  as janelas de arquivo do sistema não deixavam os roteiros com janela responder.
 
 ### Plano original do passo 2b
 

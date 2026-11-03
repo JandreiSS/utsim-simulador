@@ -29,11 +29,14 @@ use crate::document_class::UtsimDocument;
 use crate::egui_host::Host;
 use crate::egui_input::{Input, Mods};
 use crate::egui_mesh::{self, Change, Textures};
+use crate::jobs_class::{UtsimJob, UtsimPert, UtsimResults, job_object, variant_of_json};
 use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
 use crate::ui_bottom::{PlayView, StatusView};
 use crate::ui_left::{EditView, Entry, ObjectItem, Summary};
+use crate::ui_pert::{self, PertView};
 use crate::ui_props::{self, PropAction, PropsView};
+use crate::ui_results::{self, ResultsView};
 use crate::{put, strings};
 
 /// Godot's `Image.FORMAT_RGBA8`.
@@ -76,6 +79,12 @@ pub struct UtsimUi {
     /// What the main scene set for the left panel of Editar (the objects come from the
     /// document).
     edit_state: EditView,
+    /// Why the last run asked of the "Resultados" window did not start.
+    results_error: String,
+    /// The playback whose token flows the Fluxos window shows.
+    flows_pb: Option<Gd<crate::UtsimPlayback>>,
+    /// The PERT/CPM shown (kept for the exports).
+    pert: Option<Gd<UtsimPert>>,
     base: Base<Node2D>,
 }
 
@@ -103,6 +112,9 @@ impl INode2D for UtsimUi {
             icon_refs: Vec::new(),
             objects_rev: None,
             edit_state: EditView::default(),
+            results_error: String::new(),
+            pert: None,
+            flows_pb: None,
             base,
         }
     }
@@ -247,13 +259,16 @@ impl UtsimUi {
     #[func]
     fn widget_info(&self, name: GString) -> VarDictionary {
         let mut d = VarDictionary::new();
-        if let Some(w) = self.host.reg.get(&name.to_string()) {
+        if let Some(w) = self.host.reg.read(&name.to_string()) {
             put(&mut d, "text", GString::from(w.text.as_str()));
             put(&mut d, "enabled", w.enabled);
             if let Some(on) = w.checked {
                 put(&mut d, "checked", on);
             }
             put(&mut d, "choices", strings(&w.choices));
+            if let Some(n) = w.count {
+                put(&mut d, "count", n as i64);
+            }
         }
         d
     }
@@ -494,6 +509,306 @@ impl UtsimUi {
     fn update_now(&mut self) {
         self.frame_if_needed();
     }
+
+    /// A new run for the "Resultados" window (`can_run`: false for a recorded replay,
+    /// which cannot run again; `export_dir`: the CSV folder proposed when none was typed).
+    #[func]
+    fn set_results(&mut self, res: Gd<UtsimResults>, can_run: bool, export_dir: GString) {
+        let Some(run) = res.bind().run().cloned() else {
+            return;
+        };
+        self.host
+            .set_results(ResultsView::new(run, can_run), &export_dir.to_string());
+    }
+
+    /// Opens or closes the "Resultados" window (it opens only with a run to show).
+    #[func]
+    fn set_results_open(&mut self, on: bool) {
+        self.host.set_results_open(on);
+    }
+
+    #[func]
+    fn results_open(&self) -> bool {
+        self.host.results_open
+    }
+
+    /// The run of a button of the window (`aquecimento`, `mais`, `little`,
+    /// `gargalo_movel`, `cenarios`, `otimizacao`) with what its form holds, or `null` with
+    /// the reason in [`Self::results_error`] (shown under the button too).
+    #[func]
+    fn results_job(&mut self, kind: GString) -> Option<Gd<UtsimJob>> {
+        let kind = kind.to_string();
+        let v = self.host.results.as_ref()?;
+        match ui_results::task(&kind, v, &self.host.results_mem) {
+            Ok(task) => {
+                self.results_error.clear();
+                Some(job_object(task))
+            }
+            Err(e) => {
+                self.host.results_mem.set_error(&kind, &e);
+                self.results_error = e;
+                self.host.invalidate();
+                None
+            }
+        }
+    }
+
+    #[func]
+    fn results_error(&self) -> GString {
+        GString::from(self.results_error.as_str())
+    }
+
+    /// A finished run of the window: its tables and charts; returns the status line.
+    #[func]
+    fn results_done(&mut self, job: Gd<UtsimJob>) -> GString {
+        let j = job.bind();
+        let Some(v) = self.host.results.as_ref() else {
+            return GString::new();
+        };
+        let line = ui_results::done(j.kind_name(), j.data_json(), v, &mut self.host.results_mem);
+        self.host.invalidate();
+        GString::from(line.as_str())
+    }
+
+    /// The right panel of a tool or a link, as rows in JSON (see `ui_form.rs`); `""`
+    /// shows the properties again.
+    #[func]
+    fn show_form(&mut self, rows: GString) {
+        let rows = rows.to_string();
+        self.host
+            .set_form((!rows.trim().is_empty()).then(|| crate::ui_form::parse(&rows)));
+    }
+
+    /// A modal dialog in JSON (see `ui_form::Dialog`); `""` closes it. Its buttons come
+    /// back as `dialogo:<action>`.
+    #[func]
+    fn show_dialog(&mut self, dialog: GString) {
+        self.host
+            .set_dialog(crate::ui_form::parse_dialog(&dialog.to_string()));
+    }
+
+    #[func]
+    fn dialog_open(&self) -> bool {
+        self.host.dialog.is_some()
+    }
+
+    /// The performance line over the 3D view (`""`: hidden).
+    #[func]
+    fn set_performance(&mut self, text: GString) {
+        self.host.set_perf(&text.to_string());
+    }
+
+    /// The playback of the Fluxos window: its flows and their counts over the run.
+    #[func]
+    fn set_flows_playback(&mut self, pb: Gd<crate::UtsimPlayback>) {
+        let view = {
+            let b = pb.bind();
+            let Some(p) = b.core.as_ref() else {
+                return;
+            };
+            let graphs = crate::extras::flow_graphs(p);
+            let series = graphs
+                .iter()
+                .map(|g| crate::extras::flow_series(p, g, crate::ui_flows::SAMPLES))
+                .collect();
+            crate::ui_flows::FlowsView {
+                graphs,
+                series,
+                counts: Vec::new(),
+                t: 0.0,
+            }
+        };
+        self.host.flows_mem = Default::default();
+        self.host.flows = Some(view);
+        self.flows_pb = Some(pb);
+        self.flows_time(0.0);
+    }
+
+    /// The playback time: the tokens of the chosen flow at `t` (only while it is open).
+    #[func]
+    fn flows_time(&mut self, t: f64) {
+        if !self.host.flows_open
+            && self
+                .host
+                .flows
+                .as_ref()
+                .is_some_and(|v| !v.counts.is_empty())
+        {
+            return;
+        }
+        let (Some(pb), Some(v)) = (&self.flows_pb, self.host.flows.as_mut()) else {
+            return;
+        };
+        let b = pb.bind();
+        let Some(p) = b.core.as_ref() else {
+            return;
+        };
+        let k = self.host.flows_mem.flow;
+        v.counts = v
+            .graphs
+            .get(k)
+            .map(|g| crate::extras::flow_counts(p, g, t))
+            .unwrap_or_default();
+        v.t = t;
+        self.host.invalidate();
+    }
+
+    #[func]
+    fn set_flows_open(&mut self, on: bool) {
+        if self.host.flows_open != on {
+            self.host.flows_open = on;
+            self.host.flows_mem.zoom = None;
+            self.host.invalidate();
+        }
+    }
+
+    #[func]
+    fn flows_open(&self) -> bool {
+        self.host.flows_open
+    }
+
+    /// The file chosen in the dialog for the real-data form of the field `path`.
+    #[func]
+    fn set_data_file(&mut self, path: GString, file: GString) {
+        self.host
+            .props_state
+            .set_data_file(&path.to_string(), &file.to_string());
+        self.host.invalidate();
+    }
+
+    /// Opens the PERT/CPM window for the selection called `title` (empty until
+    /// [`Self::set_pert`]); the Resultados window closes.
+    #[func]
+    fn open_pert(&mut self, title: GString) {
+        self.pert = None;
+        self.host.open_pert(&title.to_string());
+    }
+
+    #[func]
+    fn close_pert(&mut self) {
+        self.host.close_pert();
+    }
+
+    #[func]
+    fn pert_open(&self) -> bool {
+        self.host.pert_open
+    }
+
+    /// `{mode, deadline, samples}` of the PERT/CPM window (what to calculate next).
+    #[func]
+    fn pert_form(&self) -> VarDictionary {
+        let m = &self.host.pert_mem;
+        let mut d = VarDictionary::new();
+        put(&mut d, "mode", GString::from(m.mode.as_str()));
+        put(&mut d, "deadline", m.deadline_value());
+        put(&mut d, "samples", m.samples_value());
+        d
+    }
+
+    /// The line over the tabs: "Calculando..." or an error.
+    #[func]
+    fn set_pert_info(&mut self, info: GString, is_error: bool) {
+        self.host.set_pert_info(&info.to_string(), is_error);
+    }
+
+    /// A computed PERT/CPM (`default_file`: the HTML report proposed when none was typed).
+    #[func]
+    fn set_pert(&mut self, p: Gd<UtsimPert>, default_file: GString) {
+        let view = {
+            let b = p.bind();
+            let Some(out) = b.output() else {
+                return;
+            };
+            PertView {
+                data: out.to_json(),
+                text: out.text(),
+            }
+        };
+        self.host.set_pert(view, &default_file.to_string());
+        self.pert = Some(p);
+    }
+
+    /// What the window shows (`UtsimPert.data()`), or `null`: the scripted checks.
+    #[func]
+    fn pert_data(&self) -> Variant {
+        self.host
+            .pert
+            .as_ref()
+            .map_or_else(Variant::nil, |v| variant_of_json(&v.data))
+    }
+
+    /// The objects on the critical path of the result shown.
+    #[func]
+    fn pert_critical(&self) -> PackedStringArray {
+        strings(
+            &self
+                .host
+                .pert
+                .as_ref()
+                .map(|v| ui_pert::critical_objects(&v.data))
+                .unwrap_or_default(),
+        )
+    }
+
+    /// The status line of the result shown.
+    #[func]
+    fn pert_status(&self) -> GString {
+        let line = self
+            .host
+            .pert
+            .as_ref()
+            .map(|v| ui_pert::status_line(&v.data))
+            .unwrap_or_default();
+        GString::from(line.as_str())
+    }
+
+    /// Writes the HTML report (`html`) or the CSV tables next to it; the status line.
+    #[func]
+    fn pert_export(&mut self, html: bool) -> GString {
+        let path = self.host.pert_mem.file.trim().to_owned();
+        let Some(p) = &self.pert else {
+            return GString::new();
+        };
+        let b = p.bind();
+        let Some(out) = b.output() else {
+            return GString::new();
+        };
+        let line = if path.is_empty() {
+            "Escreva o arquivo do relatório.".to_owned()
+        } else if html {
+            match std::fs::write(&path, out.html()) {
+                Ok(()) => format!("Relatório PERT/CPM gravado em {path}."),
+                Err(e) => format!("Não gravou {path}: {e}"),
+            }
+        } else {
+            let dir = std::path::Path::new(&path)
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_default();
+            match out.write_csv(&dir) {
+                Ok(files) => format!("{} tabela(s) CSV em {}.", files.len(), dir.display()),
+                Err(e) => format!("Não gravou os CSV em {}: {e}", dir.display()),
+            }
+        };
+        GString::from(line.as_str())
+    }
+
+    /// Writes the CSV files of the run into the folder typed; returns the status line.
+    #[func]
+    fn results_export(&mut self) -> GString {
+        let dir = self.host.results_mem.export_dir.trim().to_owned();
+        let line = match &self.host.results {
+            None => String::new(),
+            Some(_) if dir.is_empty() => "Escreva a pasta da exportação.".into(),
+            Some(v) => {
+                match utsim_model::csv::export(&std::path::PathBuf::from(&dir), &v.run.reports) {
+                    Ok(files) => format!("{} arquivo(s) CSV em {dir}.", files.len()),
+                    Err(e) => format!("Não exportou: {e}"),
+                }
+            }
+        };
+        GString::from(line.as_str())
+    }
 }
 
 impl UtsimUi {
@@ -627,9 +942,30 @@ impl UtsimUi {
                     .map(str::to_owned)
             })
             .collect();
+        let data = d
+            .data_list()
+            .into_iter()
+            .filter(|e| e["source"] == "dados")
+            .filter_map(|e| {
+                let k = e["field"].as_str()?.strip_prefix(&prefix)?.to_owned();
+                Some((k, e))
+            })
+            .collect();
+        let base_dir = d
+            .editor
+            .doc
+            .path()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf());
         self.host.props = Some(PropsView {
             props,
             families: schema::FAMILIES.iter().map(|s| s.to_string()).collect(),
+            data,
+            data_families: utsim_fit::auto::family_names()
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            base_dir,
             data_paths,
             extra: self.extra.clone(),
             driver: self.driver,
@@ -686,7 +1022,9 @@ impl UtsimUi {
                 let o = self.object.clone();
                 self.emit(&format!("motorista\t{o}\t{on}"));
             }
-            PropAction::DataMode(p) => self.emit(&format!("dados_reais\t{p}")),
+            PropAction::Data { what, path, draft } => {
+                self.emit(&format!("dados\t{what}\t{path}\t{draft}"))
+            }
             PropAction::Miniature(asset) => self.emit(&format!("miniatura\t{asset}")),
         }
     }
