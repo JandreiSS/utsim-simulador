@@ -11,6 +11,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Motor DES | `utsim-core` | determinístico, sem interface gráfica |
 | Blocos | `utsim-objects` | só falam com o motor via `Ctx`, nunca entre si |
 | Modelo | `utsim-model` | o modelo é dado (texto `.ron`), não código |
+| Estatística | `utsim-stats` | funções puras sobre números (só depende de `utsim-core`); análise de saída e funções especiais |
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
 
@@ -1162,6 +1163,38 @@ Coletadas automaticamente pelo motor para todo bloco:
 | métricas próprias (`ctx.record`) | ex.: `time_in_system` da Sink |
 
 Entre replicações: média, desvio e **semiamplitude do IC de 95%** (t de Student).
+
+### Análise de saída (`utsim-stats`)
+
+A crate `utsim-stats` é pura: recebe números e devolve números, sem modelo nem kernel, e
+só depende de `utsim-core` (pelo `Summary`). `utsim-model::analysis` transforma relatórios
+e rastros nas séries que ela precisa, e `utsim analisar` imprime o resultado.
+
+| Módulo | Conteúdo |
+|---|---|
+| `special` | `ln_gamma`, `beta_inc`, `gamma_p`, `norm_cdf`, `norm_ppf`, `brent`..., movidos de `utsim-fit` (que reexporta `utsim_fit::special`), e `t_cdf`/`t_ppf` |
+| raiz (`lib.rs`) | `t_quantile(nível, gl)` e `summary(xs, nível)`; `parse_level`; autocorrelação lag 1 |
+| `warmup` | média entre replicações, média móvel de Welch, MSER e MSER-5 |
+| `precision` | replicações necessárias para uma semiamplitude alvo; médias em lotes |
+| `little` | `L = λ·W` com a diferença pareada por replicação e tolerância relativa |
+
+- **Nível de confiança.** Em 95% `t_quantile` usa a tabela `t_975` do núcleo, então os
+  intervalos de 95% ficam idênticos bit a bit aos de antes. Outros níveis usam `t_ppf`
+  (inversa da CDF da t por `beta_inc` e `brent`), que reproduz a tabela nas três casas.
+- **Observações com instante.** `Simulation::keep_timed(bloco, medida)` liga, para uma
+  medida só, o registro `(t, x)` de cada observação (`Tally::record_at`); o relatório traz
+  a lista em `TallySummary::observations`, que não aparece no JSON quando desligada.
+  Desligado, o custo é um teste de `Option` por observação, e nenhuma estatística muda.
+  `Model::run_replications_timed` liga as medidas pedidas.
+- **Lei de Little no sistema.** `L` soma o conteúdo de todos os objetos menos os
+  sumidouros e, com `transfer`, o número médio em trânsito, calculado pelos eventos
+  `Transit` do rastro (`analysis::transit_mean`). Montagens e desmontagens mudam o número
+  de itens e ficam fora da verificação.
+- **Gargalo móvel.** `analysis::active_periods` lê os eventos `State` do rastro: período
+  ativo é o trecho contínuo em `Setup`, `Processing`, viagens, carga, descarga ou
+  `Utilize`; trechos que se tocam no mesmo instante viram um só. Em cada instante o gargalo
+  é o recurso com o período ativo mais longo; a sobreposição entre o período do gargalo
+  atual e o do seguinte é gargalo compartilhado dos dois (`shifting_bottleneck_times`).
 
 ## 6. Pontos de extensão já previstos
 

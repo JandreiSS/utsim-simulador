@@ -18,7 +18,8 @@ Como escolher o aquecimento:
 
 - sistemas **que começam vazios e voltam sempre ao vazio** (um turno de trabalho, uma agenda do dia) não precisam de aquecimento: o que importa é justamente o começo. Use `warmup: 0.0`;
 - sistemas **contínuos**, que operam sem parar, precisam de aquecimento suficiente para sair do estado vazio. Uma regra prática: rode com `--sample` e olhe a série do conteúdo das filas; o aquecimento é o tempo até a série deixar de subir;
-- teste: rode duas vezes, com aquecimento diferente, e veja se os resultados mudam. Se não mudam, o aquecimento é suficiente.
+- teste: rode duas vezes, com aquecimento diferente, e veja se os resultados mudam. Se não mudam, o aquecimento é suficiente;
+- ou peça uma sugestão: `utsim analisar modelo.ron --aquecimento` (veja "Análises de saída", no fim deste capítulo).
 
 O `warmup` precisa ser menor que o `stop_time`.
 
@@ -128,7 +129,7 @@ onde `n` é o número de replicações e `t` é o valor da distribuição t de S
 Como interpretar: "se eu repetisse o experimento muitas vezes, em 95% delas o intervalo cobriria o valor verdadeiro". Na prática, o valor verdadeiro provavelmente está dentro do intervalo.
 
 - O intervalo **estreita com a raiz do número de replicações**. Para reduzir a meia-amplitude à metade, quadruplique as replicações.
-- Uma boa meta é meia-amplitude de uns 5% da média ou menos.
+- Uma boa meta é meia-amplitude de uns 5% da média ou menos. `utsim analisar modelo.ron --precisao 5%` diz quantas replicações faltam para isso, e `--confianca` troca o nível de 95%.
 - Se duas médias têm intervalos que não se encostam, elas são diferentes. Se os intervalos se sobrepõem, **não conclua nada** olhando só os intervalos. Compare cenários com as mesmas sementes ([Experimentos e otimização](experimentos-e-otimizacao.md)); o `utsim otimizar` ainda calcula a diferença pareada com o seu intervalo, que é muito mais sensível.
 
 ## A lei de Little
@@ -149,7 +150,7 @@ Exemplo, com o [tutorial 01](tutoriais/01-um-caixa.md) (`λ` = 1 cliente a cada 
 
 Se a conta não fecha, algo está errado: aquecimento curto demais, sistema instável ou erro de modelagem.
 
-Para ver `λ` direto do relatório, divida as saídas pelo comprimento da janela (`stop_time - warmup`).
+Para ver `λ` direto do relatório, divida as saídas pelo comprimento da janela (`stop_time - warmup`). O `utsim analisar modelo.ron --little` faz essa conta para todos os objetos e para o sistema.
 
 ## Sistema estável ou não
 
@@ -251,4 +252,53 @@ O UTSim mostra dois gargalos:
   trabalhando no turno. Um posto que funciona meio dia pode parecer folgado no geral e estar
   saturado enquanto funciona; esse segundo critério mostra isso.
 
-Quando todos os recursos têm os mesmos turnos, os dois costumam apontar o mesmo objeto.
+Quando todos os recursos têm os mesmos turnos, os dois costumam apontar o mesmo objeto. Para ver se o gargalo muda de lugar ao longo da rodada, use o gargalo móvel (abaixo).
+
+## Análises de saída (`utsim analisar`)
+
+O `utsim analisar` responde a duas perguntas: quanto confiar nos números e onde está o gargalo ao longo do tempo. Cada opção roda as replicações de que precisa. Sem nenhuma opção, o comando roda o aquecimento, a precisão a 2%, a lei de Little e o gargalo móvel.
+
+```bash
+utsim analisar modelo.ron --aquecimento
+utsim analisar modelo.ron --precisao 2%
+utsim analisar modelo.ron --lotes
+utsim analisar modelo.ron --little
+utsim analisar modelo.ron --gargalo-movel
+```
+
+Opções comuns: `--confianca 90%` muda o nível dos intervalos (o padrão é 95%, com os mesmos números do `utsim run`), `-n` e `--stop` sobrescrevem `run.replications` e `run.stop_time`, e `--json arquivo.json` grava tudo o que foi calculado.
+
+### Nível de confiança
+
+Os intervalos usam 95% por padrão, com a tabela da t de Student de sempre. Com `--confianca`, o quantil vem da distribuição t calculada para qualquer nível (`95%`, `0.9`, `99,5%`). Um nível maior dá intervalos mais largos. Com 7 replicações, `t` vale 1,943 a 90%, 2,447 a 95% e 3,707 a 99%.
+
+### Aquecimento sugerido (`--aquecimento`)
+
+Roda o modelo **sem aquecimento** e olha a série desde o tempo 0. Por padrão a série é o WIP, o conteúdo somado de todos os objetos menos os sumidouros, amostrado em `run.sample_interval` (500 pontos quando ele não está definido). Com `--medida saida.time_in_system` (ou `fila.staytime`), a série são as observações dessa medida na ordem em que acontecem. O UTSim guarda o instante de cada observação só nessa análise.
+
+- **Welch:** a média das replicações ponto a ponto, suavizada por uma média móvel de janela `--janela` (padrão 5). O programa imprime a curva, e o aquecimento é onde ela deixa de subir ou descer.
+- **MSER-5:** agrupa a série em lotes de 5 e escolhe o corte que deixa o resto com o menor erro padrão da média. O resultado é o `warmup` sugerido. Se o melhor corte cai depois da metade da série, aparece um aviso: a rodada é curta demais (ou o sistema não estabiliza) e o tempo de parada precisa aumentar.
+
+### Replicações necessárias (`--precisao`)
+
+Para cada métrica, calcula quantas replicações deixam a meia-amplitude abaixo do alvo, supondo que o desvio-padrão continue o atual. É o menor `n` com `t(n-1) x desvio / raiz(n) <= alvo`. O alvo pode ser relativo (`2%` da média) ou absoluto (`0.5`, na unidade da métrica). Sem `--metrica`, entram as ocupações, os conteúdos e permanências médios e o tempo no sistema dos sumidouros. A última linha diz com que `-n` rodar. As replicações já feitas se repetem iguais, porque a semente é por replicação.
+
+### Médias em lotes (`--lotes`)
+
+Serve para um modelo que roda uma única replicação longa. As observações de uma medida (padrão: o tempo no sistema do primeiro sumidouro, ou a de `--medida`) são divididas em lotes de tamanho crescente até a autocorrelação entre lotes vizinhos ficar abaixo de 0,2. O intervalo sai das médias dos lotes. Se a rodada acaba antes disso, com menos de 10 lotes, o resultado vem com um aviso, porque o intervalo sai estreito demais.
+
+### Verificação da lei de Little (`--little`)
+
+Confere `L = λ x W` objeto a objeto (`L` = conteúdo médio, `λ` = saídas / (`stop_time` - `warmup`), `W` = permanência média) e no sistema (`L` = conteúdo de todos os objetos, `λ` e `W` pelo tempo no sistema dos sumidouros). Com `transfer`, os itens em viagem não estão em objeto nenhum. O UTSim os conta pelo rastro e os soma ao `L` do sistema. Montagens e desmontagens ficam de fora, porque o número de itens muda nelas, e a linha do sistema também fica de fora quando o modelo as tem.
+
+A coluna `diferença` é `|L - λW|` relativa ao maior dos dois. A linha leva `AVISO` quando o intervalo da diferença não contém zero e ela passa de 2%. Isso costuma indicar aquecimento curto, itens presos no fim da rodada ou um sistema instável, com a fila crescendo.
+
+### Gargalo móvel (`--gargalo-movel`)
+
+O gargalo pela ocupação média não mostra que o gargalo pode mudar de lugar ao longo do dia. O método do **período ativo** olha o rastro de cada replicação:
+
+- um **período ativo** é um trecho contínuo em que o recurso trabalha (preparação, processamento, viagem, carga e descarga, atendimento de operador);
+- em cada instante, o gargalo é o recurso com o período ativo mais longo naquele momento;
+- quando o período do gargalo atual se sobrepõe ao do próximo, a sobreposição é **gargalo compartilhado** dos dois, e o resto é **gargalo único**.
+
+A tabela mostra, por recurso, a fração do tempo como gargalo único e como compartilhado, do mais gargalo para o menos. Um recurso que é sempre o gargalo único é o lugar certo para investir. Se dois recursos dividem o tempo de gargalo, melhorar só um deles rende pouco.

@@ -57,8 +57,9 @@ enum Cmd {
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
-    /// Análises de saída: aquecimento, precisão, médias em lotes, lei de Little e
-    /// gargalo móvel (sem opção de análise, roda todas menos os lotes)
+    /// Análises de saída: aquecimento, precisão, lotes, lei de Little e gargalo móvel
+    ///
+    /// Sem nenhuma opção de análise, roda todas menos as médias em lotes.
     Analisar {
         model: PathBuf,
         /// Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
