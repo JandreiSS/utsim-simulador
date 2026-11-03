@@ -19,6 +19,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Navegação | `utsim-nav` | obstáculos, menor caminho livre (grade e A*), pontos de acesso e geração de rede; função pura dos dados (seção 4p, "Obstáculos, caminho livre e modos de movimentação") |
 | Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
+| App Seis Sigma | `utsim-lss-core`, `utsim-lss-store`, `utsim-lss-app` | domínio puro (sem arquivo, relógio nem sorteio), diário de operações só de acréscimo numa pasta sincronizada, janela egui fina; nenhuma crate comum depende delas (seção 4v) |
 
 O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois eventos
 (`entrou em t0`, `chega em t1`). Assim a mesma simulação roda a 1× com animação ou
@@ -1725,6 +1726,68 @@ Item T6 de `docs/plano_gemeo_digital_e_painel.md` (seção 1.4, "Previsão"). Ma
   numa linha determinística; mais capacidade melhora com diferença pareada significativa;
   gravação com previsões agendadas e pedidas reproduzida com previsões idênticas; seção
   validada; rotas e `POST` do painel; `utsim prever` igual ao `utsim run --estado`.
+
+## 4v. UTSim Seis Sigma: fundação (`utsim-lss-*`)
+
+Gerenciador de projetos Lean Seis Sigma da família (`docs/plano_lean_seis_sigma.md`, etapa
+L0). Manual: "UTSim Seis Sigma". Janela própria em `eframe`/`egui` (`=0.36.2`, o mesmo egui
+do launcher e do visualizador; um só egui no `Cargo.lock`), sem servidor HTTP nem navegador.
+Versão própria (`0.1.0`, tag `lss-v<versão>`), produto `lean-seis-sigma` no launcher
+(`scripts/publicar-seis-sigma.sh`).
+
+```
+ utsim-lss-app    App (telas egui)  ->  Session (sem tela: editar, mover cartão, tick)
+       |                                   |
+ utsim-lss-store  ProjectFolder: projeto.json, ops/, instantaneos/, presenca/, anexos/,
+       |          cache local fora da pasta sincronizada, .lssz
+       v
+ utsim-lss-core   Op -> Journal -> State (último escritor por campo, conflitos), formato N,
+                  tipos do domínio, quadro, visão geral, presença, datas
+```
+
+- **Operação.** `{id, autor, instante, relogio_lamport, entidade: {tipo, id}, campo, valor,
+  base}`; as chaves do JSON são as do plano, os nomes em Rust são em inglês. `base` é o id da
+  operação que escreveu o campo por último na visão do autor. Ids são UUID v7 (`Id::v7` recebe
+  o instante e os bytes aleatórios de quem chama; o núcleo não sorteia nada). Uma edição nova
+  leva o maior relógio de Lamport conhecido mais um.
+- **Reconstrução.** As operações são aplicadas na ordem `(relogio_lamport, autor, id)`: o
+  mesmo conjunto dá o mesmo estado em qualquer máquina e em qualquer ordem de chegada
+  (testes de propriedade em `utsim-lss-core/tests/convergence.rs`). Cada campo guarda o valor
+  e a operação que o escreveu (a sua versão). Excluir é o campo `excluido: true`, desfeito por
+  outra operação.
+- **Bloqueio otimista.** Se a `base` de uma operação não é a versão atual do campo e o valor
+  muda, a operação (a mais recente pela ordem) vale e o par vai para `State::conflicts` com os
+  dois valores. A meta-operação `$conflito_revisado` (valor: id da operação substituída) tira o
+  conflito da lista; "restaurar o outro" é uma escrita do valor antigo mais essa
+  meta-operação. A caixa de texto guarda a versão vista quando ganhou o foco (`Edit::seen`), de
+  modo que uma mudança que chega enquanto a pessoa digita também vira conflito. Conflito por
+  parágrafo em textos longos fica para P7.
+- **Diário.** `Journal` recebe operações uma a uma: depois de todas, aplica direto; mais antiga
+  que alguma, refaz a partir do instantâneo; duplicada (mesmo id), ignora. Um instantâneo é o
+  estado mais a lista das operações incluídas; se chega uma operação que ele deveria conter
+  (chave anterior à última dele), o diário responde `NeedsFullReplay` e o armazenamento refaz
+  tudo a partir dos arquivos. Instantâneo é só aceleração: o resultado é sempre o de
+  `State::replay` sobre o conjunto inteiro.
+- **Formato.** Todo arquivo tem `"formato": N` (ausente vale 1; `FORMAT = 1`). Mais novo que o
+  suportado: erro "projeto no formato N; esta versão do UTSim Seis Sigma lê até M". Mais
+  antigo: passos `MIGRATIONS` sobre o `serde_json::Value`, como no modelo
+  (`docs/versionamento.md`).
+- **Pasta.** `fsio::write_new` grava num temporário oculto (`.<nome>.<sorteio>.tmp`), faz
+  `sync_all` e liga o nome final por *hard link*, que falha se o nome existe (nunca
+  sobrescreve); sem suporte a links, confere e renomeia. Presença e cache usam
+  `write_replace` (um só escritor). A leitura lista `ops/` até dois níveis, pula ocultos,
+  temporários, `~$` e não JSON; arquivo que não lê ainda (incompleto ou de formato mais novo)
+  fica pendente e é tentado de novo a cada atualização; cópia em conflito do cliente de
+  sincronização traz uma operação já conhecida e cai como duplicada. Na abertura, vale o maior
+  instantâneo (da pasta ou do cache local), e os arquivos de operações que ele cobre, pelo id
+  no nome, nem são lidos.
+- **Presença.** `presenca/<pessoa>.json` com tela e entidade em edição, pulsação a cada 20 s
+  ou quando a tela muda; mais de 3 min sem pulsação é ignorada.
+- **Interface.** `Session` não conhece egui: cria e move cartões (`kanban::new_card`,
+  `move_card`, ordem fracionária na coluna), grava campos, atualiza a cada 2 s e escreve a
+  pulsação. `App` só desenha e chama a sessão; todo texto vem de `text::PT_BR` (um valor de
+  `Texts`, pronto para outro idioma). Os testes da janela rodam no contexto do egui sem
+  janela (`tests/ui.rs`).
 
 ## 5. Estatísticas
 
