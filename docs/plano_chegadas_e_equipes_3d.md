@@ -510,6 +510,8 @@ a interface Rust e o outro agente entregarem. Total do plano sem os opcionais (1
 
 ## 8. Decisões do dono
 
+**Decididas em 2026-11-03:** o dono aceitou todas as propostas de D1 a D10.
+
 1. **D1 Tabela na `Source` ou objeto novo.** Proposta: campo `table` na própria `Source`
    (um objeto só, como na prática comum). Alternativa: um objeto `ArrivalTable` separado.
 2. **D2 Tipos de item no modelo.** Proposta: `item_types` no nível do modelo, com o tipo
