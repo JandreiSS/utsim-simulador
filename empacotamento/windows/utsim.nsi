@@ -146,6 +146,21 @@ Section "Atalhos no Menu Iniciar" SecAtalhos
   CreateShortcut "$SMPROGRAMS\UTSim\Desinstalar o UTSim.lnk" "$INSTDIR\desinstalar.exe"
 SectionEnd
 
+; Componente opcional: a interface 3D em Godot (scripts/godot_exportar.sh), só quando o pacote
+; traz a pasta 3d/. Convive com o utsim-view e tem atalho próprio.
+!if /FileExists "${ORIGEM}\3d\utsim-3d.exe"
+Section "UTSim 3D (prévia)" SecTresD
+  SetOutPath "$INSTDIR\3d"
+  File /r "${ORIGEM}\3d\*.*"
+
+  SetShellVarContext current
+  SetOutPath "$INSTDIR\3d"
+  CreateDirectory "$SMPROGRAMS\UTSim"
+  CreateShortcut "$SMPROGRAMS\UTSim\UTSim 3D (prévia).lnk" "$INSTDIR\3d\utsim-3d.exe" "" "$INSTDIR\assets\icone\utsim.ico" 0
+  CreateShortcut "$SMPROGRAMS\UTSim\Avisos de terceiros do UTSim 3D.lnk" "$INSTDIR\3d\AVISOS-TERCEIROS.txt"
+SectionEnd
+!endif
+
 Section /o "Adicionar o comando utsim ao PATH (terminal)" SecPath
   ReadRegStr $R0 HKCU "Environment" "Path"
   Call FiltrarPath
@@ -161,6 +176,9 @@ SectionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPrincipal} "Os programas utsim e utsim-view, os modelos de exemplo, o manual, os modelos 3D e os ativos de terceiros com suas licenças."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAtalhos} "Cria a pasta UTSim no Menu Iniciar, com atalhos para o editor, os exemplos e o manual."
+  !if /FileExists "${ORIGEM}\3d\utsim-3d.exe"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SecTresD} "Interface 3D feita no motor Godot (prévia), com atalho próprio. Não substitui o editor utsim-view. Inclui os avisos de terceiros do motor."
+  !endif
   !insertmacro MUI_DESCRIPTION_TEXT ${SecPath} "Permite digitar utsim em qualquer terminal novo (só para o seu usuário)."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
@@ -179,12 +197,15 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\UTSim\UTSim (exemplos).lnk"
   Delete "$SMPROGRAMS\UTSim\Manual do UTSim.lnk"
   Delete "$SMPROGRAMS\UTSim\Desinstalar o UTSim.lnk"
+  Delete "$SMPROGRAMS\UTSim\UTSim 3D (prévia).lnk"
+  Delete "$SMPROGRAMS\UTSim\Avisos de terceiros do UTSim 3D.lnk"
   RMDir "$SMPROGRAMS\UTSim"
 
   ; Apaga só o que o instalador criou, nunca a pasta escolhida inteira.
   RMDir /r "$INSTDIR\bin"
   RMDir /r "$INSTDIR\examples"
   RMDir /r "$INSTDIR\assets"
+  RMDir /r "$INSTDIR\3d"
   RMDir /r "$INSTDIR\manual"
   Delete "$INSTDIR\README.md"
   Delete "$INSTDIR\CHANGELOG.md"

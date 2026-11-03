@@ -1103,7 +1103,16 @@ bash scripts/godot_teste.sh      # teste sem janela: extensão, 3 exemplos até 
 ```
 
 O executável do Godot vem de `GODOT`, de `godot` no `PATH` ou de `~/Documents/Godot_v4.7*`.
-Os modelos de exportação do Godot só entram na fase G5.
+
+**Exportação (G5):** `bash scripts/godot_exportar.sh [--instalar-modelos]` compila a ponte em
+release, importa sem janela e exporta com os presets de `godot/export_presets.cfg`
+(`--headless --export-release`) para `target/godot-export/<plataforma>/`: `utsim-3d`,
+`utsim-3d.pck` (cena, scripts e `.glb`), a biblioteca da ponte ao lado do executável e
+`AVISOS-TERCEIROS.txt`, com o copyright e as licenças do motor lidos do executável
+(`scripts/godot_avisos.gd`; não é a licença do UTSim). `scripts/preparar-pacote.sh` leva essa
+pasta como `3d/` ao instalador do Windows (componente "UTSim 3D (prévia)", com atalho próprio),
+ao `.zip`, ao `.tar.gz` e ao `.deb`, ao lado do `utsim-view`. Os modelos de exportação (cerca de
+1,2 GB) são baixados com o SHA512 conferido. Detalhes e pendências em `docs/plano_godot.md`.
 
 **Teste sem janela** (`godot/testes/teste.gd`): confere que a extensão registrou as duas
 classes e que cada modelo carrega, roda duas replicações, monta a cena (com quantos blocos
