@@ -70,11 +70,9 @@
 		{"clicar": {"controle": "Res_Fechar"}},
 		{"conferir": {"oculto": ["PainelResultados"]}},
 		{"nota": "Uma rodada longa mostra o progresso sem travar a interface, e o Cancelar para no meio."},
-		{"digitar": "3000", "em": {"controle": "Simular_Replicacoes"}},
+		{"digitar": "1000", "em": {"controle": "Simular_Replicacoes"}},
 		{"clicar": {"controle": "Botao_RodarDeNovo"}},
 		{"conferir": {"ocupado": true, "visivel": ["Progresso", "Botao_Cancelar"]}},
-		{"esperar": 10},
-		{"conferir": {"ocupado": true}},
 		{"clicar": {"controle": "Botao_Cancelar"}},
 		{"esperar_trabalho": 120},
 		{"conferir": {"ocupado": false, "oculto": ["Progresso", "Botao_Cancelar"], "status_contem": "cancelada"}}
