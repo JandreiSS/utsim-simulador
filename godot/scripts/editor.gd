@@ -135,7 +135,7 @@ func set_tool(name: String, id := "") -> void:
 	main.on_tool_changed()
 	match name:
 		"ligar":
-			main.set_status("Ligar: clique no bloco de origem e depois no de destino (Esc cancela).")
+			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
 		"colocar":
 			main.set_status("Clique no chão para colocar (Shift mantém a ferramenta, Esc cancela).")
 		_:

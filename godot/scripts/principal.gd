@@ -214,7 +214,7 @@ func _build_ui() -> void:
 	top.add_child(VSeparator.new())
 	var tools := ButtonGroup.new()
 	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
-	_tool_link = _button(top, "Ferramenta_Ligar", "Ligar", "Ligar: clique na origem e depois no destino (L)", func(): editor.set_tool("ligar"))
+	_tool_link = _button(top, "Ferramenta_Ligar", "Ligar", "Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)", func(): editor.set_tool("ligar"))
 	for b in [_tool_select, _tool_link]:
 		b.toggle_mode = true
 		b.button_group = tools
@@ -363,6 +363,10 @@ func _build_ui() -> void:
 	_props.name = "Propriedades"
 	_props.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_props.edited.connect(_on_property_edited)
+	_props.look_provider = func(asset: String) -> Object:
+		if doc == null or editor == null or editor.selected.is_empty():
+			return null
+		return doc.look_scene(editor.selected[0], asset, CenaUtsim.skeletal_available())
 	_props.action.connect(func(what): arrange_action(what))
 	_props.gesture_ended.connect(func():
 		doc.end_gesture()

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use godot::prelude::*;
 
-use crate::document::{self, Editor, Properties, edit_replay, palette_model};
+use crate::document::{self, Editor, Properties, edit_replay, look_model, palette_model};
 use crate::playback::Playback;
 use crate::schema::{self, Field, Value};
 use crate::{UtsimModel, UtsimPlayback, put, strings};
@@ -555,6 +555,26 @@ impl UtsimDocument {
                 None
             }
         }
+    }
+
+    /// The scene of object `name` alone, at the origin, drawn with `asset` (`""`: the
+    /// default look of its kind): the miniature of the asset picker. `null` when there is
+    /// no such object.
+    #[func]
+    fn look_scene(
+        &mut self,
+        name: GString,
+        asset: GString,
+        skeletal_people: bool,
+    ) -> Option<Gd<UtsimPlayback>> {
+        let model = look_model(self.editor.model(), &name.to_string(), &asset.to_string())?;
+        let dir = self
+            .editor
+            .doc
+            .path()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf());
+        edit_playback(&model, dir.as_deref(), skeletal_people).map(playback_object)
     }
 
     /// The scene of one object of palette entry `id` at the origin (the ghost shown while

@@ -30,6 +30,9 @@
 ##    - `{"arrastar": {"de": <alvo>, "para": <alvo>, "shift": false, "passos": 12}}`
 ##    - `{"mover": <alvo>}` (mouse only)
 ##    - `{"digitar": "texto", "em": <alvo>, "enter": true}` (clicks `em` first, if given)
+##    - `{"escolher": {"controle": "Prop_visual_asset", "item": "bancada_kenney"}}`: picks
+##      the item with that text in an OptionButton, as choosing it in the open list does
+##      (the list is a separate window the events do not reach without a screen)
 ##    - `{"tecla": "ctrl+z"}` (`ctrl`, `shift`, `alt` plus a key name: `a`, `f1`, `delete`,
 ##      `escape`, `enter`, `left`, `tab`...)
 ##    - `{"esperar": 10}` (frames) or `{"esperar_s": 0.5}`
@@ -281,6 +284,25 @@ func _step(s: Dictionary, k: int) -> void:
 		if s.get("enter", true):
 			await _key(KEY_ENTER, 0, false, false, false)
 		await _frames(3)
+	elif s.has("escolher"):
+		var e: Dictionary = s["escolher"]
+		var o := _control(String(e.get("controle", ""))) as OptionButton
+		if o == null or not o.is_visible_in_tree():
+			_fail("passo %d: lista não encontrada: %s" % [k, e])
+			return
+		var found := -1
+		for i in o.item_count:
+			if o.get_item_text(i) == String(e["item"]) and not o.is_item_separator(i):
+				found = i
+		if found < 0:
+			_fail("passo %d: %s não tem o item %s" % [k, o.name, e["item"]])
+			return
+		# The miniature follows the entry under the mouse, then the choice.
+		o.get_popup().id_focused.emit(o.get_item_id(found))
+		await _frames(2)
+		o.select(found)
+		o.item_selected.emit(found)
+		await _frames(4)
 	elif s.has("tecla"):
 		await _combo(String(s["tecla"]))
 	elif s.has("esperar"):
@@ -497,7 +519,9 @@ func _accept_dialog(path: String, k: int) -> void:
 ## contem: [...]}), `igual_a` ({arquivo, modelo}: the saved file holds the same model as
 ## the reference, comments and formatting aside; each difference is a failure),
 ## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
-## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or "").
+## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
+## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
+## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
 func _check(c: Dictionary, k: int) -> void:
 	var doc: Object = _main.doc
 	var objects: Array = doc.objects()
@@ -569,6 +593,17 @@ func _check(c: Dictionary, k: int) -> void:
 				var diff: PackedStringArray = _main.doc.file_differences(got, ref)
 				for d in diff:
 					report.call("%s igual a %s" % [got.get_file(), ref.get_file()], false, d)
+			"ativo":
+				var props: Dictionary = doc.properties(want["objeto"])
+				var asset := "?"
+				for f in props.get("fields", []):
+					if f["path"] == "visual.asset":
+						asset = str(f["value"])
+				report.call("ativo de %s" % want["objeto"], asset == want["valor"], asset)
+			"miniatura":
+				var view := _control("Prop_visual_asset_miniatura")
+				var shown: String = _main._props._mini_asset if view != null else "(sem miniatura)"
+				report.call("miniatura", shown == want, shown)
 			"foco":
 				var owner := get_viewport().gui_get_focus_owner()
 				var focused: String = String(owner.name) if owner != null else ""

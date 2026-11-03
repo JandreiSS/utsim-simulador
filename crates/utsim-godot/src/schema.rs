@@ -2054,6 +2054,92 @@ mod tests {
     }
 
     #[test]
+    fn shifts_use_a_table_or_a_calendar_of_the_model() {
+        let mut d = doc();
+        // Without calendars: a table of its own, and "calendar" is refused.
+        apply(&mut d, "p", "shifts.on", Value::Bool(true));
+        assert_eq!(
+            field(&d, "p", "shifts.source").value,
+            Value::Text("inline".into())
+        );
+        assert!(
+            edit(
+                d.model(),
+                "p",
+                "shifts.source",
+                &Value::Text("calendar".into())
+            )
+            .is_err()
+        );
+        apply(&mut d, "p", "shifts.period", Value::Float(480.0));
+        // With a calendar: switching keeps the calendar's name, and back copies its table.
+        d.apply(Command::Set {
+            key: "calendars.turno_a".into(),
+            value: "(period: 1440.0, off: [(start: 480.0, duration: 960.0)])".into(),
+        })
+        .unwrap();
+        apply(&mut d, "p", "shifts.source", Value::Text("calendar".into()));
+        assert_eq!(object(&d, "p").shifts, Some(ShiftSpec::calendar("turno_a")));
+        let cal = field(&d, "p", "shifts.calendar");
+        assert_eq!(cal.value, Value::Text("turno_a".into()));
+        assert_eq!(cal.choices.len(), 1);
+        assert_eq!(
+            field(&d, "p", "shifts.on_end").value,
+            Value::Text(String::new())
+        );
+        apply(&mut d, "p", "shifts.on_end", Value::Text("Finish".into()));
+        assert_eq!(
+            object(&d, "p").shifts,
+            Some(ShiftSpec::Calendar {
+                name: "turno_a".into(),
+                on_end: Some(ShiftEnd::Finish),
+            })
+        );
+        apply(&mut d, "p", "shifts.source", Value::Text("inline".into()));
+        let Some(ShiftSpec::Inline(t)) = &object(&d, "p").shifts else {
+            panic!("{:?}", object(&d, "p").shifts)
+        };
+        assert_eq!(
+            (t.period, t.off.len(), t.on_end),
+            (1440.0, 1, ShiftEnd::Finish)
+        );
+        // A new switch-on picks the first calendar, as the Bevy editor does.
+        apply(&mut d, "q", "shifts.on", Value::Bool(true));
+        assert_eq!(object(&d, "q").shifts, Some(ShiftSpec::calendar("turno_a")));
+        assert!(
+            edit(
+                d.model(),
+                "q",
+                "shifts.on_end",
+                &Value::Text("Talvez".into())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn the_model_name_and_description_are_run_fields() {
+        let mut d = doc();
+        let fields = run_fields(d.model());
+        assert_eq!(fields[0].path, "model_name");
+        assert_eq!(fields[0].section, S_MODEL);
+        apply(&mut d, "run", "model_name", Value::Text("Linha".into()));
+        apply(
+            &mut d,
+            "run",
+            "description",
+            Value::Text("Uma linha".into()),
+        );
+        assert_eq!(d.model().name, "Linha");
+        assert_eq!(d.model().description, "Uma linha");
+        assert!(
+            edit(d.model(), "run", "model_name", &Value::Text(" ".into()))
+                .and_then(|c| d.apply(c))
+                .is_err()
+        );
+    }
+
+    #[test]
     fn the_schema_has_sections_types_and_choices() {
         let d = doc();
         let fields = object_fields(d.model(), object(&d, "p"));

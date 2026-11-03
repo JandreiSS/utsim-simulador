@@ -16,7 +16,7 @@ use utsim_core::RunReport;
 use utsim_edit::arrange::{self, Align, Axis, Clipboard};
 use utsim_edit::{Command, Document, Issue};
 use utsim_model::replay::{Replay, ReplayBlock, kind_name};
-use utsim_model::{Model, is_mobile};
+use utsim_model::{Model, VisualDef, is_mobile};
 
 use crate::schema::{self, Field, Value};
 
@@ -602,6 +602,24 @@ pub fn file_differences(got: &Path, want: &Path) -> Result<Vec<String>, String> 
     Ok(model_differences(&read(got)?, &read(want)?))
 }
 
+/// A model with only object `name` of `model`, at the origin and with `asset` as its
+/// `visual.asset` (`""` for the default look of its kind; scale, turn and colour kept):
+/// the miniature of the asset picker. A rack or a conveyor keeps its own size. `None`
+/// when there is no such object.
+pub fn look_model(model: &Model, name: &str, asset: &str) -> Option<Model> {
+    let mut object = model.objects.iter().find(|o| o.name == name)?.clone();
+    object.position = [0.0; 3];
+    let mut visual = object.visual.clone().unwrap_or_default();
+    let asset = asset.trim();
+    visual.asset = (!asset.is_empty()).then(|| asset.to_string());
+    object.visual = (visual != VisualDef::default()).then_some(visual);
+    // Settings that name other objects (a team, a transporter) would not validate alone;
+    // the miniature only needs the look.
+    let mut doc = Document::new("miniatura");
+    doc.apply(Command::Add(Box::new(object))).ok()?;
+    Some(doc.model().clone())
+}
+
 /// A model with only palette entry `id` at the origin (the ghost shown while placing).
 pub fn palette_model(id: &str) -> Option<Model> {
     let mut doc = Document::new("fantasma");
@@ -613,7 +631,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 30] = [
+pub const SHORTCUTS: [(&str, &str); 31] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -626,6 +644,10 @@ pub const SHORTCUTS: [(&str, &str); 30] = [
     ),
     ("Arrastar no chão", "seleção por caixa (troca a seleção)"),
     ("Arrastar um bloco", "move o bloco ou a seleção inteira"),
+    (
+        "Arrastar da porta de saída (verde)",
+        "liga ao bloco (ou à porta de entrada) onde soltar",
+    ),
     ("Botão direito + arrastar", "gira a vista"),
     ("Shift + botão direito + arrastar", "desloca a vista"),
     ("Roda do mouse", "aproxima e afasta"),
@@ -641,7 +663,7 @@ pub const SHORTCUTS: [(&str, &str); 30] = [
     ("Del", "exclui a seleção (ou a ligação selecionada)"),
     (
         "L",
-        "ferramenta Ligar: clique na origem e depois no destino",
+        "ferramenta Ligar: arraste da origem ao destino, ou clique e clique",
     ),
     (
         "Esc",
@@ -1002,6 +1024,26 @@ mod tests {
         let diff = model_differences(a.model(), b.model());
         assert!(diff.iter().any(|d| d == "objeto a mais: saida"), "{diff:?}");
         assert!(file_differences(Path::new("nada.ron"), Path::new("nada.ron")).is_err());
+    }
+
+    #[test]
+    fn the_miniature_has_one_object_with_the_asset_asked() {
+        let e = line();
+        let m = look_model(e.model(), "processo", "bancada_kenney").unwrap();
+        assert_eq!(m.objects.len(), 1);
+        assert!(m.connections.is_empty());
+        let o = &m.objects[0];
+        assert_eq!(o.position, [0.0; 3]);
+        assert_eq!(
+            o.visual.as_ref().unwrap().asset.as_deref(),
+            Some("bancada_kenney")
+        );
+        let m = look_model(e.model(), "processo", " ").unwrap();
+        assert_eq!(m.objects[0].visual, None, "the default look");
+        assert!(look_model(e.model(), "nada", "").is_none());
+        // It draws like any edit scene.
+        let r = edit_replay(&m);
+        assert_eq!(r.blocks.len(), 1);
     }
 
     #[test]
