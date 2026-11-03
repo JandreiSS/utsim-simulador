@@ -114,6 +114,24 @@ enum Cmd {
         /// Grava os resultados em JSON
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Compara os cenários de um experimento: ANOVA, Tukey e pares com Bonferroni
+        #[arg(long, value_name = "EXPERIMENTO")]
+        comparar: Option<PathBuf>,
+        /// Correlação (Pearson e Spearman) entre as métricas nas replicações
+        #[arg(long)]
+        correlacao: bool,
+        /// Grava o mapa de calor de deslocamentos da replicação 0 em SVG
+        #[arg(long = "mapa-calor", value_name = "SVG")]
+        mapa_calor: Option<PathBuf>,
+        /// Lado da célula do mapa de calor, em metros
+        #[arg(long, default_value_t = 0.5)]
+        celula: f64,
+        /// Camadas do mapa de calor: recurso ou classe
+        #[arg(long, default_value = "recurso")]
+        por: String,
+        /// Grava cada observação em CSV longo (replicação, instante, objeto, medida, valor)
+        #[arg(long = "exportar-observacoes", value_name = "CSV")]
+        exportar_observacoes: Option<PathBuf>,
     },
     /// Grava o rastro completo de uma replicação para o visualizador 3D
     Replay {
@@ -561,6 +579,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             reps,
             stop,
             json,
+            comparar,
+            correlacao,
+            mapa_calor,
+            celula,
+            por,
+            exportar_observacoes,
         } => analisar::run(analisar::Args {
             model,
             warmup: aquecimento,
@@ -575,6 +599,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             reps,
             stop,
             json,
+            compare: comparar,
+            correlation: correlacao,
+            heatmap: mapa_calor,
+            cell: celula,
+            group: por,
+            observations: exportar_observacoes,
         })?,
         Cmd::Fluxograma {
             model,
