@@ -677,7 +677,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             max_arrivals,
             labels,
             on_blocked,
-            ..
+            schedule,
         } => {
             out.push(
                 dist_field(s, "interarrival", "Tempo entre chegadas", interarrival)
@@ -711,6 +711,22 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             out.push(
                 Field::new(s, "labels", "Rótulos", FieldType::Ron, Value::Text(ron::labels(labels)))
                     .help("Valor sorteado para cada item, por nome: {\"tipo\": Discrete([(1.0, 3.0), (2.0, 1.0)])}."),
+            );
+            out.push(
+                Field::new(
+                    s,
+                    "schedule",
+                    "Chegadas por período",
+                    FieldType::Ron,
+                    schedule
+                        .as_ref()
+                        .map_or(Value::Null, |v| Value::Text(ron::schedule(v))),
+                )
+                .optional(schedule.is_some())
+                .help(
+                    "Ciclo e períodos com o próprio intervalo, taxa ou fechados: \
+                     (cycle: 1440.0, periods: [(start: 0.0, end: 480.0, arrivals: Rate(0.5))]).",
+                ),
             );
         }
         ObjectKind::Queue {
@@ -1466,6 +1482,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         }
         (ObjectKind::Source { labels, .. }, "labels") => ron::labels(labels),
         (ObjectKind::Source { on_blocked, .. }, "on_blocked") => ron::debug(on_blocked),
+        (ObjectKind::Source { schedule, .. }, "schedule") => ron::option(schedule, ron::schedule),
         (ObjectKind::Queue { capacity, .. }, "capacity") => {
             ron::option(capacity, |v| v.to_string())
         }
@@ -1490,6 +1507,8 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
 fn default_on(model: &Model, obj: &ObjectDef, head: &str) -> Result<String, String> {
     Ok(match head {
         "max_arrivals" => "100".into(),
+        // One day: the default interval in the morning, closed the rest of the day.
+        "schedule" => "(cycle: 1440.0, periods: [(start: 0.0, end: 480.0), (start: 480.0, end: 1440.0, arrivals: Closed)])".into(),
         "capacity" => "10".into(),
         "batch" => ron::batch(2, 0.0, false),
         "setup" => ron::dist(&Dist::Const(1.0)),
@@ -2115,6 +2134,24 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn a_source_has_arrivals_by_period_as_ron() {
+        let mut d = doc();
+        assert_eq!(field(&d, "a", "schedule").value, Value::Null);
+        apply(&mut d, "a", "schedule.on", Value::Bool(true));
+        let f = field(&d, "a", "schedule");
+        assert!(f.enabled);
+        let ObjectKind::Source { schedule, .. } = &object(&d, "a").kind else {
+            panic!()
+        };
+        assert_eq!(schedule.as_ref().unwrap().periods.len(), 2);
+        let text = "(cycle: 60.0, periods: [(start: 0.0, end: 30.0, arrivals: Rate(2.0))])";
+        apply(&mut d, "a", "schedule", Value::Text(text.into()));
+        assert_eq!(read_field(object(&d, "a"), "schedule").unwrap(), text);
+        apply(&mut d, "a", "schedule.on", Value::Bool(false));
+        assert_eq!(field(&d, "a", "schedule").value, Value::Null);
     }
 
     #[test]

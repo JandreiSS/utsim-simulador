@@ -984,7 +984,7 @@ A janela **Resultados** do `utsim-view` roda replicações, cenários e otimiza�
 - `utsim-viewer::results` (biblioteca, sem egui): configurações da rodada, ordenação e filtro da tabela, dados dos gráficos (cores de estado de `style::state_color`), cenários montados das linhas da grade, problema de otimização montado do formulário e o comando de "Aplicar ao modelo" (um `Command::Batch` de `Set`, um passo de desfazer).
 - `results_panel.rs` (binário): a janela, com os gráficos em `egui_plot` 0.37 (a versão feita para o egui 0.36 do `bevy_egui` 0.43). Os trabalhos rodam numa thread no aplicativo de mesa e no próprio quadro no navegador; o progresso volta por um canal e "Cancelar" liga um `AtomicBool`. Arquivos (CSV, HTML, experimento `.ron`) só no aplicativo de mesa.
 
-## 4r. Interface Godot (fase G1: ponte e reprodução)
+## 4r. Interface Godot (fases G1 e G2: ponte, reprodução e edição)
 
 A interface 3D da versão 0.2 (e depois a realidade virtual e aumentada) é feita no Godot 4.7.
 O editor e visualizador Bevy (`utsim-viewer`) continua sendo o da versão 0.1. O Godot não
@@ -996,20 +996,35 @@ O plano das fases G1 a G5 está em `docs/plano_godot.md`.
 0.5.5 com a feature `api-4-7`). Fica fora de `default-members` e dos passos do
 `verificar.sh` sem `UTSIM_GODOT=1`. Só as classes do núcleo do Godot são geradas (sem
 `__codegen-full`), porque a ponte devolve dados simples e todo nó é criado no GDScript; o
-build da ponte leva cerca de 1 min. Duas classes, ambas `RefCounted`:
+build da ponte leva cerca de 1 min. Três classes, todas `RefCounted`:
 
 | Classe | Métodos |
 |---|---|
 | `UtsimModel` | `load(caminho)` lê e valida o `.ron` e devolve `{ok, errors, warnings, name, objects, replications, stop_time}`; `run(n)` roda `n` replicações em paralelo e devolve `{ok, replications, metrics}`, com `metrics["bloco.métrica"] = {mean, half_width, std_dev, n}` (os números do `utsim run`); `playback(rep, pessoas_animadas)` grava o replay de uma replicação e devolve um `UtsimPlayback` (ou `null`, com `last_error()`) |
 | `UtsimPlayback` | `static_scene()` (uma vez), `frame(t)` (a cada quadro), `end()`, `next_event(t)`, `prev_event(t)`, `glb(chave)`, `person_clips()`, `set_clip_durations(...)` |
+| `UtsimDocument` (G2) | o modelo em edição sobre o `utsim_edit::Document`: `new_model`, `open`, `save`, `save_as`, `undo`, `redo`, `is_dirty`, `revision`; `add(id, ponto, passo)` com encaixe na grade, `remove`, `connect_objects`, `disconnect_objects`, `move_connection`, `begin_drag`/`drag`/`end_drag` (um passo de desfazer), `nudge`, `copy`/`cut`/`paste`/`duplicate`, `align`, `distribute`; `objects()`, `connections()` (com o número da porta), `issues()`, `warnings()`; `properties(objeto)` (o esquema do painel), `set_property(objeto, caminho, valor, outros)` e `field_text`; `edit_scene()` (a cena do documento, sem rodar), `palette_scene(id)` (o fantasma ao colocar), `look_scene(objeto, ativo)` (a miniatura); `as_model()` (um `UtsimModel` para Simular); `file_differences(a, b)` (os modelos de dois arquivos, para os roteiros) |
 
 O núcleo da ponte não tem tipos do Godot e é testado sem o motor (`cargo test -p utsim-godot`):
 
 - `coords`: conversão de coordenadas, com testes;
-- `looks`: escolha do modelo de cada entidade e regras dos clipes, das cargas e das luzes,
-  portadas de `crates/utsim-viewer/src/visual.rs`, porque o `utsim-viewer` traz o Bevy junto;
-- `catalogue`: catálogo de terceiros;
-- `playback`: a `Scene` e o empacotamento dos quadros.
+- `playback`: a `Scene` e o empacotamento dos quadros;
+- `document`: o `Editor` (documento, área de transferência, arrasto), as linhas de objetos e
+  ligações, `edit_replay` (o modelo em edição desenhado pelo mesmo código da reprodução),
+  `look_model` (a miniatura) e `model_differences` (o que difere entre dois modelos);
+- `schema`: as propriedades de um objeto como uma lista de campos (caminho, rótulo, tipo,
+  valor, escolhas, unidade, ajuda, seção, profundidade, ligado ou não) e a edição de um campo
+  como um `Command` do `utsim-edit`; as distribuições vêm como família, parâmetros e texto
+  RON; os turnos como tabela própria ou calendário do modelo.
+
+Duas crates sem motor são usadas pelo Bevy e pela ponte, para os dois desenharem o mesmo
+modelo do mesmo jeito:
+
+- `utsim-look` (G2): as regras de aparência (`visual`: o ativo de cada entidade por papel,
+  tipo e `visual.asset`, os clipes das pessoas, as cargas nos garfos, no deque e nas mãos, a
+  luz do AGV, as rodas) e o catálogo de terceiros (`catalogue`). O `utsim-viewer` reexporta os
+  dois módulos com os nomes antigos (`visual`, `terceiros`) e a ponte com `looks` e
+  `catalogue`;
+- `utsim-edit::ron_text`: o texto RON de cada valor que um `Command::Set` recebe.
 
 **Fluxo de dados:**
 
@@ -1099,17 +1114,46 @@ fonte: rodar o script de novo atualiza as cópias.
 bash scripts/godot.sh            # ponte (debug), cópias dos .glb e importação
 bash scripts/godot.sh --release  # ponte otimizada
 bash scripts/godot.sh --abrir    # e abre o projeto no Godot (F5 roda)
-bash scripts/godot_teste.sh      # teste sem janela: extensão, 3 exemplos até o fim
+bash scripts/godot_teste.sh      # sem janela: extensão, 3 exemplos e os roteiros g2_*.json
 ```
 
 O executável do Godot vem de `GODOT`, de `godot` no `PATH` ou de `~/Documents/Godot_v4.7*`.
 Os modelos de exportação do Godot só entram na fase G5.
 
-**Teste sem janela** (`godot/testes/teste.gd`): confere que a extensão registrou as duas
+**Teste sem janela** (`godot/testes/teste.gd`): confere que a extensão registrou as
 classes e que cada modelo carrega, roda duas replicações, monta a cena (com quantos blocos
 têm modelo e quantas pessoas animadas) e é reproduzido do início ao fim em 400 passos. Falha
 se um recurso móvel nunca sai do lugar, se nenhum item aparece, se uma pessoa ficou sem
-animação ou se o Godot imprimir um erro.
+animação ou se o Godot imprimir um erro. Depois, o `scripts/godot_teste.sh` roda os roteiros
+da interface (`godot/roteiros/g2_*.json`) também com `--headless`: a cena principal inteira,
+com cliques, arrastos e teclas de verdade (`Input.parse_input_event`), com a vista do tamanho
+do projeto; só as capturas de tela são puladas.
+
+**Edição (G2):** o modo Editar desenha o documento com o mesmo `CenaUtsim` da reprodução
+(`UtsimDocument.edit_scene`) e o `godot/scripts/editor.gd` trata a entrada, sem física:
+
+- **escolher:** o raio da câmera cruza a caixa de cada bloco (pegada e altura); clicar de
+  novo no mesmo ponto passa ao bloco de baixo; uma ligação é pega a poucos pixels da linha;
+  arrastar no chão faz a seleção por caixa;
+- **mover:** o ponto do chão sob o mouse (projeção no plano `y = 0`) dá o deslocamento, com
+  encaixe na grade (`G` liga e desliga, passo de 0,25 a 5 m); o arrasto inteiro é um passo de
+  desfazer;
+- **colocar:** da Biblioteca (`biblioteca.gd`, ícones em `godot/icones/`), clicando e
+  clicando no chão ou arrastando até o chão, com o fantasma do objeto sob o mouse;
+- **ligar:** cada bloco tem a porta de saída (`+x`, verde) e a de entrada (`-x`, azul),
+  mostradas no selecionado e no que está sob o mouse; arrastar da saída até outro bloco (ou a
+  porta de entrada dele) liga; a ferramenta Ligar (`L`) liga arrastando de bloco a bloco ou
+  clicando na origem e no destino. Recursos móveis não têm portas (usam `transport` e
+  `operators`);
+- **painel de propriedades** (`painel_propriedades.gd`): gerado do esquema, campo por campo
+  (texto, número, escolha, distribuição com família e parâmetros ou texto RON, listas em RON,
+  conjuntos, cor, ativo com miniatura). O painel não muda o modelo: emite a edição, a ponte a
+  valida e aplica como comando, e o painel é refeito no quadro seguinte. Com vários objetos do
+  mesmo tipo selecionados, a edição vale para todos (um passo de desfazer);
+- **atalhos:** os do Bevy (Ctrl+Z, Ctrl+Y, Ctrl+S, Delete, Esc, setas, Ctrl+C/X/V/D, Ctrl+A),
+  mais F1 (a janela de atalhos) e Tab (Editar e Simular);
+- **Simular:** o documento vira um `UtsimModel` (`as_model`), só quando não tem problemas; a
+  reprodução é a da G1.
 
 **Capturas roteirizadas** (o autoload `godot/scripts/roteiro.gd`), para o controle visual:
 
@@ -1137,17 +1181,19 @@ na ponte e de 0,04 a 1,3 ms no GDScript; o maior valor é o do centro de distrib
 salto cria e apaga muitos nós de itens (palete com oito caixas), coisa que a reprodução contínua
 quase não faz.
 
-**Lacunas da G1:**
+**Lacunas depois da G2:**
 
-- as regras de aparência estão duplicadas entre `utsim-viewer/src/visual.rs` e
-  `utsim-godot/src/looks.rs` (a G2 deve mover as regras puras para uma crate sem Bevy);
 - o `operador_simples` (sem o boneco) não mexe braços e pernas no Godot;
 - os nós de fluido são cilindros simples, sem nível;
 - os rótulos não têm o limite por distância do Bevy (A3D-4);
 - só há a câmera de órbita;
 - o replay é sempre o da replicação 0;
-- `run` bloqueia o quadro enquanto as replicações rodam (a G2 deve usar uma thread com
-  progresso).
+- `run` bloqueia o quadro enquanto as replicações rodam (a thread com progresso e cancelar
+  fica para a G3, com os resultados);
+- o Editar não edita a rede de caminhos, os fluidos, os fluxos de tokens nem os calendários
+  (um objeto escolhe um calendário que já existe; a G3 traz a rede e os fluidos);
+- a aparência do Editar (portas, contornos, miniatura) só foi conferida pelos roteiros sem
+  janela: a conferência visual está anotada em `docs/plano_godot.md`.
 
 ## 5. Estatísticas
 
