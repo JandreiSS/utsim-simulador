@@ -7,6 +7,7 @@
 #
 # Cria: os arquivos do programa em $PREFIXO, os comandos utsim e utsim-view em ~/.local/bin,
 # os atalhos "UTSim" e "UTSim (exemplos)" no menu de aplicativos e o ícone.
+# Se o pacote traz a pasta 3d/, instala também o UTSim 3D (prévia): comando utsim-3d e atalho.
 
 set -eu
 
@@ -17,8 +18,8 @@ BIN_USUARIO=${BIN_USUARIO:-$HOME/.local/bin}
 TAMANHOS="16 32 48 64 128 256 512"
 
 desinstalar() {
-    rm -f "$BIN_USUARIO/utsim" "$BIN_USUARIO/utsim-view"
-    rm -f "$DADOS/applications/utsim.desktop" "$DADOS/applications/utsim-exemplos.desktop"
+    rm -f "$BIN_USUARIO/utsim" "$BIN_USUARIO/utsim-view" "$BIN_USUARIO/utsim-3d"
+    rm -f "$DADOS/applications/utsim.desktop" "$DADOS/applications/utsim-exemplos.desktop" "$DADOS/applications/utsim-3d.desktop"
     rm -f "$DADOS/icons/hicolor/scalable/apps/utsim.svg"
     for t in $TAMANHOS; do
         rm -f "$DADOS/icons/hicolor/${t}x${t}/apps/utsim.png"
@@ -52,6 +53,12 @@ done
 # Os programas procuram assets/terceiros acima de bin/, então o link aponta para a pasta real.
 ln -sf "$PREFIXO/bin/utsim" "$BIN_USUARIO/utsim"
 ln -sf "$PREFIXO/bin/utsim-view" "$BIN_USUARIO/utsim-view"
+if [ -d "$ORIGEM/3d" ]; then
+    cp -r "$ORIGEM/3d" "$PREFIXO/"
+    chmod +x "$PREFIXO/3d/utsim-3d.x86_64"
+    ln -sf "$PREFIXO/3d/utsim-3d.x86_64" "$BIN_USUARIO/utsim-3d"
+    sed "s|@PREFIXO@|$PREFIXO|g" "$ORIGEM/empacotamento/utsim-3d.desktop" > "$DADOS/applications/utsim-3d.desktop"
+fi
 
 for arq in utsim.desktop utsim-exemplos.desktop; do
     sed "s|@PREFIXO@|$PREFIXO|g" "$ORIGEM/empacotamento/$arq" > "$DADOS/applications/$arq"

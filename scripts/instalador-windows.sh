@@ -7,6 +7,8 @@
 #
 # Antes: cargo build --release -p utsim-cli -p utsim-viewer
 # Opcional: mdbook build docs/manual   (para levar o manual em HTML)
+# Opcional: bash scripts/godot_exportar.sh   (leva o componente "UTSim 3D (prévia)", de
+#           target/godot-export/windows; sem ele, o instalador sai sem esse componente)
 # O makensis é procurado em $MAKENSIS, no PATH e nas pastas padrão do NSIS.
 # O instalador só é gerado aqui, nunca executado.
 
@@ -37,7 +39,7 @@ fi
 
 PASTA=$(mktemp -d)
 trap 'rm -rf "$PASTA"' EXIT
-bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release
+bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release target/godot-export/windows
 
 mkdir -p "$SAIDA"
 ARQUIVO="utsim-v${ROTULO}-windows-x64-instalador.exe"

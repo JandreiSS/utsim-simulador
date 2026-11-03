@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=UTSim 3D (prévia)
+GenericName=Simulador de processos
+Comment=Interface 3D do UTSim em Godot (prévia, convive com o editor UTSim)
+Exec=@PREFIXO@/3d/utsim-3d.x86_64
+Icon=utsim
+Terminal=false
+Categories=Education;Science;Engineering;
+Keywords=simulação;eventos discretos;processos;logística;3D;

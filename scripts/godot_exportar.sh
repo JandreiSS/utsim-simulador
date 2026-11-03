@@ -63,6 +63,15 @@ else
     PASTA_MODELOS="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/$VERSAO_GODOT.stable"
 fi
 
+descompactar() {
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q -o "$1" -d "$2"
+    else
+        # Git Bash do Windows pode não trazer o unzip.
+        "$(command -v python3 || command -v python)" -m zipfile -e "$1" "$2"
+    fi
+}
+
 if [ ! -f "$PASTA_MODELOS/version.txt" ]; then
     [ "$INSTALAR" = 1 ] ||
         falha "modelos de exportação do Godot $VERSAO_GODOT não instalados em $PASTA_MODELOS (rode com --instalar-modelos ou use Editor > Gerenciar modelos de exportação)"
@@ -79,7 +88,7 @@ if [ ! -f "$PASTA_MODELOS/version.txt" ]; then
     [ "$ESPERADO" = "$OBTIDO" ] || falha "SHA512 dos modelos não confere (esperado $ESPERADO, obtido $OBTIDO)"
     echo "SHA512 conferido"
     mkdir -p "$TMP/x" "$PASTA_MODELOS"
-    unzip -q "$TMP/$TPZ" -d "$TMP/x" || falha "não consegui abrir $TPZ"
+    descompactar "$TMP/$TPZ" "$TMP/x" || falha "não consegui abrir $TPZ"
     cp -r "$TMP/x/templates/." "$PASTA_MODELOS/" || falha "cópia dos modelos"
 fi
 
