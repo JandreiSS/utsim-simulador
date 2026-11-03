@@ -1,0 +1,51 @@
+// Sequência de tarefa feita com um fluxo de tokens (decisão D9 do plano de chegadas e
+// equipes): um abastecedor faz uma ronda pelas linhas a cada hora.
+// Cada passo da sequência é uma atividade do fluxo:
+//   pegar o abastecedor (Acquire) -> carregar no almoxarifado (Delay)
+//   -> andar até a linha 1 (Delay) -> deixar 2 lotes no bordo da linha 1 (CreateItem)
+//   -> andar até a linha 2 (Delay) -> deixar 1 lote no bordo da linha 2 (CreateItem)
+//   -> voltar ao almoxarifado (Delay) -> liberar o abastecedor (Release).
+// As linhas consomem os lotes; quando o bordo fica vazio, a linha para à espera da
+// próxima ronda. O relatório do bloco "ronda" mostra a ocupação do abastecedor.
+Model(
+    format: 2,
+    name: "Ronda de abastecimento",
+    description: "Sequência de tarefa (buscar, levar, deixar, voltar) como fluxo de tokens",
+    run: (
+        stop_time: 2880.0,
+        seed: 3,
+        replications: 3,
+    ),
+    objects: [
+        (name: "bordo_1", kind: Queue(), position: (0.0, 4.0, 0.0)),
+        (name: "linha_1", kind: Processor(process: Uniform(min: 20.0, max: 30.0)), position: (6.0, 4.0, 0.0)),
+        (name: "bordo_2", kind: Queue(), position: (0.0, -4.0, 0.0)),
+        (name: "linha_2", kind: Processor(process: Uniform(min: 40.0, max: 60.0)), position: (6.0, -4.0, 0.0)),
+        (name: "produto", kind: Sink, position: (12.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("bordo_1", "linha_1"),
+        ("linha_1", "produto"),
+        ("bordo_2", "linha_2"),
+        ("linha_2", "produto"),
+    ],
+    flows: [
+        (
+            name: "ronda",
+            resources: [(name: "abastecedor", capacity: 1)],
+            activities: [
+                (name: "inicio", kind: Source(interarrival: Const(60.0), first_at_zero: true), next: ["pega"]),
+                (name: "pega", kind: Acquire(resource: "abastecedor"), next: ["carrega"]),
+                (name: "carrega", kind: Delay(time: Uniform(min: 3.0, max: 5.0)), next: ["anda_1"]),
+                (name: "anda_1", kind: Delay(time: Const(2.5)), next: ["lote_1a"]),
+                (name: "lote_1a", kind: CreateItem(into: "bordo_1", labels: {"lote": "1"}), next: ["lote_1b"]),
+                (name: "lote_1b", kind: CreateItem(into: "bordo_1", labels: {"lote": "1"}), next: ["anda_2"]),
+                (name: "anda_2", kind: Delay(time: Const(3.0)), next: ["lote_2"]),
+                (name: "lote_2", kind: CreateItem(into: "bordo_2", labels: {"lote": "2"}), next: ["volta"]),
+                (name: "volta", kind: Delay(time: Const(4.0)), next: ["libera"]),
+                (name: "libera", kind: Release(resource: "abastecedor"), next: ["fim"]),
+                (name: "fim", kind: Sink),
+            ],
+        ),
+    ],
+)

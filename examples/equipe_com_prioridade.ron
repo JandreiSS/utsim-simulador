@@ -1,0 +1,62 @@
+// Equipe de dois operadores que atende duas máquinas, uma delas urgente.
+// - "torno" pede um operador para o setup com prioridade 0; "urgente" pede com
+//   prioridade 5 (OperatorUse.priority): quando os dois esperam, o urgente vai primeiro.
+// - O despachante escolhe o operador menos ocupado (LeastBusy) e, quando nenhum está
+//   livre, tira o serviço de quem vai vazio para o torno (preempt: Empty). Com
+//   metrics: true o relatório traz a espera dos pedidos e a carga de cada operador.
+// - Tempos em minutos; os operadores andam 60 m/min. Eles esperam na sala da equipe
+//   (área "sala_operadores") e, na pausa de 30 min no meio do turno de 8 h, vão até a
+//   copa (área "copa").
+Model(
+    format: 2,
+    name: "Equipe com prioridade",
+    description: "Dois operadores, uma máquina urgente, regra LeastBusy, preempção e local de pausa",
+    run: (
+        stop_time: 2880.0,
+        seed: 5,
+        replications: 3,
+    ),
+    areas: [
+        (name: "sala_operadores", position: (10.0, -8.0, 0.0), size: (4.0, 3.0)),
+        (name: "copa", position: (24.0, -8.0, 0.0), size: (4.0, 4.0)),
+    ],
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 10.0)), position: (0.0, 4.0, 0.0)),
+        (name: "fila_torno", kind: Queue(), position: (6.0, 4.0, 0.0)),
+        (name: "torno", kind: Processor(
+            setup: Exp(mean: 3.0),
+            process: Exp(mean: 6.0),
+            operators: Some(OperatorUse(team: "operadores", setup: true, process: false)),
+        ), position: (12.0, 4.0, 0.0)),
+        (name: "saida_torno", kind: Sink, position: (18.0, 4.0, 0.0)),
+        (name: "urgencias", kind: Source(interarrival: Exp(mean: 25.0)), position: (12.0, 12.0, 0.0)),
+        (name: "fila_urgente", kind: Queue(), position: (18.0, 12.0, 0.0)),
+        (name: "urgente", kind: Processor(
+            setup: Const(2.0),
+            process: Exp(mean: 8.0),
+            operators: Some(OperatorUse(team: "operadores", setup: true, process: false, priority: 5)),
+        ), position: (24.0, 12.0, 0.0)),
+        (name: "saida_urgente", kind: Sink, position: (30.0, 12.0, 0.0)),
+        (name: "op1", kind: Transporter(speed: 60.0, home_object: "sala_operadores", break_object: "copa"),
+            shifts: (period: 480.0, off: [(start: 240.0, duration: 30.0)]),
+            position: (10.0, -8.0, 0.0)),
+        (name: "op2", kind: Transporter(speed: 60.0, home_object: "sala_operadores", break_object: "copa"),
+            shifts: (period: 480.0, off: [(start: 270.0, duration: 30.0)]),
+            position: (11.0, -8.0, 0.0)),
+        (name: "operadores", kind: Dispatcher(
+            team: ["op1", "op2"],
+            rule: LeastBusy,
+            pick: Nearest,
+            preempt: Empty,
+            metrics: true,
+        ), position: (10.0, -4.0, 0.0)),
+    ],
+    connections: [
+        ("pedidos", "fila_torno"),
+        ("fila_torno", "torno"),
+        ("torno", "saida_torno"),
+        ("urgencias", "fila_urgente"),
+        ("fila_urgente", "urgente"),
+        ("urgente", "saida_urgente"),
+    ],
+)

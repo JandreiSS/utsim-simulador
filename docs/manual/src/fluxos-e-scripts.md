@@ -30,6 +30,8 @@ flows: [
 
 O modelo completo, com três paletes por caminhão, está em `examples/fluxo_docas.ron`.
 
+**Sequência de tarefa com um fluxo.** Uma tarefa feita de vários passos (buscar material, andar até uma estação, deixar, seguir para a próxima, voltar) cabe num fluxo: `Acquire` pega a pessoa (um recurso do fluxo), cada deslocamento ou trabalho é um `Delay`, cada entrega é um `CreateItem` no objeto certo e `Release` devolve a pessoa no fim. O exemplo `examples/ronda_de_abastecimento.ron` faz uma ronda por hora que deixa lotes nos bordos de duas linhas; quando o bordo fica vazio, a linha para à espera da próxima ronda.
+
 ### As atividades
 
 | Atividade | Campos (padrão) | O que faz |

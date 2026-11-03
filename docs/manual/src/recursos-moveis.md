@@ -202,6 +202,8 @@ Na cena 3D (`utsim cena` e a cena ao vivo), a pose de um recurso móvel que est�
 
 A volta para casa (`home: true`) já era interrompida por qualquer pedido novo, com ou sem `preempt`. Com `preempt: Empty` o despachante ganha a métrica `preemptions.count` (membros que devolveram o serviço). Sem o campo (`Never`) tudo funciona como antes. A preempção de um trabalho em andamento na máquina, com retomada depois, não existe ainda. Um transportador só pode estar na equipe de um despachante.
 
+O exemplo `examples/equipe_com_prioridade.ron` tem dois operadores que atendem um torno e uma máquina urgente (`priority: 5` nos operadores), com `rule: LeastBusy`, `pick: Nearest`, `preempt: Empty`, `metrics: true`, casa numa área de espera e pausa na copa.
+
 ### Ligações de equipe e de pedido
 
 Além das conexões de itens, um modelo com equipes tem ligações "de referência", que saem dos campos que já existem, sem formato novo:

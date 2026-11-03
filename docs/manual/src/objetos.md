@@ -167,6 +167,8 @@ Com `batch`, cada chegada cria vários itens de uma vez: `batch: Const(6.0)` cri
 - A fonte com `batch` ganha as métricas `arrivals.count` (chegadas) e `entered.count` (itens que saíram); com `Drop` continuam `lost.count` e `loss_fraction`.
 - `batch` não vale com `table`: na tabela a quantidade de cada linha vem de `count`.
 
+O exemplo `examples/chegadas_por_tabela.ron` junta os três jeitos: um horário diário de caminhões com tipos por linha, uma sequência de ordens em laço e lotes avulsos com tipo sorteado, roteados por `ByLabel("type")`.
+
 Nos experimentos, as chaves `pedidos.table`, `pedidos.table.rows[n]` e `pedidos.table.rows[n].<campo>` (`at`, `count`, `labels`, `labels.<nome>`) mudam a tabela; por exemplo `"pedidos.table.rows[1].count": "15"`.
 
 ## Queue (Fila)
