@@ -6,6 +6,7 @@ mod estado;
 mod experiment;
 mod fit;
 mod fluxograma;
+mod gemeo;
 mod gerar;
 mod optimize;
 mod painel;
@@ -296,6 +297,9 @@ enum Cmd {
         #[arg(long, default_value_t = 20.0)]
         cena_fps: f64,
     },
+    /// Gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura,
+    /// compara com o modelo e grava as observações; `reproduzir` reexecuta sem rede
+    Gemeo(gemeo::Args),
     /// Painel web para gestores e engenheiros: roda as replicações e serve a página (127.0.0.1)
     Painel {
         model: PathBuf,
@@ -481,6 +485,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             criterion: criterio,
         })?,
         Cmd::Dados(args) => dados::run(args)?,
+        Cmd::Gemeo(args) => gemeo::run(args)?,
         Cmd::Otimizar {
             problema,
             html,

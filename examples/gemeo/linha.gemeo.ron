@@ -1,0 +1,19 @@
+// Gêmeo da linha.ron lendo a emulação OPC UA de linha_real.ron (`utsim emular`).
+// Só leitura: o gêmeo assina os nós, nunca escreve.
+Twin(
+    model: "linha.ron",
+    // O relógio é o tempo simulado da emulação (numa planta real: Wall(unit_seconds: 1.0)).
+    clock: Tag(source: "clp", tag: "UTSim/linha/TempoSimulado"),
+    sources: [
+        (name: "clp", kind: OpcUa(endpoint: "opc.tcp://127.0.0.1:4840/",
+                                  namespace: "urn:utsim:emulacao", interval_ms: 50)),
+    ],
+    tags: [
+        (source: "clp", tag: "UTSim/linha/maquina/Saidas",   object: "maquina", measure: Outputs),
+        (source: "clp", tag: "UTSim/linha/maquina/Estado",   object: "maquina", measure: State),
+        (source: "clp", tag: "UTSim/linha/fila/Conteudo",    object: "fila",    measure: Content),
+        (source: "clp", tag: "UTSim/linha/chegada/Saidas",   object: "chegada", measure: Outputs),
+    ],
+    shadow: (window: 200.0, replications: 20, warmup: 400.0, samples_per_window: 20),
+    record: (anonymize_people: true, keep_days: 30),
+)

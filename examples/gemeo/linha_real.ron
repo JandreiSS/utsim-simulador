@@ -1,0 +1,14 @@
+// "Fábrica sintética" do exemplo do gêmeo: a mesma linha com a máquina mais lenta
+// (ciclo médio 0,85 em vez de 0,6). Emulada com `utsim emular`, faz o papel da planta
+// real; o gêmeo, com linha.ron, deve acusar o desvio na máquina e na fila.
+Model(
+    name: "linha",
+    run: (stop_time: 1000000.0, warmup: 400.0, seed: 4),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0)), position: (0.0, 0.0, 0.0)),
+        (name: "fila",    kind: Queue(),                                position: (3.0, 0.0, 0.0)),
+        (name: "maquina", kind: Processor(process: Exp(mean: 0.85)),    position: (6.0, 0.0, 0.0)),
+        (name: "saida",   kind: Sink,                                   position: (9.0, 0.0, 0.0)),
+    ],
+    connections: [("chegada", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+)
