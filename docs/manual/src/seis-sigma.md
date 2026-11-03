@@ -6,10 +6,12 @@ cronograma, ganhos e as ferramentas de cada fase. É um programa de janela próp
 navegador), funciona sem internet e não precisa de servidor: a equipe trabalha numa pasta
 compartilhada do Google Drive. O nome ainda é provisório.
 
-Esta é a **fundação** (etapa L0 do `docs/plano_lean_seis_sigma.md`): o formato do projeto, o
-trabalho em equipe pela pasta compartilhada, a visão geral, o termo de abertura e o quadro de
-ações já funcionam. As outras telas aparecem na navegação com o que vão trazer e chegam nas
-próximas etapas.
+Já funcionam a **fundação** (etapa L0 do `docs/plano_lean_seis_sigma.md`: o formato do
+projeto, o trabalho em equipe pela pasta compartilhada, a visão geral, o termo de abertura e o
+quadro de ações) e as **ferramentas qualitativas** (etapa L2: VOC e árvore CTQ, SIPOC,
+Pareto, plano de coleta, Ishikawa, 5 porquês, matriz causa-efeito, FMEA com a tabela de ação
+prioritária, planos de controle e de resposta e A3). As outras telas aparecem na navegação
+com o que vão trazer e chegam nas próximas etapas.
 
 ## Instalar e abrir
 
@@ -106,9 +108,9 @@ A navegação à esquerda tem a **Carteira** e as telas do projeto.
 - **Fases e tollgates**: as fases da abordagem e o estado de cada uma. Entregáveis,
   checklist do tollgate e decisões dos aprovadores chegam na etapa L1.
 - **Ações**: o quadro kanban, descrito abaixo.
-- **Riscos**, **Reuniões**, **Cronograma**, **Ganhos** (etapa L1), **Ferramentas** (etapas
-  L2 e L3) e **Dados** (etapa L3) mostram o que vão trazer. Em **Dados** já está a exportação
-  `.lssz`.
+- **Ferramentas**: os entregáveis das fases, descritos em [Ferramentas](#ferramentas).
+- **Riscos**, **Reuniões**, **Cronograma**, **Ganhos** (etapa L1) e **Dados** (etapa L3)
+  mostram o que vão trazer. Em **Dados** já está a exportação `.lssz`.
 
 ### Quadro de ações
 
@@ -124,8 +126,222 @@ As colunas são A fazer, Fazendo, Bloqueado, Verificar e Feito.
 - Cartões com prazo vencido e fora de "Feito" aparecem com a data em destaque, e entram na
   lista de atrasadas da visão geral.
 
+Cartões criados pelas ferramentas (a ação recomendada de uma linha do FMEA, um sinal do plano
+de resposta) mostram a origem no painel do cartão.
+
 Limites por coluna, raias, verificação de eficácia e a visão "minhas ações" de toda a carteira
 chegam na etapa L1.
+
+## Ferramentas
+
+A tela **Ferramentas** reúne as ferramentas qualitativas das fases (etapa L2 do plano). Cada
+ferramenta é um **entregável** de uma fase: escolha a ferramenta em "Novo entregável" e
+clique em "Criar". Ela entra na fase onde costuma ser usada no DMAIC (VOC, SIPOC, Pareto e
+A3 no Definir; plano de coleta no Medir; Ishikawa, 5 porquês, matriz causa-efeito e FMEA no
+Analisar; planos de controle e de resposta no Controlar) e pode ser mudada de fase no alto
+do entregável. Um projeto pode ter mais de um entregável da mesma ferramenta (dois Paretos,
+por exemplo).
+
+No alto de cada entregável ficam o nome, a fase, o estado (em elaboração ou concluído) e
+"Excluir". Os entregáveis aparecem em linha, agrupados pela fase; o concluído leva `✔`.
+
+Como no quadro de ações, cada célula é um campo próprio no diário: duas pessoas editando
+linhas diferentes do mesmo FMEA não se atrapalham, e duas pessoas mudando a mesma célula sem
+ver a mudança uma da outra geram um conflito na tela **Conflitos**. Em todas as listas, `⬆` e
+`⬇` mudam a posição e `✖` exclui o item (com os itens abaixo dele, numa árvore). Números
+aceitam vírgula ou ponto (`12,5`).
+
+### VOC e árvore CTQ
+
+- **Voz do cliente**: cada fala do cliente, nas palavras dele, com a fonte (SAC, pesquisa,
+  visita) e o segmento. Na coluna "Necessidade", agrupe a fala numa necessidade.
+- **Árvore CTQ**: cada necessidade (com a classe de Kano opcional: obrigatório, desempenho
+  ou atrativo) se desdobra em direcionadores, e cada direcionador em CTQs mensuráveis, com
+  definição operacional, unidade, LIE, LSE e meta.
+- **Como ler**: ao lado de cada CTQ aparecem as pendências (sem unidade, sem nenhum limite,
+  LIE maior ou igual ao LSE, meta fora dos limites); embaixo, o total de pendências da
+  árvore, contando também falas sem necessidade, necessidades sem direcionador e
+  direcionadores sem CTQ. "Árvore completa" quer dizer que cada CTQ tem unidade e ao menos
+  um limite.
+
+### SIPOC
+
+Cinco colunas, da esquerda para a direita: fornecedores, entradas, processo (as etapas,
+numeradas), saídas e clientes. Escreva no campo de cada coluna e tecle Enter. O programa
+avisa quando o processo não tem de 5 a 7 etapas (o usual num SIPOC) e quando há coluna
+vazia. O SIPOC gerado do modelo de simulação chega na etapa L4.
+
+### Pareto
+
+- **Contagens por categoria**: uma linha por categoria com a contagem. Com "Ponderar pelo
+  custo unitário", cada contagem é multiplicada pelo custo e o Pareto passa a ser de custo.
+- **Tabela de ocorrências**: cole uma ocorrência por linha (de uma planilha, por exemplo);
+  linhas iguais são somadas sem diferenciar maiúsculas. Para várias de uma vez, termine a
+  linha com `;quantidade` (`Rebarba;12`).
+- "Juntar em Outros abaixo de x %" junta as categorias pequenas numa só, no fim.
+- **Como ler**: a tabela traz o valor, o percentual e o acumulado de cada categoria, em
+  ordem decrescente. As **poucas vitais** são as categorias necessárias para chegar a 80 %
+  do total, contando a que cruza os 80 %. No gráfico, as barras são o percentual de cada
+  categoria (as vitais na cor de destaque), a linha é o acumulado e a linha horizontal marca
+  os 80 %. O acumulado sempre termina em 100 %.
+
+### Plano de coleta de dados
+
+Uma linha por medida: Y ou X, nome, definição operacional (o que conta e como medir, para
+todos medirem igual), tipo de dado (contínuo, atributo ou contagem), unidade,
+estratificação, tamanho da amostra, frequência, subgrupo, quem coleta, onde e formulário. A
+coluna "Falta" mostra o que ainda impede a coleta: nome, definição operacional, unidade
+(dado contínuo) ou amostra e frequência.
+
+### Ishikawa
+
+- Escreva o **efeito** no alto: ele vai na cabeça do peixe.
+- Cada categoria dos 6M (mão de obra, máquina, método, material, medição, meio ambiente)
+  abre a lista das suas causas; "nova categoria" cria uma categoria da equipe, além dos 6M.
+- Cada causa tem o estado (aberta, provável, verificada ou descartada) e a evidência que o
+  decidiu. "+ subcausa" desce um nível, sem limite de profundidade.
+- **Como ler o diagrama**: cada espinha é uma categoria (metade em cima, metade embaixo) com
+  as suas primeiras causas; as verificadas aparecem na cor de destaque, as prováveis em
+  laranja e as descartadas apagadas. As subcausas ficam na lista abaixo do desenho.
+- Se duas pessoas moverem causas ao mesmo tempo e uma ficar embaixo da outra (um ciclo), o
+  programa mostra a primeira como causa principal e avisa; nada some.
+
+### 5 porquês
+
+- Cada **cadeia** começa de um problema, escrito à mão ou tirado de uma causa de um Ishikawa
+  do projeto ("Nova cadeia a partir de uma causa do Ishikawa" ou o campo "Causa do
+  Ishikawa" da cadeia).
+- "+ por quê (novo ramo)" acrescenta um primeiro porquê; "+ por quê" ao lado de um porquê
+  acrescenta o seguinte. Clicar duas vezes no mesmo porquê abre dois ramos.
+- Cada porquê tem a evidência. Marque "causa raiz" no porquê que a equipe concluiu.
+- **Como ler**: as causas raiz candidatas são os porquês marcados; sem marcação, o último
+  porquê de cada ramo. Cinco níveis são a referência usual, não uma regra.
+
+### Matriz causa-efeito
+
+- **Saídas (Y)**: cada saída com o peso para o cliente, de 1 a 10.
+- **Entradas (X)**: cada entrada recebe, para cada saída, a nota de correlação 0
+  (nenhuma), 1 (fraca), 3 (média) ou 9 (forte). Célula em branco conta como 0.
+- **Como ler**: o total de uma entrada é a soma de peso × nota sobre as saídas; a coluna
+  "Ordem" dá a posição da entrada (1º é o maior total; empate fica na ordem de entrada). A
+  linha "Soma das notas" mostra quanto cada saída é explicada pelas entradas listadas. O
+  Pareto dos totais mostra as entradas que somam até 80 % da pontuação: são as primeiras a
+  investigar no Analisar ou a levar para o FMEA.
+
+### FMEA de processo
+
+Cada linha é um modo de falha de uma etapa (ou função) do processo:
+
+| Coluna | O que é |
+|---|---|
+| Etapa / função | onde no processo |
+| Modo de falha | como a etapa deixa de cumprir a função |
+| Efeito | o que o cliente (interno ou externo) sente |
+| S | severidade do efeito, 1 a 10 |
+| Causa | por que o modo de falha acontece |
+| O | ocorrência da causa, 1 a 10 |
+| Controle de prevenção | o que evita a causa |
+| Controle de detecção | o que detecta a causa ou o modo antes de chegar ao cliente |
+| D | detecção, 1 a 10 (10: não há como detectar) |
+| RPN | S × O × D, de 1 a 1000 |
+| AP | ação prioritária: alta, média ou baixa, pela tabela do projeto |
+| Ação recomendada | o que fazer |
+| Cartão | "Criar cartão" leva a ação ao quadro; depois, "Abrir cartão" mostra a coluna onde ela está |
+| Ação tomada, S', O', D' | o que foi feito e as notas revistas depois da ação |
+| RPN antes → depois, AP depois | o efeito da ação (em negrito quando melhorou) |
+
+- **Escalas da empresa**: em "Escalas da empresa", descreva o que cada nota de S, O e D quer
+  dizer na sua empresa. As descrições ficam no FMEA para toda a equipe.
+- **Ação recomendada → cartão**: o cartão entra no fim de "A fazer" com a ação como título,
+  o modo de falha e a causa no "por quê", e a origem "ação recomendada do FMEA" no painel do
+  cartão. Uma linha tem um cartão; se o cartão for excluído, dá para criar outro.
+- **Revisão**: preencha S', O' e D' depois da ação. Nota não revista vale a original. O
+  RPN e a AP depois da ação aparecem ao lado dos de antes.
+- **Características críticas**: linhas com S a partir de 9 (o valor pode ser mudado em
+  "Característica crítica a partir de S") são marcadas com `◆`. Cada uma precisa de uma
+  linha no plano de controle do projeto; o FMEA e o plano de controle avisam quantas
+  faltam. Com S' preenchido, vale a severidade revista.
+- **Como ler o RPN e a AP**: o RPN ordena, mas trata igual um 10 × 2 × 5 e um 2 × 10 × 5. A AP
+  corrige isso dando peso maior à severidade: priorize as linhas de AP alta, depois as de
+  AP média, e use o RPN só para desempatar.
+
+#### A tabela de ação prioritária do UTSim
+
+O programa já vem com uma tabela de AP para as 1000 combinações de S, O e D. Ela é própria do
+UTSim, escrita a partir da lógica pública do método (a severidade pesa primeiro, depois a
+ocorrência, depois a detecção); não é cópia da tabela de nenhum manual. As regras, por faixa
+de severidade (vale a prioridade mais alta entre as regras atendidas; nenhuma: baixa):
+
+| Severidade | Alta | Média |
+|---|---|---|
+| 9–10 (segurança, requisito legal) | O ≥ 4; ou O 2–3 com D ≥ 5 | O 2–3 com D ≤ 4; ou O = 1 com D ≥ 7 |
+| 7–8 | O ≥ 6; ou O 4–5 com D ≥ 7 | O 4–5 com D ≤ 6; ou O 2–3 com D ≥ 5 |
+| 4–6 | O ≥ 8 com D ≥ 5 | O ≥ 6 (fora a alta); ou O 4–5 com D ≥ 7 |
+| 2–3 | nunca | O ≥ 8 com D ≥ 7 |
+| 1 (sem efeito) | nunca | nunca |
+
+Cada regra é da forma "S ≥ a, O ≥ b e D ≥ c". Por isso a prioridade **nunca cai quando S, O
+ou D sobe**: piorar qualquer nota nunca baixa a prioridade. Os testes conferem isso nas 1000
+combinações, contra todas as combinações piores. A tabela tem 334 combinações altas, 216
+médias e 450 baixas.
+
+#### Tabela da empresa
+
+A empresa que tem direito de usar outra tabela (a de um manual que ela licenciou, por
+exemplo) pode importá-la. No FMEA, escreva o caminho de um arquivo CSV, dê um nome à tabela
+e clique em "Importar tabela da empresa". O arquivo tem uma linha por combinação:
+
+```
+S,O,D,AP
+1,1,1,L
+1,1,2,L
+...
+10,10,10,H
+```
+
+- Separador vírgula, ponto e vírgula ou tabulação; cabeçalho opcional; AP `H` (alta), `M`
+  (média) ou `L` (baixa), maiúsculas ou minúsculas.
+- As **1000 combinações** precisam estar lá, cada uma uma vez só. Se algo estiver errado, a
+  tabela não é importada e a tela lista os problemas com o número da linha (coluna faltando,
+  nota fora de 1 a 10, AP inválida, combinação repetida, combinações faltando).
+- A tabela importada vale para **todos os FMEAs do projeto** e para toda a equipe (ela fica
+  no diário, como qualquer alteração). Se ela tiver combinações em que a prioridade cai
+  quando uma nota sobe, a tela avisa, mas aceita: a tabela é da empresa.
+- "Salvar a tabela atual em CSV" grava a tabela em uso no caminho escrito: serve de modelo
+  para montar a da empresa. "Voltar à tabela do UTSim" desfaz a importação.
+
+### Plano de controle
+
+Uma linha por característica: processo ou etapa, característica, tipo (produto ou processo),
+especificação, método de medição, tamanho e frequência da amostra, método de controle (carta,
+checklist, poka-yoke), responsável e plano de reação. Na coluna "Linha do FMEA", ligue a linha
+à linha do FMEA que ela controla e marque se é característica crítica.
+
+- **Como ler**: embaixo, o programa lista as características críticas do FMEA (S alto) que
+  ainda não têm linha ligada a elas; "Criar a linha" cria a linha já ligada, com a etapa e o
+  modo de falha. Quando a lista fica vazia, o plano cobre todas: é a verificação do
+  tollgate do Controlar.
+
+### Plano de resposta
+
+Uma linha por sinal (regra de carta violada, limite de especificação, alarme): ação imediata,
+contenção, quem acionar e prazo. "Sinal ocorreu: abrir cartão" cria um cartão em "A fazer"
+com o sinal e a ação imediata no título, a contenção no "como", quem acionar no "onde", o
+prazo (se for uma data) e a origem "sinal do plano de resposta". Cada vez que o sinal ocorre,
+um cartão novo; "Abrir cartão" leva ao último.
+
+### A3
+
+Uma página com o projeto inteiro em sete blocos: contexto, condição atual, objetivo, análise
+das causas, contramedidas, plano de ação e acompanhamento. O conteúdo é montado na hora a
+partir do que o projeto já tem: problema, caso de negócio, meta, linha de base e prazo do
+termo de abertura; as poucas vitais dos Paretos; os CTQs com unidade e limites; as etapas do
+SIPOC; as causas verificadas dos Ishikawas; as causas raiz dos 5 porquês; as três entradas de
+maior total das matrizes causa-efeito; as linhas de AP alta dos FMEAs com a ação; os cartões
+do quadro com coluna, prazo e responsável; as linhas do plano de controle, os sinais do plano
+de resposta e as características críticas sem controle. Cada bloco tem uma nota da equipe,
+para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
+
 
 ## A pasta do projeto
 
@@ -161,7 +377,6 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 ## O que vem depois
 
 Pela ordem do plano: gestão do projeto (carteira, priorização, termo versionado, papéis e
-RACI, tollgates, riscos, reuniões, cronograma com PERT/CPM, ganhos), ferramentas qualitativas
-(VOC, SIPOC, Ishikawa, FMEA com a tabela de ação prioritária, plano de controle, A3),
-estatística (sobre o `utsim-quality`), integração com o modelo de simulação e os relatórios
-em PDF.
+RACI, tollgates, riscos, reuniões, cronograma com PERT/CPM, ganhos), as telas de estatística
+(sobre o `utsim-quality` e o `utsim-stats`), integração com o modelo de simulação (SIPOC e
+fluxograma gerados do modelo) e os relatórios em PDF (A3, FMEA, plano de controle).
