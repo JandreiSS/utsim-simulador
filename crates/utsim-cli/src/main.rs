@@ -10,6 +10,7 @@ mod optimize;
 mod painel;
 mod pert;
 mod planta;
+mod qualidade;
 mod replay;
 
 use std::path::PathBuf;
@@ -329,6 +330,14 @@ enum Cmd {
         #[arg(long)]
         json: Option<PathBuf>,
     },
+    // Arguments parsed by `qualidade::run_args`, so the main parser stays small (its
+    // debug build overflowed the main-thread stack on Windows).
+    /// Controle estatístico de processo, capacidade e análise do sistema de medição
+    #[command(disable_help_flag = true)]
+    Qualidade {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
     Pert {
         model: PathBuf,
@@ -380,6 +389,7 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
+        Cmd::Qualidade { args } => qualidade::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,

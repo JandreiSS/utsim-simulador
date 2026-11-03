@@ -16,6 +16,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
+| `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
@@ -38,6 +39,9 @@ utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
+utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
+utsim qualidade capacidade examples/qualidade/lead_time.csv --lse 18 --metodo todos
+utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
 ```
 
 ## Observações sobre as opções
@@ -48,6 +52,7 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
 - `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
   para ele e `--sorteios` só para `montecarlo`.
+- `qualidade`: tem quatro subcomandos (`carta`, `capacidade`, `msa`, `arl`), cada um com o seu `--help`. Na `carta`, `--excluir` e `--revisar` são da fase I e `--limites` da fase II; `--regras` aceita `1`, `we`, `nelson` ou uma lista como `1,2,5`. Na `capacidade`, `--deslocamento` é o deslocamento somado ao Z no nível sigma (1,5 por convenção).
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 ## Saída de `--help`
@@ -292,3 +297,122 @@ Options:
   -h, --help                 Print help
 ```
 
+### `utsim qualidade carta --help`
+
+```text
+Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
+
+Usage: utsim qualidade carta [OPTIONS] <ARQUIVO>
+
+Arguments:
+  <ARQUIVO>  
+
+Options:
+      --tipo <TIPO>
+          imr (padrão), xbarr, xbars, p, np, c, u, ewma ou cusum; com --limites, o tipo gravado nos limites
+      --subgrupo <SUBGRUPO>
+          Corta uma coluna de valores em subgrupos consecutivos deste tamanho
+      --regras <REGRAS>
+          Regras: 1 (só fora dos limites), we (Western Electric), nelson, ou lista como 1,2,5 ou we1,we4 [default: 1]
+      --excluir <EXCLUIR>
+          Fase I: subgrupos com causa atribuível fora da estimativa (a partir de 1), ex. 3,7
+      --revisar
+          Fase I revista: retira os pontos fora dos limites e reestima até não sobrar nenhum
+      --limites <LIMITES>
+          Fase II: limites congelados de um estudo anterior (JSON de --salvar-limites)
+      --salvar-limites <SALVAR_LIMITES>
+          Grava os limites estimados em JSON (para a fase II)
+      --media <MEDIA>
+          Média conhecida (padrão dado; EWMA e CUSUM: alvo)
+      --sigma <SIGMA>
+          σ conhecido do processo (padrão dado; EWMA e CUSUM: σ do valor individual)
+      --lambda <LAMBDA>
+          EWMA: peso λ [default: 0.2]
+      --l <L>
+          EWMA: largura L dos limites em σ [default: 3]
+      --k <K>
+          CUSUM: folga k em σ [default: 0.5]
+      --h <H>
+          CUSUM: intervalo de decisão h em σ [default: 5]
+      --html <HTML>
+          Grava o relatório com os gráficos em HTML
+      --json <JSON>
+          Grava a carta em JSON
+  -h, --help
+          Print help
+```
+
+### `utsim qualidade capacidade --help`
+
+```text
+Capacidade do processo (Cp, Cpk, Pp, Ppk, Cpm, PPM, nível sigma)
+
+Usage: utsim qualidade capacidade [OPTIONS] <ARQUIVO>
+
+Arguments:
+  <ARQUIVO>  
+
+Options:
+      --lie <LIE>                    Limite inferior de especificação
+      --lse <LSE>                    Limite superior de especificação
+      --alvo <ALVO>                  Alvo (padrão: meio da especificação)
+      --subgrupo <SUBGRUPO>          Corta uma coluna de valores em subgrupos consecutivos deste tamanho
+      --sigma-dentro <SIGMA_DENTRO>  σ dentro: mr (amplitude móvel), rbar (R̄/d2) ou sbar (S̄/c4)
+      --metodo <METODO>              normal, boxcox, percentis ou todos [default: normal]
+      --arredondar                   Box-Cox: arredonda λ para um valor usual dentro do IC
+      --deslocamento <DESLOCAMENTO>  Deslocamento somado ao Z no nível sigma (convenção: 1,5; 0 desliga) [default: 1.5]
+      --confianca <CONFIANCA>        Nível de confiança dos intervalos [default: 95%]
+      --html <HTML>                  Grava o relatório com o histograma em HTML
+      --json <JSON>                  Grava os índices em JSON
+  -h, --help                         Print help
+```
+
+### `utsim qualidade msa --help`
+
+```text
+Análise do sistema de medição (Gage R&R, atributos, viés e linearidade)
+
+Usage: utsim qualidade msa [OPTIONS] <ARQUIVO>
+
+Arguments:
+  <ARQUIVO>  
+
+Options:
+      --tipo <TIPO>
+          grr (peça, operador, valor), atributos (item, avaliador, resposta[, padrão]), vies ou linearidade (referência, valor) [default: grr]
+      --tolerancia <TOLERANCIA>
+          Tolerância LSE − LIE (para a %tolerância)
+      --lie <LIE>
+          Limite inferior de especificação (com --lse, dá a tolerância)
+      --lse <LSE>
+          Limite superior de especificação
+      --k <K>
+          Multiplicador de σ da variação do estudo (6 ou 5,15) [default: 6]
+      --variacao-processo <VARIACAO_PROCESSO>
+          Linearidade: variação do processo (6σ) para a linearidade absoluta
+      --html <HTML>
+          Grava o relatório com os gráficos em HTML
+      --json <JSON>
+          Grava o resultado em JSON
+  -h, --help
+          Print help
+```
+
+### `utsim qualidade arl --help`
+
+```text
+Comprimento médio de corrida (ARL) de um esquema, por simulação
+
+Usage: utsim qualidade arl [OPTIONS]
+
+Options:
+      --tipo <TIPO>                  shewhart, we, nelson, ewma ou cusum [default: shewhart]
+      --deslocamento <DESLOCAMENTO>  Deslocamento da média em σ (0: alarmes falsos) [default: 0]
+      --lambda <LAMBDA>              EWMA: peso λ [default: 0.2]
+      --l <L>                        EWMA: largura L dos limites em σ [default: 3]
+      --k <K>                        CUSUM: folga k em σ [default: 0.5]
+      --h <H>                        CUSUM: intervalo de decisão h em σ [default: 5]
+      --corridas <CORRIDAS>          Corridas simuladas [default: 10000]
+      --semente <SEMENTE>            Semente dos números aleatórios [default: 1]
+  -h, --help                         Print help
+```
