@@ -24,6 +24,8 @@ Model(
     description: "Texto livre",
     run: (stop_time: 1000.0),
     calendars: { "S1": (period: 1440.0, off: [...]) },
+    item_types: [ (name: "A", color: "#3b82f6", asset: "caixa_pequena", labels: {...}), ... ],
+    areas: [ (name: "copa", position: (30.0, 15.0, 0.0), size: (4.0, 4.0)), ... ],
     objects: [ ... ],
     connections: [ ... ],
     network: Some((...)),
@@ -86,6 +88,8 @@ Model(
 | `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)`, mais os campos opcionais de manutenção `repair_crew`, `wear`, `basis`, `repair`, `preventive`, `cost` e `oee` ([Manutenção de máquinas e OEE](manutencao.md)) |
 | `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...], on_end: Pause)` ou `Calendar("nome")` (veja abaixo) |
 | `transport` | nenhum | nome de um `Transporter` ou `Dispatcher` que leva os itens que saem do objeto |
+| `transport_priority` | `0` | só com `transport`: prioridade dos pedidos de transporte (maior vai primeiro) |
+| `transport_priority_label` | nenhum | só com `transport`: rótulo do item que substitui `transport_priority` |
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |
 | `on_entry` | nenhum | script executado na entrada de cada item |
 | `visual` | nenhuma | aparência no 3D |
@@ -140,8 +144,15 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `labels` | `{}` (mapa de nome para `Dist`) |
 | `on_blocked` | `Wait` (ou `Drop`) |
 | `schedule` | nenhuma: `(cycle: n, periods: [(start: n, end: n, arrivals: ..., labels: {...}), ...])` |
+| `table` | nenhuma: `(mode: Times, repeat: Once, rows: [(at: n, count: 1, labels: {...}), ...])`; não junto com `schedule` |
+| `batch` | nenhum (um item por chegada): `Dist` de itens por chegada, arredondada; não junto com `table` |
+| `release` | `Together` (ou `OneByOne(Dist)`: itens da chegada um a um, com esse intervalo) |
+| `item_type` | nenhum: nome de um tipo de `item_types` |
+| `item_type_mix` | `[]`: `[("nome", peso), ...]`, pesos >= 0 com ao menos um > 0; não junto com `item_type` |
 
 Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
+
+Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não decrescente) ou `Sequence` (sem `at`; `interarrival` entre linhas); `repeat` é `Once` (padrão), `Cycle(d)` (só `Times`, `d > 0`, `at` em `[0, d)`) ou `Loop` (só `Sequence`); `count` (padrão 1, de 0 a 1.000.000), `labels` (mapa de nome para número) e `item_type` (nome de um tipo) por linha. Veja [Objetos](objetos.md#tabela-de-chegadas-table).
 
 ### `Queue`
 
@@ -158,7 +169,7 @@ Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de
 | `capacity` | `1` (mínimo 1) |
 | `setup` | nenhum |
 | `process` | obrigatório |
-| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None)`; `requires: "habilidade"` só aceita pessoas com ela |
+| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None)`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
 
 ### `Combiner`
 
@@ -194,13 +205,18 @@ Sem campos. Escreva `kind: Sink`.
 | `agv` | `false` |
 | `movement` | o de `run` |
 | `clearance` | pelo papel: pessoa 0,6, empilhadeira 0,9, outros 0,8 (finita, maior ou igual a 0) |
+| `home_at` / `home_object` | nenhum: casa num ponto, ou num objeto ou área (um ou outro; ligam a volta para casa) |
+| `break_at` / `break_object` | nenhum: local de pausa num ponto, ou num objeto ou área (um ou outro) |
 
 ### `Dispatcher`
 
 | Campo | Padrão |
 |---|---|
 | `team` | obrigatório (lista de nomes de `Transporter`; não vazia; um transportador só em uma equipe) |
-| `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`) |
+| `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`, `LeastBusy`, `LongestIdle`, `Random`) |
+| `pick` | `Priority` (ou `Nearest`, `NearestAny`): qual serviço da fila o membro que fica livre pega |
+| `preempt` | `Never` (ou `Empty`: um pedido de prioridade maior tira o serviço de um membro que vai vazio buscá-lo) |
+| `metrics` | `false` (com `true`: `request_wait`, `requests.count`, `member.<nome>.requests` e `.busy` no relatório) |
 
 ### `Conveyor`
 
@@ -291,7 +307,7 @@ Tipos de nó: `Source(rate)`, `Tank(capacity, initial: 0, max_in: nenhum, max_ou
 | `scenarios` | obrigatório: `(name, set)`, com `set` padrão `{}` |
 | `measures` | `[]` (todas) |
 
-Chaves de `set` além de `<objeto>.<campo>` e `run.<campo>`: `<fonte>.schedule.cycle`, `<fonte>.schedule[n]` e `<fonte>.schedule[n].start`, `.end`, `.arrivals`, `.rate`, `.interarrival`, `.labels` (períodos contados a partir de 1); `<objeto>.shifts.on_end`; `calendars.<nome>` (a tabela inteira, ou `None` para apagar) e `calendars.<nome>.on_end`.
+Chaves de `set` além de `<objeto>.<campo>` e `run.<campo>`: `<fonte>.schedule.cycle`, `<fonte>.schedule[n]` e `<fonte>.schedule[n].start`, `.end`, `.arrivals`, `.rate`, `.interarrival`, `.labels` (períodos contados a partir de 1); `<fonte>.table.rows[n]` e `<fonte>.table.rows[n].at`, `.count`, `.labels`, `.labels.<nome>` (linhas contadas a partir de 1); `<objeto>.shifts.on_end`; `calendars.<nome>` (a tabela inteira, ou `None` para apagar) e `calendars.<nome>.on_end`.
 
 ## Arquivo de otimização (`OptProblem`)
 

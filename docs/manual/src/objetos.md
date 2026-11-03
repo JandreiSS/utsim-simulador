@@ -35,6 +35,11 @@ Cria itens. É por aqui que o trabalho entra no modelo.
 | `labels` | vazio | rótulos sorteados para cada item, por exemplo `{ "tipo": Discrete([(1.0, 0.7), (2.0, 0.3)]) }` |
 | `on_blocked` | `Wait` | o que fazer com o item que não consegue sair no instante em que nasce |
 | `schedule` | nenhuma | chegadas por período: a taxa ou o tempo entre chegadas muda com a hora (veja abaixo) |
+| `table` | nenhuma | tabela de chegadas: instantes fixos ou sequência ordenada de linhas com quantidade e rótulos (veja abaixo) |
+| `batch` | um item | itens criados em cada chegada (`Dist`, arredondada, mínimo 0), por exemplo `Const(6.0)` para caixas de seis. Sem `table` |
+| `release` | `Together` | como os itens de uma chegada (lote ou linha da tabela) saem: `Together` (todos no instante da chegada) ou `OneByOne(Dist)` (um a um, com esse intervalo entre eles) |
+| `item_type` | nenhum | tipo de todos os itens (um nome de `item_types`, veja abaixo) |
+| `item_type_mix` | `[]` | tipos sorteados para cada item, com pesos: `[("A", 0.7), ("B", 0.3)]`. Não junto com `item_type` |
 
 Os dois valores de `on_blocked`:
 
@@ -83,6 +88,88 @@ Regras:
 No editor, a seção **Chegadas por período** das propriedades da fonte mostra a tabela: ciclo, uma linha por período com início, fim, modo (igual ao padrão, distribuição, taxa ou sem chegadas) e valor, o botão "copiar do padrão" e o número esperado de chegadas por período e por ciclo, para conferir com os dados. Com ciclo de 1440 (um dia em minutos) os horários aparecem e são digitados como hh:mm e as taxas são por hora; com 10080 (uma semana) como "dia N hh:mm". O modelo não tem unidade de tempo própria: com outros ciclos os horários e as taxas ficam na unidade do modelo.
 
 Nos experimentos, as chaves `chegada.schedule`, `chegada.schedule.cycle`, `chegada.schedule[n]` e `chegada.schedule[n].<campo>` (`start`, `end`, `arrivals`, `rate`, `interarrival`, `labels`) mudam a tabela; por exemplo `"chegada.schedule[2].rate": "0.5"`.
+
+### Tabela de chegadas (`table`)
+
+Quando as chegadas vêm de uma lista (caminhões com hora marcada, ordens de produção numa ordem definida, o mix de pedidos do dia), dê à fonte uma tabela. Há dois modos:
+
+- **`Times` (horário)**: cada linha cria `count` itens no instante `at`. Com `repeat: Cycle(d)` a tabela se repete a cada `d` unidades de tempo e os `at` ficam dentro de `[0, d)`; com `Once` (o padrão) a fonte cria as linhas uma vez e fica `idle`.
+- **`Sequence` (sequência)**: as linhas não têm instante. A fonte percorre a lista em ordem, uma linha por chegada, e sorteia `interarrival` entre uma linha e a próxima. Com `repeat: Loop` volta à primeira linha; com `Once` para no fim.
+
+```ron
+(name: "pedidos", kind: Source(
+    interarrival: Exp(mean: 5.0),            // só no modo Sequence, entre linhas
+    table: (
+        mode: Times,
+        repeat: Cycle(1440.0),
+        rows: [
+            (at: 480.0, count: 12, labels: { "prioridade": 2.0 }),
+            (at: 600.0, count: 5),
+            (at: 840.0, count: 8, labels: { "prazo": 1080.0 }),
+        ],
+    ),
+))
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `mode` | `Times` | `Times` (horário) ou `Sequence` (sequência) |
+| `repeat` | `Once` | `Once` (uma vez), `Cycle(d)` (só `Times`: repete a cada `d`) ou `Loop` (só `Sequence`: volta ao início) |
+| `rows[].at` | obrigatório em `Times` | instante da linha, em ordem não decrescente; não vale em `Sequence` |
+| `rows[].count` | `1` | itens criados de uma vez pela linha (0 é aceito: a linha não cria nada) |
+| `rows[].labels` | `{}` | rótulos constantes dos itens da linha; substituem os rótulos sorteados de mesmo nome |
+| `rows[].item_type` | o da fonte | tipo dos itens da linha (veja "Tipos de item") |
+
+Regras:
+
+- Itens criados no mesmo instante saem na ordem da tabela.
+- No modo `Times` os instantes são fixos: com `on_blocked: Wait`, os itens que não conseguem sair esperam na fonte, e a linha seguinte chega no seu horário mesmo assim. Com `Drop`, os que não saem são perdidos.
+- No modo `Sequence` com `Wait`, o intervalo até a próxima linha começa quando o último item da linha saiu, como no modo normal. `first_at_zero: true` cria a primeira linha em t = 0.
+- `max_arrivals` limita o número de chegadas (linhas usadas), não de itens.
+- `table` e `schedule` juntos é erro: use um ou outro. Uma sequência em laço precisa de `interarrival` com média maior que 0.
+- Os erros apontam a linha, contada a partir de 1: `pedidos: table.rows[2]: at (300) antes da linha anterior (480); as linhas precisam estar em ordem de at`.
+- A fonte com tabela ganha as métricas `arrivals.count` (chegadas, isto é, linhas usadas) e `entered.count` (itens que saíram).
+- O `utsim check` resume a tabela: `chegadas: pedidos: horário com 3 linha(s), 25 item(ns) a cada ciclo de 1440`.
+
+### Tipos de item (`item_types`)
+
+O modelo pode declarar tipos de item no nível de cima, ao lado de `objects`. O tipo dá nome, cor e aparência no 3D aos itens e rótulos iniciais:
+
+```ron
+item_types: [
+    (name: "A", color: "#3b82f6", asset: "caixa_pequena", labels: { "peso": 8.0 }),
+    (name: "B", color: "#f59e0b", asset: "palete", labels: { "peso": 400.0 }),
+],
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `name` | obrigatório | nome único do tipo |
+| `color` | nenhuma | cor dos itens no 3D, `"#rrggbb"` |
+| `asset` | nenhum | aparência dos itens no 3D: um modelo da biblioteca ou um arquivo `.glb` |
+| `labels` | `{}` | rótulos constantes que todo item do tipo recebe ao nascer |
+
+A fonte escolhe o tipo com `item_type` (fixo), `item_type_mix` (sorteado com pesos) ou, numa tabela de chegadas, com `item_type` em cada linha (a linha vence a fonte).
+
+- **Rótulo reservado `type`.** O item de tipo `k` (contado a partir de 1, na ordem de `item_types`) leva o rótulo numérico `type = k`. Assim `output: ByLabel("type")` manda o tipo 1 para a saída 1, o tipo 2 para a saída 2, e os scripts leem `type` como qualquer rótulo. Por isso `type` não pode aparecer nos `labels` de uma fonte que dá tipo aos itens, nem nos rótulos de um tipo ou de uma linha.
+- **Ordem dos rótulos.** Primeiro os do tipo, depois os sorteados da fonte (e do período), por fim os da linha da tabela: o mais específico vence.
+- **Relatório por tipo.** Num modelo com tipos, cada `Sink` registra também `time_in_system.<tipo>` (por exemplo `saida.time_in_system.A.mean`); a contagem dessa medida é a vazão do tipo, e as contagens somam o `time_in_system` total.
+- **3D.** A cena (`utsim cena` e a cena ao vivo) lista os tipos no cabeçalho, com cor e aparência, e cada item no quadro diz o seu tipo; os visualizadores desenham o item com a cor e o modelo do tipo.
+- O `utsim check` lista os tipos: `chegadas: tipos de item (rótulo 'type'): A = 1 (#3b82f6, caixa_pequena); B = 2 (#f59e0b, palete)`.
+- Um nome de tipo que não existe é erro, com a lista dos tipos do modelo.
+
+### Lote por chegada (`batch` e `release`)
+
+Com `batch`, cada chegada cria vários itens de uma vez: `batch: Const(6.0)` cria seis, `batch: Poisson(mean: 4.0)` um número sorteado (arredondado; 0 não cria nada). Com `release: OneByOne(Const(2.0))` os itens do lote saem um a um, com 2 unidades de tempo entre eles; com `Together` (o padrão) saem juntos e o próximo objeto decide quantos cabem. O espaçamento vale também para os itens de uma linha da tabela.
+
+- Com `on_blocked: Wait`, o intervalo até a próxima chegada começa quando o **último** item do lote saiu. Com `Drop`, cada item que não cabe é perdido.
+- `max_arrivals` conta chegadas (lotes), não itens.
+- A fonte com `batch` ganha as métricas `arrivals.count` (chegadas) e `entered.count` (itens que saíram); com `Drop` continuam `lost.count` e `loss_fraction`.
+- `batch` não vale com `table`: na tabela a quantidade de cada linha vem de `count`.
+
+O exemplo `examples/chegadas_por_tabela.ron` junta os três jeitos: um horário diário de caminhões com tipos por linha, uma sequência de ordens em laço e lotes avulsos com tipo sorteado, roteados por `ByLabel("type")`.
+
+Nos experimentos, as chaves `pedidos.table`, `pedidos.table.rows[n]` e `pedidos.table.rows[n].<campo>` (`at`, `count`, `labels`, `labels.<nome>`) mudam a tabela; por exemplo `"pedidos.table.rows[1].count": "15"`.
 
 ## Queue (Fila)
 

@@ -826,6 +826,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             labels,
             on_blocked,
             schedule,
+            ..
         } => {
             out.push(
                 dist_field(s, "interarrival", "Tempo entre chegadas", interarrival)

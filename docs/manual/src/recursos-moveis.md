@@ -31,8 +31,35 @@ Por onde eles andam (caminho livre desviando dos objetos e das paredes, rede de 
 | `agv` | `false` | se `true`, segue a rede de caminhos aresta por aresta, com controle de tráfego |
 | `movement` | o de `run` | modo de movimentação deste recurso: `Free`, `Network`, `Legacy` (veja [Movimentação e obstáculos](movimentacao.md)) |
 | `clearance` | pelo papel | distância mínima (m) aos obstáculos nos modos `Free` e `Network`: pessoa 0,6, empilhadeira 0,9, outros 0,8 |
+| `home_at` | nenhum | casa num ponto próprio `(x, y, z)`; liga a volta para casa |
+| `home_object` | nenhum | casa num objeto ou numa área (`areas`): a posição dele; liga a volta para casa |
+| `break_at` | nenhum | local de pausa num ponto: para onde o membro vai quando o turno pausa |
+| `break_object` | nenhum | local de pausa num objeto ou numa área |
 
 A **posição** do transportador (campo `position` do objeto) é onde ele começa e, com `home: true`, para onde volta.
+
+### Casa, área de espera e local de pausa
+
+A casa pode ficar em outro lugar que não a posição do próprio transportador: um ponto (`home_at: (2.0, 8.0, 0.0)`), um objeto (`home_object: "doca"`) ou uma **área** do modelo. Com qualquer um dos dois campos o membro volta para lá quando fica ocioso, como com `home: true`; um serviço novo interrompe a volta.
+
+As áreas são marcadores no piso, fora do fluxo: áreas de espera, salas de pausa, zonas de escritório. Ficam numa lista própria do modelo, ao lado de `objects`, e não têm portas nem estados:
+
+```ron
+areas: [
+    (name: "espera_empilhadeiras", position: (12.0, -4.0, 0.0), size: (6.0, 3.0)),
+    (name: "copa", position: (30.0, 15.0, 0.0), size: (4.0, 4.0)),
+],
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `name` | obrigatório | nome único (não pode repetir o de um objeto) |
+| `position` | `(0.0, 0.0, 0.0)` | centro da área no piso |
+| `size` | `(2.0, 2.0)` | comprimento em x e largura em y, em metros |
+
+Com `break_at` ou `break_object`, quando o turno do membro pausa (janela `off` de `shifts`) e ele não tem serviço, ele **vai até o local de pausa**. O deslocamento fica dentro da pausa: aparece no 3D, mas não conta tempo da rodada (supõe-se que a pausa é mais longa que a caminhada). Quando o turno volta, ele caminha de volta para casa (ou para onde estava, sem casa); um serviço que chegou durante a pausa começa direto do local de pausa. Um membro no meio de um serviço quando a pausa começa segue as regras de `on_end` e fica onde está, como antes.
+
+A cena 3D (`utsim cena`) lista as áreas no cabeçalho, com nome, centro e tamanho, para os visualizadores desenharem no piso.
 
 ### Tempo de viagem
 
@@ -65,6 +92,22 @@ Aqui a empilhadeira leva o palete de `recebimento` até `porta_paletes`. O `tran
 
 Se `capacity` for maior que 1, o transportador também leva, na mesma viagem, outros serviços da fila que saem do mesmo objeto, até a sua capacidade. Ele nunca espera por mais itens para completar a carga.
 
+### Prioridade dos pedidos de transporte
+
+Quando vários objetos disputam a mesma equipe, a prioridade decide quem é atendido primeiro. O pedido de prioridade maior passa na frente na fila do despachante (e na fila do próprio transportador); entre iguais vale a ordem de chegada.
+
+```ron
+(name: "urgente", kind: Queue(), transport: "frota", transport_priority: 5),
+(name: "pedidos", kind: Queue(), transport: "frota", transport_priority_label: "prioridade"),
+```
+
+| Campo do objeto | Padrão | Significado |
+|---|---|---|
+| `transport_priority` | `0` | prioridade dos pedidos de transporte deste objeto (inteiro; maior vai primeiro) |
+| `transport_priority_label` | nenhum | rótulo do item cujo valor, arredondado, substitui `transport_priority`. Um item sem o rótulo usa o valor fixo |
+
+Os dois campos só valem num objeto com `transport`. Sem eles a prioridade é 0, como antes: os modelos antigos dão o mesmo resultado. A prioridade não interrompe um serviço já entregue a um membro; para desviar quem está indo vazio, veja a preempção no [Dispatcher](#dispatcher-despachante).
+
 ## Operadores numa máquina: `operators`
 
 Um Processor pode exigir pessoas durante o setup, o processamento ou os dois.
@@ -83,6 +126,9 @@ Um Processor pode exigir pessoas durante o setup, o processamento ou os dois.
 | `count` | `1` | quantos operadores a fase exige |
 | `setup` | `true` | o setup exige operador |
 | `process` | `true` | o processamento exige operador |
+| `requires` | nenhum | habilidade que o operador precisa ter |
+| `priority` | `0` | prioridade dos pedidos de operador desta máquina na fila do despachante (maior vai primeiro) |
+| `priority_label` | nenhum | rótulo do item em processo cujo valor substitui `priority` |
 
 Como funciona:
 
@@ -108,14 +154,69 @@ O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 |---|---|---|
 | `team` | obrigatório | nomes dos transportadores da equipe (não pode ser vazia) |
 | `rule` | `FirstAvailable` | como escolher entre membros livres |
+| `pick` | `Priority` | qual serviço da fila um membro que fica livre pega |
+| `preempt` | `Never` | se um pedido mais urgente pode tirar o serviço de um membro que vai vazio buscá-lo |
+| `metrics` | `false` | com `true`, o relatório ganha as métricas da equipe (veja abaixo) |
 
 As regras:
 
 - `FirstAvailable`: o primeiro membro livre, na ordem da equipe;
 - `RoundRobin`: os membros livres em rodízio;
-- `Nearest`: o membro livre mais próximo de onde o serviço começa (distância em linha reta, sem considerar a rede de caminhos). Empates vão para o primeiro da equipe.
+- `Nearest`: o membro livre mais próximo de onde o serviço começa (distância em linha reta, sem considerar a rede de caminhos). Empates vão para o primeiro da equipe;
+- `LeastBusy`: o membro livre com o menor tempo ocupado acumulado (do serviço entregue até o aviso de livre), para equilibrar a carga. Empates vão para o primeiro da equipe;
+- `LongestIdle`: o membro livre há mais tempo. No início todos estão livres desde 0, e o primeiro da equipe vence;
+- `Random`: um membro livre ao acaso, com o fluxo de números aleatórios do próprio despachante (a mesma semente dá as mesmas escolhas).
 
-Se todos estão ocupados, o serviço espera na fila do despachante, por prioridade e, entre iguais, por ordem de chegada. Quando um membro fica livre, pega o serviço que está na frente da fila. Um transportador só pode estar na equipe de um despachante.
+Se todos estão ocupados, o serviço espera na fila do despachante, por prioridade e, entre iguais, por ordem de chegada. Quando um membro fica livre, `pick` diz qual serviço ele pega:
+
+- `Priority` (padrão): o da frente da fila;
+- `Nearest`: entre os serviços da maior prioridade que espera, o que começa mais perto do membro (empate: o mais antigo);
+- `NearestAny`: o mais perto do membro, qualquer que seja a prioridade. Diminui as viagens vazias, mas um serviço longe ou de prioridade baixa pode esperar muito (inanição): confira a espera máxima nos resultados.
+
+```ron
+(name: "frota", kind: Dispatcher(team: ["emp1", "emp2", "emp3"], rule: LeastBusy, pick: Nearest))
+```
+
+### Preempção (`preempt`)
+
+Com `preempt: Empty`, quando chega um pedido e nenhum membro está livre, o despachante procura um membro ocupado cujo serviço tenha prioridade **menor** que a do pedido da frente da fila (o de menor prioridade; empate: o primeiro da equipe) e pede que ele desista:
+
+- se o membro está **indo vazio** buscar o item ou indo até a máquina (ainda sem nada carregado e sem ter chegado), ele para onde está, devolve o serviço e atende o pedido urgente saindo desse ponto. O serviço devolvido volta para a frente da fila, entre os da sua prioridade, e é feito depois;
+- se já está carregando, levando o item, descarregando ou trabalhando na máquina, ele **recusa** e o despachante pergunta ao próximo candidato. Um item carregado nunca é largado no caminho.
+
+### Métricas da equipe (`metrics`)
+
+Com `metrics: true` no despachante, o relatório ganha:
+
+| Métrica | Significado |
+|---|---|
+| `eq.request_wait.mean`, `.count`, máximo | espera do pedido por um membro: do pedido chegar ao despachante até ser entregue a um membro (a primeira vez) |
+| `eq.requests.count` | pedidos recebidos |
+| `eq.member.<nome>.requests` | serviços entregues a cada membro (equilíbrio da carga) |
+| `eq.member.<nome>.busy` | fração da janela em que o membro esteve com serviço, do ponto de vista do despachante |
+| `eq.preemptions.count` | membros que devolveram o serviço (com `preempt: Empty`) |
+
+A utilização de cada membro e o tempo indo vazio e carregado continuam no relatório do próprio membro (`emp1.utilization`, `emp1.state.travel_empty`, `emp1.state.travel_loaded`). A função `Model::team_summaries` junta tudo por equipe para o painel e para quem usa a biblioteca. Sem `metrics` nada muda no relatório.
+
+Na cena 3D (`utsim cena` e a cena ao vivo), a pose de um recurso móvel que está andando ganha `task_target`: o fim do trecho em curso, para desenhar a linha do membro até o destino. Parado, o campo não aparece.
+
+A volta para casa (`home: true`) já era interrompida por qualquer pedido novo, com ou sem `preempt`. Com `preempt: Empty` o despachante ganha a métrica `preemptions.count` (membros que devolveram o serviço). Sem o campo (`Never`) tudo funciona como antes. A preempção de um trabalho em andamento na máquina, com retomada depois, não existe ainda. Um transportador só pode estar na equipe de um despachante.
+
+O exemplo `examples/equipe_com_prioridade.ron` tem dois operadores que atendem um torno e uma máquina urgente (`priority: 5` nos operadores), com `rule: LeastBusy`, `pick: Nearest`, `preempt: Empty`, `metrics: true`, casa numa área de espera e pausa na copa.
+
+### Ligações de equipe e de pedido
+
+Além das conexões de itens, um modelo com equipes tem ligações "de referência", que saem dos campos que já existem, sem formato novo:
+
+| Ligação | De → para | Campo |
+|---|---|---|
+| equipe | despachante → membro | `team` |
+| pedido de transporte | objeto → transportador ou despachante | `transport` |
+| pedido de operador | processo → equipe | `operators.team` |
+| reparo | objeto → equipe de manutenção | `downtime.repair_crew` |
+| casa e pausa | membro → casa ou local de pausa | `home_at`, `home_object`, `break_at`, `break_object` |
+
+A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`links`, com o tipo, os dois blocos e o ponto final), para o editor desenhar as linhas de equipe e de pedido com cores e traços próprios. A biblioteca de edição (`utsim-edit`, módulo `teams`) tem as operações que o editor usa ao arrastar uma ligação: pôr ou tirar um membro da equipe (um transportador sai da equipe antiga no mesmo passo, porque só pode estar em uma), definir ou limpar o `transport` de um objeto e os `operators` de um processo. Cada operação é um passo de desfazer. O desenho e o arrasto no editor 3D vêm depois, na interface em Rust.
 
 ## Rede de caminhos
 

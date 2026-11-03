@@ -1,0 +1,73 @@
+// Centro de distribuição com chegadas por tabela e tipos de item.
+// - "caminhoes": horário fixo que se repete todo dia (1440 min): cada linha diz a hora,
+//   quantos itens e de que tipo; os itens descem um por minuto.
+// - "ordens": sequência de ordens de produção percorrida em laço, uma linha por chegada,
+//   com intervalo exponencial entre linhas.
+// - "avulsos": lotes de tamanho sorteado (Poisson) com tipo sorteado (80 % caixas).
+// O tipo fica no rótulo reservado "type" (caixa = 1, palete = 2), então ByLabel("type")
+// manda caixas para a separação e paletes para a conferência. A expedição registra o
+// tempo no sistema por tipo (time_in_system.caixa e time_in_system.palete).
+Model(
+    name: "Chegadas por tabela",
+    description: "Horário de caminhões, sequência de ordens e lotes avulsos com tipos de item",
+    run: (
+        stop_time: 4320.0,
+        seed: 11,
+        replications: 3,
+    ),
+    item_types: [
+        (name: "caixa", color: "#3b82f6", asset: "caixa_pequena", labels: {"peso": 8.0}),
+        (name: "palete", color: "#f59e0b", asset: "palete", labels: {"peso": 400.0}),
+    ],
+    objects: [
+        (name: "caminhoes", kind: Source(
+            interarrival: Const(60.0),
+            table: (
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 480.0, count: 12, item_type: "caixa", labels: {"prioridade": 2.0}),
+                    (at: 600.0, count: 5, item_type: "palete"),
+                    (at: 840.0, count: 8, item_type: "caixa"),
+                    (at: 960.0, count: 4, item_type: "palete", labels: {"prioridade": 1.0}),
+                ],
+            ),
+            release: OneByOne(Const(1.0)),
+        ), output: ByLabel("type"), position: (0.0, 4.0, 0.0)),
+        (name: "ordens", kind: Source(
+            interarrival: Exp(mean: 45.0),
+            first_at_zero: true,
+            table: (
+                mode: Sequence,
+                repeat: Loop,
+                rows: [
+                    (count: 2, item_type: "caixa"),
+                    (count: 1, item_type: "palete"),
+                    (count: 3, item_type: "caixa"),
+                ],
+            ),
+        ), output: ByLabel("type"), position: (0.0, 0.0, 0.0)),
+        (name: "avulsos", kind: Source(
+            interarrival: Exp(mean: 90.0),
+            batch: Poisson(mean: 3.0),
+            item_type_mix: [("caixa", 0.8), ("palete", 0.2)],
+        ), output: ByLabel("type"), position: (0.0, -4.0, 0.0)),
+        (name: "fila_caixas", kind: Queue(), position: (5.0, 2.0, 0.0)),
+        (name: "fila_paletes", kind: Queue(), position: (5.0, -2.0, 0.0)),
+        (name: "separacao", kind: Processor(process: Exp(mean: 4.0)), position: (10.0, 2.0, 0.0)),
+        (name: "conferencia", kind: Processor(process: Exp(mean: 12.0)), position: (10.0, -2.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (15.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("caminhoes", "fila_caixas"),
+        ("caminhoes", "fila_paletes"),
+        ("ordens", "fila_caixas"),
+        ("ordens", "fila_paletes"),
+        ("avulsos", "fila_caixas"),
+        ("avulsos", "fila_paletes"),
+        ("fila_caixas", "separacao"),
+        ("fila_paletes", "conferencia"),
+        ("separacao", "expedicao"),
+        ("conferencia", "expedicao"),
+    ],
+)
