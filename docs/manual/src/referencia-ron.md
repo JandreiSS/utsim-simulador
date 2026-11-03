@@ -98,7 +98,7 @@ Model(
 | `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
 | `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift)` ([Pessoas](pessoas.md)) |
 | `preset` | nenhuma | predefinição da biblioteca de uma linha que criou o objeto, `"linha/predefinição"` (por exemplo `"lean_office/aprovacao"`): nome e papel do objeto nos relatórios da linha. A simulação não lê o campo |
-| `area` | nenhuma | área ou departamento do objeto (`"Compras"`): raia do fluxograma multifuncional e relatórios por departamento. A simulação não lê o campo |
+| `department` | nenhuma | departamento do objeto (`"Compras"`): raia do fluxograma multifuncional e relatórios por departamento. Não é uma das `areas` do modelo (áreas de piso). A simulação não lê o campo |
 | `symbol` | inferido | símbolo do fluxograma: `inicio`, `fim`, `operacao`, `transporte`, `inspecao`, `espera` ou `armazenagem`. Ausente, o fluxograma escolhe pelo tipo do objeto; `--simbolo` do `utsim fluxograma` ainda tem precedência |
 
 ### `transfer`

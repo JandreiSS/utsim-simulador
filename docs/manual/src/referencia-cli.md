@@ -51,7 +51,7 @@ utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --co
 utsim tempos examples/homem_maquina.ron --tolerancia 15 --html estudo.html
 utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron --csv elementos.csv
 utsim linha lean_office relatorio examples/aprovacao_de_compras.ron --html relatorio.html
-utsim linha lean_office colocar escritorio.ron posto --area Compras --campo ca=0.9
+utsim linha lean_office colocar escritorio.ron posto --departamento Compras --campo ca=0.9
 utsim run examples/aprovacao_de_compras.ron --linha lean_office
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
@@ -81,7 +81,7 @@ utsim corredores modelo.ron --svg planta.svg
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 - `tempos`: sem `--ator`, estuda cada operador que trabalhou em máquinas no intervalo; `--de` e `--ate` vão juntos (padrão: do fim do aquecimento ao fim da rodada); `--ciclo N` escolhe o ciclo desenhado (padrão: o mediano); `--ritmo` e `--tolerancia` são em %; `--custo-operador` e `--custo-maquina` vão juntos (por hora; `--unidade s|min|h` diz a unidade de tempo do modelo); `--comparar depois.ron` pareia os elementos dos dois métodos pelo nome. O resumo vai sempre para o terminal; `--html`, `--svg`, `--csv` e `--json` gravam os arquivos.
-- `linha`: `utsim linha lista` mostra as linhas instaladas; `utsim linha <linha>` resume a linha; as ações são `predefinicoes`, `vocabulario`, `modelos`, `relatorio` (indicadores no terminal; `-n`, `--html`, `--json` e `--comparar futuro.ron` para o estado futuro) e `colocar` (cria o arquivo se não existir, grava `line` no modelo; `--campo chave=valor` repetível com valores em RON, `--posicao x y`, `--area`, `--nome`, `--saida`). Cada ação tem o seu `--help`.
+- `linha`: `utsim linha lista` mostra as linhas instaladas; `utsim linha <linha>` resume a linha; as ações são `predefinicoes`, `vocabulario`, `modelos`, `relatorio` (indicadores no terminal; `-n`, `--html`, `--json` e `--comparar futuro.ron` para o estado futuro) e `colocar` (cria o arquivo se não existir, grava `line` no modelo; `--campo chave=valor` repetível com valores em RON, `--posicao x y`, `--departamento`, `--nome`, `--saida`). Cada ação tem o seu `--help`.
 
 ## Saída de `--help`
 
@@ -648,10 +648,10 @@ Arguments:
   <PREDEFINICAO>  Predefinição (veja `utsim linha <linha> predefinicoes`)
 
 Options:
-      --nome <NOME>          Nome do objeto (padrão: o nome base da predefinição, numerado se preciso)
-      --campo <CHAVE=VALOR>  Valor de um campo em RON (repetível), por exemplo --campo 'tempo=Exp(mean: 20.0)'
-      --posicao <X> <Y>      Posição (x y) em metros
-      --area <AREA>          Área (departamento) dos objetos criados
-      --saida <SAIDA>        Grava em outro arquivo (padrão: o próprio modelo)
-  -h, --help                 Print help
+      --nome <NOME>                  Nome do objeto (padrão: o nome base da predefinição, numerado se preciso)
+      --campo <CHAVE=VALOR>          Valor de um campo em RON (repetível), por exemplo --campo 'tempo=Exp(mean: 20.0)'
+      --posicao <X> <Y>              Posição (x y) em metros
+      --departamento <DEPARTAMENTO>  Departamento dos objetos criados (campo `department`; raia do fluxograma)
+      --saida <SAIDA>                Grava em outro arquivo (padrão: o próprio modelo)
+  -h, --help                         Print help
 ```

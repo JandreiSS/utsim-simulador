@@ -114,7 +114,14 @@ fn place_presets_and_run_with_the_line() {
         "--campo",
         "intervalo=Exp(mean: 10.0)",
     ]);
-    place(&["caixa_entrada", "--posicao", "1", "0", "--area", "Compras"]);
+    place(&[
+        "caixa_entrada",
+        "--posicao",
+        "1",
+        "0",
+        "--departamento",
+        "Compras",
+    ]);
     place(&["posto", "--posicao", "2", "0", "--campo", "ca=0.9"]);
     place(&["equipe", "--posicao", "2", "2"]);
     let out = place(&["conclusao", "--posicao", "3", "0"]);

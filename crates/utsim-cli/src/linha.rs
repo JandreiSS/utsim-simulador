@@ -66,9 +66,9 @@ enum Acao {
         /// Posição (x y) em metros
         #[arg(long, num_args = 2, value_names = ["X", "Y"], allow_negative_numbers = true)]
         posicao: Option<Vec<f64>>,
-        /// Área (departamento) dos objetos criados
+        /// Departamento dos objetos criados (campo `department`; raia do fluxograma)
         #[arg(long)]
-        area: Option<String>,
+        departamento: Option<String>,
         /// Grava em outro arquivo (padrão: o próprio modelo)
         #[arg(long)]
         saida: Option<PathBuf>,
@@ -162,7 +162,7 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             nome,
             campos,
             posicao,
-            area,
+            departamento,
             saida,
         }) => {
             let mut doc = if model.exists() {
@@ -176,13 +176,7 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             if doc.model().line.is_none() {
                 doc.apply(Command::SetLine(Some(p.id().to_string())))?;
             }
-            let mut values = BTreeMap::new();
-            for c in &campos {
-                let (k, v) = c
-                    .split_once('=')
-                    .ok_or_else(|| format!("--campo espera chave=valor, recebi '{c}'"))?;
-                values.insert(k.trim().to_string(), v.trim().to_string());
-            }
+            let values = valores(&campos)?;
             let pos = posicao.unwrap_or_else(|| vec![0.0, 0.0]);
             let names = p.apply(
                 &mut doc,
@@ -191,7 +185,7 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
                     name: nome.as_deref(),
                     values,
                     position: [pos[0], pos[1], 0.0],
-                    area: area.as_deref(),
+                    department: departamento.as_deref(),
                 },
             )?;
             let out = saida.unwrap_or(model);
@@ -207,6 +201,22 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// The `--campo chave=valor` options as a map (the value is kept as RON text).
+fn valores(campos: &[String]) -> Result<BTreeMap<String, String>, String> {
+    let mut values = BTreeMap::new();
+    for c in campos {
+        let (k, v) = c
+            .split_once('=')
+            .ok_or_else(|| format!("--campo espera chave=valor, recebi '{c}'"))?;
+        let k = k.trim();
+        if k.is_empty() {
+            return Err(format!("--campo sem chave: '{c}'"));
+        }
+        values.insert(k.to_string(), v.trim().to_string());
+    }
+    Ok(values)
 }
 
 fn load(path: &Path, reps: Option<u32>) -> Result<Model, Box<dyn std::error::Error>> {
@@ -254,10 +264,10 @@ fn relatorio_cmd(
         let v = serde_json::json!({
             "linha": p.id(),
             "modelo": k.modelo,
-            "replicacoes": k.reps,
+            "replicacoes": &k.reps,
             "futuro": futuro.as_ref().map(|(_, k2)| serde_json::json!({
                 "modelo": k2.modelo,
-                "replicacoes": k2.reps,
+                "replicacoes": &k2.reps,
             })),
         });
         std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
@@ -273,4 +283,73 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
     println!();
     print!("{}", relatorio::texto(&k));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Result<Args, clap::Error> {
+        Args::try_parse_from(std::iter::once("utsim linha").chain(args.iter().copied()))
+    }
+
+    #[test]
+    fn colocar_takes_fields_negative_positions_and_department() {
+        let a = parse(&[
+            "lean_office",
+            "colocar",
+            "m.ron",
+            "posto",
+            "--campo",
+            "tempo=Exp(mean: 20.0)",
+            "--campo",
+            "ca=0.9",
+            "--posicao",
+            "-2",
+            "1.5",
+            "--departamento",
+            "Compras",
+        ])
+        .unwrap();
+        let Some(Acao::Colocar {
+            predefinicao,
+            campos,
+            posicao,
+            departamento,
+            ..
+        }) = a.acao
+        else {
+            panic!("ação colocar");
+        };
+        assert_eq!(predefinicao, "posto");
+        assert_eq!(posicao, Some(vec![-2.0, 1.5]));
+        assert_eq!(departamento.as_deref(), Some("Compras"));
+        let v = valores(&campos).unwrap();
+        assert_eq!(v["tempo"], "Exp(mean: 20.0)");
+        assert_eq!(v["ca"], "0.9");
+    }
+
+    #[test]
+    fn relatorio_options_and_bad_input() {
+        let a = parse(&[
+            "lean_office",
+            "relatorio",
+            "m.ron",
+            "-n",
+            "3",
+            "--html",
+            "r.html",
+        ])
+        .unwrap();
+        let Some(Acao::Relatorio { reps, html, .. }) = a.acao else {
+            panic!("ação relatorio");
+        };
+        assert_eq!(reps, Some(3));
+        assert_eq!(html, Some(PathBuf::from("r.html")));
+        assert!(parse(&["lean_office", "colocar", "m.ron"]).is_err());
+        assert!(parse(&["lean_office", "relatorio"]).is_err());
+        assert!(valores(&["sem_igual".into()]).is_err());
+        assert!(valores(&["=1".into()]).is_err());
+        assert!(pack("nada").unwrap_err().contains("lean_office"));
+    }
 }
