@@ -14,6 +14,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim otimizar` | procura os melhores parâmetros | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
+| `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
 
@@ -31,6 +32,7 @@ utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
 utsim emular examples/linha_com_bloqueio.ron --velocidade 10
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
+utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
 ```
 
 ## Observações sobre as opções
@@ -39,6 +41,8 @@ utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 - `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
+- `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
+  para ele e `--sorteios` só para `montecarlo`.
 
 ## Saída de `--help`
 
@@ -61,6 +65,7 @@ Commands:
   otimizar      Otimiza parâmetros do modelo por simulação (busca com comparação pareada)
   emular        Emula o modelo em tempo real, com servidor OPC UA (comissionamento virtual)
   fit           Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
+  pert          PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
   help          Print this message or the help of the given subcommand(s)
 
 Options:
@@ -252,5 +257,30 @@ Options:
       --itens <ITENS>      Itens que a fonte cria (exatamente) [default: 1000]
       --saida <SAIDA>      Arquivo de saída (padrão: a saída padrão)
   -h, --help               Print help
+```
+
+### `utsim pert --help`
+
+```text
+PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
+
+Usage: utsim pert [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  
+
+Options:
+      --objetos <OBJETOS>    Objetos da seleção, separados por vírgula
+      --de <DE>              Início do trecho (todos os objetos em algum caminho de --de até --ate)
+      --ate <ATE>            Fim do trecho
+      --prazo <PRAZO>        Prazo: calcula a probabilidade de terminar até ele
+      --modo <MODO>          simulado (caminho crítico observado na simulação), classico ou montecarlo [default: simulado]
+      --momentos <MOMENTOS>  Momentos do PERT clássico: exatos (das distribuições) ou classicos (beta) [default: exatos]
+      --sorteios <SORTEIOS>  Sorteios do Monte Carlo [default: 10000]
+      --semente <SEMENTE>    Semente (padrão: a do modelo)
+  -n, --reps <REPS>          Replicações do modo simulado (padrão: as do modelo)
+      --csv <CSV>            Grava atividades, caminhos, tempo total, diagrama e sensibilidade em CSV neste diretório
+      --html <HTML>          Grava o relatório completo, com a rede, o Gantt e os gráficos, em um HTML
+  -h, --help                 Print help
 ```
 

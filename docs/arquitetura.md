@@ -13,6 +13,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Modelo | `utsim-model` | o modelo é dado (texto `.ron`), não código |
 | Estatística | `utsim-stats` | funções puras sobre números (só depende de `utsim-core`); análise de saída e funções especiais |
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
+| PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
 
 O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois eventos
@@ -1204,6 +1205,53 @@ quase não faz.
   (um objeto escolhe um calendário que já existe; a G3 traz a rede e os fluidos);
 - a aparência do Editar (portas, contornos, miniatura) só foi conferida pelos roteiros sem
   janela: a conferência visual está anotada em `docs/plano_godot.md`.
+
+## 4s. PERT/CPM de uma parte do processo
+
+Crate `crates/utsim-pert`, pura (sem motor gráfico), dependendo de `utsim-core` (`Dist`,
+`rng`, rastro, `Summary`), `utsim-model` (`Model`, `effective_transfer`, CSV e `esc` do
+HTML), `utsim-objects` (`network::router` para as distâncias) e `utsim-scene`
+(`layout::layers` para as colunas do diagrama). Comando: `utsim pert`
+(`crates/utsim-cli/src/pert.rs`); manual em `docs/manual/src/pert-cpm.md`.
+
+- `network.rs`: `derive(model, selection, options)` monta a `ActivityNetwork` (atividade no
+  nó, marcos `início` e `fim`, avisos e hipóteses). A seleção é `Selection::Objects` ou
+  `Selection::Between { from, to }` (interseção dos alcançáveis a partir de `from` com os que
+  alcançam `to`, a semântica de `SpanDef`). Ordem dos passos: recursos móveis saem da seleção;
+  ligações de volta são achadas por DFS a partir das raízes e cortadas, e as atividades do
+  laço (alcançáveis de `v` que alcançam `u`) ganham o fator `1 / (1 - p)`, com `p` do
+  `Weighted` de `u`; cada objeto com várias saídas que não é divisão E (`Separator`,
+  `Combiner` em `Batch`) fica com um ramo (`WeightedBranch::MostLikely` ou o primeiro) ou gera
+  cenários (`derive_scenarios`, até 64, mais provável primeiro); o que as raízes não alcançam
+  mais sai da rede; ligações com `transport` ou `transfer` viram atividades próprias
+  (`transport_name`, `transfer_name`). Uma atividade é `factor × soma das partes`, cada parte
+  uma `Dist` sorteada à parte (setup + processo, ou viagem vazia + carga + viagem + descarga).
+- `cpm.rs`: `Cpm` guarda a ordem topológica (Kahn, menor índice primeiro) e as adjacências
+  para passagens repetidas. Folga total `LS - ES`, folga livre `min(ES dos sucessores) - EF`,
+  crítica com tolerância `1e-9 × max(1, T)`, todos os caminhos críticos por DFS sobre as
+  precedências justas (`EF = ES`), até 1000.
+- `pert.rs`: `(a, m, b)` por distribuição (quantis de 1% e 99% e moda quando não há forma
+  direta; quantis sem fórmula fechada vêm de 20 001 sorteios de um stream fixo), variância
+  exata de todas as famílias de `Dist`, `Moments::Exact` (padrão) ou `Classic`, variância do
+  caminho crítico de maior variância e `Φ` local (`math.rs`), sem depender de `utsim-fit`.
+- `monte_carlo.rs`: blocos de 500 sorteios; o bloco `k` sorteia a atividade `i` de
+  `rng::stream(semente, k, i)`; os blocos rodam no rayon e são juntados na ordem, então o
+  resultado não depende do número de threads. Criticidade por atividade e por caminho,
+  percentis, `P(T ≤ prazo)` com intervalo de Wilson, correlação de Spearman e crucialidade.
+- `observed.rs`: roda as replicações do modelo com um `Observer` que guarda só as visitas
+  aos objetos da seleção e aos recursos móveis (entrada, saída, origem, ligação com o item de
+  origem em `Unpacked` e nas cópias do `Split`) e os estados dos objetos que trabalham um item
+  por vez. Para cada unidade que sai de um objeto final, recua: em `Combiner`, pela entrada
+  do conjunto que chegou por último (conjuntos não se sobrepõem no tempo, porque a montagem só
+  aceita o próximo depois que o anterior saiu); em itens saídos de `Separator`, pelo item que
+  entrou nele; para quando a parada anterior está fora do trecho. Os trechos são contíguos, então
+  espera + trabalho + bloqueio somam o tempo total da unidade.
+- `report.rs`: texto, CSV, HTML (rede, Gantt, histograma, tornado, tabela) e `diagram`, que
+  devolve caixas (camada, raia, posição, datas, criticidade) e setas para a interface desenhar.
+
+**Lacunas:** o campo `pert` do formato do modelo (análises salvas) ainda não existe; o modo
+simulado guarda o rastro do trecho de uma replicação inteira na memória (não em fluxo); a
+janela na interface Godot fica para depois.
 
 ## 5. Estatísticas
 
