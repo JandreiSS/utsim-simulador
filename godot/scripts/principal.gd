@@ -94,6 +94,8 @@ var _job_done := Callable()
 var _progress: ProgressBar
 var _cancel: Button
 var _tool_rede: Button
+var _tool_aisle: Button
+var _show_obstacles: CheckBox
 var _results_panel: PainelResultados
 var _pert_panel: PainelPert
 var _flows_panel: PainelFluxos
@@ -242,7 +244,8 @@ func _build_ui() -> void:
 	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
 	_tool_link = _button(top, "Ferramenta_Ligar", "Ligar", "Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)", func(): editor.set_tool("ligar"))
 	_tool_rede = _button(top, "Ferramenta_Rede", "Rede", "Rede de caminhos: nós e trechos (N)", func(): editor.set_tool("selecionar" if editor.tool == "rede" else "rede"))
-	for b in [_tool_select, _tool_link, _tool_rede]:
+	_tool_aisle = _button(top, "Ferramenta_Corredor", "Corredor", "Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)", func(): editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor"))
+	for b in [_tool_select, _tool_link, _tool_rede, _tool_aisle]:
 		b.toggle_mode = true
 		b.button_group = tools
 	var arrange := MenuButton.new()
@@ -356,6 +359,13 @@ func _build_ui() -> void:
 		editor.select_only(_listed[k]))
 	_objects_list.item_activated.connect(func(k): focus_block(_listed[k], 8.0))
 	_edit_left.add_child(_objects_list)
+	_show_obstacles = CheckBox.new()
+	_show_obstacles.name = "Ver_Obstaculos"
+	_show_obstacles.text = "Mostrar obstáculos e folgas"
+	_show_obstacles.tooltip_text = "Mostra a área ocupada dos objetos, as paredes, a folga dos recursos e o ponto de acesso de cada objeto (arraste-o com a ferramenta Selecionar)"
+	_show_obstacles.focus_mode = Control.FOCUS_NONE
+	_show_obstacles.toggled.connect(func(on): editor.corredores.set_obstacles_visible(on))
+	_edit_left.add_child(_show_obstacles)
 
 	_sim_left = VBoxContainer.new()
 	_sim_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -435,6 +445,7 @@ func _build_ui() -> void:
 	_props.name = "Propriedades"
 	_props.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_props.edited.connect(_on_property_edited)
+	_props.issue_clicked.connect(func(m): editor.corredores.highlight_issue(m))
 	_props.look_provider = func(asset: String) -> Object:
 		if doc == null or editor == null or editor.selected.is_empty():
 			return null
@@ -676,13 +687,19 @@ func set_status(text: String) -> void:
 func on_tool_changed() -> void:
 	_tool_link.set_pressed_no_signal(editor.tool == "ligar")
 	_tool_rede.set_pressed_no_signal(editor.tool == "rede")
-	_tool_select.set_pressed_no_signal(editor.tool != "ligar" and editor.tool != "rede")
+	_tool_aisle.set_pressed_no_signal(editor.tool == "corredor")
+	_tool_select.set_pressed_no_signal(editor.tool != "ligar" and editor.tool != "rede" and editor.tool != "corredor")
 	_library.mark(editor.place_id)
 	_show_properties()
 
 
 ## The node or edge chosen with the Rede tool changed.
 func on_network_selection() -> void:
+	_show_properties()
+
+
+## The aisle or vertex chosen with the Corredor tool changed.
+func on_aisle_selection() -> void:
 	_show_properties()
 
 
@@ -812,6 +829,7 @@ func after_edit(force := false) -> void:
 	var objects: Array = doc.objects()
 	editor.sync(objects, doc.connections())
 	editor.rede.sync(doc.network())
+	editor.corredores.sync()
 	if mode == "editar":
 		_build_edit_scene()
 	_fill_objects()
@@ -881,6 +899,10 @@ func _show_properties() -> void:
 		return
 	if editor.tool == "rede":
 		_show_network()
+		_props_scroll.scroll_vertical = scroll
+		return
+	if editor.tool == "corredor":
+		_show_aisles()
 		_props_scroll.scroll_vertical = scroll
 		return
 	var sel: Array = editor.selected
@@ -1119,7 +1141,7 @@ func set_mode(which: String) -> bool:
 	_right.visible = true
 	_bar.visible = false
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = true
 	_revision = -1
 	after_edit(true)
@@ -1150,7 +1172,7 @@ func simulate(reps: int) -> bool:
 	_right.visible = false
 	_bar.visible = true
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	_reps.value = reps
 	playing_replay = false
@@ -1442,6 +1464,11 @@ func _edit_key(k: InputEventKey) -> bool:
 			editor.set_tool("selecionar" if editor.tool == "ligar" else "ligar")
 		KEY_N:
 			editor.set_tool("selecionar" if editor.tool == "rede" else "rede")
+		KEY_C:
+			editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor")
+		KEY_ENTER, KEY_KP_ENTER:
+			if editor.tool != "corredor" or not editor.corredores.finish():
+				return false
 		KEY_G:
 			set_snap(not snap_on, grid_step)
 		_:
@@ -1638,7 +1665,7 @@ func open_replay(path: String) -> bool:
 	_right.visible = false
 	_bar.visible = true
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	on_results(model.replay_results())
 	_show_playback()
@@ -1715,6 +1742,163 @@ func _drive_camera() -> void:
 			camera_aim = eye + forward * 10.0 - Vector3(0, eye_y * 0.8, 0)
 			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
 			cena.clear_view(eye, camera_aim, i)
+
+
+# ---------------------------------------------------------------------------
+# The Corredor panel (G4)
+# ---------------------------------------------------------------------------
+
+
+func _show_aisles() -> void:
+	_props.clear()
+	var ai: EditorCorredores = editor.corredores
+	var title := Label.new()
+	title.text = "Corredores de circulação"
+	title.theme_type_variation = &"TituloPainel"
+	_props.add_child(title)
+	var c := ai.counts()
+	var info := Label.new()
+	info.name = "Corredor_Resumo"
+	info.text = "%d corredor(es): %d de pedestres, %d de empilhadeiras, %d mistos; %d cruzamento(s)." % [c["total"], c["pedestre"], c["empilhadeira"], c["misto"], c["cruzamentos"]]
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+	_props.add_child(info)
+	var help := Label.new()
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+	help.theme_type_variation = &"Ajuda"
+	help.text = "Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso."
+	_props.add_child(help)
+	var a := ai._aisle(ai.selected)
+	if a.is_empty():
+		var head := Label.new()
+		head.text = "Novos corredores"
+		head.theme_type_variation = &"RotuloSecao"
+		_props.add_child(head)
+		_aisle_kind_row("Corredor_NovoTipo", ai.new_kind, func(k): ai.set_kind.call_deferred(k); _show_properties.call_deferred())
+		_aisle_width_row("Corredor_NovaLargura", ai.new_width, func(v): ai.set_width.call_deferred(v))
+		_aisle_check("Corredor_NovosMaoDupla", "Mão dupla", ai.new_two_way, func(on): ai.set_two_way.call_deferred(on))
+	else:
+		var head := Label.new()
+		head.text = "Corredor %s" % a["name"]
+		head.theme_type_variation = &"RotuloSecao"
+		_props.add_child(head)
+		var row := HBoxContainer.new()
+		var l := Label.new()
+		l.text = "Nome"
+		row.add_child(l)
+		var e := LineEdit.new()
+		e.name = "Corredor_Nome"
+		e.text = a["name"]
+		e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		e.text_submitted.connect(func(tx): ai.rename.call_deferred(tx))
+		row.add_child(e)
+		_props.add_child(row)
+		var len_label := Label.new()
+		len_label.name = "Corredor_Comprimento"
+		len_label.text = "%d ponto(s), %s m de comprimento" % [(a["points"] as PackedVector3Array).size(), _num(float(a["length"]))]
+		_props.add_child(len_label)
+		_aisle_kind_row("Corredor_Tipo", a["kind"], func(k): ai.set_kind.call_deferred(k))
+		_aisle_width_row("Corredor_Largura", float(a["width"]), func(v): ai.set_width.call_deferred(v))
+		_aisle_check("Corredor_MaoDupla", "Mão dupla", a["two_way"], func(on): ai.set_two_way.call_deferred(on))
+		if a["kind"] != "forklift":
+			_aisle_check("Corredor_Secundaria", "Passagem secundária de pedestres (mínimo menor)", a["secondary"], func(on): ai.set_secondary.call_deferred(on))
+		var prow := HBoxContainer.new()
+		var pl := Label.new()
+		pl.text = "Perfil"
+		prow.add_child(pl)
+		var pick := OptionButton.new()
+		pick.name = "Corredor_Perfil"
+		pick.focus_mode = Control.FOCUS_NONE
+		for item in [["Padrão do modelo", ""], ["Brasil (amarelo)", "Brasil"], ["Branco", "Branco"]]:
+			pick.add_item(item[0])
+			pick.set_item_metadata(pick.item_count - 1, item[1])
+			if a["profile"] == item[1]:
+				pick.select(pick.item_count - 1)
+		pick.item_selected.connect(func(k): ai.set_profile.call_deferred(String(pick.get_item_metadata(k))))
+		prow.add_child(pick)
+		_props.add_child(prow)
+		if ai.selected_vertex >= 0:
+			var v := Label.new()
+			v.name = "Corredor_Vertice"
+			v.text = "Vértice %d selecionado" % (ai.selected_vertex + 1)
+			_props.add_child(v)
+			var rv := Button.new()
+			rv.name = "Corredor_VerticeRemover"
+			rv.text = "Remover vértice"
+			rv.disabled = (a["points"] as PackedVector3Array).size() <= 2
+			rv.pressed.connect(func(): ai.remove_vertex.call_deferred())
+			_props.add_child(rv)
+		var rev := Button.new()
+		rev.name = "Corredor_Inverter"
+		rev.text = "Inverter sentido"
+		rev.disabled = a["two_way"]
+		rev.pressed.connect(func(): ai.reverse.call_deferred())
+		_props.add_child(rev)
+		var del := Button.new()
+		del.name = "Corredor_Excluir"
+		del.text = "Excluir corredor (Del)"
+		del.pressed.connect(func(): ai.delete_selected.call_deferred())
+		_props.add_child(del)
+		for w in doc.warnings():
+			if String(w["message"]).contains("'%s'" % a["name"]):
+				var wl := Label.new()
+				wl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				wl.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+				wl.text = "• " + String(w["message"])
+				wl.add_theme_color_override("font_color", YELLOW)
+				wl.name = "Corredor_Aviso"
+				_props.add_child(wl)
+	for i in doc.issues():
+		var m: String = i["message"]
+		if m.contains("corredor") or m.contains("Aisles"):
+			var w := Label.new()
+			w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			w.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+			w.text = m
+			w.add_theme_color_override("font_color", RED)
+			_props.add_child(w)
+
+
+func _aisle_kind_row(node_name: String, kind: String, on_pick: Callable) -> void:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = "Tipo"
+	row.add_child(l)
+	var pick := OptionButton.new()
+	pick.name = node_name
+	pick.focus_mode = Control.FOCUS_NONE
+	for k in EditorCorredores.KINDS.size():
+		pick.add_item(EditorCorredores.KIND_LABELS[k])
+	pick.select(EditorCorredores.KINDS.find(kind))
+	pick.item_selected.connect(func(k): on_pick.call(EditorCorredores.KINDS[k]))
+	row.add_child(pick)
+	_props.add_child(row)
+
+
+func _aisle_width_row(node_name: String, width: float, on_change: Callable) -> void:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = "Largura (m)"
+	row.add_child(l)
+	var spin := SpinBox.new()
+	spin.name = node_name
+	spin.min_value = 0.3
+	spin.max_value = 20.0
+	spin.step = 0.05
+	spin.value = width
+	spin.value_changed.connect(func(v): on_change.call(v))
+	row.add_child(spin)
+	_props.add_child(row)
+
+
+func _aisle_check(node_name: String, text: String, on: bool, on_toggle: Callable) -> void:
+	var box := CheckBox.new()
+	box.name = node_name
+	box.text = text
+	box.button_pressed = on
+	box.toggled.connect(func(v): on_toggle.call(v))
+	_props.add_child(box)
 
 
 # ---------------------------------------------------------------------------

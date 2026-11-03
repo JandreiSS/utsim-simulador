@@ -134,6 +134,29 @@ Para recursos em `Free` ou `Network`, o `utsim check` e o `utsim run` avisam qua
   rede gerada);
 - a rede foi gerada com outros obstáculos.
 
+## Na interface 3D
+
+Na interface 3D (Godot) o modo de movimentação, a folga e o ponto de acesso se editam no painel
+de propriedades e na cena, e tudo se desfaz com **Ctrl+Z**:
+
+- **Painel do recurso** (transportador), seção **Movimentação**: a lista *Movimentação* escolhe o
+  padrão do modelo, Legado, Livre, Pela rede de caminhos ou Pelos corredores; *Folga dos
+  obstáculos* liga a folga própria (começa com a do papel e pode ser mudada) ou a desliga.
+- **Painel do modelo** (clique no chão, sem objeto selecionado): *Movimentação padrão* é o
+  `run.movement`; a seção **Piso e corredores** tem o perfil da faixa (Brasil ou Branco), a largura
+  da faixa e a parada no cruzamento (`floor_marking`).
+- **Mostrar obstáculos e folgas** (caixa na lista de objetos): desenha a área ocupada de cada
+  objeto, as paredes e colunas do modelo, o contorno da folga em volta delas e o ponto de acesso
+  de cada objeto, que se arrasta com a ferramenta Selecionar (grava `access`). Também há, no painel
+  do objeto fixo, o grupo **Ponto de acesso próprio** com o X e o Y em metros, a partir do centro
+  do objeto.
+- Os avisos de movimentação (ponto de acesso dentro de um obstáculo, recurso sem caminho, rede
+  desatualizada) aparecem na lista de Avisos do objeto; um clique no aviso destaca na cena o que
+  ele cita.
+
+Os corredores e as faixas no piso estão em
+[Corredores e faixas de segurança](corredores.md#na-interface-3d).
+
 ## Ainda não disponível
 
 - conflitos entre recursos no modo livre: duas pessoas passam uma pela outra no tempo da

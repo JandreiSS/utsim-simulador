@@ -56,7 +56,10 @@
 ##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
 ##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's ports),
 ##    `{"no": "nome"}` (a node of the path network), `{"trecho": ["de", "para"]}` (the
-##    middle of an edge) or `{"aba": ["Abas", "Título"]}` (a tab of a TabContainer).
+##    middle of an edge), `{"vertice": ["corredor_1", 0]}` (a vertex of an aisle),
+##    `{"corredor": "corredor_1"}` (the middle of its first segment), `{"acesso": "objeto"}`
+##    (the access point of an object, with the obstacles shown) or
+##    `{"aba": ["Abas", "Título"]}` (a tab of a TabContainer).
 extends Node
 
 var _out := ""
@@ -416,6 +419,12 @@ func _target(t: Variant) -> Variant:
 		return _main.editor.rede.node_screen(String(d["no"]))
 	if d.has("trecho"):
 		return _main.editor.rede.edge_screen(String(d["trecho"][0]), String(d["trecho"][1]))
+	if d.has("vertice"):
+		return _main.editor.corredores.vertex_screen(String(d["vertice"][0]), int(d["vertice"][1]))
+	if d.has("corredor"):
+		return _main.editor.corredores.line_screen(String(d["corredor"]))
+	if d.has("acesso"):
+		return _main.editor.corredores.access_screen(String(d["acesso"]))
 	if d.has("aba"):
 		var tabs := _control(String(d["aba"][0])) as TabContainer
 		if tabs == null or not tabs.is_visible_in_tree():
@@ -459,6 +468,10 @@ func _text_of(c: Control) -> String:
 		return (c as LineEdit).text
 	if c is TextEdit:
 		return (c as TextEdit).text
+	if c is SpinBox:
+		return str((c as SpinBox).value)
+	if c is OptionButton:
+		return (c as OptionButton).get_item_text((c as OptionButton).selected) if (c as OptionButton).selected >= 0 else ""
 	return ""
 
 
@@ -599,6 +612,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
 ## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
 ##
+## G4: `corredores` ({total, pedestre, empilhadeira, misto, cruzamentos}), `faixas` ({continuas_maior_que, zebras_maior_que, setas_maior_que}: polygons of the floor marking in the scene), `corredor` ({nome, tipo, largura, mao_dupla, pontos, perfil}: an aisle of the document), `corredor_selecionado` (name), `desenhando` (points of the aisle being drawn), `obstaculos_visiveis`, `acesso` ({objeto, proprio, x, y, tolerancia}: the access point of an object, model plan), `destaque` (names outlined), `campo_painel` ({objeto, caminho, valor}: a field of the properties schema; `objeto` "run" for the model) and `movel_em` ({objeto, t, x, y, tolerancia}: where a mobile is drawn at time `t`, a range `[min, max]` for `x` and `y`).
+##
 ## G3: `dados` ({campo, fonte, familia, familia_contem, n_maior_que, defasado, analisado}: the real data of a field, `objeto.campo`), `grafico_dados` ({controle, barras_maior_que, curva}: the mini histogram of a field), `rede` ({nos, trechos, controlados}), `no_posicao` ({no, x, y, tolerancia}), `texto` ({controle, contem}: the text of a
 ## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
 ## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
@@ -710,6 +725,85 @@ func _check(c: Dictionary, k: int) -> void:
 				var got: Dictionary = _main.editor.rede.counts()
 				for key2 in want:
 					report.call("rede.%s" % key2, int(got.get(key2, -1)) == int(want[key2]), str(got))
+			"corredores":
+				var got: Dictionary = _main.editor.corredores.counts()
+				for key2 in want:
+					report.call("corredores.%s" % key2, int(got.get(key2, -1)) == int(want[key2]), str(got))
+			"faixas":
+				var marks: Dictionary = _main.cena.mark_counts
+				for key2 in want:
+					var pattern: String = String(key2).trim_suffix("_maior_que")
+					pattern = {"continuas": "continuous", "zebras": "zebra", "setas": "arrow"}.get(pattern, pattern)
+					report.call("faixas %s > %s" % [pattern, want[key2]], int(marks.get(pattern, 0)) > int(want[key2]), str(marks))
+			"corredor":
+				var found := false
+				for a in doc.aisles():
+					if a["name"] != want["nome"]:
+						continue
+					found = true
+					if want.has("tipo"):
+						report.call("tipo de %s" % a["name"], a["kind"] == want["tipo"], str(a["kind"]))
+					if want.has("largura"):
+						report.call("largura de %s" % a["name"], absf(float(a["width"]) - float(want["largura"])) < 1e-6, str(a["width"]))
+					if want.has("mao_dupla"):
+						report.call("mão dupla de %s" % a["name"], bool(a["two_way"]) == bool(want["mao_dupla"]), str(a["two_way"]))
+					if want.has("pontos"):
+						report.call("pontos de %s" % a["name"], (a["points"] as PackedVector3Array).size() == int(want["pontos"]), str((a["points"] as PackedVector3Array).size()))
+					if want.has("perfil"):
+						report.call("perfil de %s" % a["name"], a["profile"] == want["perfil"], str(a["profile"]))
+					if want.has("ponto"):
+						var mp: Vector2 = (a["model_points"] as PackedVector2Array)[int(want["ponto"][0])]
+						var tol := float(want.get("tolerancia", 1e-6))
+						report.call("ponto %d de %s" % [int(want["ponto"][0]), a["name"]], absf(mp.x - float(want["ponto"][1])) <= tol and absf(mp.y - float(want["ponto"][2])) <= tol, str(mp))
+				report.call("corredor %s" % want["nome"], found, str(doc.aisles().size()))
+			"nao_existe_corredor":
+				for n in want:
+					var exists := false
+					for a in doc.aisles():
+						if a["name"] == n:
+							exists = true
+					report.call("corredor %s não existe" % n, not exists, "")
+			"corredor_selecionado":
+				report.call("corredor selecionado", _main.editor.corredores.selected == want, _main.editor.corredores.selected)
+			"desenhando":
+				report.call("pontos do corredor em desenho", _main.editor.corredores.points.size() == int(want), str(_main.editor.corredores.points.size()))
+			"obstaculos_visiveis":
+				report.call("obstáculos visíveis", _main.editor.corredores.show_obstacles == bool(want), str(_main.editor.corredores.show_obstacles))
+			"destaque":
+				var got: Array = _main.editor.corredores.highlight
+				for n in want:
+					report.call("destaque de %s" % n, got.has(n), str(got))
+			"acesso":
+				var found := false
+				for a in doc.access_points():
+					if a["object"] != want["objeto"]:
+						continue
+					found = true
+					if want.has("proprio"):
+						report.call("ponto de acesso próprio de %s" % a["object"], bool(a["custom"]) == bool(want["proprio"]), str(a["custom"]))
+					var pt: Vector3 = a["point"]
+					var tol := float(want.get("tolerancia", 1e-6))
+					if want.has("x"):
+						report.call("x do acesso de %s" % a["object"], absf(pt.x - float(want["x"])) <= tol, str(pt.x))
+					if want.has("y"):
+						report.call("y do acesso de %s" % a["object"], absf(-pt.z - float(want["y"])) <= tol, str(-pt.z))
+				report.call("acesso de %s" % want["objeto"], found, "")
+			"campo_painel":
+				var value: Variant = "(sem o campo)"
+				for f in doc.properties(String(want["objeto"])).get("fields", []):
+					if f["path"] == want["caminho"]:
+						value = f["value"]
+				report.call("campo %s.%s" % [want["objeto"], want["caminho"]], str(value) == str(want["valor"]), str(value))
+			"movel_em":
+				_main.seek(float(want["t"]), true)
+				var i: int = _main.cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var at: Vector3 = (_main.cena.rigs[i]["root"] as Node3D).global_position
+					if want.has("x"):
+						report.call("x de %s em t=%s" % [want["objeto"], want["t"]], at.x >= float(want["x"][0]) and at.x <= float(want["x"][1]), "x = %.2f" % at.x)
+					if want.has("y"):
+						report.call("y de %s em t=%s" % [want["objeto"], want["t"]], -at.z >= float(want["y"][0]) and -at.z <= float(want["y"][1]), "y = %.2f" % -at.z)
 			"no_posicao":
 				var found := false
 				for n in _main.editor.rede.net["nodes"]:

@@ -401,6 +401,36 @@ cache compartilhado com a thread evita ajustar de novo ao aplicar, desfazer e re
 `AvisoDados` e `ErroDados` do tema. Roteiro `godot/roteiros/g3_dados_reais.json` (sem janela no
 `scripts/godot_teste.sh`; com janela, capturas em `godot/capturas/dados/`).
 
+### Corredores, obstáculos e movimentação (feito)
+
+Os corredores de circulação com faixas de segurança, os obstáculos e os modos de movimentação do
+núcleo (`utsim-nav`, `Model::aisles`) chegaram à interface. Não é a fase G4 deste plano (realidade
+virtual e aumentada): o roteiro se chama `g4_corredores.json` por pedido.
+
+- **Faixas no piso**: `UtsimPlayback.floor_marks()` (a partir de `Model::floor_marks()`) vira uma
+  malha só, com cor por vértice, um pouco acima do chão (6, 9 e 12 mm para a faixa, a zebra e as
+  setas, sem z-fighting) em `cena.gd`; vale no Editar e no Simular.
+- **Ferramenta Corredor** (`godot/scripts/corredores.gd`, tecla `C`): modelo na ferramenta Rede,
+  com encaixe nos outros corredores (`UtsimDocument.aisle_snap`), Enter ou duplo clique, mover e
+  acrescentar vértices e o painel do corredor em `principal.gd`. Comandos novos em
+  `crates/utsim-edit/src/aisles.rs`; linhas e edições da ponte em `aisle_edit.rs` e
+  `aisle_godot.rs`.
+- **Obstáculos e pontos de acesso**: visualização opcional na lista de objetos; o losango do ponto
+  de acesso se arrasta e grava `access` (`set_access_at`).
+- **Movimentação**: `movement` e `clearance` do transportador, `access` dos objetos fixos, e
+  `run.movement` e `floor_marking` no painel do modelo, todos pelo esquema genérico da ponte.
+- **Avisos**: os de corredores e de movimentação aparecem nas listas de Problemas e Avisos; um
+  clique destaca o corredor ou o objeto na cena.
+- **Simular**: a cena já reproduzia as rotas novas, porque o rastro carrega o caminho de cada
+  viagem; o roteiro confere a empilhadeira no desvio do corredor.
+- Roteiro `godot/roteiros/g4_corredores.json` (modelo `g4_cruzamento.ron`): desenha um corredor de
+  empilhadeira e um de pedestres que se cruzam, confere a zebra, muda largura, sentido e vértices,
+  mostra os obstáculos, move um ponto de acesso, troca o modo dos recursos, simula, desfaz e refaz,
+  salva e reabre. Capturas em `godot/capturas/corredores/`.
+
+Fica para depois: desenhar e editar as paredes e colunas (`obstacles`) na cena e as áreas marcadas
+no piso.
+
 ## Lacunas conhecidas depois da G3
 
 - O ajuste de dados reais não cobre ainda os campos fora dos objetos (fluxos de tokens, fluidos,
