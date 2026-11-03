@@ -21,6 +21,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) e grava paredes e colunas como obstáculos do modelo | [Planta CAD](planta-cad.md) |
 | `utsim rede gerar` | gera a rede de caminhos pelo caminho livre, desviando dos obstáculos, e grava no modelo | [Movimentação e obstáculos](movimentacao.md) |
+| `utsim corredores` | resumo dos corredores, da rede gerada e dos cruzamentos, avisos e planta em SVG (`--svg`) | [Corredores e faixas de segurança](corredores.md) |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
 
@@ -48,6 +49,7 @@ utsim qualidade capacidade examples/qualidade/lead_time.csv --lse 18 --metodo to
 utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
 utsim planta galpao.dxf --obstaculos modelo.ron
 utsim rede gerar modelo.ron --usar
+utsim corredores modelo.ron --svg planta.svg
 ```
 
 ## Observações sobre as opções
@@ -146,6 +148,21 @@ Options:
       --usar           Também muda `run.movement` para Network (os recursos passam a usar a rede)
       --substituir     Substitui uma rede desenhada à mão (sem isso, só uma rede gerada é trocada)
   -h, --help           Print help
+```
+
+### `utsim corredores --help`
+
+```text
+Corredores de circulação: resumo, avisos e planta em SVG com as faixas
+
+Usage: utsim corredores [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  
+
+Options:
+      --svg <SVG>  Grava a planta com os corredores, as faixas e a rede gerada em SVG
+  -h, --help       Print help
 ```
 
 ### `utsim analisar --help`

@@ -33,6 +33,8 @@ Model(
     data: [ ... ],
     obstacles: [ ... ],
     floor_plan: Some((...)),
+    aisles: [ ... ],
+    floor_marking: Some((...)),
 )
 ```
 
@@ -52,6 +54,8 @@ Model(
 | `data` | `[]` | campos de distribuição alimentados por valores observados, ajustados ao abrir o modelo: `(field: "torno.process", source: "dados/t.csv", choose: Best, criterion: Aic)`. Veja [Dados reais e ajuste automático](dados-reais.md) |
 | `obstacles` | `[]` | polígonos que os recursos não atravessam nos modos `Free` e `Network`: `(name, polygon: [(x, y), ...])`, ao menos 3 pontos, nomes únicos. Veja [Movimentação e obstáculos](movimentacao.md) |
 | `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
+| `aisles` | `[]` | corredores de circulação: `(name, kind: Pedestrian \| Forklift \| Mixed, points: [(x, y), ...], width, two_way: true, secondary: false, profile: None)`; geram a rede do modo `Aisles`. Veja [Corredores e faixas de segurança](corredores.md) |
+| `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0)` |
 
 ## `run`
 
@@ -65,7 +69,7 @@ Model(
 | `histogram_bins` | nenhum | número de classes dos histogramas; pelo menos 1 |
 | `default_decision` | nenhuma | opção usada quando o modelo pede uma decisão externa e não há agente |
 | `transfer` | nenhuma | tempo de viagem padrão das ligações diretas (veja `transfer`) |
-| `movement` | `Free` | modo de movimentação dos recursos móveis: `Free`, `Network`, `Legacy` (`Aisles` ainda não). `Network` exige `network` |
+| `movement` | `Free` | modo de movimentação dos recursos móveis: `Free`, `Network`, `Aisles`, `Legacy`. `Network` exige `network`; `Aisles` exige `aisles` |
 
 ## Objeto
 

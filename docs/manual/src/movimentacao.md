@@ -13,7 +13,7 @@ folga de cada recurso, a rede gerada e os avisos.
 | `Free` (livre) | menor caminho no piso desviando dos objetos, das paredes e dos obstáculos, até o ponto de acesso | nada |
 | `Network` (pela rede) | pela rede de caminhos; do ponto onde está até o nó mais próximo e do último nó até o ponto de acesso, pelo caminho livre | `network` |
 | `Legacy` (legado) | como no formato 1: linha reta sem rede; com rede, entra e sai pelo nó mais próximo em linha reta; vai até o centro do objeto | nada |
-| `Aisles` (corredores) | só pelos corredores da classe do recurso | ainda não disponível (a validação recusa) |
+| `Aisles` (corredores) | só pelos corredores da classe do recurso (pessoas nos de pedestres e mistos, veículos nos de empilhadeiras e mistos), com prioridade ao pedestre nos cruzamentos; ver [Corredores e faixas de segurança](corredores.md) | `aisles` |
 
 O modo vale para o modelo inteiro em `run` e pode ser trocado por recurso:
 
@@ -136,7 +136,6 @@ Para recursos em `Free` ou `Network`, o `utsim check` e o `utsim run` avisam qua
 
 ## Ainda não disponível
 
-- o modo `Aisles` (corredores por classe de recurso);
 - conflitos entre recursos no modo livre: duas pessoas passam uma pela outra no tempo da
-  simulação; reservas de cruzamentos e zonas virão depois;
+  simulação (as reservas de cruzamento existem só no modo `Aisles`);
 - o desvio nas ligações diretas com `transfer` (que continuam em linha reta ou pela rede).

@@ -14,6 +14,7 @@
 - [Conexões e regras de saída](conexoes.md)
 - [Recursos móveis](recursos-moveis.md)
   - [Movimentação e obstáculos](movimentacao.md)
+  - [Corredores e faixas de segurança](corredores.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)
 - [Quebras e turnos](quebras-e-turnos.md)
 - [Fluxos de tokens e scripts](fluxos-e-scripts.md)

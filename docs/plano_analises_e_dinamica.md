@@ -713,6 +713,23 @@ um formato novo (o 3, depois do 2 da seção 7), com o passo correspondente em `
 
 Ligada aos recursos 4 (desvio) e 5 (planta CAD).
 
+**Situação (2026-11-03):** pronto no núcleo, sem a interface. `aisles` e `floor_marking`
+aditivos no formato 2 (sem nova versão nem migração); perfis Brasil (padrão), Branco e
+`Custom`; rede gerada pelas linhas centrais (`utsim_nav::aisle_network`) com cruzamentos e
+ligações dos pontos de acesso por classe; modo `Aisles` com roteador por classe e folga;
+cruzamentos com parada obrigatória (2 s) e prioridade ao pedestre por reserva em
+`utsim_objects::traffic::Crossings`; avisos de largura, obstáculo, alcance e classe sem
+corredor; faixas como polígonos (`Model::floor_marks`); `utsim corredores [--svg]`; manual
+"Corredores e faixas de segurança". Desvios do texto abaixo: os campos do corredor são `kind`
+e `points` (em vez de `class` e `centerline`), `floor_marking` em vez de `marking`; o
+`Transporter` não ganhou `class`, `footprint` nem `load_width` (classe pelo papel, `L` pelo
+papel ou pela folga); `EdgeDef` não mudou (a classe de cada trecho fica na `AisleNet`); a rede
+dos corredores não é gravada no `.ron` (é refeita ao abrir); `crossings` não é um campo editável
+(só `crossing_stop`), e só a regra `PedestrianPriority` existe. Pendentes: `floor_marks` de áreas
+(armazenagem, a manter livre, incêndio), `speed_limit`, limite de espera e métrica de espera
+por cruzamento nos resultados, regras `VehiclePriority`/`Fifo`/`StopBoth`, pedestres livres
+atravessando só pelas zebras, aviso de cruzamento sem zebra, interface no Godot.
+
 ### Objetivo
 - Todos os deslocamentos respeitam paredes e objetos da planta (obstáculos do recurso 4,
   vindos do CAD e das áreas ocupadas).
@@ -891,9 +908,11 @@ crossings: [ (at: "corredor_A x passeio_1", rule: PedestrianPriority, stop: 2.0)
 `Network` funcionam, com roteador por recurso (`Transporter::router`, montados uma vez por folga
 em `Model::nav_set` e compartilhados pelas replicações) e `utsim check` listando o modo de cada
 recurso. Desvios: a migração só grava `movement: Legacy` quando o modelo tem transportadores
-(sem eles o modo não significa nada, e o modelo migrado fica igual ao novo); `Aisles` existe no
-formato, mas a validação o recusa até os corredores (seção 6); AGVs com rede seguem o `Traffic`
-em qualquer modo; o roteador é por folga, não por classe (a classe vem da seção 6); o cache é por
+(sem eles o modo não significa nada, e o modelo migrado fica igual ao novo); `Aisles` funciona
+desde 2026-11-03 (seção 6: pessoas só em corredores de pedestres e mistos, veículos só nos de
+empilhadeiras e mistos, roteador por classe e folga, prioridade ao pedestre nos cruzamentos);
+AGVs com rede seguem o `Traffic` em qualquer modo; nos modos `Free` e `Network` o roteador é
+por folga, não por classe; o cache é por
 par exato origem-destino (bits das coordenadas, sem quantização em milímetros, para não depender
 da ordem das consultas). Pendentes: `TransferPath::Free`, convivência com corredores e a
 interface no Godot.
