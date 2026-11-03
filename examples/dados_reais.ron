@@ -5,7 +5,7 @@
 // O mesmo atendimento do tutorial 05, agora sem copiar parâmetros à mão:
 // - chegadas: instantes anotados num arquivo (os intervalos entre eles são ajustados);
 // - atendimento: tempos anotados num arquivo, melhor família pelo AIC;
-// - pausa (setup) entre clientes: poucos valores escritos no próprio modelo,
+// - pausa (setup) entre clientes: 30 valores escritos no próprio modelo,
 //   distribuição empírica.
 // O campo `fitted` de cada entrada registra o último ajuste (família, distribuição e
 // hash dos dados): com os mesmos dados ele é reaproveitado; se os dados mudarem, o
@@ -59,18 +59,22 @@ Model(
         ),
         (
             field: "atendentes.setup",
-            values: [0.2, 0.5, 0.3, 0.4, 0.2, 0.6, 0.3, 0.3, 0.5, 0.4, 0.2, 0.3],
+            values: [
+                0.3295, 0.2603, 0.4604, 0.229, 0.4144, 0.3463, 0.2232, 0.403, 0.215, 0.3735,
+                0.2279, 0.2363, 0.3698, 0.5307, 0.2495, 0.2893, 0.451, 0.5791, 0.4308, 0.3587,
+                0.5905, 0.2186, 0.5434, 0.3158, 0.2577, 0.2471, 0.3234, 0.5265, 0.2723, 0.4326,
+            ],
             choose: Empirical,
             fitted: (
                 family: "Empírica",
-                dist: Empirical([0.2, 0.2, 0.2, 0.3, 0.3, 0.3, 0.3, 0.4, 0.4, 0.5, 0.5, 0.6]),
-                hash: "fnv1a64:9e2e860351d16368",
-                n: 12,
+                dist: Empirical([
+                    0.215, 0.2186, 0.2232, 0.2279, 0.229, 0.2363, 0.2471, 0.2495, 0.2577, 0.2603,
+                    0.2723, 0.2893, 0.3158, 0.3234, 0.3295, 0.3463, 0.3587, 0.3698, 0.3735, 0.403,
+                    0.4144, 0.4308, 0.4326, 0.451, 0.4604, 0.5265, 0.5307, 0.5434, 0.5791, 0.5905,
+                ]),
+                hash: "fnv1a64:73542bad2f8f96ac",
+                n: 30,
                 settings: "auto1 Empirical Aic alpha=0.05 bootstrap=300 seed=1",
-                warnings: [
-                    "58,3 % dos valores são repetidos: os dados parecem arredondados ou discretizados. Os p-valores de KS e AD ficam menos confiáveis; considere famílias discretas.",
-                    "Amostra pequena (n = 12): os testes têm baixo poder e vários modelos podem parecer igualmente adequados.",
-                ],
             ),
         ),
     ],
