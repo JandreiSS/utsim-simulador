@@ -12,6 +12,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim experiment` | compara cenários | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim otimizar` | procura os melhores parâmetros | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
+| `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
@@ -28,6 +29,7 @@ utsim experiment examples/experimento_mm1.ron
 utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
 utsim emular examples/linha_com_bloqueio.ron --velocidade 10
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
+utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 ```
 
@@ -36,6 +38,7 @@ utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 - `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
+- `fluxograma`: `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 ## Saída de `--help`
 
