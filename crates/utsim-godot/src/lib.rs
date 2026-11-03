@@ -22,6 +22,8 @@
 // `#[derive(GodotClass)]` with `init` writes `base: base` in the generated constructor.
 #![allow(clippy::redundant_field_names)]
 
+pub mod aisle_edit;
+pub mod aisle_godot;
 pub mod coords;
 pub mod dados;
 pub mod document;
@@ -442,6 +444,19 @@ impl UtsimPlayback {
     #[func]
     fn end(&self) -> f64 {
         self.core.as_ref().map_or(0.0, Playback::end)
+    }
+
+    /// The polygons of the floor marking of the circulation aisles: `{source, pattern
+    /// ("continuous" | "zebra" | "arrow"), color, polygon}` (empty without a model).
+    #[func]
+    fn floor_marks(&self) -> VarArray {
+        aisle_godot::marks(self.core.as_ref().and_then(|c| c.model.as_ref()))
+    }
+
+    /// Pedestrian x vehicle crossings: `{name, position, radius}`.
+    #[func]
+    fn crossings(&self) -> VarArray {
+        aisle_godot::crossings(self.core.as_ref().and_then(|c| c.model.as_ref()))
     }
 
     /// Next event strictly after `t`, or -1.

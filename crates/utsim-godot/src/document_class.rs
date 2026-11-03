@@ -12,6 +12,8 @@ use std::path::PathBuf;
 
 use godot::prelude::*;
 
+use crate::aisle_edit;
+use crate::aisle_godot;
 use crate::dados::{self, FitCache};
 use crate::document::{self, Editor, Properties, edit_replay, look_model, palette_model};
 use crate::jobs::Task;
@@ -601,6 +603,206 @@ impl UtsimDocument {
         self.editor
             .node_near(to_model(at), radius)
             .map_or_else(GString::new, |n| GString::from(n.as_str()))
+    }
+
+    // -- Circulation aisles, obstacles and access points (G4) -----------------------------
+
+    /// The aisles in model order: `{name, kind ("pedestrian" | "forklift" | "mixed"),
+    /// kind_label, points (Godot, on the floor), model_points, width, two_way, secondary,
+    /// profile ("" | "Brasil" | "Branco" | "Custom"), length}`.
+    #[func]
+    fn aisles(&self) -> VarArray {
+        aisle_godot::aisles(self.editor.model())
+    }
+
+    /// The polygons of the floor marking of the model as it is now: `{source, pattern
+    /// ("continuous" | "zebra" | "arrow"), color, polygon}`.
+    #[func]
+    fn floor_marks(&self) -> VarArray {
+        aisle_godot::marks(Some(self.editor.model()))
+    }
+
+    /// Pedestrian x vehicle crossings: `{name, position, radius}`.
+    #[func]
+    fn crossings(&self) -> VarArray {
+        aisle_godot::crossings(Some(self.editor.model()))
+    }
+
+    /// The obstacles resources keep clear of: `{name, kind ("objeto" | "parede"),
+    /// polygon, clearance}`.
+    #[func]
+    fn obstacles(&self) -> VarArray {
+        aisle_godot::obstacles(self.editor.model())
+    }
+
+    /// The access point of each fixed object: `{object, point, center, custom}`.
+    #[func]
+    fn access_points(&self) -> VarArray {
+        aisle_godot::access_points(self.editor.model())
+    }
+
+    /// Where a point of an aisle lands when put at `at`: on a vertex or a line of another
+    /// aisle within `radius` metres, else on the grid of `step` (0: no grid). `skip_index`
+    /// >= 0 leaves out that vertex of `skip` (the one being moved).
+    #[func]
+    fn aisle_snap(
+        &self,
+        at: Vector3,
+        step: f64,
+        radius: f64,
+        skip: GString,
+        skip_index: i64,
+    ) -> Vector3 {
+        let p = aisle_godot::plan(at);
+        let skip = skip.to_string();
+        let skip =
+            (skip_index >= 0 && !skip.is_empty()).then_some((skip.as_str(), skip_index as usize));
+        let q = aisle_edit::snap_to_aisles(self.editor.model(), p, radius, skip)
+            .unwrap_or([document::snap_to(p[0], step), document::snap_to(p[1], step)]);
+        aisle_godot::point(q)
+    }
+
+    /// The vertex of an aisle within `radius` metres of `at`: `{name, index}`, or `{}`.
+    #[func]
+    fn aisle_vertex_near(&self, at: Vector3, radius: f64) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        if let Some((name, index)) =
+            aisle_edit::vertex_near(self.editor.model(), aisle_godot::plan(at), radius)
+        {
+            put(&mut d, "name", GString::from(name.as_str()));
+            put(&mut d, "index", index as i64);
+        }
+        d
+    }
+
+    /// Adds an aisle along `points` (Godot, already snapped); `width` 0 takes the default
+    /// of its kind. Returns its name, or `""`.
+    #[func]
+    fn add_aisle(
+        &mut self,
+        points: PackedVector3Array,
+        kind: GString,
+        width: f64,
+        two_way: bool,
+    ) -> GString {
+        let line: Vec<[f64; 2]> = points
+            .as_slice()
+            .iter()
+            .map(|v| aisle_godot::plan(*v))
+            .collect();
+        match self
+            .editor
+            .add_aisle(&line, &kind.to_string(), width, two_way)
+        {
+            Ok(name) => {
+                self.last_error.clear();
+                GString::from(name.as_str())
+            }
+            Err(e) => {
+                self.last_error = e;
+                GString::new()
+            }
+        }
+    }
+
+    #[func]
+    fn move_aisle_point(&mut self, name: GString, index: i64, at: Vector3) -> bool {
+        let r = self.editor.move_aisle_point(
+            &name.to_string(),
+            index.max(0) as usize,
+            aisle_godot::plan(at),
+        );
+        self.done(r)
+    }
+
+    #[func]
+    fn insert_aisle_point(&mut self, name: GString, index: i64, at: Vector3) -> bool {
+        let r = self.editor.insert_aisle_point(
+            &name.to_string(),
+            index.max(0) as usize,
+            aisle_godot::plan(at),
+        );
+        self.done(r)
+    }
+
+    #[func]
+    fn remove_aisle_point(&mut self, name: GString, index: i64) -> bool {
+        let r = self
+            .editor
+            .remove_aisle_point(&name.to_string(), index.max(0) as usize);
+        self.done(r)
+    }
+
+    #[func]
+    fn remove_aisle(&mut self, name: GString) -> bool {
+        let r = self.editor.remove_aisle(&name.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn rename_aisle(&mut self, from: GString, to: GString) -> bool {
+        let r = self.editor.rename_aisle(&from.to_string(), &to.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn set_aisle_kind(&mut self, name: GString, kind: GString) -> bool {
+        let r = self
+            .editor
+            .set_aisle_kind(&name.to_string(), &kind.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn set_aisle_width(&mut self, name: GString, width: f64) -> bool {
+        let r = self.editor.set_aisle_width(&name.to_string(), width);
+        self.done(r)
+    }
+
+    #[func]
+    fn set_aisle_two_way(&mut self, name: GString, two_way: bool) -> bool {
+        let r = self.editor.set_aisle_two_way(&name.to_string(), two_way);
+        self.done(r)
+    }
+
+    #[func]
+    fn set_aisle_secondary(&mut self, name: GString, secondary: bool) -> bool {
+        let r = self
+            .editor
+            .set_aisle_secondary(&name.to_string(), secondary);
+        self.done(r)
+    }
+
+    /// `""` (the model's), `"Brasil"` or `"Branco"`.
+    #[func]
+    fn set_aisle_profile(&mut self, name: GString, profile: GString) -> bool {
+        let r = self
+            .editor
+            .set_aisle_profile(&name.to_string(), &profile.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn reverse_aisle(&mut self, name: GString) -> bool {
+        let r = self.editor.reverse_aisle(&name.to_string());
+        self.done(r)
+    }
+
+    /// Puts the access point of `object` at the floor point `at` (snapped to `step`, in
+    /// the object's own coordinates).
+    #[func]
+    fn set_access_at(&mut self, object: GString, at: Vector3, step: f64) -> bool {
+        let r = self
+            .editor
+            .set_access_at(&object.to_string(), aisle_godot::plan(at), step);
+        self.done(r)
+    }
+
+    /// Back to the default access point.
+    #[func]
+    fn reset_access(&mut self, object: GString) -> bool {
+        let r = self.editor.reset_access(&object.to_string());
+        self.done(r)
     }
 
     /// Sets property `path` of `object` (`"run"`: the run settings) to `value`, and the

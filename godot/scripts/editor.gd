@@ -16,7 +16,9 @@
 ## does the same by dragging from block to block, or by clicking the origin and then the
 ## destination.
 ##
-## The path network has its own tool, Rede (N, `rede.gd`), drawn in this same overlay.
+## The path network has its own tool, Rede (N, `rede.gd`), drawn in this same overlay, and
+## so do the circulation aisles: the Corredor tool (C, `corredores.gd`), which also draws
+## the obstacles, the clearances and the access points when they are shown.
 ## Objects on the critical path of the PERT/CPM window get a red outline (`critical`).
 class_name EditorUtsim
 extends Node3D
@@ -44,12 +46,14 @@ var main: Node
 var selected: Array = []
 ## Selected connection `[from, to]`, or empty.
 var selected_link: Array = []
-## `selecionar`, `ligar`, `colocar` or `rede`.
+## `selecionar`, `ligar`, `colocar`, `rede` or `corredor`.
 var tool := "selecionar"
 ## Objects on the critical path of the PERT/CPM window (red outline).
 var critical: Array = []
 ## The path network tool.
 var rede: EditorRede
+## The circulation aisles tool, and the overlay of obstacles and access points.
+var corredores: EditorCorredores
 var place_id := ""
 var connect_from := ""
 ## Mouse position on screen (kept from the events, so scripted input works the same).
@@ -102,6 +106,10 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	rede.name = "Rede"
 	add_child(rede)
 	rede.setup(owner_main, self)
+	corredores = EditorCorredores.new()
+	corredores.name = "Corredores"
+	add_child(corredores)
+	corredores.setup(owner_main, self)
 
 
 func doc() -> Object:
@@ -150,6 +158,8 @@ func set_tool(name: String, id := "") -> void:
 			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
 		"colocar":
 			main.set_status("Clique no chão para colocar (Shift mantém a ferramenta, Esc cancela).")
+		"corredor":
+			main.set_status("Corredor: clique no chão para pôr os pontos do eixo (Enter ou duplo clique termina), clique num corredor para editá-lo, arraste um vértice para movê-lo; Esc cancela.")
 		"rede":
 			main.set_status("Rede: clique no chão para pôr nós (cada clique continua o caminho), clique num trecho para editá-lo, arraste um nó para movê-lo; Esc encerra o caminho.")
 		_:
@@ -474,6 +484,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 				rede.drag(mm.position)
 			return
+		if tool == "corredor":
+			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+				corredores.drag(mm.position)
+			return
+		if corredores.access_active():
+			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+				corredores.access_drag(mm.position)
+			return
 		if not _press.is_empty() and (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			_on_drag(mm.position)
 		return
@@ -489,6 +507,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			rede.release(mb.position)
 		get_viewport().set_input_as_handled()
 		return
+	if tool == "corredor":
+		if mb.pressed:
+			get_viewport().gui_release_focus()
+			corredores.press(mb.position, mb.shift_pressed)
+		else:
+			corredores.release(mb.position)
+		get_viewport().set_input_as_handled()
+		return
+	if tool == "selecionar":
+		# An access point (shown with the obstacles) is dragged before any object.
+		if mb.pressed and corredores.access_press(mb.position):
+			get_viewport().gui_release_focus()
+			get_viewport().set_input_as_handled()
+			return
+		if not mb.pressed and corredores.access_active():
+			corredores.access_release(mb.position)
+			get_viewport().set_input_as_handled()
+			return
 	if mb.pressed:
 		get_viewport().gui_release_focus()
 		_on_press(mb.position, mb.shift_pressed)
@@ -705,6 +741,10 @@ func cancel() -> void:
 		if not rede.cancel():
 			set_tool("selecionar")
 		return
+	if tool == "corredor":
+		if not corredores.cancel():
+			set_tool("selecionar")
+		return
 	if tool == "colocar":
 		set_tool("selecionar")
 	elif connect_from != "":
@@ -729,6 +769,10 @@ func nudge(dx: int, dy: int) -> void:
 
 func delete_selected() -> void:
 	if tool == "rede" and rede.delete_selected():
+		return
+	if tool == "corredor":
+		if not corredores.delete_selected():
+			main.set_status("Nenhum corredor selecionado para excluir.")
 		return
 	if not selected_link.is_empty():
 		var link := selected_link
@@ -855,6 +899,7 @@ func _redraw() -> void:
 				_rect(box.grow(0.2), CONNECTING, 0.08)
 			if critical.has(name):
 				_rect(box.grow(0.3), CRITICAL, 0.1)
+		corredores.draw(self)
 		rede.draw(self)
 		var segs := _segments()
 		var outs := {}

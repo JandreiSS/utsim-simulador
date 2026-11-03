@@ -565,9 +565,17 @@ impl Editor {
         let warnings = self.doc.warnings();
         let model = self.model();
         let Some(obj) = model.objects.iter().find(|o| o.name == object) else {
+            // The model's own list: what belongs to no object, and what talks about an
+            // aisle (its warnings also name a vehicle, which would file them under it).
             let general = |list: &[Issue]| -> Vec<String> {
                 list.iter()
-                    .filter(|i| i.object.is_none())
+                    .filter(|i| {
+                        i.object.is_none()
+                            || model
+                                .aisles
+                                .iter()
+                                .any(|a| i.message.contains(&format!("'{}'", a.name)))
+                    })
                     .map(|i| i.message.clone())
                     .collect()
             };
@@ -754,7 +762,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 31] = [
+pub const SHORTCUTS: [(&str, &str); 32] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -789,8 +797,12 @@ pub const SHORTCUTS: [(&str, &str); 31] = [
         "ferramenta Ligar: arraste da origem ao destino, ou clique e clique",
     ),
     (
+        "C",
+        "ferramenta Corredor: clique pontos no chão, Enter ou duplo clique termina",
+    ),
+    (
         "Esc",
-        "cancela a ferramenta, a ligação começada ou a seleção",
+        "cancela a ferramenta, a ligação ou o corredor começado, ou a seleção",
     ),
     ("F", "enquadra o modelo"),
     ("G", "liga ou desliga o encaixe na grade"),

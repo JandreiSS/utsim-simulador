@@ -27,7 +27,9 @@ use std::f64::consts::PI;
 
 use utsim_core::{Dist, OffWindow, OutputRule, ShiftEnd, ShiftTable};
 use utsim_edit::Command;
-use utsim_model::{Model, ObjectDef, ObjectKind, RunSettings, ShiftSpec, VisualDef, is_mobile};
+use utsim_model::{
+    Model, Movement, ObjectDef, ObjectKind, Profile, RunSettings, ShiftSpec, VisualDef, is_mobile,
+};
 
 use crate::catalogue;
 use crate::looks;
@@ -252,6 +254,8 @@ pub const S_OUTPUT: &str = "Saída";
 pub const S_DOWNTIME: &str = "Quebras e turnos";
 pub const S_LOOK: &str = "Aparência";
 pub const S_RUN: &str = "Simulação";
+pub const S_MOVE: &str = "Movimentação";
+pub const S_FLOOR: &str = "Piso e corredores";
 pub const S_MODEL: &str = "Modelo";
 
 /// Portuguese name of an object kind.
@@ -667,6 +671,150 @@ fn first_label(model: &Model) -> String {
         .unwrap_or_else(|| "tipo".into())
 }
 
+/// The movement mode choices; the first is "the model's" (stored as no value).
+const MOVEMENT_CHOICES: [(&str, &str); 5] = [
+    ("", "Padrão do modelo"),
+    ("Legacy", "Legado (linha reta ou rede)"),
+    ("Free", "Livre (menor caminho no piso)"),
+    ("Network", "Pela rede de caminhos"),
+    ("Aisles", "Pelos corredores"),
+];
+
+fn movement_name(m: Option<Movement>) -> &'static str {
+    match m {
+        None => "",
+        Some(Movement::Legacy) => "Legacy",
+        Some(Movement::Free) => "Free",
+        Some(Movement::Network) => "Network",
+        Some(Movement::Aisles) => "Aisles",
+    }
+}
+
+fn movement_from(name: &str) -> Result<Option<Movement>, String> {
+    Ok(match name {
+        "" => None,
+        "Legacy" => Some(Movement::Legacy),
+        "Free" => Some(Movement::Free),
+        "Network" => Some(Movement::Network),
+        "Aisles" => Some(Movement::Aisles),
+        _ => return Err(format!("modo de movimentação desconhecido: {name}")),
+    })
+}
+
+/// How a mobile resource moves: its own mode (or the model's) and its clearance.
+fn movement_fields(
+    model: &Model,
+    obj: &ObjectDef,
+    movement: Option<Movement>,
+    clearance: Option<f64>,
+) -> Vec<Field> {
+    let s = S_MOVE;
+    // The clearance of its role: the one it has with no clearance of its own.
+    let mut plain = obj.clone();
+    if let ObjectKind::Transporter { clearance, .. } = &mut plain.kind {
+        *clearance = None;
+    }
+    let by_role = model.clearance_of(&plain);
+    vec![
+        pick(
+            s,
+            "movement",
+            "Movimentação",
+            movement_name(movement),
+            &MOVEMENT_CHOICES,
+        )
+        .help(
+            "Como o recurso anda: o padrão do modelo (Simulação), em linha reta como no \
+             formato antigo, livre pelo piso desviando dos obstáculos, pela rede de \
+             caminhos ou só pelos corredores da sua classe.",
+        ),
+        Field::new(
+            s,
+            "clearance",
+            "Folga dos obstáculos",
+            FieldType::Float,
+            clearance.map_or(Value::Null, Value::Float),
+        )
+        .optional(clearance.is_some())
+        .min(0.0)
+        .unit("m")
+        .help(&format!(
+            "Distância mínima de qualquer obstáculo. Desligada, vale a do papel do recurso \
+             ({} m: meia largura mais 0,3 m).",
+            format!("{by_role:.2}").replace('.', ",")
+        )),
+    ]
+}
+
+/// The access point of a fixed object (`access`), in its own coordinates.
+fn access_fields(obj: &ObjectDef) -> Vec<Field> {
+    let s = S_MOVE;
+    let mut out = vec![
+        group(s, "access", "Ponto de acesso próprio", obj.access.is_some()).help(
+            "Onde os recursos móveis param para atender este objeto, em metros a partir do \
+             seu centro e girando com ele. Desligado, é o lado -y. Também se arrasta na \
+             cena, com \"Mostrar obstáculos e folgas\" ligado.",
+        ),
+    ];
+    if let Some(a) = obj.access {
+        out.push(float(s, "access.x", "X no objeto", a[0]).depth(1).unit("m"));
+        out.push(float(s, "access.y", "Y no objeto", a[1]).depth(1).unit("m"));
+    }
+    out
+}
+
+/// The edit of the movement fields (`movement`, `clearance`, `access`), or `None` for
+/// other fields.
+fn edit_movement(
+    model: &Model,
+    obj: &ObjectDef,
+    head: &str,
+    rest: &str,
+    value: &Value,
+) -> Option<Result<Command, String>> {
+    let name = obj.name.clone();
+    let mobile = matches!(obj.kind, ObjectKind::Transporter { .. });
+    Some(match (head, rest) {
+        ("movement", "") if mobile => value
+            .as_text()
+            .ok_or_else(|| "modo de movimentação esperado".to_string())
+            .and_then(movement_from)
+            .map(|movement| Command::SetMovement { name, movement }),
+        ("clearance", "on") if mobile => {
+            bool_of(value, "clearance").map(|on| Command::SetClearance {
+                clearance: on.then(|| model.clearance_of(obj)),
+                name,
+            })
+        }
+        ("clearance", "") if mobile => match value {
+            Value::Null => Ok(Command::SetClearance {
+                name,
+                clearance: None,
+            }),
+            v => f64_of(v, "folga").map(|c| Command::SetClearance {
+                name,
+                clearance: Some(c),
+            }),
+        },
+        ("access", "on") if !mobile => bool_of(value, "access").map(|on| Command::SetAccess {
+            // A point two metres in front of the object, on its -y side, to start from.
+            access: on.then(|| [0.0, -2.0]),
+            name,
+        }),
+        ("access", "x" | "y") if !mobile => {
+            let mut a = obj.access.unwrap_or([0.0, -2.0]);
+            f64_of(value, "ponto de acesso").map(|v| {
+                a[usize::from(rest == "y")] = v;
+                Command::SetAccess {
+                    name,
+                    access: Some(a),
+                }
+            })
+        }
+        _ => return None,
+    })
+}
+
 fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let s = S_PARAMS;
     let mut out = Vec::new();
@@ -903,8 +1051,11 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             unload_time,
             home,
             agv,
+            movement,
+            clearance,
             ..
         } => {
+            out.extend(movement_fields(model, obj, *movement, *clearance));
             out.push(
                 float(s, "speed", "Velocidade máxima", *speed)
                     .min(0.001)
@@ -1394,6 +1545,7 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     out.extend(kind_fields(model, obj));
     if !is_mobile(&obj.kind) {
         out.extend(output_fields(model, obj));
+        out.extend(access_fields(obj));
     }
     out.extend(downtime_fields(model, obj));
     out.extend(look_fields(obj));
@@ -1404,6 +1556,7 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
 pub fn run_fields(model: &Model) -> Vec<Field> {
     let s = S_RUN;
     let run: &RunSettings = &model.run;
+    let marking = model.marking();
     vec![
         Field::new(
             S_MODEL,
@@ -1432,6 +1585,53 @@ pub fn run_fields(model: &Model) -> Vec<Field> {
             u64::from(run.replications),
         )
         .min(1.0),
+        pick(
+            S_MOVE,
+            "movement",
+            "Movimentação padrão",
+            movement_name(run.movement),
+            &MOVEMENT_CHOICES,
+        )
+        .help(
+            "Como andam os recursos móveis que não escolheram um modo próprio. Vazio, \
+             vale Livre (menor caminho no piso, desviando dos obstáculos).",
+        ),
+        pick(
+            S_FLOOR,
+            "marking.profile",
+            "Perfil da marcação do piso",
+            if matches!(marking.profile, Profile::Branco) {
+                "Branco"
+            } else {
+                "Brasil"
+            },
+            &[
+                ("Brasil", "Brasil (faixa amarela)"),
+                ("Branco", "Branco (redação original da NR-26)"),
+            ],
+        )
+        .help(
+            "Cores das faixas e setas dos corredores. O programa não certifica \
+             conformidade: confira o texto vigente das normas.",
+        ),
+        float(
+            S_FLOOR,
+            "marking.line_width",
+            "Largura da faixa",
+            marking.line_width,
+        )
+        .min(0.001)
+        .unit("m")
+        .help("A prática usual vai de 0,05 a 0,15 m."),
+        float(
+            S_FLOOR,
+            "marking.crossing_stop",
+            "Parada no cruzamento",
+            marking.crossing_stop,
+        )
+        .min(0.0)
+        .unit("s")
+        .help("O veículo para esse tempo antes de um cruzamento com pedestres."),
     ]
 }
 
@@ -1770,6 +1970,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
         "visual" => return edit_visual(obj, rest, value),
         _ => {}
     }
+    if let Some(command) = edit_movement(model, obj, head, rest, value) {
+        return command;
+    }
     if rest == "on" {
         let on = bool_of(value, path)?;
         let text = if on {
@@ -1887,6 +2090,30 @@ fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String>
                 name: model.name.clone(),
                 description: text(value)?,
             });
+        }
+        _ => {}
+    }
+    let mut marking = model.marking();
+    match path {
+        "movement" => {
+            let movement = movement_from(value.as_text().ok_or("modo esperado")?)?;
+            return Ok(Command::SetRunMovement(movement));
+        }
+        "marking.profile" => {
+            marking.profile = match value.as_text() {
+                Some("Brasil") => Profile::Brasil,
+                Some("Branco") => Profile::Branco,
+                _ => return Err("perfil: Brasil ou Branco".into()),
+            };
+            return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
+        }
+        "marking.line_width" => {
+            marking.line_width = f64_of(value, "largura da faixa")?;
+            return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
+        }
+        "marking.crossing_stop" => {
+            marking.crossing_stop = f64_of(value, "parada no cruzamento")?;
+            return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
         }
         _ => {}
     }
@@ -2024,6 +2251,70 @@ mod tests {
             .into_iter()
             .find(|f| f.path == path)
             .unwrap_or_else(|| panic!("no field {path}"))
+    }
+
+    #[test]
+    fn movement_clearance_access_and_marking_are_edited_through_the_panel() {
+        let mut d = doc();
+        assert_eq!(
+            field(&d, "emp", "movement").value,
+            Value::Text(String::new())
+        );
+        apply(&mut d, "emp", "movement", Value::Text("Aisles".into()));
+        assert_eq!(
+            field(&d, "emp", "movement").value,
+            Value::Text("Aisles".into())
+        );
+        apply(&mut d, "emp", "movement", Value::Text(String::new()));
+        assert!(matches!(
+            object(&d, "emp").kind,
+            ObjectKind::Transporter { movement: None, .. }
+        ));
+        assert!(edit(d.model(), "emp", "movement", &Value::Text("Voar".into())).is_err());
+        assert!(!field(&d, "emp", "clearance").enabled);
+        apply(&mut d, "emp", "clearance.on", Value::Bool(true));
+        assert!(field(&d, "emp", "clearance").enabled);
+        apply(&mut d, "emp", "clearance", Value::Float(1.4));
+        assert_eq!(field(&d, "emp", "clearance").value, Value::Float(1.4));
+        apply(&mut d, "emp", "clearance.on", Value::Bool(false));
+        assert_eq!(field(&d, "emp", "clearance").value, Value::Null);
+        // Fixed objects have the access point, mobile ones do not.
+        assert!(!field(&d, "p", "access").enabled);
+        assert!(
+            object_fields(d.model(), object(&d, "emp"))
+                .iter()
+                .all(|f| !f.path.starts_with("access"))
+        );
+        apply(&mut d, "p", "access.on", Value::Bool(true));
+        apply(&mut d, "p", "access.x", Value::Float(1.5));
+        assert_eq!(object(&d, "p").access, Some([1.5, -2.0]));
+        apply(&mut d, "p", "access.on", Value::Bool(false));
+        assert_eq!(object(&d, "p").access, None);
+        // The run settings: the default mode and the marking.
+        apply(&mut d, "run", "movement", Value::Text("Network".into()));
+        assert_eq!(d.model().run.movement, Some(Movement::Network));
+        apply(
+            &mut d,
+            "run",
+            "marking.profile",
+            Value::Text("Branco".into()),
+        );
+        apply(&mut d, "run", "marking.crossing_stop", Value::Float(3.0));
+        apply(&mut d, "run", "marking.line_width", Value::Float(0.12));
+        let m = d.model().marking();
+        assert_eq!(
+            (m.profile, m.crossing_stop, m.line_width),
+            (Profile::Branco, 3.0, 0.12)
+        );
+        assert!(edit(d.model(), "run", "marking.line_width", &Value::Float(0.0)).is_ok());
+        assert!(
+            d.apply(edit(d.model(), "run", "marking.line_width", &Value::Float(0.0)).unwrap())
+                .is_err()
+        );
+        let fields = run_fields(d.model());
+        for path in ["movement", "marking.profile", "marking.line_width"] {
+            assert!(fields.iter().any(|f| f.path == path), "{path}");
+        }
     }
 
     #[test]

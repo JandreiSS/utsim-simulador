@@ -1,0 +1,29 @@
+// Ponto de partida do roteiro g4_corredores.json: uma empilhadeira leva caixas da doca ao
+// estoque pelo eixo x e uma pessoa leva caixas pelo eixo y, os dois caminhos se cruzando
+// em (0, 0). O modelo ainda não tem corredores: o roteiro os desenha com a ferramenta
+// Corredor, escolhe "Pelos corredores" para os dois recursos e simula.
+Model(
+    format: 2,
+    name: "cruzamento",
+    run: (stop_time: 300.0, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(20.0), first_at_zero: true, max_arrivals: 6),
+         position: (-16.0, 3.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "empilhadeira_1", position: (-10.0, 3.0, 0.0), access: (0.0, -3.0)),
+        (name: "estoque", kind: Sink, position: (10.0, 3.0, 0.0), access: (0.0, -3.0)),
+        (name: "empilhadeira_1", kind: Transporter(speed: 2.0), position: (-10.0, 0.0, 0.0),
+         visual: (asset: "empilhadeira")),
+        (name: "chegada_2", kind: Source(interarrival: Const(20.0), first_at_zero: true, max_arrivals: 6),
+         position: (6.0, -12.0, 0.0)),
+        (name: "fila_2", kind: Queue(), transport: "ana", position: (3.0, -10.0, 0.0), access: (-3.0, 0.0)),
+        (name: "saida_2", kind: Sink, position: (3.0, 10.0, 0.0), access: (-3.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.2), position: (0.0, -10.0, 0.0),
+         visual: (asset: "operador")),
+    ],
+    connections: [
+        ("chegada", "doca"),
+        ("doca", "estoque"),
+        ("chegada_2", "fila_2"),
+        ("fila_2", "saida_2"),
+    ],
+)

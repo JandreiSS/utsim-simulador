@@ -157,6 +157,59 @@ trechos, ligações, cruzamentos), o modo de cada recurso e os avisos. Com `--sv
 planta com os objetos, os obstáculos, os corredores com as faixas nas cores do perfil, as
 zebras, as setas, a rede, as ligações (tracejadas) e os cruzamentos (círculos vermelhos).
 
+## Na interface 3D
+
+No modo Editar da interface 3D os corredores se desenham com o mouse, e as faixas aparecem
+pintadas no piso (no Editar e no Simular).
+
+**As faixas no piso.** A cena desenha os polígonos de `Model::floor_marks()` como malhas finas
+sobre o chão: a faixa de delimitação contínua de cada corredor (amarela no perfil Brasil, branca
+no perfil Branco), as listras pretas e amarelas da travessia zebrada onde um corredor de
+empilhadeiras cruza um de pedestres e as setas dos corredores de mão única. As cores e as larguras
+vêm do perfil, como no `utsim corredores --svg`. As faixas se atualizam a cada edição.
+
+**A ferramenta Corredor** (botão **Corredor** na barra ou a tecla `C`):
+
+1. Clique no chão para pôr os pontos da linha central, um clique por ponto. Cada ponto se encaixa
+   no vértice ou na linha de outro corredor, quando estiver a menos de 45 cm, e senão na grade.
+2. **Enter**, ou um clique duplo no último ponto, termina o corredor. **Backspace** volta um
+   ponto e **Esc** cancela o que está sendo desenhado.
+3. O painel da direita mostra o tipo (pedestres, empilhadeiras ou misto), a largura, a mão dupla
+   ou única, a passagem secundária de pedestres, o perfil só deste corredor (padrão do modelo,
+   Brasil ou Branco) e o nome. Os novos corredores nascem com a largura mínima do perfil para o
+   tipo (1,20 m, 3,60 m e 4,80 m). Os avisos do corredor, como a largura abaixo do mínimo, aparecem
+   no próprio painel.
+4. Clique numa linha para selecionar o corredor. Arraste um vértice para movê-lo; **Shift** mais
+   clique na linha do corredor selecionado acrescenta um vértice; **Del** exclui o corredor.
+   Inverter o sentido de um corredor de mão única também tem botão.
+
+Cada mudança é um comando do documento (`AddAisle`, `SetAisle`, `RemoveAisle`) e se desfaz com
+**Ctrl+Z**.
+
+**Mostrar obstáculos e folgas.** A caixa da lista de objetos desenha a área ocupada de cada objeto
+(vermelho), as paredes e colunas de `obstacles` (roxo) e, em volta de cada uma, o contorno da folga
+que o recurso mantém (laranja). Cada objeto mostra o seu **ponto de acesso**, um losango ligado ao
+centro dele: ciano quando é o padrão e rosa quando o modelo tem o `access`. Com a ferramenta
+Selecionar, arraste o losango para outro lugar: o ponto é gravado em `access`, em coordenadas do
+objeto e na grade de 5 cm, e se desfaz. Para voltar ao padrão, desligue "Ponto de acesso próprio" no
+painel do objeto. Um recurso parado sobre o ponto (uma pessoa na máquina) é selecionado com um
+clique; um arrasto a partir dali move o ponto.
+
+**Modo de movimentação.** No painel do recurso (transportador) a seção **Movimentação** escolhe o
+modo (padrão do modelo, legado, livre, pela rede ou pelos corredores) e a folga própria. No painel
+do modelo (nada selecionado), **Movimentação padrão** é o `run.movement`, e **Piso e corredores**
+tem o perfil da marcação, a largura da faixa e a parada no cruzamento. Detalhes em
+[Movimentação e obstáculos](movimentacao.md).
+
+**Avisos.** Os avisos dos corredores e da movimentação aparecem na lista de Problemas e Avisos do
+painel (do modelo e do objeto). Clique num aviso: a cena destaca em laranja o corredor e o objeto
+que ele cita.
+
+**Simular.** As pessoas e as empilhadeiras andam pelo caminho calculado: o rastro da simulação
+leva o caminho de cada viagem, pelos corredores ou livre, e a cena o reproduz como reproduz a
+rede de caminhos. O modelo de exemplo do roteiro de teste está em
+`godot/roteiros/g4_cruzamento.ron`.
+
 ## Para quem programa a interface
 
 `Model::floor_marks()` devolve as faixas como polígonos convexos com cor e padrão
@@ -190,9 +243,10 @@ ser lido).
 
 ## Ainda não disponível
 
-- desenho e edição dos corredores na interface 3D (Godot), áreas marcadas no piso
-  (armazenagem, área a manter livre, equipamento de incêndio) e as regras `VehiclePriority`,
-  `Fifo` e `StopBoth`;
+- áreas marcadas no piso (armazenagem, área a manter livre, equipamento de incêndio) e as regras
+  `VehiclePriority`, `Fifo` e `StopBoth`;
+- desenho e edição das paredes e colunas (`obstacles`) na interface 3D: elas só são mostradas
+  (a planta CAD e o `.ron` as trazem);
 - limite de velocidade por corredor, limite de espera do veículo no cruzamento e a métrica de
   espera por cruzamento nos resultados (o núcleo já conta as esperas por cruzamento);
 - pedestres em modo livre atravessando os corredores de veículos só pelas zebras;

@@ -48,6 +48,8 @@ var fluid_nodes: Array = []
 var fluid_pipes: Array = []
 var _fluid_materials: Array = []
 var _labels_shown := 0
+## Polygons of the floor marking of the aisles, by pattern (`continuous`, `zebra`, `arrow`).
+var mark_counts := {}
 ## Room kept around a following camera's eye (`clear_view`).
 const VIEW_MARGIN := 0.5
 ## Meshes hidden by `clear_view` (shown again by `restore_view`).
@@ -178,6 +180,7 @@ func build(pb: Object, keep_templates := false) -> void:
 		if b["mobile"]:
 			mobiles.append(i)
 	_draw_lines()
+	_draw_marks()
 	_build_fluids()
 
 
@@ -392,6 +395,62 @@ func _draw_lines() -> void:
 	im.surface_end()
 	lines.name = "Linhas"
 	add_child(lines)
+
+
+## Heights above the floor (m) of each pattern of the marking, so the zebra lies over the
+## lines and the arrows over both and none of them fights the floor in the depth buffer.
+const MARK_HEIGHT := {"continuous": 0.006, "zebra": 0.009, "arrow": 0.012}
+
+
+## The floor marking of the circulation aisles (`UtsimPlayback.floor_marks`): continuous
+## lines, zebra stripes at the crossings and arrows of one-way aisles, as thin coloured
+## meshes just above the floor. One mesh for all of them (vertex colours).
+func _draw_marks() -> void:
+	mark_counts = {}
+	if playback == null or not playback.has_method("floor_marks"):
+		return
+	var marks: Array = playback.floor_marks()
+	if marks.is_empty():
+		return
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var normals := PackedVector3Array()
+	for m in marks:
+		var poly: PackedVector3Array = m["polygon"]
+		if poly.size() < 3:
+			continue
+		var pattern: String = m["pattern"]
+		mark_counts[pattern] = int(mark_counts.get(pattern, 0)) + 1
+		var y: float = MARK_HEIGHT.get(pattern, 0.006)
+		var base := verts.size()
+		for p in poly:
+			verts.append(Vector3(p.x, y, p.z))
+			colors.append(m["color"])
+			normals.append(Vector3.UP)
+		for k in range(1, poly.size() - 1):
+			indices.append_array(PackedInt32Array([base, base + k, base + k + 1]))
+	if verts.is_empty():
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	mat.roughness = 0.85
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mi := MeshInstance3D.new()
+	mi.name = "Faixas"
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
 
 
 ## Applies the frame at `t`. `dt`: real time since the last call (clip crossfades);
