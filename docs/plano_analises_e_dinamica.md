@@ -1208,6 +1208,13 @@ Contexto: G2 (edição) e G5 (empacotamento) em andamento; G3 (rede, fluidos, re
 - A janela do PERT abre no caminho crítico observado na simulação, com o CPM clássico e o Monte
   Carlo a um clique.
 
+Conferência das normas (pendente antes de publicar no manual): a NR-26 vigente é a redação da
+Portaria MTP nº 2.770, de 5 de setembro de 2022 ("Sinalização e Identificação de Segurança"), e
+as cores de segurança estão na ABNT NBR 7195:2018. Fontes secundárias divergem entre branco e
+amarelo para corredores de pedestres, e o valor de largura mínima das vias da NR-12 não foi
+confirmado no texto oficial. Por isso os dois perfis de cor continuam no programa, e os números
+só entram no manual depois da leitura do texto oficial.
+
 Texto original das decisões:
 
 1. **Modo de movimentação padrão e formato 2.** O plano propõe subir o formato para 2, com os
