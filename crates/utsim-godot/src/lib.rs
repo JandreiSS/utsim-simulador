@@ -23,6 +23,7 @@
 #![allow(clippy::redundant_field_names)]
 
 pub mod coords;
+pub mod dados;
 pub mod document;
 mod document_class;
 pub mod extras;

@@ -106,6 +106,11 @@ var camera_aim := Vector3.ZERO
 var follow_name := ""
 var _frames := 0
 var _replay_dialog: FileDialog
+var _data_dialog: FileDialog
+var _report_dialog: FileDialog
+var _data_pick_path := ""
+## The last report of the real data written: `{index, files, failed}`.
+var last_report := {}
 ## A recorded replay (`.json`) is being played instead of the document.
 var playing_replay := false
 
@@ -125,6 +130,7 @@ func _ready() -> void:
 	editor.setup(self, _ui)
 	_library.build(doc.palette(), doc.categories())
 	_props.families = doc.families()
+	_props.data_families = doc.data_families()
 	_fill_shortcuts()
 	set_mode("editar")
 	camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
@@ -434,6 +440,18 @@ func _build_ui() -> void:
 			return null
 		return doc.look_scene(editor.selected[0], asset, CenaUtsim.skeletal_available())
 	_props.action.connect(func(what): arrange_action(what))
+	_props.columns_provider = func(file: String) -> Array:
+		if doc == null:
+			return []
+		var r: Dictionary = doc.data_columns(file)
+		return Array(r["columns"]) if r["ok"] else []
+	_props.data_apply.connect(_on_data_apply)
+	_props.data_analyze.connect(_on_data_analyze)
+	_props.data_to_dist.connect(_on_data_to_dist)
+	_props.data_report.connect(func(): _report_dialog.popup_centered_ratio(0.6))
+	_props.data_pick_file.connect(func(path):
+		_data_pick_path = path
+		_data_dialog.popup_centered_ratio(0.7))
 	_props.gesture_ended.connect(func():
 		doc.end_gesture()
 		after_edit.call_deferred())
@@ -558,6 +576,21 @@ func _build_ui() -> void:
 	_flows_panel.anchor_left = 1.0
 	for panel in [_results_panel, _pert_panel]:
 		panel.visibility_changed.connect(_sync_panels)
+	_data_dialog = FileDialog.new()
+	_data_dialog.name = "Dialogo_Dados"
+	_data_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_data_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_data_dialog.filters = PackedStringArray(["*.csv, *.txt, *.tsv ; Dados (CSV ou texto)"])
+	_data_dialog.title = "Arquivo com os dados reais"
+	_data_dialog.file_selected.connect(func(p): _on_data_file(p))
+	_ui.add_child(_data_dialog)
+	_report_dialog = FileDialog.new()
+	_report_dialog.name = "Dialogo_Relatorio"
+	_report_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_report_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	_report_dialog.title = "Pasta para o relatório dos dados"
+	_report_dialog.dir_selected.connect(func(p): write_data_report(p))
+	_ui.add_child(_report_dialog)
 	_replay_dialog = FileDialog.new()
 	_replay_dialog.name = "Dialogo_Replay"
 	_replay_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -892,6 +925,109 @@ func _on_property_edited(path: String, value: Variant) -> void:
 	else:
 		set_status("Não alterou %s: %s" % [path, doc.last_error()])
 		_show_properties.call_deferred()
+
+
+# ---------------------------------------------------------------------------
+# Real data in the distribution fields (G3)
+# ---------------------------------------------------------------------------
+
+
+## The bridge's config from the form of the panel, or `{}` (the reason goes to the status).
+func _data_config(draft: Dictionary) -> Dictionary:
+	var config := {
+		"timestamps": bool(draft.get("timestamps", false)),
+		"choose": String(draft.get("choose", "Best")),
+		"criterion": String(draft.get("criterion", "aic")),
+	}
+	if draft.get("origem", "arquivo") == "arquivo":
+		var file := String(draft.get("source", "")).strip_edges()
+		if file == "":
+			set_status("Escolha o arquivo de dados.")
+			return {}
+		config["source"] = doc.data_relative(file)
+		config["column"] = String(draft.get("column", ""))
+	else:
+		var r: Dictionary = doc.data_parse_values(String(draft.get("text", "")))
+		if not r["ok"]:
+			set_status("Valores colados: %s" % r["error"])
+			return {}
+		config["values"] = r["values"]
+	return config
+
+
+func _selected_field(path: String) -> String:
+	var sel: Array = editor.selected
+	return "%s.%s" % [sel[0], path] if not sel.is_empty() else ""
+
+
+func _on_data_apply(path: String, draft: Dictionary) -> void:
+	var field := _selected_field(path)
+	var config := _data_config(draft)
+	if field == "" or config.is_empty():
+		return
+	if busy():
+		set_status("Aguarde: %s." % job.what())
+		return
+	var j: Object = doc.data_fit(field, config)
+	if j == null:
+		set_status("Não ajustou: %s" % doc.last_error())
+		return
+	start_job(j, func(_j):
+		if doc.data_apply(field, config):
+			doc.end_gesture()
+			_props.drafts_seen.erase(_props.draft_key(path))
+			_props.clear_requests()
+			after_edit.call_deferred()
+			set_status("%s agora usa dados reais (Ctrl+Z desfaz)." % field)
+		else:
+			set_status("Não aplicou os dados: %s" % doc.last_error()))
+
+
+## The analysis of an applied entry that has none yet (the panel asks once).
+func _on_data_analyze(path: String, draft: Dictionary) -> void:
+	var field := _selected_field(path)
+	var config := _data_config(draft)
+	_props.clear_requests()
+	if field == "" or config.is_empty() or busy():
+		return
+	var j: Object = doc.data_fit(field, config)
+	if j == null:
+		return
+	start_job(j, func(_j):
+		after_edit.call_deferred())
+
+
+func _on_data_to_dist(path: String) -> void:
+	var field := _selected_field(path)
+	if field == "":
+		return
+	if doc.data_to_dist(field):
+		doc.end_gesture()
+		_props.clear_requests()
+		after_edit.call_deferred()
+		set_status("%s volta a usar uma distribuição (Ctrl+Z desfaz)." % field)
+	else:
+		set_status("Não voltou para a distribuição: %s" % doc.last_error())
+		_show_properties.call_deferred()
+
+
+func _on_data_file(file: String) -> void:
+	_props.set_data_file(_data_pick_path, file)
+
+
+## Writes the HTML reports of the fields with data into `dir` (on the bridge's thread)
+## and opens `index.html` in the system browser.
+func write_data_report(dir: String) -> void:
+	var j: Object = doc.data_report(dir)
+	if j == null:
+		set_status("Sem relatório: %s" % doc.last_error())
+		return
+	start_job(j, func(done):
+		last_report = done.data()
+		var index := String(last_report.get("index", ""))
+		set_status("Relatório gravado em %s (%d arquivos)." % [dir, int(last_report.get("files", 0))])
+		if index != "" and DisplayServer.get_name() != "headless":
+			OS.shell_open(index))
 
 
 ## The actions of the "Organizar" menu and of the keyboard shortcuts.
