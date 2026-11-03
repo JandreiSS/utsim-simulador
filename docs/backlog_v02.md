@@ -61,6 +61,8 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 | Calendário com feriados e exceções | Sonnet |
 | Submodelos: um grupo de objetos vira um bloco reutilizável com portas | Opus |
 | Tabelas globais importadas de planilha (roteiros, mix de produtos, chegadas programadas) | Sonnet |
+| Chegadas por tabela (horário e sequência), lote por chegada, tipos de item; prioridade, regras novas, preempção e casa das equipes; ligações de equipe no 3D: plano em `docs/plano_chegadas_e_equipes_3d.md` | Opus (projeto) e Sonnet |
+| Linhas especializadas (pacotes de domínio), começando pelo Lean Office: plano em `docs/plano_linhas_especializadas.md` | Opus (projeto) e Sonnet |
 
 ## Análise e decisão
 
