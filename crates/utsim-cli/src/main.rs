@@ -2,6 +2,7 @@ mod cena;
 mod emulate;
 mod experiment;
 mod fit;
+mod fluxograma;
 mod gerar;
 mod optimize;
 mod replay;
@@ -107,6 +108,38 @@ enum Cmd {
         /// Arquivo de saída (padrão: a saída padrão)
         #[arg(long)]
         saida: Option<PathBuf>,
+    },
+    /// Gera o fluxograma do processo (SVG, HTML, Mermaid) e a carta de processo (HTML, CSV)
+    Fluxograma {
+        model: PathBuf,
+        /// Grava o fluxograma em SVG
+        #[arg(long)]
+        svg: Option<PathBuf>,
+        /// Grava a página HTML com legenda, fluxograma e carta de processo
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Grava o fluxograma em Mermaid (`flowchart LR`)
+        #[arg(long)]
+        mermaid: Option<PathBuf>,
+        /// Grava a carta de processo (caminho principal) em CSV
+        #[arg(long)]
+        csv: Option<PathBuf>,
+        /// Roda o modelo e põe ocupação, fila média e espera média nas caixas
+        #[arg(long)]
+        com_resultados: bool,
+        /// Desenha da esquerda para a direita (padrão: de cima para baixo)
+        #[arg(long)]
+        horizontal: bool,
+        /// Não mostra tempos médios
+        #[arg(long)]
+        sem_tempos: bool,
+        /// Não mostra distâncias das transferências
+        #[arg(long)]
+        sem_distancias: bool,
+        /// Troca o símbolo de um objeto: objeto=simbolo (inicio, fim, operacao, transporte,
+        /// inspecao, espera, armazenagem); pode repetir
+        #[arg(long = "simbolo", value_name = "OBJETO=SIMBOLO")]
+        simbolos: Vec<String>,
     },
     /// Compara cenários de um arquivo de experimento
     Experiment {
@@ -263,6 +296,29 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 m.connections.len()
             );
         }
+        Cmd::Fluxograma {
+            model,
+            svg,
+            html,
+            mermaid,
+            csv,
+            com_resultados,
+            horizontal,
+            sem_tempos,
+            sem_distancias,
+            simbolos,
+        } => fluxograma::run(fluxograma::Args {
+            model,
+            svg,
+            html,
+            mermaid,
+            csv,
+            with_results: com_resultados,
+            horizontal,
+            no_times: sem_tempos,
+            no_distances: sem_distancias,
+            symbols: simbolos,
+        })?,
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::GerarModelo {
             objetos,
