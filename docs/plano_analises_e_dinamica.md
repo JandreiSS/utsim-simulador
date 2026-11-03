@@ -1038,6 +1038,20 @@ um rótulo, e não de `quality: Reject` na `Sink`; custos por tempo parado, por 
 preventiva (sem hora de técnico nem peças à parte). Pendentes: energia, especificações de
 empilhadeira, aquecimento e partida, as características de pessoas e o visual no Godot.
 
+**Situação (2026-11-03, pessoas):** a parte de **pessoas** (itens 1 a 6 e as estatísticas
+de pessoas) está pronta no núcleo (`utsim_core::person`, `crates/utsim-core/src/engine/person.rs`,
+campo `person` do objeto e `OperatorUse.requires` em `utsim_model`, exemplo
+`examples/pessoas_fadiga.ron`, manual "Pessoas: fadiga, aprendizado e habilidades").
+Desvios do proposto: o perfil fica num campo `person` do objeto (só `Transporter`), não em
+campos soltos; o `λ` de caminhada carregada é `walk + carry·kg` (sem o ritmo); o ritmo
+individual divide os tempos e multiplica a velocidade; o esquecimento entre turnos (Jaber e
+Bonney) não foi feito; a verificação do NIOSH usa o maior peso que as fontes dão ao rótulo
+e os multiplicadores de frequência e pega informados (sem as tabelas), e o aviso legal cita
+a CLT art. 198; a habilidade vale para operadores (`OperatorUse`), ainda não para
+`DriverUse` (recurso 3, que não existe) nem para a equipe de manutenção; o índice de
+levantamento por posto não virou métrica (é aviso). Pendente: o visual no Godot (barra de
+fadiga, `Pose.fatigue`).
+
 ### Objetivo
 Representar o que muda o desempenho real de pessoas e equipamentos (fadiga, aprendizado,
 limites de carga, habilidades, manutenção, desgaste, energia, especificações dos veículos), de

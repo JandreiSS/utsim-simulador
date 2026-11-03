@@ -227,6 +227,42 @@ bloco segue o caminho das quebras simples, intocado: os golden não mudam.
   `save_state` grava a idade, o que falta de cada plano e `down`/`up`; `maint_start`
   aplica os dois no início, antes de sortear a próxima falha condicionada à idade.
 
+### Pessoas (`utsim_core::person`, `engine/person.rs`)
+O campo opcional `person` de um objeto (só `Transporter`) é o `utsim_core::Person` em si
+(serde direto, como os tipos da manutenção): `fatigue`, `learning`, `skills`,
+`walk_speed_loaded`, `variation`, `weight_label` e `lift`. O modelo chama
+`Simulation::set_person`; sem `person`, nenhum caminho novo é tomado e os golden não mudam.
+
+- **Fadiga só nos eventos.** Por pessoa, `PersonState` guarda o nível `F` num instante
+  `since` e a taxa em vigor (`Work(λ)` ou `Rest(μ)`). `Core::person_refresh`, chamado em
+  `set_block_state`, integra o trecho em forma fechada (`fatigue_work`, `fatigue_rest`: o
+  nível e a integral para a média, o tempo acima do limite pela inversa da exponencial) e
+  troca a taxa pela do estado novo. `utilize`, `loading`, `unloading` usam `work`;
+  `travel_empty`, `walk`; `travel_loaded`, `walk + carry·kg` (o peso é informado pelo
+  transportador em `Ctx::walk_speed` antes de mudar o estado); o resto recupera com `μ`.
+- **Ritmo.** `Ctx::person_time(pessoas, tarefa, t)` devolve `t` × o maior multiplicador
+  entre as pessoas (`(1 + p)` ou `(1 + β·F)`, curva de aprendizado, `1/v`) e conta uma
+  repetição por pessoa com curva; sem perfil devolve `t` exato. O `Processor` chama com a
+  equipe que está com o item (tarefa = nome do posto, ou `posto:setup`); o `Transporter`
+  com ele mesmo (`carga`, `descarga`). `Ctx::walk_speed` dá a velocidade de cada trecho
+  (carga, `1 − α·F`, `v`), guardada em `Transporter::cur_speed` e usada no lugar de `speed`
+  em todos os cálculos de viagem.
+- **Pausas.** No fim de uma tarefa, `Ctx::take_rest` diz se `F ≥ limit` e por quanto tempo
+  pausar (`ln(F/target)/μ`); o transportador fica em `State::Resting` (estado novo) com um
+  temporizador comum (`RESTED`) e só então pega a próxima tarefa ou avisa o despachante.
+  Intervalos de turno recuperam por serem `off_shift`.
+- **Habilidades.** `Ctx::request_task_requiring` registra a habilidade do pedido em
+  `Core::required` (pelo id; removida quando chega o `MSG_ARRIVED`). O `Dispatcher` filtra
+  os livres por `Ctx::qualified` antes de aplicar a regra, e quem fica livre pega o primeiro
+  pedido da fila para o qual está habilitado. `TaskRequest` não mudou.
+- **Ritmo individual.** Sorteado em `person_start` (antes dos `restore`) de um *stream*
+  próprio (`PERSON_STREAMS + bloco`), truncado por rejeição.
+- **Métricas e estado.** `person.*` (lista em `person::METRICS`) entram no `custom` do bloco
+  em `report`; `rest_time` e `break_time` vêm das frações de `resting` e `off_shift`.
+  `BlockState` ganhou `fatigue` e `experience`, gravados por `person_save` e aplicados em
+  `person_start`. O aviso do NIOSH (`recommended_weight_limit`, `lifting_index`) e o da
+  habilidade sem ninguém habilitado ficam em `utsim_model::person` (avisos do modelo).
+
 ### Medições de tempo entre dois pontos (`spans`)
 O campo `spans: [(name, from, to)]` do modelo mede, por item, o tempo entre sair de `from`
 e entrar em `to`. O kernel guarda o instante de saída no próprio item (`Item::marks`, por

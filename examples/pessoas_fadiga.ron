@@ -1,0 +1,73 @@
+// Pessoas com fadiga, aprendizado e habilidades: três pessoas a pé levam caixas do estoque
+// até o torno e do torno até a expedição, e operam o torno. Só ana e carla sabem operar o
+// torno (habilidade "torno"); bruno só carrega. Tempos em segundos, distâncias em metros.
+//
+// Cada pessoa tem um perfil (person):
+// - fadiga dinâmica: o nível sobe trabalhando e andando (mais depressa com carga, pelo peso
+//   da caixa no rótulo "weight") e cai parado; os tempos crescem 20 % com F = 1 e a
+//   velocidade cai 20 %; com F >= 0,5 a pessoa faz uma pausa até voltar a 0,2 (estado
+//   resting); o intervalo de 15 min a cada 2 h (calendário "pausas") também recupera;
+// - aprendizado: a 1.ª operação do torno leva 1,6 vez o tempo padrão, com taxa de 85 %;
+// - caminhada com carga: −1 % de velocidade por kg acima de 5 kg (mínimo 0,8 m/s);
+// - ritmo individual sorteado por replicação (padrão Normal(1; 0,1) em [0,7; 1,3]);
+// - levantamento: com a geometria padrão (condições ideais da equação do NIOSH) o limite
+//   recomendado é 23 kg e as caixas de 8 a 18 kg não geram aviso; com
+//   `lift: Some((horizontal: 40.0, vertical: 30.0, distance: 50.0))` o limite cai para
+//   cerca de 11 kg e o `utsim check` avisa.
+//
+// Os parâmetros de fadiga são estimativas para o exemplo, sem dados medidos.
+//
+//   chegada -> estoque (4, 0) --[equipe]--> torno (16, 0) --[equipe]--> expedicao (16, 10)
+Model(
+    name: "Pessoas com fadiga",
+    description: "Equipe a pé com fadiga, pausas, curva de aprendizado e habilidades",
+    run: (stop_time: 14400.0, seed: 5, replications: 3),
+    calendars: {
+        "pausas": (period: 7200.0, off: [(start: 3600.0, duration: 900.0)]),
+    },
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 90.0),
+            labels: {"weight": Uniform(min: 8.0, max: 18.0)}), position: (0.0, 0.0, 0.0)),
+        (name: "estoque", kind: Queue(), transport: "equipe", position: (4.0, 0.0, 0.0)),
+        (name: "torno", kind: Processor(
+            process: Triangular(min: 40.0, mode: 50.0, max: 70.0),
+            operators: Some(OperatorUse(team: "equipe", requires: "torno")),
+        ), transport: "equipe", position: (16.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (16.0, 10.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.3, load_time: Const(4.0), unload_time: Const(4.0)),
+            position: (6.0, 3.0, 0.0), shifts: Calendar("pausas"), visual: Some((asset: Some("pessoa"))),
+            person: Some((
+                fatigue: Some(Dynamic(work: 2.0e-4, walk: 1.0e-4, carry: 1.0e-5, limit: Some(0.5), target: 0.2)),
+                learning: Some((rate: 0.85, first: 1.6)),
+                skills: ["torno"],
+                walk_speed_loaded: Some(()),
+                variation: Some(()),
+                lift: Some(()),
+            ))),
+        (name: "bruno", kind: Transporter(speed: 1.3, load_time: Const(4.0), unload_time: Const(4.0)),
+            position: (6.0, -3.0, 0.0), shifts: Calendar("pausas"), visual: Some((asset: Some("pessoa"))),
+            person: Some((
+                fatigue: Some(Dynamic(work: 2.0e-4, walk: 1.0e-4, carry: 1.0e-5, limit: Some(0.5), target: 0.2)),
+                walk_speed_loaded: Some(()),
+                variation: Some(()),
+                lift: Some(()),
+            ))),
+        (name: "carla", kind: Transporter(speed: 1.3, load_time: Const(4.0), unload_time: Const(4.0)),
+            position: (14.0, 4.0, 0.0), shifts: Calendar("pausas"), visual: Some((asset: Some("pessoa"))),
+            person: Some((
+                fatigue: Some(Dynamic(work: 2.0e-4, walk: 1.0e-4, carry: 1.0e-5, limit: Some(0.5), target: 0.2)),
+                learning: Some((rate: 0.85, first: 1.6)),
+                skills: ["torno"],
+                walk_speed_loaded: Some(()),
+                variation: Some(()),
+                lift: Some(()),
+            ))),
+        (name: "equipe", kind: Dispatcher(team: ["ana", "bruno", "carla"], rule: FirstAvailable),
+            position: (8.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "estoque"),
+        ("estoque", "torno"),
+        ("torno", "expedicao"),
+    ],
+)

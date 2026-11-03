@@ -45,7 +45,7 @@ Exemplo: 40 m a 2 m/s com `a = d = 0,5 m/s²` leva 40 / 2 + 1 x (2 + 2) = 24 s.
 
 ### Estados do transportador
 
-`idle` (ocioso), `travel_empty` (indo buscar), `loading`, `travel_loaded` (levando), `unloading`, `utilize` (trabalhando numa máquina como operador), `blocked` (AGV esperando uma aresta), `down` e `off_shift`.
+`idle` (ocioso), `travel_empty` (indo buscar), `loading`, `travel_loaded` (levando), `unloading`, `utilize` (trabalhando numa máquina como operador), `blocked` (AGV esperando uma aresta), `down`, `off_shift` e `resting` (pessoa em pausa pela fadiga, veja [Pessoas](pessoas.md)).
 
 ## Levar itens: `transport`
 
@@ -93,6 +93,7 @@ Como funciona:
 - A liberação acontece quando termina a última fase que exige operador. Uma saída bloqueada não prende o operador.
 - Numa quebra, os operadores ficam no posto e os tempos pausam.
 - Cada item tem os seus próprios pedidos, então `capacity` maior que 1 funciona.
+- Com `requires: "torno"`, só pessoas com essa habilidade no perfil (`person.skills`) operam; veja [Pessoas](pessoas.md).
 
 O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 

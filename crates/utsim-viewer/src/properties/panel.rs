@@ -576,7 +576,7 @@ impl Editor<'_> {
         &mut self,
         ui: &mut Ui,
         field: &str,
-        current: Option<(String, usize, bool, bool)>,
+        current: Option<(String, usize, bool, bool, Option<String>)>,
     ) {
         let id = self.id(field);
         let candidates: Vec<String> = spec::mobile_names(&self.doc.model().objects)
@@ -598,7 +598,7 @@ impl Editor<'_> {
             };
             self.set(field, text);
         }
-        let Some((team, mut count, mut setup, mut process)) = current else {
+        let Some((team, mut count, mut setup, mut process, requires)) = current else {
             if candidates.is_empty() {
                 ui.weak("Crie um Transportador ou Despachante para usar como equipe.");
             }
@@ -637,7 +637,10 @@ impl Editor<'_> {
                 .changed();
         });
         if changed {
-            self.set(field, ron::operators(&new_team, count, setup, process));
+            self.set(
+                field,
+                ron::operators_requiring(&new_team, count, setup, process, requires.as_deref()),
+            );
         }
     }
 
@@ -1265,9 +1268,15 @@ impl Editor<'_> {
                 self.operators_field(
                     ui,
                     "operators",
-                    operators
-                        .as_ref()
-                        .map(|o| (o.team.clone(), o.count, o.setup, o.process)),
+                    operators.as_ref().map(|o| {
+                        (
+                            o.team.clone(),
+                            o.count,
+                            o.setup,
+                            o.process,
+                            o.requires.clone(),
+                        )
+                    }),
                 );
             }
             ObjectKind::Combiner {

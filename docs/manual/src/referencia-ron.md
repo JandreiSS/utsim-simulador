@@ -90,6 +90,7 @@ Model(
 | `on_entry` | nenhum | script executado na entrada de cada item |
 | `visual` | nenhuma | aparência no 3D |
 | `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
+| `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift)` ([Pessoas](pessoas.md)) |
 
 ### `transfer`
 
@@ -157,7 +158,7 @@ Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de
 | `capacity` | `1` (mínimo 1) |
 | `setup` | nenhum |
 | `process` | obrigatório |
-| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true)` |
+| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None)`; `requires: "habilidade"` só aceita pessoas com ela |
 
 ### `Combiner`
 
