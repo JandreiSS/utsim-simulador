@@ -1,0 +1,50 @@
+// Uma operadora atende três máquinas automáticas (estudo de tempos e métodos, homem-máquina).
+// Cada máquina precisa da operadora "ana" só para descarregar a peça pronta e carregar a
+// próxima (o setup, entre 18 e 24 s); depois disso a máquina trabalha sozinha por 70 s
+// (tempo automático) e a operadora anda até a próxima máquina (uns 6 m a 1 m/s).
+// O estoque nunca falta: a análise mostra só a interação da operadora com as máquinas.
+//
+// Teoria (atendimento sincronizado): a ≈ 20,7 s (carga e descarga), b ≈ 6 s (caminhada),
+// t = 70 s: n' = (a + t)/(a + b) ≈ 3,4 máquinas por operadora. Com 3 máquinas o ciclo é
+// limitado pelas máquinas (a + t ≈ 91 s) e a operadora fica um pouco ociosa.
+//
+//   utsim tempos examples/homem_maquina.ron --html hm.html
+//   utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron
+//
+// Tempo em segundos, distâncias em metros.
+Model(
+    name: "Operadora com três máquinas",
+    description: "Uma operadora carrega e descarrega três máquinas automáticas, andando entre elas",
+    run: (stop_time: 7200.0, warmup: 600.0, seed: 3, replications: 3),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(5.0)), position: (3.0, 0.5, 0.0)),
+        (name: "estoque", kind: Queue(capacity: Some(6)), position: (3.0, 2.0, 0.0)),
+        (name: "maq1", kind: Processor(
+            setup: Some(Triangular(min: 18.0, mode: 20.0, max: 24.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (0.0, 0.0, 0.0)),
+        (name: "maq2", kind: Processor(
+            setup: Some(Triangular(min: 18.0, mode: 20.0, max: 24.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (6.0, 0.0, 0.0)),
+        (name: "maq3", kind: Processor(
+            setup: Some(Triangular(min: 18.0, mode: 20.0, max: 24.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (3.0, 5.0, 0.0)),
+        (name: "saida", kind: Sink, position: (3.0, 2.5, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.0), position: (1.0, 1.0, 0.0),
+            visual: Some((asset: Some("pessoa")))),
+    ],
+    connections: [
+        ("chegada", "estoque"),
+        ("estoque", "maq1"),
+        ("estoque", "maq2"),
+        ("estoque", "maq3"),
+        ("maq1", "saida"),
+        ("maq2", "saida"),
+        ("maq3", "saida"),
+    ],
+)
