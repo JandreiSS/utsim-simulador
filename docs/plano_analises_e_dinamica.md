@@ -1197,7 +1197,18 @@ Contexto: G2 (edição) e G5 (empacotamento) em andamento; G3 (rede, fluidos, re
    imagem e, na G4, a planta como referência para ancorar a realidade aumentada e o glTF do
    prédio.
 
-## 12. Decisões que precisam do dono
+## 12. Decisões do dono
+
+**Aprovadas em 2026-11-02, como propostas abaixo:**
+
+- Formato 2, com os modelos atuais migrados para `movement: Legacy`, os novos nascendo em `Free`
+  e a rede gerada gravada no `.ron`.
+- Perfil de piso "Brasil" com faixa amarela de 10 cm, larguras `L + 1,0 m` (mão única) e
+  `2L + 1,2 m` (mão dupla) e prioridade ao pedestre com parada de 2 s; perfil branco disponível.
+- A janela do PERT abre no caminho crítico observado na simulação, com o CPM clássico e o Monte
+  Carlo a um clique.
+
+Texto original das decisões:
 
 1. **Modo de movimentação padrão e formato 2.** O plano propõe subir o formato para 2, com os
    modelos atuais migrados para `movement: Legacy` (comportamento de hoje) e os modelos novos
