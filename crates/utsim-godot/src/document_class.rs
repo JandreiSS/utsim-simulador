@@ -447,6 +447,19 @@ impl UtsimDocument {
             .map_or_else(GString::new, |t| GString::from(t.as_str()))
     }
 
+    /// What differs between the model of file `got` and that of file `want` (one line
+    /// per difference, empty when they are the same model; comments and formatting do not
+    /// count). When a file cannot be read, the only line starts with `erro:`.
+    #[func]
+    fn file_differences(got: GString, want: GString) -> PackedStringArray {
+        let got = PathBuf::from(got.to_string());
+        let want = PathBuf::from(want.to_string());
+        match document::file_differences(&got, &want) {
+            Ok(lines) => strings(&lines),
+            Err(e) => strings(&[format!("erro: {e}")]),
+        }
+    }
+
     /// Objects in model order: `{name, kind, kind_label, position (Godot), model_position,
     /// mobile, problems, warnings}`.
     #[func]

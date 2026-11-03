@@ -451,7 +451,7 @@ impl Editor {
                 name: "run".into(),
                 kind: "run",
                 kind_label: "Modelo",
-                fields: schema::run_fields(&model.run),
+                fields: schema::run_fields(model),
                 problems: general(&issues),
                 warnings: general(&warnings),
                 outputs: Vec::new(),
@@ -522,6 +522,84 @@ pub fn edit_replay(model: &Model) -> Replay {
         },
         fluids: model.fluids.clone(),
     }
+}
+
+/// Compact RON of a value, for comparing two models part by part.
+fn ron_of<T: serde::Serialize>(v: &T) -> String {
+    ron::to_string(v).unwrap_or_else(|e| format!("<{e}>"))
+}
+
+/// What differs between model `got` and model `want`, in Portuguese, one line per
+/// difference (empty when they are the same model): the name, the description, the run
+/// settings, each object (by name, so the order of the list does not matter), the
+/// connections (in order: it gives the ports) and the other parts as a whole. Comments
+/// and formatting of the files do not count. The scripted check of the Godot interface
+/// compares the `.ron` it saved with an example this way.
+pub fn model_differences(got: &Model, want: &Model) -> Vec<String> {
+    let mut out = Vec::new();
+    if got.name != want.name {
+        out.push(format!("nome: {:?} em vez de {:?}", got.name, want.name));
+    }
+    if got.description != want.description {
+        out.push(format!(
+            "descrição: {:?} em vez de {:?}",
+            got.description, want.description
+        ));
+    }
+    if got.run != want.run {
+        out.push(format!(
+            "run: {} em vez de {}",
+            ron_of(&got.run),
+            ron_of(&want.run)
+        ));
+    }
+    for w in &want.objects {
+        match got.objects.iter().find(|g| g.name == w.name) {
+            None => out.push(format!("falta o objeto {}", w.name)),
+            Some(g) if g != w => out.push(format!(
+                "objeto {}: {} em vez de {}",
+                w.name,
+                ron_of(g),
+                ron_of(w)
+            )),
+            Some(_) => {}
+        }
+    }
+    for g in &got.objects {
+        if !want.objects.iter().any(|w| w.name == g.name) {
+            out.push(format!("objeto a mais: {}", g.name));
+        }
+    }
+    if got.connections != want.connections {
+        out.push(format!(
+            "ligações: {} em vez de {}",
+            ron_of(&got.connections),
+            ron_of(&want.connections)
+        ));
+    }
+    let rest = |m: &Model| {
+        let mut m = m.clone();
+        m.name.clear();
+        m.description.clear();
+        m.objects.clear();
+        m.connections.clear();
+        m.run = want.run.clone();
+        ron_of(&m)
+    };
+    if rest(got) != rest(want) {
+        out.push("outras partes do modelo (calendários, rede, fluxos, fluidos) diferem".into());
+    }
+    out
+}
+
+/// [`model_differences`] between the models of two files.
+pub fn file_differences(got: &Path, want: &Path) -> Result<Vec<String>, String> {
+    let read = |p: &Path| {
+        Document::open(p)
+            .map(|d| d.model().clone())
+            .map_err(|e| format!("{}: {e}", p.display()))
+    };
+    Ok(model_differences(&read(got)?, &read(want)?))
 }
 
 /// A model with only palette entry `id` at the origin (the ghost shown while placing).
@@ -843,6 +921,87 @@ mod tests {
         assert_eq!(back.model(), e.model());
         std::fs::remove_dir_all(&dir).ok();
         assert!(Editor::open(&dir.join("nada.ron")).is_err());
+    }
+
+    /// The steps of the scripted check `godot/roteiros/g2_tutorial_01.json`, through the
+    /// same calls the interface makes (palette, snapping, the panel's paths, connect),
+    /// give the model of `examples/tutorial_01_caixa.ron`.
+    #[test]
+    fn the_tutorial_01_is_built_from_the_palette_and_the_panel() {
+        let mut e = Editor::new("novo_modelo");
+        // Dropped near the grid points, as the mouse would.
+        for (id, x) in [
+            ("Source", 0.2),
+            ("Queue", 3.9),
+            ("Processor", 8.3),
+            ("Sink", 11.8),
+        ] {
+            let at = [snap_to(x, 1.0), snap_to(-0.3, 1.0), 0.0];
+            e.add(id, at).unwrap();
+        }
+        let set = |e: &mut Editor, object: &str, path: &str, v: Value| {
+            e.set_property(object, path, &v, &[])
+                .unwrap_or_else(|err| panic!("{object}.{path}: {err}"));
+        };
+        set(&mut e, "processo", "name", Value::Text("caixa".into()));
+        set(&mut e, "chegada", "interarrival.mean", Value::Float(5.0));
+        set(&mut e, "caixa", "process.family", Value::Int(2));
+        set(&mut e, "caixa", "process.mean", Value::Float(4.0));
+        for (a, b) in [("chegada", "fila"), ("fila", "caixa"), ("caixa", "saida")] {
+            e.connect(a, b).unwrap();
+        }
+        set(
+            &mut e,
+            "run",
+            "model_name",
+            Value::Text("Tutorial 01: um caixa".into()),
+        );
+        set(
+            &mut e,
+            "run",
+            "description",
+            Value::Text("Fila M/M/1 para comparar a simulação com a fórmula".into()),
+        );
+        set(&mut e, "run", "stop_time", Value::Float(100000.0));
+        set(&mut e, "run", "warmup", Value::Float(2000.0));
+        set(&mut e, "run", "seed", Value::Int(42));
+        set(&mut e, "run", "replications", Value::Int(10));
+        assert!(e.doc.issues().is_empty(), "{:?}", e.doc.issues());
+        let dir = std::env::temp_dir().join(format!("utsim-godot-t01-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let saved = dir.join("tutorial_01.ron");
+        e.doc.save_as(&saved).unwrap();
+        let example =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/tutorial_01_caixa.ron");
+        let diff = file_differences(&saved, &example).unwrap();
+        assert!(diff.is_empty(), "{diff:#?}");
+        // One change shows up as one line.
+        set(&mut e, "caixa", "process.mean", Value::Float(3.0));
+        let diff = model_differences(e.model(), Editor::open(&example).unwrap().model());
+        assert_eq!(diff.len(), 1, "{diff:?}");
+        assert!(diff[0].starts_with("objeto caixa:"), "{diff:?}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn differences_name_what_changed() {
+        let a = line();
+        let mut b = line();
+        assert!(model_differences(a.model(), b.model()).is_empty());
+        b.remove(&names(&["saida"])).unwrap();
+        b.doc
+            .apply(Command::SetInfo {
+                name: "outro".into(),
+                description: String::new(),
+            })
+            .unwrap();
+        let diff = model_differences(b.model(), a.model());
+        assert!(diff.iter().any(|d| d.starts_with("nome:")), "{diff:?}");
+        assert!(diff.iter().any(|d| d == "falta o objeto saida"), "{diff:?}");
+        assert!(diff.iter().any(|d| d.starts_with("ligações:")), "{diff:?}");
+        let diff = model_differences(a.model(), b.model());
+        assert!(diff.iter().any(|d| d == "objeto a mais: saida"), "{diff:?}");
+        assert!(file_differences(Path::new("nada.ron"), Path::new("nada.ron")).is_err());
     }
 
     #[test]

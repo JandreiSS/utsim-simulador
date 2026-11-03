@@ -8,6 +8,13 @@
 ## block is hit when the ray crosses the box of its footprint and height. Clicking again
 ## at the same point walks through the blocks under it. Connections are hit within a
 ## few pixels of their line on screen.
+##
+## Connecting: each block that can send items has an output port (a green mark on its
+## `+x` side) and each one that can receive has an input port (on its `-x` side). The
+## ports show on the selected blocks and on the block under the mouse; dragging from an
+## output port to another block (or to its input port) connects them. The Ligar tool (L)
+## does the same by dragging from block to block, or by clicking the origin and then the
+## destination.
 class_name EditorUtsim
 extends Node3D
 
@@ -20,6 +27,13 @@ const LINK := Color(0.62, 0.72, 0.88)
 const LINK_LOGICAL := Color(0.50, 0.55, 0.62)
 const LINK_SELECTED := Color(1.0, 0.85, 0.30)
 const CONNECTING := Color(0.45, 0.95, 0.55)
+const PORT_OUT := Color(0.45, 0.95, 0.55)
+const PORT_IN := Color(0.55, 0.80, 1.0)
+const PORT_PIXELS := 14.0
+## Kinds without an output port (a sink only receives; mobile resources are not wired
+## by ports) and without an input port (a source only sends).
+const NO_OUTPUT := ["Sink", "Transporter", "Dispatcher"]
+const NO_INPUT := ["Source", "Transporter", "Dispatcher"]
 
 var main: Node
 ## Selected objects, the primary one first.
@@ -51,6 +65,7 @@ var _ghosts := {}
 var _ghost: Node3D
 var _connections: Array = []
 var _objects: Array = []
+var _hover := ""
 
 
 func setup(owner_main: Node, canvas: CanvasLayer) -> void:
@@ -267,6 +282,77 @@ func block_screen(name: String) -> Variant:
 	return camera().unproject_position(c)
 
 
+func _kind_of(i: int) -> String:
+	return String(cena().blocks[i].get("kind", ""))
+
+
+## The output port of block `name` (a floor point on its `+x` side), or null when the
+## block has none.
+func port_out(name: String) -> Variant:
+	var i := cena().block_index(name)
+	if i < 0 or NO_OUTPUT.has(_kind_of(i)):
+		return null
+	var box := _box_of(i)
+	return Vector3(box.end.x + 0.25, 0.06, box.get_center().z)
+
+
+## The input port of block `name` (on its `-x` side), or null.
+func port_in(name: String) -> Variant:
+	var i := cena().block_index(name)
+	if i < 0 or NO_INPUT.has(_kind_of(i)):
+		return null
+	var box := _box_of(i)
+	return Vector3(box.position.x - 0.25, 0.06, box.get_center().z)
+
+
+## Blocks whose ports are drawn and can be grabbed: the selection and the block under
+## the mouse.
+func _port_blocks() -> Array:
+	var out := selected.duplicate()
+	if _hover != "" and not out.has(_hover):
+		out.append(_hover)
+	return out
+
+
+func _near(world: Variant, p: Vector2) -> bool:
+	if world == null or camera().is_position_behind(world):
+		return false
+	return camera().unproject_position(world).distance_to(p) <= PORT_PIXELS
+
+
+## The block under the mouse, or whose output port is under it (the port sticks out of
+## the block), or "".
+func _hover_at(p: Vector2) -> String:
+	var hits := hits_at(p)
+	if not hits.is_empty():
+		return hits[0]
+	for o in _objects:
+		if _near(port_out(o["name"]), p):
+			return o["name"]
+	return ""
+
+
+## The block whose output port is under screen point `p`, or "".
+func port_at(p: Vector2) -> String:
+	for n in _port_blocks():
+		if _near(port_out(n), p):
+			return n
+	return ""
+
+
+## The block a connection dragged from `from` lands on at screen point `p`: an input port
+## under the point, else the nearest block under it that is not `from`; "" for none.
+func drop_target(p: Vector2, from: String) -> String:
+	for o in _objects:
+		var n: String = o["name"]
+		if n != from and _near(port_in(n), p):
+			return n
+	for n in hits_at(p):
+		if n != from:
+			return n
+	return ""
+
+
 static func _segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 	var ab := b - a
 	var len2 := ab.length_squared()
@@ -358,7 +444,9 @@ func _input(event: InputEvent) -> void:
 			main.set_status("Colocação cancelada: solte o objeto sobre o chão.")
 		else:
 			_place(id, mouse, mb.shift_pressed)
-		get_viewport().set_input_as_handled()
+		# The release still goes to the GUI: the library button that took the press keeps
+		# the mouse until it sees the release (its tooltip would stay up and eat the next
+		# Esc). It does not arm the entry again, the drag already cleared it.
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -367,6 +455,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		mouse = mm.position
+		_hover = _hover_at(mm.position)
 		if not _press.is_empty() and (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			_on_drag(mm.position)
 		return
@@ -403,9 +492,16 @@ func _on_press(p: Vector2, shift: bool) -> void:
 	if tool == "colocar":
 		_place(place_id, p, shift)
 		return
+	var port := port_at(p) if connect_from == "" else ""
+	if port != "":
+		_begin_link(p, port, false)
+		return
 	var hits := hits_at(p)
 	if tool == "ligar":
-		_connect_click(hits)
+		if connect_from == "" and not hits.is_empty():
+			_begin_link(p, hits[0], true)
+		else:
+			_connect_click(hits)
 		return
 	_press = {"pos": p, "shift": shift, "kind": "floor", "name": ""}
 	if hits.is_empty():
@@ -434,6 +530,36 @@ func _on_press(p: Vector2, shift: bool) -> void:
 		select_only(name)
 
 
+## A connection begun at block `from` (its output port, or the block itself with the Ligar
+## tool): it is made where the mouse is released, or, after a plain click, on the next
+## click (the Ligar tool stays on).
+func _begin_link(p: Vector2, from: String, from_tool: bool) -> void:
+	_press = {"pos": p, "shift": false, "kind": "link", "name": from, "tool": from_tool}
+	connect_from = from
+	main.set_status("Ligar: solte sobre o destino (ou clique nele). Esc cancela.")
+
+
+func _finish_link(p: Vector2, press: Dictionary) -> void:
+	var from: String = press["name"]
+	if not press.get("moved", false):
+		# A click: wait for the destination with the Ligar tool.
+		if tool != "ligar":
+			set_tool("ligar")
+		connect_from = from
+		main.set_status("Ligar: %s → clique no destino (Esc cancela)." % from)
+		return
+	var to := drop_target(p, from)
+	connect_from = ""
+	if to == "":
+		main.set_status("Ligação cancelada: solte sobre o bloco de destino.")
+		return
+	if doc().connect_objects(from, to):
+		main.after_edit()
+		main.set_status("Ligado: %s → %s." % [from, to])
+	else:
+		main.set_status("Não ligou: %s" % doc().last_error())
+
+
 func _connect_click(hits: Array) -> void:
 	if hits.is_empty():
 		main.set_status("Ligar: clique em um bloco.")
@@ -457,6 +583,8 @@ func _on_drag(p: Vector2) -> void:
 	if not _dragging and not _box and p.distance_to(start) < DRAG_PIXELS:
 		return
 	match _press["kind"]:
+		"link":
+			_press["moved"] = true
 		"block":
 			if _press["shift"]:
 				return
@@ -515,6 +643,9 @@ func _on_release(p: Vector2) -> void:
 		return
 	var press := _press
 	_press = {}
+	if press["kind"] == "link":
+		_finish_link(p, press)
+		return
 	if _dragging:
 		_dragging = false
 		doc().end_drag()
@@ -705,8 +836,16 @@ func _redraw() -> void:
 				k += 1
 		for j in range(k, _ports.size()):
 			_ports[j].visible = false
-		if tool == "ligar" and connect_from != "":
-			var a = block_position(connect_from)
+		for n in _port_blocks():
+			_port_mark(port_out(n), PORT_OUT)
+			_port_mark(port_in(n), PORT_IN)
+		if connect_from != "":
+			for o in _objects:
+				if o["name"] != connect_from:
+					_port_mark(port_in(o["name"]), PORT_IN)
+			var a = port_out(connect_from)
+			if a == null:
+				a = block_position(connect_from)
 			var b = floor_at(mouse)
 			if a != null and b != null:
 				var pa: Vector3 = a
@@ -715,6 +854,19 @@ func _redraw() -> void:
 				pb.y = 0.06
 				_arrow(pa, pb, CONNECTING, 0.07)
 	_mesh.surface_end()
+
+
+## A port: a small diamond on the floor.
+func _port_mark(at: Variant, color: Color) -> void:
+	if at == null:
+		return
+	var c: Vector3 = at
+	var r := 0.18
+	var pts := [c + Vector3(r, 0, 0), c + Vector3(0, 0, r), c + Vector3(-r, 0, 0), c + Vector3(0, 0, -r)]
+	for k in [[0, 1, 2], [0, 2, 3]]:
+		for j in k:
+			_mesh.surface_set_color(color)
+			_mesh.surface_add_vertex(pts[j])
 
 
 func _port_label(k: int, at: Vector3, text: String, color: Color) -> void:

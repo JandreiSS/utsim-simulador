@@ -252,6 +252,7 @@ pub const S_OUTPUT: &str = "Saída";
 pub const S_DOWNTIME: &str = "Quebras e turnos";
 pub const S_LOOK: &str = "Aparência";
 pub const S_RUN: &str = "Simulação";
+pub const S_MODEL: &str = "Modelo";
 
 /// Portuguese name of an object kind.
 pub fn kind_label(kind: &ObjectKind) -> &'static str {
@@ -1383,10 +1384,26 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     out
 }
 
-/// The `run` settings, edited as object `"run"`.
-pub fn run_fields(run: &RunSettings) -> Vec<Field> {
+/// The model's name and description and its `run` settings, edited as object `"run"`.
+pub fn run_fields(model: &Model) -> Vec<Field> {
     let s = S_RUN;
+    let run: &RunSettings = &model.run;
     vec![
+        Field::new(
+            S_MODEL,
+            "model_name",
+            "Nome do modelo",
+            FieldType::Text,
+            Value::Text(model.name.clone()),
+        ),
+        Field::new(
+            S_MODEL,
+            "description",
+            "Descrição",
+            FieldType::Script,
+            Value::Text(model.description.clone()),
+        )
+        .help("Texto livre sobre o modelo, gravado no arquivo."),
         float(s, "stop_time", "Tempo de simulação", run.stop_time).min(0.001),
         float(s, "warmup", "Aquecimento", run.warmup)
             .min(0.0)
@@ -1701,7 +1718,7 @@ const TEXT_FIELDS: [&str; 3] = ["transport", "on_entry", "output"];
 /// `value`. Nothing is applied here: the document validates the command.
 pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Command, String> {
     if object == "run" {
-        return edit_run(path, value);
+        return edit_run(model, path, value);
     }
     let obj = model
         .objects
@@ -1837,7 +1854,23 @@ fn edit_shift_source(model: &Model, obj: &ObjectDef, value: &Value) -> Result<Co
     Ok(set(&obj.name, "shifts", text))
 }
 
-fn edit_run(path: &str, value: &Value) -> Result<Command, String> {
+fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String> {
+    let text = |v: &Value| v.as_text().map(str::to_string).ok_or("texto esperado");
+    match path {
+        "model_name" => {
+            return Ok(Command::SetInfo {
+                name: text(value)?,
+                description: model.description.clone(),
+            });
+        }
+        "description" => {
+            return Ok(Command::SetInfo {
+                name: model.name.clone(),
+                description: text(value)?,
+            });
+        }
+        _ => {}
+    }
     let text = match path {
         "stop_time" | "warmup" => ron::float(f64_of(value, path)?),
         "seed" => usize_of(value, path, 0)?.to_string(),
@@ -2011,7 +2044,7 @@ mod tests {
                     n += 1;
                 }
             }
-            for f in run_fields(&d.model().run) {
+            for f in run_fields(d.model()) {
                 let before = d.model().clone();
                 apply(&mut d, "run", &f.path, f.value.clone());
                 assert_eq!(d.model(), &before, "run.{}", f.path);

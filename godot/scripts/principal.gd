@@ -366,13 +366,13 @@ func _build_ui() -> void:
 	_props.action.connect(func(what): arrange_action(what))
 	_props.gesture_ended.connect(func():
 		doc.end_gesture()
-		after_edit())
+		after_edit.call_deferred())
 	_props.reorder.connect(func(k, delta):
 		if doc.move_connection(editor.selected[0], k, delta):
-			after_edit())
+			after_edit.call_deferred())
 	_props.disconnect_output.connect(func(to):
 		if doc.disconnect_objects(editor.selected[0], to):
-			after_edit())
+			after_edit.call_deferred())
 	_props_scroll.add_child(_props)
 
 	_bottom = _panel("BarraInferior")
@@ -717,17 +717,6 @@ func _show_properties() -> void:
 		extra = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
 	_props.show_properties(props, extra)
 	_props_scroll.scroll_vertical = scroll
-	_debug_widths.call_deferred()
-
-
-func _debug_widths() -> void:
-	for c in _props.get_children():
-		var w := (c as Control).get_combined_minimum_size().x
-		if w > 300:
-			var parts := []
-			for g in c.get_children():
-				parts.append("%s:%s=%d" % [g.get_class(), g.name, (g as Control).get_combined_minimum_size().x])
-			print("LARGO ", c.get_class(), " ", c.name, " ", w, " ", parts)
 
 
 func _show_link(link: Array) -> void:
@@ -757,11 +746,11 @@ func _on_property_edited(path: String, value: Variant) -> void:
 			editor.selected[0] = String(value).strip_edges()
 		if not path.begins_with("visual.color"):
 			doc.end_gesture()
-		after_edit()
+		after_edit.call_deferred()
 		set_status("%s: %s alterado." % [name, path])
 	else:
 		set_status("Não alterou %s: %s" % [path, doc.last_error()])
-		_show_properties()
+		_show_properties.call_deferred()
 
 
 ## The actions of the "Organizar" menu and of the keyboard shortcuts.
@@ -1139,3 +1128,4 @@ func focus_block(name: String, distance: float, yaw: Variant = null, pitch: Vari
 		return false
 	camera.focus(cena.block_focus(i), distance, yaw, pitch)
 	return true
+

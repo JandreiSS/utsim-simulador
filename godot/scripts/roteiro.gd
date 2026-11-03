@@ -7,6 +7,10 @@
 ## path is the capture folder. Quits at the end (exit code 1 on any failure) and writes
 ## the log to `<pasta>/log.txt`.
 ##
+## Without a window (`godot --headless ...`, as `scripts/godot_teste.sh` runs the UI
+## scripts) the steps run the same way, with the same input events, but nothing is drawn:
+## `capturar` is skipped (logged) and only the checks count.
+##
 ## 1. Captures of models (phase G1): `modelos` lists models; for each one it opens the
 ##    model, runs the replications, then for each capture jumps to `t`, optionally aims the
 ##    camera (`focar`, the same numbers as the `Focar` step of the Bevy viewer's scripts)
@@ -40,8 +44,9 @@
 ##    A target (<alvo>) is one of: `{"ponto": [x, y]}` (pixels), `{"controle": "Nome"}`
 ##    (a control by node name, its centre), `{"chao": [x, y]}` (a floor point in model
 ##    plan coordinates), `{"objeto": "nome"}` (where a block is drawn),
-##    `{"item": ["Lista", 0]}` (an item of an ItemList) or
-##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line).
+##    `{"item": ["Lista", 0]}` (an item of an ItemList),
+##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
+##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's ports).
 extends Node
 
 var _out := ""
@@ -99,6 +104,12 @@ func _run(script_path: String) -> void:
 	if _out == "":
 		_out = _resolve(_base, data.get("saida", "capturas"))
 	DirAccess.make_dir_recursive_absolute(_out)
+	if headless():
+		# Without a window the root viewport is tiny: give it the project's size, so the
+		# panels and the 3D view are laid out as on screen and the targets land the same.
+		get_tree().root.size = Vector2i(
+			int(ProjectSettings.get_setting("display/window/size/viewport_width", 1600)),
+			int(ProjectSettings.get_setting("display/window/size/viewport_height", 900)))
 	await _frames(5)
 	_main = get_tree().current_scene
 	if _main == null or not _main.has_method("open_model"):
@@ -158,7 +169,15 @@ func _run_models(models: Array) -> void:
 			await _measure(_main, m["medir"], path.get_file())
 
 
+## Whether the project runs without a window (`--headless`): nothing to capture.
+static func headless() -> bool:
+	return DisplayServer.get_name() == "headless"
+
+
 func _capture(name: String) -> void:
+	if headless():
+		_say("captura %s pulada (sem janela)" % name)
+		return
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	var file := _out.path_join(name + ".png")
@@ -255,6 +274,8 @@ func _step(s: Dictionary, k: int) -> void:
 				(c as LineEdit).select_all()
 			elif c is SpinBox:
 				(c as SpinBox).get_line_edit().select_all()
+			elif c is TextEdit:
+				(c as TextEdit).select_all()
 		for ch in String(s["digitar"]):
 			await _key(KEY_NONE, ch.unicode_at(0), false, false, false)
 		if s.get("enter", true):
@@ -327,6 +348,13 @@ func _target(t: Variant) -> Variant:
 		return cam.unproject_position(p)
 	if d.has("objeto"):
 		return _main.editor.block_screen(d["objeto"]) if _main.is_editing() else null
+	if d.has("porta_saida") or d.has("porta_entrada"):
+		var out := d.has("porta_saida")
+		var name: String = d["porta_saida"] if out else d["porta_entrada"]
+		var at = _main.editor.port_out(name) if out else _main.editor.port_in(name)
+		if at == null or cam.is_position_behind(at):
+			return null
+		return cam.unproject_position(at)
 	if d.has("ligacao"):
 		var l: Array = d["ligacao"]
 		var a = _main.editor.block_position(l[0])
@@ -466,8 +494,10 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `ligado` ([de, para]), `nao_ligado`, `problemas` (count), `sujo` (bool), `selecao`
 ## (names, primary first), `modo`, `campo` ({objeto, campo, valor}: the RON text),
 ## `posicao` ({objeto, x, y, tolerancia}: model plan coordinates), `arquivo` ({caminho,
-## contem: [...]}), `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`,
-## `pode_desfazer`, `pode_refazer`, `ferramenta`.
+## contem: [...]}), `igual_a` ({arquivo, modelo}: the saved file holds the same model as
+## the reference, comments and formatting aside; each difference is a failure),
+## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
+## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or "").
 func _check(c: Dictionary, k: int) -> void:
 	var doc: Object = _main.doc
 	var objects: Array = doc.objects()
@@ -533,6 +563,18 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("arquivo %s" % path, text != "", "vazio ou ausente")
 				for piece in want.get("contem", []):
 					report.call("arquivo contém %s" % piece, text.contains(piece), path)
+			"igual_a":
+				var got := _resolve(_base, String(want["arquivo"]))
+				var ref := _resolve(_base, String(want["modelo"]))
+				var diff: PackedStringArray = _main.doc.file_differences(got, ref)
+				for d in diff:
+					report.call("%s igual a %s" % [got.get_file(), ref.get_file()], false, d)
+			"foco":
+				var owner := get_viewport().gui_get_focus_owner()
+				var focused: String = String(owner.name) if owner != null else ""
+				report.call("foco", focused == want, focused)
+			"ligando":
+				report.call("ligando", _main.editor.connect_from == want, _main.editor.connect_from)
 			"status_contem":
 				var status: String = _main._status.text
 				report.call("status contém %s" % want, status.contains(want), status)
