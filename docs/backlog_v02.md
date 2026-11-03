@@ -79,6 +79,7 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 | Biblioteca Python (PyO3) para rodar modelos e ler resultados em notebooks | Opus |
 | Conectores MQTT e banco SQL, além do OPC UA que já existe | Sonnet |
 | Gêmeo digital: modelo alimentado por dados ao vivo e comparação com o real | Opus |
+| Protocolo próprio para placas (ESP32, Arduino, Raspberry Pi e placas do dono) enviarem dados direto ao UTSim: conversar o desenho com o dono antes (transporte, formato, autenticação, biblioteca para as placas) | Opus |
 
 ## Interface, ativos 3D e conteúdo
 
