@@ -27,6 +27,7 @@
 
 # Recursos avançados
 
+- [Simular a partir de um estado](estado-inicial.md)
 - [Emulação OPC UA](emulacao-opcua.md)
 - [Aprendizado por reforço](aprendizado-por-reforco.md)
 - [3D realista e aparência](visual-3d.md)

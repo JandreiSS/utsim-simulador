@@ -1,0 +1,26 @@
+// Estado inicial para examples/turnos.ron: a linha às 21h30, com as filas cheias.
+//
+//   utsim run examples/turnos.ron --estado examples/estados/turnos_21h30.ron
+//
+// No modelo, t = 0 é 06h00 e o tempo está em minutos; 21h30 é o minuto 930 do dia
+// (clock). Às 22h (t = 30) começa o fim do expediente, então a rodada começa com meia hora
+// de trabalho, para à noite e volta às 06h. Sem "warmup", a rodada não tem aquecimento: o
+// estado já é a linha em operação.
+InitialState(
+    clock: 930.0,
+    objects: {
+        // 20 peças esperando (a capacidade da fila), sem idade conhecida.
+        "fila": (count: 20),
+        // O corte está no meio de uma peça: já passou 1,5 minuto de um tempo Triangular(2, 3, 5).
+        // O que falta é sorteado condicionado a esses 1,5 minuto.
+        "corte": (items: [(phase: Processing, elapsed: 1.5)]),
+        // Três peças esperando a montagem, com os minutos que já esperaram e um rótulo.
+        "fila_montagem": (items: [
+            (elapsed: 12.0, labels: {"lote": 7.0}),
+            (elapsed: 8.0, labels: {"lote": 7.0}),
+            (elapsed: 2.5, labels: {"lote": 8.0}),
+        ]),
+        // A montagem está ocupada há 3 minutos (Exp não tem memória: o restante é Exp(4)).
+        "montagem": (items: [(elapsed: 3.0)], off_shift: false),
+    },
+)

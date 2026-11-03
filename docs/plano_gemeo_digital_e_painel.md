@@ -255,6 +255,34 @@ zero, usado também pelos turnos e pelo painel para mostrar horas reais).
 
 ### 1.5 Estado inicial a partir do real (núcleo)
 
+*Feito no núcleo, no modelo e na CLI (níveis 1 e 2, adiantado pela decisão D13; manual
+"Simular a partir de um estado").* Notas da implementação:
+- [x] Formato: arquivo `InitialState` à parte do modelo (`utsim_model::state`), com `clock`
+  (instante do calendário em `t = 0`, no lugar de `shifts_clock`), `warmup` opcional (padrão 0)
+  e `objects` por nome. Cada objeto é um `BlockState` com campos opcionais (`count`, `items`,
+  `down`, `up`, `off_shift`, `position`, `elapsed`, `levels`), em vez de uma variante por tipo;
+  os tempos são **decorridos** (`elapsed`, `stay`, `age`), não instantes negativos
+  (`entered: -340`), para que gravar e retomar usem a mesma estrutura.
+- [x] Kernel: `Simulation::set_start_state` (no lugar de `with_initial_state`),
+  `Behavior::restore(&mut self, cx, &BlockState)` que recusa por padrão e
+  `Behavior::save_state`; `Simulation::save_state` grava o estado num instante. Blocos:
+  `Queue`, `Processor` (setup, processando, pronto; com operadores, a equipe é pedida de
+  novo), `Source` (relógio de chegadas e item parado), `Conveyor` (posições), `Rack`
+  (posições e permanência), `Transporter` (posição), quebras (`down`, `up`), turnos e
+  chegadas por período pelo `clock`, tanques (como `initial`). `Sink`, `Combiner`,
+  `Separator`, `Dispatcher` e fluxos recusam itens.
+- [x] Residual condicional: `Dist::sample_residual` com o método de cada distribuição
+  (`crates/utsim-core/src/residual.rs`); inversão numérica por bisseção sobre a sobrevivência
+  exata (funções especiais copiadas para o `utsim-core`, que não pode depender do
+  `utsim-stats`), e não Brent; elapsed além do suporte dá residual 0 e aviso.
+- [x] CLI: `utsim run --estado arquivo` e `--salvar-estado T arquivo` (replicação 0).
+- [x] Testes (`crates/utsim-model/tests/estado_inicial.rs`): casos exatos, retomada exata de
+  um modelo determinístico e compatível de um aleatório, M/M/1 cheio converge, validação,
+  estado vazio idêntico; residual conferido contra integração numérica (Weibull, Gamma,
+  Triangular e as outras); golden inalterados.
+- [ ] Rastro `Init`: não feito; os itens pré-carregados aparecem como `Created` em `t = 0`.
+- [ ] Nível 3 (itens identificados pelo MES) e conteúdo de `Combiner`, `Separator` e fluxos.
+
 Hoje toda rodada começa com o sistema vazio. A previsão e o início do modo sincronizado exigem
 começar de um estado dado. É a maior mudança no núcleo deste plano.
 
@@ -479,7 +507,7 @@ utsim run modelo.ron --estado-inicial estado_6h.ron --replicacoes 40       # est
 | T2 conectores: arquivo/histórico (3–4), MQTT (4–5), Sparkplug B (4–6), cliente OPC UA com assinatura e histórico (5–7), SQL (2–3), Modbus TCP (2–3) | 20–28 | Sonnet (Sparkplug e OPC UA com revisão Opus) |
 | T3 modo sombra e gêmeo livre no laço (`TwinFrontend`) | 5–7 | Sonnet |
 | T4 modo sincronizado: fonte guiada, paradas reais, `Set` de parâmetros, reconciliação de WIP | 10–14 | Opus |
-| T5 estado inicial no kernel (níveis 1 e 2, blocos principais, rastro `Init`) | 18–26 | Opus |
+| T5 estado inicial no kernel (níveis 1 e 2, blocos principais, rastro `Init`) — **feito**, menos o rastro `Init` | 18–26 | Opus |
 | T6 previsão à frente com replicações, "e se" pareado, `run.start_at` | 8–11 | Opus |
 | T7 calibração: conjuntos derivados, ajuste, sugestão, atualização conjugada | 8–11 | Opus |
 | T8 desvio: posto entre replicações, CUSUM/EWMA, KS/AD/Mann–Whitney, BH, menor desvio detectável | 8–11 | Opus |
@@ -1060,7 +1088,7 @@ estatística P1–P3) e `utsim-emu/src/runner.rs` (T3/T4).
 | T2 conectores MQTT, Sparkplug B, cliente OPC UA | Sonnet (revisão Opus) | T1 |
 | T3 modo sombra + T10 CLI + reprodução de histórico | Sonnet | T1, T2 (arquivo) |
 | D4, D5, D8, D9 visões, exportação e configuração do painel | Sonnet | D2, D3 |
-| T5 estado inicial no kernel | Opus | formato 2 (ordem do `plano_analises_e_dinamica.md`, item 2), para conferir os golden uma vez; não roda junto com "capacidade por hora do dia" nem com conflitos determinísticos (mesmos arquivos do kernel) |
+| T5 estado inicial no kernel (**feito**, sem mudar o formato do modelo: arquivo à parte) | Opus | formato 2 (ordem do `plano_analises_e_dinamica.md`, item 2), para conferir os golden uma vez; não roda junto com "capacidade por hora do dia" nem com conflitos determinísticos (mesmos arquivos do kernel) |
 | E4, E5 CEP e mudança | Opus | E7 |
 
 **Leva 3 (depois da G3 e de T5)**

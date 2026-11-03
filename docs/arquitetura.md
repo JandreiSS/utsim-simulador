@@ -197,6 +197,51 @@ contêiner (`item.container`, `contêiner.contents`). `ctx.unpack(contêiner)` d
 itens ao bloco atual. Um contêiner conta como **um** item no conteúdo. Destruir um
 contêiner destrói o que está dentro. `ctx.clone_item` copia rótulos e o instante de criação.
 
+### Estado inicial e retomada (`utsim_core::init`, `utsim_model::state`)
+Uma rodada pode partir de um estado dado em vez do sistema vazio
+(`Simulation::set_start_state(StartState)`, antes do primeiro evento). O `StartState` traz o
+relógio do calendário em `t = 0` (`clock`) e, por bloco, um `BlockState`: itens (`count` ou
+`items` com `elapsed`, `stay`, `age`, rótulos, `phase`, `at`, `slot`), `down`/`up` (quebra em
+curso ou tempo desde o último reparo), `off_shift` (só conferência), `position` (transportador),
+`elapsed` (relógio de chegadas da fonte) e `levels` (tanques). Os tempos são sempre
+decorridos, nunca instantes absolutos.
+
+Em `start`, depois do `reset` de todos os blocos, o kernel cria os itens dentro de cada bloco
+(com `entered_at = -stay` e `created_at = -age`, contados no conteúdo desde `t = 0`, não como
+entradas) e chama `Behavior::restore(cx, &BlockState)`, em que o bloco refaz os próprios
+relógios: o Processor recomeça cada fase pelo tempo residual (com operadores, pede a equipe de
+novo), a Queue recebe os itens como se tivessem chegado, a Conveyor monta a esteira com as
+posições, o Rack ocupa as posições e sorteia o residual da permanência, a Source reagenda a
+chegada pelo residual do intervalo, o Transporter fica parado na posição dada. O padrão de
+`restore` **recusa** qualquer parte do estado que seja do bloco: um tipo novo nunca aceita um
+estado que não entende. Depois o kernel aplica as quebras (`down`: parada com reparo residual
+do `mttr`; `up`: próxima falha pelo residual do `mtbf`) e os turnos na fase
+`clock mod period` (uma janela já aberta começa aberta, com o tempo que falta; `Finish` com
+trabalho em curso entra fechando). A Source usa `Ctx::calendar_start` para começar o ciclo das
+chegadas por período no mesmo ponto. Problemas viram erros de modelo em `begin`.
+
+O residual é `Dist::sample_residual(a, rng)`: um sorteio de `X - a` dado `X > a`, do *stream*
+do bloco (ou do *stream* de quebras), com o método de cada família documentado em
+`crates/utsim-core/src/residual.rs` (sem memória para `Exp` e `Geometric`, fórmula fechada para
+`Weibull` e `LogLogistic`, inversa da acumulada para `Triangular` e `Empirical`, inversão
+numérica da sobrevivência exata para as outras contínuas, massa renormalizada para as
+discretas). `Dist::survival` e `Dist::can_exceed` servem aos avisos de dado inconsistente.
+
+O caminho inverso é `Simulation::save_state`: o kernel escreve os itens de cada bloco com os
+tempos e rótulos, `down`/`up`, e chama `Behavior::save_state`, em que o bloco completa o que só
+ele sabe (fases e trabalho feito, posições na esteira, posições no porta-paletes, posição do
+transportador, relógio de chegadas, níveis dos tanques); `clock` sai como
+`clock de partida + agora`. O que não cabe (itens em viagem, embalados ou carregados) vira nota.
+No modelo, `InitialState` é o arquivo (`estado.ron`, nomes em vez de ids); os níveis dos
+tanques entram como `initial` dos tanques, e o aquecimento é `warmup` do arquivo (padrão 0).
+`Model::check_state` valida nomes e campos e monta a replicação 0 até o `begin`, para que os
+erros do kernel apareçam antes de rodar. Sem estado nada muda: com `clock = 0` os turnos e as
+chegadas são agendados exatamente como antes, e os snapshots golden ficam iguais.
+
+> **Nosso jeito:** tempos decorridos no arquivo (e não instantes negativos) para que gravar e
+> retomar sejam a mesma estrutura; o rastro não ganhou um registro `Init`: os itens
+> pré-carregados aparecem como `Created` em `t = 0`.
+
 ## 4c. Rastro e replay (fase 2)
 Com `enable_trace`, o kernel registra um `TraceEvent` para cada criação, movimento,
 empacotamento, desempacotamento, destruição e mudança de estado, com o instante e na
