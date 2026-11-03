@@ -75,7 +75,8 @@ enum Cmd {
     Check { model: PathBuf },
     /// Análises de saída: aquecimento, precisão, lotes, lei de Little e gargalo móvel
     ///
-    /// Sem nenhuma opção de análise, roda todas menos as médias em lotes.
+    /// Sem nenhuma opção de análise, roda todas menos as médias em lotes. Comparação de cenários,
+    /// correlação, mapa de calor e exportação das observações só rodam quando pedidas.
     Analisar {
         model: PathBuf,
         /// Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
@@ -99,7 +100,7 @@ enum Cmd {
         /// Medida para aquecimento e lotes: objeto.medida (ex.: saida.time_in_system)
         #[arg(long)]
         medida: Option<String>,
-        /// Métrica para --precisao (repetível; padrão: ocupações, conteúdos e tempos)
+        /// Métrica para --precisao, --comparar e --correlacao (repetível; padrão: ocupações, conteúdos e tempos)
         #[arg(long)]
         metrica: Vec<String>,
         /// Janela da média móvel de Welch

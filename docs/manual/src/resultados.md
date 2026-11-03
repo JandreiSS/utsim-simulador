@@ -256,7 +256,7 @@ Quando todos os recursos têm os mesmos turnos, os dois costumam apontar o mesmo
 
 ## Análises de saída (`utsim analisar`)
 
-O `utsim analisar` responde a duas perguntas: quanto confiar nos números e onde está o gargalo ao longo do tempo. Cada opção roda as replicações de que precisa. Sem nenhuma opção, o comando roda o aquecimento, a precisão a 2%, a lei de Little e o gargalo móvel.
+O `utsim analisar` responde a três grupos de perguntas: quanto confiar nos números, onde está o gargalo ao longo do tempo e como comparar cenários e medidas. Cada opção roda as replicações de que precisa. Sem nenhuma opção, o comando roda o aquecimento, a precisão a 2%, a lei de Little e o gargalo móvel; as opções de comparação, correlação, mapa de calor e exportação só rodam quando pedidas.
 
 ```bash
 utsim analisar modelo.ron --aquecimento
@@ -264,6 +264,10 @@ utsim analisar modelo.ron --precisao 2%
 utsim analisar modelo.ron --lotes
 utsim analisar modelo.ron --little
 utsim analisar modelo.ron --gargalo-movel
+utsim analisar modelo.ron --comparar experimento.ron
+utsim analisar modelo.ron --correlacao
+utsim analisar modelo.ron --mapa-calor mapa.svg [--celula 0.5] [--por recurso|classe]
+utsim analisar modelo.ron --exportar-observacoes observacoes.csv
 ```
 
 Opções comuns: `--confianca 90%` muda o nível dos intervalos (o padrão é 95%, com os mesmos números do `utsim run`), `-n` e `--stop` sobrescrevem `run.replications` e `run.stop_time`, e `--json arquivo.json` grava tudo o que foi calculado.
@@ -302,3 +306,25 @@ O gargalo pela ocupação média não mostra que o gargalo pode mudar de lugar a
 - quando o período do gargalo atual se sobrepõe ao do próximo, a sobreposição é **gargalo compartilhado** dos dois, e o resto é **gargalo único**.
 
 A tabela mostra, por recurso, a fração do tempo como gargalo único e como compartilhado, do mais gargalo para o menos. Um recurso que é sempre o gargalo único é o lugar certo para investir. Se dois recursos dividem o tempo de gargalo, melhorar só um deles rende pouco.
+
+### Comparar vários cenários (`--comparar`)
+
+`--comparar experimento.ron` lê um arquivo no formato do `utsim experiment` (veja [Experimentos e otimização](experimentos-e-otimizacao.md)) e roda os cenários sobre o modelo da linha de comando, todos com as mesmas sementes. Para cada medida (as `measures` do experimento, as de `--metrica` ou, sem nenhuma, ocupações, conteúdos, permanências e tempos no sistema, as que mudam entre cenários primeiro), o comando mostra a média de cada cenário e três testes:
+
+- **ANOVA de um fator**: os cenários diferem em alguma coisa? A estatística `F` compara a variação entre cenários com a variação dentro deles; o valor-p vem da distribuição F. Um p abaixo de 1 menos o nível de confiança (0,05 a 95%) diz que há diferença.
+- **Tukey HSD**: quais pares diferem? Os intervalos das diferenças valem todos juntos ao nível de confiança, pelo quantil da amplitude estudentizada (calculado por integração numérica, conferido com as tabelas publicadas). Com tamanhos diferentes entra a variante de Tukey-Kramer. O Tukey trata os cenários como independentes.
+- **Pares com Bonferroni**: a leitura recomendada quando os cenários usam as mesmas sementes (números aleatórios comuns, o padrão do UTSim). A diferença é feita replicação a replicação, o que tira o ruído comum aos cenários, e cada um dos `m` intervalos é calculado ao nível `1 - (1 - nível)/m` para que todos valham juntos. O p ajustado é `m` vezes o p de cada par (no máximo 1).
+
+Um par "difere" quando o intervalo não contém zero. Com as mesmas sementes, os intervalos pareados costumam ser bem mais estreitos que os do Tukey.
+
+### Correlação entre medidas (`--correlacao`)
+
+Cada replicação é uma observação de todas as medidas ao mesmo tempo. O comando calcula, para as medidas de `--metrica` (ou as vazões das saídas mais as medidas da precisão, sem as que não variam e sem as cópias, como a ocupação de uma estação de um lugar, que é o seu conteúdo médio), a matriz de correlação de **Pearson** (relação linear) acima da diagonal e de **Spearman** (postos, relação monotônica, menos sensível a valores extremos) abaixo dela, e os pares mais fortes com o valor-p de cada coeficiente. Serve para perguntas como "fila longa no posto 2 acompanha vazão menor?". Correlação não é causa: as duas medidas podem depender de uma terceira, como o ritmo das chegadas. Os valores-p não estão corrigidos para o número de pares.
+
+### Mapa de calor de deslocamentos (`--mapa-calor`)
+
+Lê o rastro da replicação 0 e passa cada deslocamento de um recurso móvel (e cada item numa ligação com `transfer`, depois do `delay`) por uma grade do piso com células de `--celula` metros (0,5 m por padrão). O recurso anda a velocidade constante ao longo do caminho, como na cena 3D; cada célula recebe o tempo que ele leva para atravessá-la (**tempo de ocupação**) e uma **passagem** a cada entrada. Conta só o intervalo depois do aquecimento. `--por recurso` separa as camadas por transportador; `--por classe`, por pessoas, empilhadeiras, AGVs e veículos (o mesmo papel da cena 3D), com as transferências numa camada própria. O SVG mostra a soma das camadas sobre a planta (objetos e ligações), do amarelo-claro ao vermelho-escuro; o terminal lista a distância e o tempo em movimento de cada camada e as células mais ocupadas. O painel web mostra cada camada e as passagens.
+
+### Exportar cada observação (`--exportar-observacoes`)
+
+Grava um CSV em formato longo, uma linha por valor: `replicacao,instante,objeto,medida,valor`. As medidas são `conteudo` (cada amostra do conteúdo, quando o modelo define `run.sample_interval`), `staytime` (a permanência de cada item em cada objeto, menos fontes e sumidouros, onde ela é sempre zero) e as medidas próprias dos objetos, como `time_in_system` nas saídas. O instante é o da observação (a saída do item). Só entram as observações depois do aquecimento, as mesmas das estatísticas. O arquivo pode ficar grande: são todas as observações de todas as replicações. A gravação em Parquet não faz parte do instalador.
