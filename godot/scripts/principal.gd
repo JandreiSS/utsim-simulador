@@ -17,10 +17,14 @@
 ## Everything visible is built here in code (lights, floor, grid, camera, panels), so the
 ## `.tscn` stays a single node and the layout is easy to read in one file. Panels are
 ## opaque, so the 3D labels never show through them.
+##
+## The top bar is drawn in Rust with egui (`UtsimUi`, `crates/utsim-godot/src/ui_bar.rs`):
+## it shows `_sync_bar()`'s state and its clicks come back as `bar_action(what)`. Its
+## widgets keep the names of the Godot buttons they replaced (`Modo_Editar`,
+## `Botao_Novo`...), which the scripted runs find through the bridge.
 extends Node3D
 
 const SPEEDS := [0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
-const STEPS := [0.25, 0.5, 1.0, 2.0, 5.0]
 const LEFT_WIDTH := 290
 const RIGHT_WIDTH := 420
 const TOP_HEIGHT := 46
@@ -47,7 +51,9 @@ var snap_on := true
 var grid_step := 1.0
 
 var _ui: CanvasLayer
-var _top: PanelContainer
+## The interface around the 3D view drawn in Rust with egui (`UtsimUi`, the bridge): the
+## top bar for now; the other panels move to it in the next steps (plano_interface_rust.md).
+var ui: Object
 var _left: PanelContainer
 var _right: PanelContainer
 var _bottom: PanelContainer
@@ -61,7 +67,6 @@ var _props: PainelPropriedades
 var _props_scroll: ScrollContainer
 var _status: Label
 var _sim_status: Label
-var _title: Label
 var _summary: RichTextLabel
 var _reps: SpinBox
 var _play: Button
@@ -72,14 +77,6 @@ var _open_dialog: FileDialog
 var _save_dialog: FileDialog
 var _discard: ConfirmationDialog
 var _shortcuts: AcceptDialog
-var _mode_edit: Button
-var _mode_sim: Button
-var _tool_select: Button
-var _tool_link: Button
-var _undo: Button
-var _redo: Button
-var _snap: CheckBox
-var _step: OptionButton
 var _grid: MeshInstance3D
 var _slider_lock := false
 var _fps: Label
@@ -93,8 +90,6 @@ var job: Object
 var _job_done := Callable()
 var _progress: ProgressBar
 var _cancel: Button
-var _tool_rede: Button
-var _tool_aisle: Button
 var _show_obstacles: CheckBox
 var _results_panel: PainelResultados
 var _pert_panel: PainelPert
@@ -215,112 +210,6 @@ func _build_ui() -> void:
 	_ui = CanvasLayer.new()
 	_ui.name = "Interface"
 	add_child(_ui)
-
-	_top = _panel("BarraSuperior")
-	_top.anchor_right = 1.0
-	_top.offset_bottom = TOP_HEIGHT
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 4)
-	_top.add_child(top)
-	var brand := Label.new()
-	brand.text = "UTSim"
-	brand.theme_type_variation = &"TituloPainel"
-	top.add_child(brand)
-	var modes := ButtonGroup.new()
-	_mode_edit = _button(top, "Modo_Editar", "Editar", "Montar o modelo (Tab alterna)", func(): set_mode("editar"))
-	_mode_sim = _button(top, "Modo_Simular", "Simular", "Rodar as replicações e reproduzir (Tab alterna)", func(): set_mode("simular"))
-	for b in [_mode_edit, _mode_sim]:
-		b.toggle_mode = true
-		b.button_group = modes
-	top.add_child(VSeparator.new())
-	_button(top, "Botao_Novo", "Novo", "Novo modelo (Ctrl+N)", func(): new_document())
-	_button(top, "Botao_Abrir", "Abrir...", "Abrir um modelo (Ctrl+O)", func(): _confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7)))
-	_button(top, "Botao_Salvar", "Salvar", "Salvar (Ctrl+S)", func(): save())
-	_button(top, "Botao_SalvarComo", "Salvar como...", "Salvar como (Ctrl+Shift+S)", func(): save_as_dialog())
-	top.add_child(VSeparator.new())
-	_undo = _button(top, "Botao_Desfazer", "Desfazer", "Desfazer (Ctrl+Z)", func(): undo())
-	_redo = _button(top, "Botao_Refazer", "Refazer", "Refazer (Ctrl+Y)", func(): redo())
-	top.add_child(VSeparator.new())
-	var tools := ButtonGroup.new()
-	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
-	_tool_link = _button(top, "Ferramenta_Ligar", "Ligar", "Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)", func(): editor.set_tool("ligar"))
-	_tool_rede = _button(top, "Ferramenta_Rede", "Rede", "Rede de caminhos: nós e trechos (N)", func(): editor.set_tool("selecionar" if editor.tool == "rede" else "rede"))
-	_tool_aisle = _button(top, "Ferramenta_Corredor", "Corredor", "Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)", func(): editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor"))
-	for b in [_tool_select, _tool_link, _tool_rede, _tool_aisle]:
-		b.toggle_mode = true
-		b.button_group = tools
-	var arrange := MenuButton.new()
-	arrange.name = "Menu_Organizar"
-	arrange.text = "Organizar"
-	arrange.flat = false
-	arrange.focus_mode = Control.FOCUS_NONE
-	var pm := arrange.get_popup()
-	for item in [["Alinhar à esquerda", "esquerda"], ["Alinhar ao centro (X)", "centro_x"], ["Alinhar à direita", "direita"],
-			["Alinhar ao topo", "topo"], ["Alinhar ao centro (Y)", "centro_y"], ["Alinhar à base", "base"]]:
-		pm.add_item(item[0])
-		pm.set_item_metadata(pm.item_count - 1, "alinhar:" + item[1])
-	pm.add_separator()
-	for item in [["Distribuir em X", "x"], ["Distribuir em Y", "y"]]:
-		pm.add_item(item[0])
-		pm.set_item_metadata(pm.item_count - 1, "distribuir:" + item[1])
-	pm.add_separator()
-	for item in [["Copiar (Ctrl+C)", "copiar"], ["Recortar (Ctrl+X)", "recortar"], ["Colar (Ctrl+V)", "colar"],
-			["Duplicar (Ctrl+D)", "duplicar"], ["Excluir (Del)", "excluir"], ["Selecionar tudo (Ctrl+A)", "tudo"]]:
-		pm.add_item(item[0])
-		pm.set_item_metadata(pm.item_count - 1, item[1])
-	pm.index_pressed.connect(func(k): arrange_action(String(pm.get_item_metadata(k))))
-	top.add_child(arrange)
-	top.add_child(VSeparator.new())
-	_snap = CheckBox.new()
-	_snap.name = "Grade_Encaixe"
-	_snap.text = "Grade"
-	_snap.tooltip_text = "Encaixar na grade ao pôr e arrastar (passo ao lado)"
-	_snap.button_pressed = snap_on
-	_snap.focus_mode = Control.FOCUS_NONE
-	_snap.toggled.connect(func(on): set_snap(on, grid_step))
-	top.add_child(_snap)
-	_step = OptionButton.new()
-	_step.name = "Grade_Passo"
-	_step.focus_mode = Control.FOCUS_NONE
-	_step.tooltip_text = "Passo da grade"
-	for k in STEPS.size():
-		_step.add_item("%s m" % str(STEPS[k]), k)
-	_step.selected = STEPS.find(grid_step)
-	_step.item_selected.connect(func(k): set_snap(snap_on, STEPS[k]))
-	top.add_child(_step)
-	var analysis := MenuButton.new()
-	analysis.name = "Menu_Analisar"
-	analysis.text = "Analisar"
-	analysis.flat = false
-	analysis.focus_mode = Control.FOCUS_NONE
-	var am := analysis.get_popup()
-	for item in [["Resultados", "resultados"], ["PERT/CPM da seleção", "pert"], ["PERT/CPM de... até... (dois selecionados)", "pert_trecho"], ["Fluxos de tokens", "fluxos"]]:
-		am.add_item(item[0])
-		am.set_item_metadata(am.item_count - 1, item[1])
-	am.index_pressed.connect(func(k): analysis_action(String(am.get_item_metadata(k))))
-	top.add_child(analysis)
-	_button(top, "Botao_Resultados", "Resultados", "Tabela, gráficos, análises, cenários e otimização da última rodada", func(): analysis_action("resultados"))
-	_button(top, "Botao_Pert", "PERT/CPM", "PERT/CPM da seleção (com dois objetos, de um até o outro)", func(): analysis_action("pert_auto"))
-	_button(top, "Botao_Atalhos", "Atalhos", "F1: lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
-	# The top bar's buttons are compact (the theme's "BotaoBarra"), so the whole bar
-	# fits at 1600 px with the model name.
-	for c in top.get_children():
-		if c is Button and not (c is CheckBox or c is OptionButton):
-			(c as Button).theme_type_variation = &"BotaoBarra"
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(spacer)
-	_title = Label.new()
-	_title.name = "Titulo"
-	# Only the model name, cut with an ellipsis; the file name goes to the window title
-	# and to the tooltip (the G2 visual check found "orial 01: um caixa tutorial_01.r").
-	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_title.custom_minimum_size = Vector2(120, 0)
-	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_title.size_flags_stretch_ratio = 0.6
-	_title.mouse_filter = Control.MOUSE_FILTER_PASS
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	top.add_child(_title)
 
 	_left = _panel("PainelEsquerdo")
 	_left.anchor_bottom = 1.0
@@ -624,6 +513,11 @@ func _build_ui() -> void:
 	_shortcuts.title = "Atalhos"
 	_shortcuts.ok_button_text = "Fechar"
 	_ui.add_child(_shortcuts)
+	if ClassDB.class_exists(&"UtsimUi"):
+		ui = ClassDB.instantiate(&"UtsimUi")
+		ui.name = "InterfaceRust"
+		ui.action.connect(bar_action)
+		_ui.add_child(ui)
 
 
 func _fill_shortcuts() -> void:
@@ -665,12 +559,20 @@ func free_span() -> Vector2:
 	var w := get_viewport().get_visible_rect().size.x
 	var lo := float(LEFT_WIDTH) if _left != null and _left.visible else 0.0
 	var hi := w - float(RIGHT_WIDTH) if _right != null and _right.visible else w
+	if ui != null:
+		# The free area egui leaves (its side panels, once they move to Rust).
+		var free: Rect2 = ui.central_rect()
+		if free.size.x > 0.0:
+			lo = maxf(lo, free.position.x)
+			hi = minf(hi, free.end.x)
 	return Vector2(lo, hi)
 
 
 ## Whether screen point `p` is over a panel (the 3D view does not take it).
 func over_ui(p: Vector2) -> bool:
-	for c in [_top, _left, _right, _bottom, _bar, _results_panel, _pert_panel, _flows_panel]:
+	if ui != null and ui.is_over(p):
+		return true
+	for c in [_left, _right, _bottom, _bar, _results_panel, _pert_panel, _flows_panel]:
 		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
@@ -698,8 +600,7 @@ func snap_step() -> float:
 func set_snap(on: bool, step: float) -> void:
 	snap_on = on
 	grid_step = step
-	_snap.set_pressed_no_signal(on)
-	_step.selected = STEPS.find(step)
+	_sync_bar()
 	_draw_edit_grid()
 	set_status("Encaixe na grade %s (passo %s m)." % ["ligado" if on else "desligado", str(step)])
 
@@ -711,10 +612,7 @@ func set_status(text: String) -> void:
 
 
 func on_tool_changed() -> void:
-	_tool_link.set_pressed_no_signal(editor.tool == "ligar")
-	_tool_rede.set_pressed_no_signal(editor.tool == "rede")
-	_tool_aisle.set_pressed_no_signal(editor.tool == "corredor")
-	_tool_select.set_pressed_no_signal(editor.tool != "ligar" and editor.tool != "rede" and editor.tool != "corredor")
+	_sync_bar()
 	_library.mark(editor.place_id)
 	_show_properties()
 
@@ -736,6 +634,67 @@ func on_selection_changed() -> void:
 
 func on_dragging() -> void:
 	pass
+
+
+# ---------------------------------------------------------------------------
+# Top bar (egui, in Rust)
+# ---------------------------------------------------------------------------
+
+
+## Sends what the top bar shows to `UtsimUi` (it redraws only when something changed).
+func _sync_bar() -> void:
+	if ui == null or doc == null:
+		return
+	var dirty := " *" if doc.is_dirty() else ""
+	var file: String = doc.path() if doc.path() != "" else "(sem arquivo)"
+	ui.set_bar({
+		"editing": mode == "editar",
+		"tool": editor.tool if editor != null else "selecionar",
+		"snap": snap_on,
+		"step": grid_step,
+		"can_undo": doc.can_undo(),
+		"can_redo": doc.can_redo(),
+		"title": "%s%s" % [doc.name(), dirty],
+		"title_tip": "%s%s\n%s" % [doc.name(), dirty, file],
+	})
+
+
+## The clicks of the top bar (`UtsimUi.action`): the same as the Godot buttons did.
+func bar_action(what: String) -> void:
+	if doc == null:
+		return
+	var arg := what.get_slice(":", 1) if what.contains(":") else ""
+	match what.get_slice(":", 0):
+		"modo":
+			set_mode(arg)
+		"novo":
+			new_document()
+		"abrir":
+			_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
+		"salvar":
+			save()
+		"salvar_como":
+			save_as_dialog()
+		"desfazer":
+			undo()
+		"refazer":
+			redo()
+		"ferramenta":
+			if arg == "selecionar" or arg == "ligar":
+				editor.set_tool(arg)
+			else:
+				editor.set_tool("selecionar" if editor.tool == arg else arg)
+		"organizar":
+			arrange_action(what.substr("organizar:".length()))
+		"grade":
+			set_snap(arg == "ligar", grid_step)
+		"passo":
+			set_snap(snap_on, float(arg))
+		"analisar":
+			analysis_action(arg)
+		"atalhos":
+			toggle_shortcuts()
+	_sync_bar()
 
 
 # ---------------------------------------------------------------------------
@@ -879,13 +838,9 @@ func _build_edit_scene() -> void:
 func _update_title() -> void:
 	var file: String = doc.path().get_file() if doc.path() != "" else "(sem arquivo)"
 	var dirty := " *" if doc.is_dirty() else ""
-	_title.text = "%s%s" % [doc.name(), dirty]
-	_title.tooltip_text = "%s%s
-%s" % [doc.name(), dirty, doc.path() if doc.path() != "" else file]
 	if is_inside_tree():
 		get_window().title = "UTSim 3D: %s%s (%s)" % [doc.name(), dirty, file]
-	_undo.disabled = not doc.can_undo()
-	_redo.disabled = not doc.can_redo()
+	_sync_bar()
 
 
 func _fill_objects() -> void:
@@ -1155,20 +1110,16 @@ func set_mode(which: String) -> bool:
 	if doc == null:
 		return false
 	if which == "simular":
-		_mode_edit.set_pressed_no_signal(true)
 		return simulate(_run_reps)
 	set_playing(false)
 	mode = "editar"
 	playing_replay = false
-	_mode_edit.set_pressed_no_signal(true)
-	_mode_sim.set_pressed_no_signal(false)
 	_edit_left.visible = true
 	_sim_left.visible = false
 	_right.visible = true
 	_bar.visible = false
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
-		(_top.find_child(b, true, false) as Control).visible = true
+	_sync_bar()
 	_revision = -1
 	after_edit(true)
 	return true
@@ -1187,19 +1138,15 @@ func simulate(reps: int) -> bool:
 		var issues: Array = doc.issues()
 		var first: String = issues[0]["message"] if not issues.is_empty() else ""
 		set_status("O modelo tem %d problema(s) e não roda: %s" % [issues.size(), first])
-		_mode_edit.set_pressed_no_signal(true)
-		_mode_sim.set_pressed_no_signal(false)
+		_sync_bar()
 		return false
 	mode = "simular"
-	_mode_sim.set_pressed_no_signal(true)
-	_mode_edit.set_pressed_no_signal(false)
 	_edit_left.visible = false
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
-		(_top.find_child(b, true, false) as Control).visible = false
+	_sync_bar()
 	_reps.value = reps
 	playing_replay = false
 	if job != null:
@@ -1687,15 +1634,12 @@ func open_replay(path: String) -> bool:
 		return false
 	playing_replay = true
 	mode = "simular"
-	_mode_sim.set_pressed_no_signal(true)
-	_mode_edit.set_pressed_no_signal(false)
 	_edit_left.visible = false
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
 	_sync_panels()
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Ferramenta_Corredor", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
-		(_top.find_child(b, true, false) as Control).visible = false
+	_sync_bar()
 	on_results(model.replay_results())
 	_show_playback()
 	camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])

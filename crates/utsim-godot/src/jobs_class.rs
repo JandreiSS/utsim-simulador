@@ -80,10 +80,10 @@ impl UtsimJob {
         if self.outcome.is_some() {
             return;
         }
-        if let Some(job) = self.job.as_mut() {
-            if job.is_finished() {
-                self.outcome = job.take();
-            }
+        if let Some(job) = self.job.as_mut()
+            && job.is_finished()
+        {
+            self.outcome = job.take();
         }
     }
 }
@@ -132,10 +132,10 @@ impl UtsimJob {
     /// Blocks until the job ends (scripts and tests; the interface polls instead).
     #[func]
     fn wait(&mut self) -> bool {
-        if self.outcome.is_none() {
-            if let Some(j) = self.job.as_mut() {
-                self.outcome = Some(j.wait());
-            }
+        if self.outcome.is_none()
+            && let Some(j) = self.job.as_mut()
+        {
+            self.outcome = Some(j.wait());
         }
         self.ok()
     }

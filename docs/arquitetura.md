@@ -1534,6 +1534,47 @@ líquido na altura do nível, a cor pela taxa), os tubos e os conversores, limit
 - a aparência da G3 só foi conferida pelos roteiros sem janela: a conferência visual está
   anotada em `docs/plano_godot.md`.
 
+### Interface em Rust com egui (primeira frente)
+
+Decisão de 2026-11-03: só a vista 3D central continua no Godot; a interface em volta passa
+do GDScript para Rust, desenhada com egui dentro da janela do Godot pela ponte. O plano, a
+ordem dos passos e as estimativas estão em `docs/plano_interface_rust.md`. Nesta frente
+foram feitos a fundação e a barra superior:
+
+- **`UtsimUi`** (`ui_class.rs`, um `Node2D` no `CanvasLayer` da interface, `z_index` 100):
+  dono do `egui::Context` (`egui_host.rs`). Lê a entrada em `_input` (mouse, roda, teclas,
+  texto, modificadores; área de transferência pelo `DisplayServer`; escala pelo
+  `content_scale_factor` da janela), roda um quadro do egui só quando chega entrada, o
+  estado muda, a janela muda ou o egui pede, e desenha cada malha tesselada num canvas item
+  filho com recorte e a textura do egui (cópia na CPU, atualizações parciais aplicadas e
+  enviadas como `Image` RGBA8; cores pré-multiplicadas convertidas para alfa direto). Sem
+  `__codegen-full`, os eventos, a `Image` e o `DisplayServer` são usados por chamadas
+  dinâmicas.
+- **Quem fica com o evento:** é do egui (marcado como tratado) quando o ponteiro está sobre
+  um painel ou menu do egui, quando o clique começou no egui e ainda está pressionado, ou,
+  para teclas, quando um campo de texto do egui tem o foco. A roda sobre um painel nunca
+  chega à câmera. Tab só vai ao egui dentro de um campo de texto, e um botão não guarda o
+  foco, então os atalhos continuam do `principal.gd`.
+- **Métodos:** `set_bar(estado)`, sinal `action(o_que)` (emitido diferido), `central_rect()`
+  (a área que os painéis do egui deixam para a vista; o `principal.gd` a usa em
+  `free_span()`), `is_over(p)` (usado por `over_ui()`), `is_typing()`, `widget_rect(nome)`,
+  `has_widget(nome)`, `widget_info(nome)`, `widget_names()`, `choose(nome, item)`,
+  `repaint()`, `update_now()` e `frames_run()`.
+- **Nomes estáveis** (`egui_widgets.rs`): cada widget é registrado com o nome do nó Godot
+  que substituiu (`Modo_Editar`, `Botao_Novo`, `Ferramenta_Ligar`, `Grade_Passo`...), e o
+  `roteiro.gd` acha o widget do egui quando não há nó com aquele nome; os passos dos
+  roteiros não mudaram.
+- **Barra superior** (`ui_bar.rs`): grupos arquivo | editar | modos (Editar | Simular e as
+  ferramentas, segmentados) | vista | análise e o nome do modelo à direita; os grupos que não
+  cabem vão para o menu "Mais", na ordem Atalhos, Organizar, Arquivo, Grade, Análise,
+  Desfazer/Refazer (`fit`). O `principal.gd` manda o estado em `_sync_bar()` e executa as
+  ações em `bar_action()`, com as mesmas funções dos botões antigos.
+- **Tema** (`crates/utsim-ui-tema`, só egui): cores do tema Godot por papel, tamanhos,
+  estilo dos widgets, fontes de interface do sistema com as do egui como reserva, botão
+  primário e controle segmentado. O launcher e o app UTSim Seis Sigma vão adotá-lo.
+- Um só egui no workspace (0.36.2, o mesmo do `eframe` do launcher e do `bevy_egui` do
+  visualizador); a ponte passou a pedir Rust 1.95.
+
 ## 4s. PERT/CPM de uma parte do processo
 
 Crate `crates/utsim-pert`, pura (sem motor gráfico), dependendo de `utsim-core` (`Dist`,

@@ -256,10 +256,10 @@ impl Editor {
 
     pub fn connect(&mut self, from: &str, to: &str) -> Result<(), String> {
         for end in [from, to] {
-            if let Some(o) = self.model().objects.iter().find(|o| o.name == end) {
-                if let Some(msg) = connect_blocked(kind_name(&o.kind)) {
-                    return Err(msg.to_string());
-                }
+            if let Some(o) = self.model().objects.iter().find(|o| o.name == end)
+                && let Some(msg) = connect_blocked(kind_name(&o.kind))
+            {
+                return Err(msg.to_string());
             }
         }
         self.apply(Command::Connect {

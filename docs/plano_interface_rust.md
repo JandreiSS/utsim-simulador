@@ -1,0 +1,156 @@
+# Plano da interface em Rust (egui dentro do Godot)
+
+Decisão do dono (2026-11-03): na interface Godot (`godot/`) só a vista 3D central continua
+no Godot. Toda a interface em volta dela (barra superior, biblioteca, lista de objetos,
+propriedades, resultados, PERT/CPM, dados reais, rede, corredores, janelas e barra de status)
+sai do GDScript e passa a ser Rust, desenhada com egui dentro da janela do Godot pela ponte
+GDExtension (`crates/utsim-godot`). Este documento é a primeira frente dessa migração.
+
+Por quê:
+
+- a lógica dos painéis já está no Rust (o esquema das propriedades em `schema.rs`, a edição
+  com desfazer em `utsim-edit`, os resultados em `results.rs`): o GDScript só traduzia
+  dicionários em nós; com egui o painel chama o Rust direto, sem a volta pelo GDScript;
+- tudo o que é Rust é testável sem o motor (`cargo test -p utsim-godot`);
+- o mesmo visual (crate `utsim-ui-tema`) serve à interface Godot, ao launcher e ao app
+  UTSim Seis Sigma, que já são egui.
+
+## Arquitetura
+
+```
+Godot (janela, vista 3D, câmera, cena)            Rust (ponte utsim-godot)
+┌──────────────────────────────────────┐         ┌──────────────────────────────────┐
+│ principal.gd                         │ set_bar │ UtsimUi (Node2D, ui_class.rs)    │
+│  ├─ CanvasLayer "Interface"          │────────▶│  ├─ Host (egui_host.rs)          │
+│  │   ├─ painéis GDScript (a migrar)  │         │  │   ├─ egui::Context            │
+│  │   └─ InterfaceRust (UtsimUi) ─────┼─────────┼──┤   ├─ ui_bar.rs (barra)        │
+│  ├─ editor.gd, camera_orbita.gd      │ action  │  │   └─ Registry (nomes)          │
+│  └─ cena.gd (vista 3D)               │◀────────│  ├─ egui_input.rs (entrada)      │
+└──────────────────────────────────────┘         │  └─ egui_mesh.rs (desenho)       │
+                                                  └──────────────────────────────────┘
+```
+
+- **Nó `UtsimUi`** (`ui_class.rs`): um `Node2D` no `CanvasLayer` da interface, com
+  `z_index` 100 (os menus do egui abrem sobre os painéis Godot que ainda existem). Só as
+  classes do núcleo do Godot são geradas para a ponte (sem `__codegen-full`, para o build
+  continuar curto); por isso os eventos de entrada, a `Image` e o `DisplayServer` são lidos
+  e chamados dinamicamente (`get`, `call`), poucas chamadas por evento.
+- **Entrada** (`egui_input.rs`, puro): `_input` lê cada evento (mouse, roda, teclas, texto,
+  modificadores) para um `Input` simples e o converte para eventos do egui, em pontos
+  (pixels sobre a escala). Ctrl+C, Ctrl+X e Ctrl+V viram copiar, recortar e colar, com a
+  área de transferência do `DisplayServer`. A escala vem do `content_scale_factor` da
+  janela vezes `ui_scale` do nó.
+- **Quem fica com o evento** (`egui_host.rs`, puro): o evento é do egui (marcado como
+  tratado, e a vista 3D não o recebe) quando o ponteiro está sobre um painel ou um menu do
+  egui, quando um clique começou sobre o egui e ainda está pressionado (um arrasto), ou,
+  para teclas, quando um campo de texto do egui tem o foco. **A roda sobre um painel é
+  sempre do painel: nunca aproxima a câmera.** O resto segue para os controles Godot, o
+  `editor.gd` e a câmera, como antes. Tab nunca vai para o egui fora de um campo de texto
+  (é a troca Editar/Simular), e um botão do egui não guarda o foco do teclado, então os
+  atalhos (Ctrl+O/N/S, Tab, F, F1, F3, Del, L, N, C, G...) continuam do `principal.gd`.
+- **Desenho** (`egui_mesh.rs`, puro, e `ui_class.rs`): o egui tessela a saída em malhas;
+  cada malha vira um canvas item filho do nó (reaproveitado entre quadros), com o recorte
+  (`canvas_item_set_custom_rect` + `canvas_item_set_clip`) e um `canvas_item_add_triangle_array`
+  com a textura certa. As texturas do egui (o atlas das fontes) têm uma cópia na CPU, onde
+  as atualizações parciais são aplicadas, e são enviadas ao Godot como `Image` RGBA8. As
+  cores do egui são pré-multiplicadas; a ponte as converte para alfa direto, que é a mistura
+  do canvas 2D do Godot.
+- **Redesenho só quando precisa**: um quadro do egui roda quando chega entrada, quando o
+  estado mostrado muda (`set_bar` com outro estado), quando a janela muda de tamanho ou
+  quando o próprio egui pede (animações, dicas). Fora disso os canvas items ficam como
+  estão e o custo por quadro é zero.
+- **Área livre** (`central_rect()`): o que os painéis do egui deixam para a vista 3D. O
+  `principal.gd` combina com os painéis Godot que ainda existem em `free_span()` (o
+  enquadramento da câmera centraliza o modelo entre os painéis) e `over_ui()` pergunta
+  `is_over(p)` ao nó.
+- **Ações**: o egui não muda o modelo nem o modo. A barra devolve ações em texto
+  (`novo`, `abrir`, `modo:simular`, `ferramenta:ligar`, `organizar:alinhar:esquerda`,
+  `grade:ligar`, `passo:0.5`, `analisar:resultados`...), emitidas no sinal `action(what)`
+  depois do quadro (diferido, fora do empréstimo do nó), e o `principal.gd`
+  (`bar_action`) chama as mesmas funções dos botões antigos. O estado mostrado vem de
+  `_sync_bar()` (modo, ferramenta, grade, desfazer/refazer, título).
+- **IME**: o texto digitado chega pelo `unicode` das teclas, o que cobre acentos e teclas
+  mortas; a composição de IME (idiomas asiáticos) fica para depois.
+
+### Tema comum (`crates/utsim-ui-tema`)
+
+Crate só de egui, sem Godot: as cores com papel (painel, botão, selecionado, destaque,
+campo, menu, texto, ajuda, erro, aviso, selo), os tamanhos (corpo 15, títulos 17, barra de
+46 px), o estilo de cada estado dos widgets, as fontes (a fonte de interface do sistema,
+Segoe UI no Windows e Noto Sans ou DejaVu Sans no Linux, lida de onde o sistema a guarda,
+sem ir no pacote, com as fontes do egui como reserva) e dois widgets: o botão primário
+("Aplicar") e o controle segmentado (Editar | Simular). As cores são as do tema Godot
+(`godot/tema/utsim.tres`), então os painéis egui e os painéis Godot que ainda restam ficam
+iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
+(`crates/utsim-lss-app`) passam a usar este tema** (`utsim_ui_tema::install(&ctx)`) quando
+forem mexidos; não foram tocados nesta frente.
+
+### Um só egui
+
+O workspace tem um egui só (0.36.2): o `eframe =0.36.2` do launcher e o `bevy_egui 0.43` do
+visualizador usam o mesmo. A ponte e o tema fixam `egui = "=0.36.2"` sem features além de
+`default_fonts`. O egui 0.36 pede Rust 1.95, que passou a ser o `rust-version` da ponte.
+
+## Os roteiros continuam com os mesmos nomes
+
+Os roteiros de interface (`godot/roteiros/*.json`, rodados pelo `roteiro.gd`, com janela ou
+sem) acham os controles pelo nome do nó (`Modo_Editar`, `Botao_Novo`, `Prop_name`...). Os
+widgets do egui ficam com esses nomes:
+
+- a cada quadro a interface registra o retângulo, o texto, o estado e as escolhas de cada
+  widget nomeado (`egui_widgets.rs`, `Registry`);
+- a ponte responde `widget_rect(nome)`, `has_widget(nome)`, `widget_info(nome)`,
+  `widget_names()` e `choose(nome, item)`;
+- o `roteiro.gd` procura primeiro um nó Godot com o nome e, se não houver, o widget do egui
+  (`_widget`): `clicar`, `mover`, `arrastar` e `rolar` mandam os mesmos eventos de entrada
+  ao centro do widget; `escolher` usa `choose` (como escolher na lista aberta); `texto`,
+  `visivel` e `oculto` leem o registro.
+
+Assim um passo `{"clicar": {"controle": "Modo_Simular"}}` funciona igual antes e depois da
+migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da barra: `Menu_Mais`
+(os grupos que não cabem), `Menu_Analisar`, `Organizar_<ação>`, `Analisar_<ação>`,
+`Grade_Passo_<passo>`.
+
+## Ordem da migração e estimativas (horas Opus 5.5)
+
+| Passo | Conteúdo | Estimativa | Situação |
+|---|---|---|---|
+| 1 | Fundação: nó `UtsimUi`, entrada, desenho, área livre, registro de nomes, tema comum, testes | 6–8 h | **feito** |
+| 2a | Barra superior em egui, com grupos e menu "Mais" | 2–3 h | **feito** |
+| 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | a fazer |
+| 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | a fazer |
+| 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | a fazer |
+| 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
+
+Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
+`g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
+
+### Detalhes do passo 2b (propriedades)
+
+- O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
+  `UtsimDocument` (o nó recebe o documento uma vez, `set_document(doc)`) e aplica cada mudança
+  como `Command::Set` pela mesma validação de hoje; depois avisa o `principal.gd`
+  (`after_edit`) pelo sinal `action("editado:<caminho>")`.
+- Campos: rótulo à esquerda e controle à direita numa grade de duas colunas alinhadas;
+  seções recolhíveis (o estado fica por título, como hoje); problemas em vermelho e avisos
+  em amarelo, clicáveis; texto longo quebra em várias linhas; "Aplicar" como botão
+  primário; distribuição com família, parâmetros e "editar como texto".
+- Nomes `Prop_<caminho>` com os sufixos de hoje (`_ligado`, `_familia`, `_texto`, `_ron`,
+  `_aplicar`, `Secao_<título>`, `Problemas_<k>`, `Avisos_<k>`), para os roteiros.
+- A miniatura do ativo (um mundo 3D pequeno) continua desenhada pelo Godot num
+  `SubViewport`; o egui mostra a textura dele (`TextureId::User`) no lugar.
+- Os subpainéis de rede, corredores e ligação e o formulário de dados reais vêm no passo 5;
+  até lá, quando a ferramenta Rede ou Corredor estiver ativa, o painel Godot de hoje é
+  mostrado no lugar do painel egui.
+
+## O que esta frente entregou
+
+- Crate `utsim-ui-tema` (tema, fontes, botão primário, controle segmentado) com testes de
+  contraste e de layout.
+- Na ponte: `egui_input.rs`, `egui_mesh.rs`, `egui_widgets.rs`, `egui_host.rs` (puros, com
+  testes) e `ui_class.rs` (o nó `UtsimUi`); `ui_bar.rs` (a barra superior).
+- `principal.gd` sem a barra superior em GDScript: `_sync_bar()` e `bar_action()`; o
+  `roteiro.gd` acha widgets do egui pelo nome.
+- A conferência visual com janela (capturas a 1600×900 e 1280×720) ficou pendente: a tela
+  estava em uso pelo dono; os testes de layout da barra (`ui_bar::tests`) conferem que nada
+  se sobrepõe nem sai da barra nas duas larguras e que o menu "Mais" só aparece a 1280.

@@ -62,6 +62,11 @@
 ##    `{"corredor": "corredor_1"}` (the middle of its first segment), `{"acesso": "objeto"}`
 ##    (the access point of an object, with the obstacles shown) or
 ##    `{"aba": ["Abas", "Título"]}` (a tab of a TabContainer).
+##
+## The widgets drawn by egui in Rust (`UtsimUi`, the top bar first) keep the names of the
+## Godot nodes they replaced: `{"controle": "Modo_Editar"}` finds the Godot control by that
+## name or, when there is none, the egui widget (`_widget`), and the steps act on it with
+## the same input events. `escolher`, `texto`, `visivel` and `oculto` work on both.
 extends Node
 
 var _out := ""
@@ -318,6 +323,12 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("escolher"):
 		var e: Dictionary = s["escolher"]
 		var o := _control(String(e.get("controle", ""))) as OptionButton
+		if o == null and _egui() != null and _widget_visible(String(e.get("controle", ""))):
+			if not _egui().choose(String(e["controle"]), String(e["item"])):
+				_fail("passo %d: %s não tem o item %s" % [k, e["controle"], e["item"]])
+				return
+			await _frames(4)
+			return
 		if o == null or not o.is_visible_in_tree():
 			_fail("passo %d: lista não encontrada: %s" % [k, e])
 			return
@@ -389,6 +400,31 @@ func _control(name: String) -> Control:
 	return n as Control
 
 
+## The egui interface of the main scene (`UtsimUi`), or null.
+func _egui() -> Object:
+	if _main == null:
+		return null
+	var u = _main.get("ui")
+	return u if u is Object and u != null else null
+
+
+## The rectangle of the egui widget `name` on screen (pixels), or an empty one.
+func _widget(name: String) -> Rect2:
+	var u := _egui()
+	if u == null or name == "":
+		return Rect2()
+	u.update_now()
+	return u.widget_rect(name)
+
+
+func _widget_visible(name: String) -> bool:
+	var u := _egui()
+	if u == null:
+		return false
+	u.update_now()
+	return u.has_widget(name)
+
+
 ## The screen point of a target, or null.
 func _target(t: Variant) -> Variant:
 	if typeof(t) != TYPE_DICTIONARY:
@@ -398,7 +434,10 @@ func _target(t: Variant) -> Variant:
 		return Vector2(float(d["ponto"][0]), float(d["ponto"][1]))
 	if d.has("controle"):
 		var c := _control(d["controle"])
-		if c == null or not c.is_visible_in_tree():
+		if c == null:
+			var r := _widget(String(d["controle"]))
+			return r.get_center() if r.has_area() else null
+		if not c.is_visible_in_tree():
 			return null
 		return c.get_global_rect().get_center()
 	if d.has("item"):
@@ -825,15 +864,17 @@ func _check(c: Dictionary, k: int) -> void:
 			"texto":
 				var ctl := _control(String(want["controle"]))
 				var shown := _text_of(ctl) if ctl != null else "(controle ausente)"
+				if ctl == null and _widget_visible(String(want["controle"])):
+					shown = String(_egui().widget_info(String(want["controle"])).get("text", ""))
 				report.call("texto de %s contém %s" % [want["controle"], want["contem"]], shown.contains(String(want["contem"])), shown.substr(0, 300))
 			"visivel":
 				for n in want:
 					var ctl := _control(String(n))
-					report.call("%s visível" % n, ctl != null and ctl.is_visible_in_tree(), "")
+					report.call("%s visível" % n, (ctl != null and ctl.is_visible_in_tree()) or (ctl == null and _widget_visible(String(n))), "")
 			"oculto":
 				for n in want:
 					var ctl := _control(String(n))
-					report.call("%s oculto" % n, ctl == null or not ctl.is_visible_in_tree(), "")
+					report.call("%s oculto" % n, (ctl == null and not _widget_visible(String(n))) or (ctl != null and not ctl.is_visible_in_tree()), "")
 			"replicacoes":
 				var n: int = _main.results.replications() if _main.results != null else 0
 				report.call("replicações dos resultados", n == int(want), str(n))
