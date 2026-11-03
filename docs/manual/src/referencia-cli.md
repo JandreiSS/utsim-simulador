@@ -309,7 +309,7 @@ Arguments:
 
 Options:
       --tipo <TIPO>
-          imr, xbarr, xbars, p, np, c, u, ewma ou cusum [default: imr]
+          imr (padrão), xbarr, xbars, p, np, c, u, ewma ou cusum; com --limites, o tipo gravado nos limites
       --subgrupo <SUBGRUPO>
           Corta uma coluna de valores em subgrupos consecutivos deste tamanho
       --regras <REGRAS>

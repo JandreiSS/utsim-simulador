@@ -36,9 +36,10 @@ pub enum Cmd {
     /// Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
     Carta {
         arquivo: PathBuf,
-        /// imr, xbarr, xbars, p, np, c, u, ewma ou cusum
-        #[arg(long, default_value = "imr")]
-        tipo: String,
+        /// imr (padrão), xbarr, xbars, p, np, c, u, ewma ou cusum; com --limites, o tipo
+        /// gravado nos limites
+        #[arg(long)]
+        tipo: Option<String>,
         /// Corta uma coluna de valores em subgrupos consecutivos deste tamanho
         #[arg(long)]
         subgrupo: Option<usize>,
@@ -200,6 +201,8 @@ pub fn run(cmd: Cmd) -> Result<(), String> {
             let table = read_table(&arquivo)?;
             let title = file_name(&arquivo);
             let rules = RuleSet::parse(&regras)?;
+            let given = tipo.is_some();
+            let tipo = tipo.unwrap_or_else(|| "imr".into());
             let t = tipo.to_lowercase();
             if t == "ewma" || t == "cusum" {
                 return memory_chart(
@@ -209,14 +212,35 @@ pub fn run(cmd: Cmd) -> Result<(), String> {
             let kind = ChartKind::parse(&tipo).ok_or_else(|| {
                 format!("--tipo '{tipo}' desconhecido: use imr, xbarr, xbars, p, np, c, u, ewma ou cusum")
             })?;
+            // Frozen limits carry their chart type, which wins over --tipo.
+            let frozen: Option<Limits> = match &limites {
+                Some(path) => {
+                    let text = std::fs::read_to_string(path)
+                        .map_err(|e| format!("não foi possível ler '{}': {e}", path.display()))?;
+                    Some(
+                        serde_json::from_str(&text).map_err(|e| {
+                            format!("limites inválidos em '{}': {e}", path.display())
+                        })?,
+                    )
+                }
+                None => None,
+            };
+            let kind = match frozen.as_ref().and_then(Limits::kind) {
+                Some(k) if k != kind => {
+                    if given {
+                        eprintln!(
+                            "aviso: os limites são de uma carta {}; --tipo ignorado",
+                            k.label()
+                        );
+                    }
+                    k
+                }
+                _ => kind,
+            };
             let chart_data = chart_data(kind, &table, subgrupo)?;
             let excluded = parse_indices(excluir.as_deref(), chart_data.len())?;
-            let chart = if let Some(path) = &limites {
-                let text = std::fs::read_to_string(path)
-                    .map_err(|e| format!("não foi possível ler '{}': {e}", path.display()))?;
-                let lim: Limits = serde_json::from_str(&text)
-                    .map_err(|e| format!("limites inválidos em '{}': {e}", path.display()))?;
-                charts::apply(&lim, &chart_data, &rules, &[])?
+            let chart = if let Some(lim) = &frozen {
+                charts::apply(lim, &chart_data, &rules, &[])?
             } else if let (Some(mu), Some(s)) = (media, sigma) {
                 let lim = standard_limits(kind, &chart_data, mu, s)?;
                 charts::apply(&lim, &chart_data, &rules, &excluded)?
