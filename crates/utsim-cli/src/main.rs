@@ -10,6 +10,7 @@ mod fit;
 mod fluxograma;
 mod gemeo;
 mod gerar;
+mod linha;
 mod optimize;
 mod painel;
 mod pert;
@@ -73,6 +74,9 @@ enum Cmd {
         /// Grava o estado da replicação 0 no instante T neste arquivo, para encadear rodadas
         #[arg(long = "salvar-estado", num_args = 2, value_names = ["T", "ARQUIVO"])]
         salvar_estado: Option<Vec<String>>,
+        /// Mostra também os indicadores desta linha especializada (por exemplo lean_office)
+        #[arg(long)]
+        linha: Option<String>,
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
@@ -445,6 +449,13 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// Linhas especializadas (Lean Office): predefinições, vocabulário, modelos prontos,
+    /// indicadores e relatório da linha
+    #[command(disable_help_flag = true)]
+    Linha {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -468,6 +479,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::Qualidade { args } => qualidade::run_args(args)?,
         Cmd::Estatistica { args } => estatistica::run_args(args)?,
         Cmd::Tempos { args } => tempos::run_args(args)?,
+        Cmd::Linha { args } => linha::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,
@@ -727,7 +739,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             bins,
             estado,
             salvar_estado,
+            linha,
         } => {
+            if let Some(l) = &linha {
+                linha::pack(l)?;
+            }
             let mut m = Model::load(&model)?;
             if let Some(v) = reps {
                 m.run.replications = v;
@@ -776,6 +792,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::to_string_pretty(&out).expect("report serializes"),
                 )?;
                 println!("relatório gravado em {}", path.display());
+            }
+            if let Some(l) = &linha {
+                linha::after_run(&m, l)?;
             }
         }
     }

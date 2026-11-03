@@ -38,7 +38,7 @@ Model(
     },
     objects: [
         // Solicitante.
-        (name: "pedidos", kind: Source(interarrival: Exp(mean: 30.0),
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 36.0),
             labels: {
                 "valor": LogNormal(mean: 8000.0, sd: 15000.0),
                 "prioridade": Discrete([(1.0, 0.85), (2.0, 0.15)]),
