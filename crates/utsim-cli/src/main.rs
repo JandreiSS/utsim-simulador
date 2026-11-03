@@ -1,6 +1,7 @@
 mod analisar;
 mod cena;
 mod emulate;
+mod estado;
 mod experiment;
 mod fit;
 mod gerar;
@@ -55,6 +56,12 @@ enum Cmd {
         /// Número de classes dos histogramas (sobrescreve run.histogram_bins)
         #[arg(long)]
         bins: Option<usize>,
+        /// Parte deste estado inicial (arquivo RON) em vez do sistema vazio
+        #[arg(long, value_name = "ARQUIVO")]
+        estado: Option<PathBuf>,
+        /// Grava o estado da replicação 0 no instante T neste arquivo, para encadear rodadas
+        #[arg(long = "salvar-estado", num_args = 2, value_names = ["T", "ARQUIVO"])]
+        salvar_estado: Option<Vec<String>>,
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
@@ -440,6 +447,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             csv,
             sample,
             bins,
+            estado,
+            salvar_estado,
         } => {
             let mut m = Model::load(&model)?;
             if let Some(v) = reps {
@@ -460,10 +469,20 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(v) = bins {
                 m.run.histogram_bins = Some(v);
             }
+            let state = match &estado {
+                Some(path) => Some(estado::load(&mut m, path, warmup)?),
+                None => None,
+            };
             m.validate()?;
             print_warnings(&m);
+            if let Some(args) = &salvar_estado {
+                estado::save(&m, state.as_ref(), args)?;
+            }
             let started = std::time::Instant::now();
-            let reports = m.run_replications()?;
+            let reports = match &state {
+                Some(st) => m.run_replications_from(st)?,
+                None => m.run_replications()?,
+            };
             let elapsed = started.elapsed();
             print_summary(&m, &reports);
             let events: u64 = reports.iter().map(|r| r.events).sum();
