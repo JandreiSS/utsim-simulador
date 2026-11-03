@@ -4,6 +4,7 @@
 
 - [Introdução](introducao.md)
 - [Primeiros passos](primeiros-passos.md)
+- [Launcher (para testadores)](launcher.md)
 
 # Construindo modelos
 
