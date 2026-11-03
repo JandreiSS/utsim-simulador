@@ -795,7 +795,31 @@ impl UtsimPlayback {
             "item_stack",
             PackedInt32Array::from(f.item_stack.as_slice()),
         );
+        put(&mut d, "task_target", vectors(&f.task_target));
         d
+    }
+
+    /// The team and request lines (E1b): `[{kind, from, to, point}]` with block indices
+    /// (`to` is -1 for a home or break place, then `point` is where it is).
+    #[func]
+    fn team_links(&self) -> VarArray {
+        let mut out = VarArray::new();
+        let Some(c) = &self.core else {
+            return out;
+        };
+        for l in &c.links {
+            let mut d = VarDictionary::new();
+            put(&mut d, "kind", l.kind);
+            put(&mut d, "from", l.from as i64);
+            put(&mut d, "to", l.to.map_or(-1, |t| t as i64));
+            put(
+                &mut d,
+                "point",
+                Vector3::new(l.to_point[0], l.to_point[1], l.to_point[2]),
+            );
+            out.push(&d.to_variant());
+        }
+        out
     }
 }
 

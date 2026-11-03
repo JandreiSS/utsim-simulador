@@ -20,6 +20,16 @@
 ## so do the circulation aisles: the Corredor tool (C, `corredores.gd`), which also draws
 ## the obstacles, the clearances and the access points when they are shown.
 ## Objects on the critical path of the PERT/CPM window get a red outline (`critical`).
+##
+## Teams and requests (`docs/plano_chegadas_e_equipes_3d.md`, E1b and E8b): the lines of
+## `UtsimPlayback.team_links()` (dispatcher → member, object → who carries its items, a
+## processor → its operators, the repair crew, home and break places) are drawn in both
+## modes, dashed or dotted by kind; in Simular they are faint and the ones of the block
+## followed light up, the members get a ring in the colour of their state and the one
+## followed a line to where its task takes it. The Equipe tool (E, or Alt with Ligar)
+## edits them by dragging (`UtsimDocument.team_link`): from a dispatcher to a transporter
+## (joins or leaves the team), from an object to a transporter or dispatcher (who carries
+## its items), with Shift from a processor (who supplies its operators).
 class_name EditorUtsim
 extends Node3D
 
@@ -36,6 +46,16 @@ const PORT_OUT := Color(0.45, 0.95, 0.55)
 const PORT_IN := Color(0.55, 0.80, 1.0)
 const PORT_PIXELS := 14.0
 const CRITICAL := Color(1.0, 0.30, 0.22)
+## The team and request lines by kind: colour and dash (metres drawn, metres skipped).
+const TEAM_LINES := {
+	"equipe": [Color(0.78, 0.58, 0.98), 0.5, 0.25],
+	"transporte": [Color(0.40, 0.86, 0.92), 0.14, 0.16],
+	"operadores": [Color(0.98, 0.70, 0.35), 0.14, 0.16],
+	"manutencao": [Color(1.0, 0.45, 0.42), 0.3, 0.2],
+	"casa": [Color(0.45, 0.90, 0.55), 0.2, 0.2],
+	"pausa": [Color(0.55, 0.80, 1.0), 0.2, 0.2],
+}
+const TASK_LINE := Color(1.0, 1.0, 1.0)
 ## Kinds without an output port (a sink only receives; mobile resources are not wired
 ## by ports) and without an input port (a source only sends).
 const NO_OUTPUT := ["Sink", "Transporter", "Dispatcher"]
@@ -46,7 +66,7 @@ var main: Node
 var selected: Array = []
 ## Selected connection `[from, to]`, or empty.
 var selected_link: Array = []
-## `selecionar`, `ligar`, `colocar`, `rede` or `corredor`.
+## `selecionar`, `ligar`, `colocar`, `rede`, `corredor` or `equipe`.
 var tool := "selecionar"
 ## Objects on the critical path of the PERT/CPM window (red outline).
 var critical: Array = []
@@ -56,6 +76,8 @@ var rede: EditorRede
 var corredores: EditorCorredores
 var place_id := ""
 var connect_from := ""
+## The start of a team link begun by a click (the next click ends it).
+var team_from := ""
 ## Mouse position on screen (kept from the events, so scripted input works the same).
 var mouse := Vector2.ZERO
 
@@ -78,6 +100,11 @@ var _ghost: Node3D
 var _connections: Array = []
 var _objects: Array = []
 var _hover := ""
+var _team_lines: MeshInstance3D
+var _team_mesh: ImmediateMesh
+var _links: Array = []
+var _links_of: Object
+var _alt := false
 
 
 func setup(owner_main: Node, canvas: CanvasLayer) -> void:
@@ -96,6 +123,13 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	mat.render_priority = 5
 	_lines.material_override = mat
 	add_child(_lines)
+	_team_mesh = ImmediateMesh.new()
+	_team_lines = MeshInstance3D.new()
+	_team_lines.name = "LigacoesEquipe"
+	_team_lines.mesh = _team_mesh
+	_team_lines.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_team_lines.material_override = mat
+	add_child(_team_lines)
 	_box_rect = ColorRect.new()
 	_box_rect.name = "CaixaSelecao"
 	_box_rect.color = Color(0.35, 0.65, 1.0, 0.18)
@@ -151,9 +185,12 @@ func set_tool(name: String, id := "") -> void:
 	tool = name
 	place_id = id if name == "colocar" else ""
 	connect_from = ""
+	team_from = ""
 	_show_ghost(place_id)
 	main.on_tool_changed()
 	match name:
+		"equipe":
+			main.set_status("Equipe: arraste do despachante a um transportador, ou de um objeto a quem leva os itens (Shift: de um processo a quem fornece os operadores); de novo desfaz. Esc cancela.")
 		"ligar":
 			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
 		"colocar":
@@ -499,6 +536,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
 	mouse = mb.position
+	_alt = mb.alt_pressed
 	if tool == "rede":
 		if mb.pressed:
 			get_viewport().gui_release_focus()
@@ -554,11 +592,14 @@ func _on_press(p: Vector2, shift: bool) -> void:
 	if tool == "colocar":
 		_place(place_id, p, shift)
 		return
+	var hits := hits_at(p)
+	if tool == "equipe" or (tool == "ligar" and _alt):
+		_team_press(p, hits, shift)
+		return
 	var port := port_at(p) if connect_from == "" else ""
 	if port != "":
 		_begin_link(p, port, false)
 		return
-	var hits := hits_at(p)
 	if tool == "ligar":
 		if connect_from == "" and not hits.is_empty():
 			_begin_link(p, hits[0], true)
@@ -640,12 +681,40 @@ func _connect_click(hits: Array) -> void:
 		main.set_status("Não ligou: %s" % doc().last_error())
 
 
+## A press of the Equipe tool: starts a drag from the block under the mouse, or ends a link
+## begun by a click.
+func _team_press(p: Vector2, hits: Array, shift: bool) -> void:
+	if team_from != "":
+		var from := team_from
+		team_from = ""
+		if hits.is_empty():
+			main.set_status("Equipe: clique no transportador ou despachante de destino.")
+			return
+		_team_link(from, hits[0], shift)
+		return
+	if hits.is_empty():
+		main.set_status("Equipe: comece num despachante ou num objeto.")
+		return
+	_press = {"pos": p, "shift": shift, "kind": "team", "name": hits[0]}
+	team_from = hits[0]
+
+
+func _team_link(from: String, to: String, operators: bool) -> void:
+	if from == to:
+		main.set_status("Equipe: solte sobre outro objeto.")
+		return
+	var r: Dictionary = doc().team_link(from, to, operators)
+	if r["ok"]:
+		main.after_edit()
+	main.set_status(("" if r["ok"] else "Não mudou: ") + String(r["message"]))
+
+
 func _on_drag(p: Vector2) -> void:
 	var start: Vector2 = _press["pos"]
 	if not _dragging and not _box and p.distance_to(start) < DRAG_PIXELS:
 		return
 	match _press["kind"]:
-		"link":
+		"link", "team":
 			_press["moved"] = true
 		"block":
 			if _press["shift"]:
@@ -708,6 +777,18 @@ func _on_release(p: Vector2) -> void:
 	if press["kind"] == "link":
 		_finish_link(p, press)
 		return
+	if press["kind"] == "team":
+		if not press.get("moved", false):
+			# A click: the next click is the destination.
+			main.set_status("Equipe: %s → clique no destino (Esc cancela)." % press["name"])
+			return
+		team_from = ""
+		var hits := hits_at(p)
+		if hits.is_empty():
+			main.set_status("Equipe: solte sobre o transportador ou despachante.")
+			return
+		_team_link(press["name"], hits[0], press["shift"])
+		return
 	if _dragging:
 		_dragging = false
 		doc().end_drag()
@@ -746,6 +827,11 @@ func cancel() -> void:
 			set_tool("selecionar")
 		return
 	if tool == "colocar":
+		set_tool("selecionar")
+	elif team_from != "":
+		team_from = ""
+		main.set_status("Equipe: cancelado.")
+	elif tool == "equipe":
 		set_tool("selecionar")
 	elif connect_from != "":
 		connect_from = ""
@@ -822,6 +908,7 @@ func _show_ghost(id: String) -> void:
 func _process(_dt: float) -> void:
 	if main == null:
 		return
+	_draw_team()
 	if not main.is_editing():
 		_lines.visible = false
 		for l in _ports:
@@ -934,6 +1021,107 @@ func _redraw() -> void:
 				pb.y = 0.06
 				_arrow(pa, pb, CONNECTING, 0.07)
 	_mesh.surface_end()
+
+
+## The team and request lines, in both modes (see the header).
+func _draw_team() -> void:
+	_team_mesh.clear_surfaces()
+	var c := cena()
+	if c == null or c.playback == null or c.rigs.is_empty():
+		_team_lines.visible = false
+		return
+	if _links_of != c.playback:
+		_links_of = c.playback
+		_links = c.playback.team_links() if c.playback.has_method("team_links") else []
+	_team_lines.visible = true
+	_team_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in 3:
+		_team_mesh.surface_set_color(Color(0, 0, 0, 0))
+		_team_mesh.surface_add_vertex(Vector3.ZERO)
+	var editing: bool = main.is_editing()
+	var focus := {}
+	if editing:
+		for n in selected:
+			focus[c.block_index(n)] = true
+	elif main.follow_name != "":
+		focus[c.block_index(main.follow_name)] = true
+	var hidden: Array = main.links_hidden
+	var members := {}
+	for l in _links:
+		var kind := String(l["kind"])
+		var from := int(l["from"])
+		var to := int(l["to"])
+		if kind == "equipe" and to >= 0:
+			members[to] = true
+		if hidden.has(kind) or from >= c.rigs.size() or to >= c.rigs.size():
+			continue
+		var a: Vector3 = (c.rigs[from]["root"] as Node3D).global_position
+		var b: Vector3 = (c.rigs[to]["root"] as Node3D).global_position if to >= 0 else l["point"]
+		var style: Array = TEAM_LINES.get(kind, [Color.WHITE, 0.3, 0.2])
+		var color: Color = style[0]
+		var lit := focus.has(from) or focus.has(to)
+		if editing:
+			color.a = 1.0 if lit or focus.is_empty() else 0.55
+		else:
+			color.a = 1.0 if lit else 0.22
+		_dashed(a + Vector3(0, 0.09, 0), b + Vector3(0, 0.09, 0), color, 0.09 if lit else 0.06, style[1], style[2])
+	if not editing:
+		# E8b: a ring in the colour of the state under each member, and the task of the one
+		# followed.
+		for i in members:
+			if i < c.rigs.size() and i < c._last_color.size():
+				var col: Color = c._last_color[i]
+				col.a = 0.9
+				_ring((c.rigs[i]["root"] as Node3D).global_position + Vector3(0, 0.04, 0), 0.62, col)
+		for i in focus:
+			if i >= 0 and i < c.task_target.size():
+				var t := c.task_target[i]
+				if not is_nan(t.x):
+					var a: Vector3 = (c.rigs[i]["root"] as Node3D).global_position
+					_dashed(a + Vector3(0, 0.12, 0), t + Vector3(0, 0.12, 0), TASK_LINE, 0.07, 0.35, 0.2)
+	elif team_from != "":
+		var a = block_position(team_from)
+		var b = floor_at(mouse)
+		if a != null and b != null:
+			_dashed((a as Vector3) + Vector3(0, 0.1, 0), (b as Vector3) + Vector3(0, 0.1, 0), TEAM_LINES["equipe"][0], 0.08, 0.3, 0.15)
+	_team_mesh.surface_end()
+
+
+## A dashed ribbon from `a` to `b` (`on` metres drawn, `off` skipped).
+func _dashed(a: Vector3, b: Vector3, color: Color, width: float, on: float, off: float) -> void:
+	var d := b - a
+	var length := d.length()
+	if length < 1e-3:
+		return
+	var dir := d / length
+	var side := Vector3(-dir.z, 0, dir.x).normalized() * width * 0.5
+	if side.length() < 1e-6:
+		side = Vector3(width * 0.5, 0, 0)
+	var s := 0.0
+	while s < length:
+		var e := minf(s + on, length)
+		var p := a + dir * s
+		var q := a + dir * e
+		for v in [p - side, p + side, q + side, p - side, q + side, q - side]:
+			_team_mesh.surface_set_color(color)
+			_team_mesh.surface_add_vertex(v)
+		s = e + off
+
+
+## A ring on the floor around `c`.
+func _ring(c: Vector3, r: float, color: Color) -> void:
+	var n := 20
+	var w := 0.07
+	for k in n:
+		var a0 := TAU * k / n
+		var a1 := TAU * (k + 1) / n
+		var p0 := c + Vector3(cos(a0), 0, sin(a0)) * r
+		var p1 := c + Vector3(cos(a1), 0, sin(a1)) * r
+		var q0 := c + Vector3(cos(a0), 0, sin(a0)) * (r + w)
+		var q1 := c + Vector3(cos(a1), 0, sin(a1)) * (r + w)
+		for v in [p0, q0, q1, p0, q1, p1]:
+			_team_mesh.surface_set_color(color)
+			_team_mesh.surface_add_vertex(v)
 
 
 ## A port: a small diamond on the floor.

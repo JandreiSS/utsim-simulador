@@ -191,6 +191,11 @@ impl UtsimUi {
         if let Some(v) = get("step") {
             s.step = v.try_to::<f64>().unwrap_or(s.step);
         }
+        if let Some(v) = get("links_hidden")
+            && let Ok(list) = v.try_to::<PackedStringArray>()
+        {
+            s.links_hidden = list.as_slice().iter().map(|g| g.to_string()).collect();
+        }
         if let Some(v) = get("can_undo") {
             s.can_undo = v.try_to::<bool>().unwrap_or(s.can_undo);
         }

@@ -37,6 +37,8 @@ var _item_spare: Array[Node3D] = []
 var _templates := {}
 var _materials := {}
 var _last_color: Array = []
+## Where each mobile resource goes for its current task, at the last frame (NaN: none).
+var task_target := PackedVector3Array()
 var _last_label: Array = []
 var _pallets := false
 var _clips2: AnimationLibrary
@@ -516,6 +518,7 @@ func apply(t: float, dt: float, snap := false) -> void:
 			(rig["person"] as Pessoa).drive(clip[i], clip_time[i], dt, snap)
 		if rig.has("driver"):
 			(rig["driver"] as Pessoa).drive(clip[i], clip_time[i], dt, snap)
+	task_target = f.get("task_target", PackedVector3Array())
 	var color: PackedColorArray = f["color"]
 	var label: PackedStringArray = f["label"]
 	for i in rigs.size():

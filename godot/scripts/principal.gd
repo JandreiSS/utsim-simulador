@@ -106,6 +106,8 @@ var _data_pick_path := ""
 var last_report := {}
 ## A recorded replay (`.json`) is being played instead of the document.
 var playing_replay := false
+## The kinds of team and request lines hidden (the "Ligações" toggles of the bar).
+var links_hidden: Array = []
 
 
 func _ready() -> void:
@@ -395,6 +397,7 @@ func _sync_bar() -> void:
 		"can_redo": doc.can_redo(),
 		"title": "%s%s" % [doc.name(), dirty],
 		"title_tip": "%s%s\n%s" % [doc.name(), dirty, file],
+		"links_hidden": PackedStringArray(links_hidden),
 	})
 
 
@@ -421,6 +424,11 @@ func bar_action(what: String) -> void:
 			undo()
 		"refazer":
 			redo()
+		"ligacoes":
+			var kind := arg.get_slice(":", 0)
+			links_hidden.erase(kind)
+			if arg.get_slice(":", 1) == "desligar":
+				links_hidden.append(kind)
 		"ferramenta":
 			if arg == "selecionar" or arg == "ligar":
 				editor.set_tool(arg)
@@ -1344,6 +1352,8 @@ func _edit_key(k: InputEventKey) -> bool:
 			editor.set_tool("selecionar" if editor.tool == "rede" else "rede")
 		KEY_C:
 			editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor")
+		KEY_E:
+			editor.set_tool("selecionar" if editor.tool == "equipe" else "equipe")
 		KEY_ENTER, KEY_KP_ENTER:
 			if editor.tool != "corredor" or not editor.corredores.finish():
 				return false

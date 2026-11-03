@@ -468,13 +468,13 @@ Exemplos novos em `examples/`: `chegadas_por_tabela.ron` (pedidos por hora e tip
 | 5 | E1a Operações de equipe em `utsim-edit` e linhas em `utsim-scene` | 5–7 | Opus | nada | já |
 | 6 | E3 Regras `LeastBusy`, `LongestIdle`, `Random` e `pick` | 8–12 | Opus | E2 | depois de 1 |
 | 7 | E8a Métricas de equipe e `task_target` na cena | 4–6 | Sonnet | nada | já |
-| 8 | E1b Ligações de equipe e pedido no editor 3D | 9–13 | Opus | 5, entrega do outro agente | depois |
+| 8 | E1b Ligações de equipe e pedido no editor 3D | 9–13 | Opus | 5, entrega do outro agente | **feito** (interface em Rust, passo 5b) |
 | 9 | C7 Fonte no 3D (portas, prévia, acumulados, selo) | 10–14 | Sonnet | 3, entrega do outro agente | depois |
 | 10 | C6 Editores de tabela e horário (egui) | 16–24 | Sonnet | 2, plano da interface Rust | depois |
 | 11 | E5 Casa, área de espera e pausa | 8–12 | Sonnet + Opus | nada | já |
 | 12 | E4 Preempção `Empty` | 8–12 | Opus | E2 | depois de 1 |
 | 13 | C5 Tabela de chegadas de planilha | 8–12 | Sonnet | 2 | depois de 2 |
-| 14 | E8b Equipe ao vivo no 3D | 6–8 | Sonnet | 7, 8 | depois |
+| 14 | E8b Equipe ao vivo no 3D | 6–8 | Sonnet | 7, 8 | **feito** (interface em Rust, passo 5b) |
 | 15 | C4 Rótulos de texto e por expressão | 8–12 | Opus | 2 | depois de 2 |
 | 16 | E4 Preempção `Full` | 14–20 | Opus | 12 | se o dono quiser |
 | 17 | E6 Hierarquia e membros compartilhados | 12–18 | Opus | 6 | se um caso pedir |

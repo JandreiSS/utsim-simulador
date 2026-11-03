@@ -303,6 +303,23 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   do PERT passava da borda de baixo; a nota dos fluxos falava de uma linha amarela que é azul;
   as janelas de arquivo do sistema não deixavam os roteiros com janela responder.
 
+### Passo 5b, ligações de equipe e equipe ao vivo (E1b, E8b), como foi feito
+
+- A ponte manda as linhas de `utsim_scene::team_links` com os blocos desenhados
+  (`UtsimPlayback.team_links()`), o destino da tarefa de cada recurso móvel no quadro
+  (`task_target`, de `travel_target`) e, no rótulo do despachante, quantos membros estão
+  livres. O `editor.gd` desenha as linhas numa malha própria, visível no Editar e no Simular
+  (decisão D5: apagadas no Simular, acesas as do bloco seguido), o anel de estado dos membros e
+  a linha da tarefa do seguido.
+- Ferramenta **Equipe** (decisão D4: ferramenta própria, tecla E, e `Alt` com Ligar):
+  `UtsimDocument.team_link(de, para, operadores)` decide pelo tipo dos dois objetos (equipe,
+  transporte ou, com Shift, operadores), com as operações de `utsim_edit::teams`, um passo de
+  desfazer, e diz o que mudou.
+- O menu ▼ de Analisar ganhou os interruptores das linhas por tipo (`Ligacoes_<tipo>`); para a
+  barra caber a 1600 px com a ferramenta nova, o botão Atalhos virou "?" (a dica diz F1).
+- Roteiro `g4_equipes.json` (tira e põe um membro, transporte, operadores, desfazer, Simular
+  seguindo um membro) e o teste `team_lines_and_the_free_members_come_with_the_frame`.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
