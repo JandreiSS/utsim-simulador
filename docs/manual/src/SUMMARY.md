@@ -32,6 +32,7 @@
 - [Experimentos e otimização](experimentos-e-otimizacao.md)
 - [PERT/CPM de uma parte do processo](pert-cpm.md)
 - [Qualidade: cartas de controle, capacidade e MSA](qualidade.md)
+- [Estatística: descritiva e testes de hipótese](estatistica.md)
 
 # Recursos avançados
 

@@ -1,0 +1,5 @@
+# Peças boas e defeituosas por turno (dados sintéticos): qui-quadrado de independência.
+turno,boas,defeituosas
+manha,482,18
+tarde,471,29
+noite,455,45

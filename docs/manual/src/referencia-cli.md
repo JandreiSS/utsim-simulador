@@ -19,6 +19,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
+| `utsim estatistica` | descritiva e testes de hipótese (t, ANOVA com Tukey, qui-quadrado, proporções, Fisher, Mann-Whitney, Wilcoxon) sobre as colunas de um CSV | [Estatística](estatistica.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) e grava paredes e colunas como obstáculos do modelo | [Planta CAD](planta-cad.md) |
 | `utsim rede gerar` | gera a rede de caminhos pelo caminho livre, desviando dos obstáculos, e grava no modelo | [Movimentação e obstáculos](movimentacao.md) |
@@ -50,6 +51,8 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
 utsim qualidade capacidade examples/qualidade/lead_time.csv --lse 18 --metodo todos
 utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
+utsim estatistica descritiva examples/estatistica/setup.csv --coluna antes
+utsim estatistica teste-t examples/estatistica/setup.csv --coluna antes --coluna2 depois --pareado
 utsim planta galpao.dxf --obstaculos modelo.ron
 utsim rede gerar modelo.ron --usar
 utsim corredores modelo.ron --svg planta.svg
@@ -67,6 +70,7 @@ utsim corredores modelo.ron --svg planta.svg
   para ele e `--sorteios` só para `montecarlo`.
 - `gemeo`: o arquivo do gêmeo é `<modelo>.gemeo.ron` (ou `--config`); `--ate` é o tempo do gêmeo em que a sessão termina (sem ele, até Ctrl+C); `--estado` grava o estado observado como estado inicial; `reproduzir` aceita a pasta de uma sessão ou a pasta de gravações (usa a mais recente).
 - `qualidade`: tem quatro subcomandos (`carta`, `capacidade`, `msa`, `arl`), cada um com o seu `--help`. Na `carta`, `--excluir` e `--revisar` são da fase I e `--limites` da fase II; `--regras` aceita `1`, `we`, `nelson` ou uma lista como `1,2,5`. Na `capacidade`, `--deslocamento` é o deslocamento somado ao Z no nível sigma (1,5 por convenção).
+- `estatistica`: tem sete subcomandos (`descritiva`, `teste-t`, `anova`, `qui-quadrado`, `proporcao`, `mann-whitney`, `wilcoxon`), cada um com o seu `--help`. `--coluna` e `--coluna2` aceitam o nome do cabeçalho ou o número da coluna; `--alternativa` é `diferente`, `menor` ou `maior`; no `teste-t`, Welch é o padrão e `--combinada` supõe variâncias iguais.
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 ## Saída de `--help`
