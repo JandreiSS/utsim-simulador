@@ -38,6 +38,8 @@ Cria itens. É por aqui que o trabalho entra no modelo.
 | `table` | nenhuma | tabela de chegadas: instantes fixos ou sequência ordenada de linhas com quantidade e rótulos (veja abaixo) |
 | `batch` | um item | itens criados em cada chegada (`Dist`, arredondada, mínimo 0), por exemplo `Const(6.0)` para caixas de seis. Sem `table` |
 | `release` | `Together` | como os itens de uma chegada (lote ou linha da tabela) saem: `Together` (todos no instante da chegada) ou `OneByOne(Dist)` (um a um, com esse intervalo entre eles) |
+| `item_type` | nenhum | tipo de todos os itens (um nome de `item_types`, veja abaixo) |
+| `item_type_mix` | `[]` | tipos sorteados para cada item, com pesos: `[("A", 0.7), ("B", 0.3)]`. Não junto com `item_type` |
 
 Os dois valores de `on_blocked`:
 
@@ -116,6 +118,7 @@ Quando as chegadas vêm de uma lista (caminhões com hora marcada, ordens de pro
 | `rows[].at` | obrigatório em `Times` | instante da linha, em ordem não decrescente; não vale em `Sequence` |
 | `rows[].count` | `1` | itens criados de uma vez pela linha (0 é aceito: a linha não cria nada) |
 | `rows[].labels` | `{}` | rótulos constantes dos itens da linha; substituem os rótulos sorteados de mesmo nome |
+| `rows[].item_type` | o da fonte | tipo dos itens da linha (veja "Tipos de item") |
 
 Regras:
 
@@ -127,6 +130,33 @@ Regras:
 - Os erros apontam a linha, contada a partir de 1: `pedidos: table.rows[2]: at (300) antes da linha anterior (480); as linhas precisam estar em ordem de at`.
 - A fonte com tabela ganha as métricas `arrivals.count` (chegadas, isto é, linhas usadas) e `entered.count` (itens que saíram).
 - O `utsim check` resume a tabela: `chegadas: pedidos: horário com 3 linha(s), 25 item(ns) a cada ciclo de 1440`.
+
+### Tipos de item (`item_types`)
+
+O modelo pode declarar tipos de item no nível de cima, ao lado de `objects`. O tipo dá nome, cor e aparência no 3D aos itens e rótulos iniciais:
+
+```ron
+item_types: [
+    (name: "A", color: "#3b82f6", asset: "caixa_pequena", labels: { "peso": 8.0 }),
+    (name: "B", color: "#f59e0b", asset: "palete", labels: { "peso": 400.0 }),
+],
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `name` | obrigatório | nome único do tipo |
+| `color` | nenhuma | cor dos itens no 3D, `"#rrggbb"` |
+| `asset` | nenhum | aparência dos itens no 3D: um modelo da biblioteca ou um arquivo `.glb` |
+| `labels` | `{}` | rótulos constantes que todo item do tipo recebe ao nascer |
+
+A fonte escolhe o tipo com `item_type` (fixo), `item_type_mix` (sorteado com pesos) ou, numa tabela de chegadas, com `item_type` em cada linha (a linha vence a fonte).
+
+- **Rótulo reservado `type`.** O item de tipo `k` (contado a partir de 1, na ordem de `item_types`) leva o rótulo numérico `type = k`. Assim `output: ByLabel("type")` manda o tipo 1 para a saída 1, o tipo 2 para a saída 2, e os scripts leem `type` como qualquer rótulo. Por isso `type` não pode aparecer nos `labels` de uma fonte que dá tipo aos itens, nem nos rótulos de um tipo ou de uma linha.
+- **Ordem dos rótulos.** Primeiro os do tipo, depois os sorteados da fonte (e do período), por fim os da linha da tabela: o mais específico vence.
+- **Relatório por tipo.** Num modelo com tipos, cada `Sink` registra também `time_in_system.<tipo>` (por exemplo `saida.time_in_system.A.mean`); a contagem dessa medida é a vazão do tipo, e as contagens somam o `time_in_system` total.
+- **3D.** A cena (`utsim cena` e a cena ao vivo) lista os tipos no cabeçalho, com cor e aparência, e cada item no quadro diz o seu tipo; os visualizadores desenham o item com a cor e o modelo do tipo.
+- O `utsim check` lista os tipos: `chegadas: tipos de item (rótulo 'type'): A = 1 (#3b82f6, caixa_pequena); B = 2 (#f59e0b, palete)`.
+- Um nome de tipo que não existe é erro, com a lista dos tipos do modelo.
 
 ### Lote por chegada (`batch` e `release`)
 

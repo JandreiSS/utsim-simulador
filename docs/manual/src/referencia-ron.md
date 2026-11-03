@@ -24,6 +24,7 @@ Model(
     description: "Texto livre",
     run: (stop_time: 1000.0),
     calendars: { "S1": (period: 1440.0, off: [...]) },
+    item_types: [ (name: "A", color: "#3b82f6", asset: "caixa_pequena", labels: {...}), ... ],
     objects: [ ... ],
     connections: [ ... ],
     network: Some((...)),
@@ -145,10 +146,12 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `table` | nenhuma: `(mode: Times, repeat: Once, rows: [(at: n, count: 1, labels: {...}), ...])`; não junto com `schedule` |
 | `batch` | nenhum (um item por chegada): `Dist` de itens por chegada, arredondada; não junto com `table` |
 | `release` | `Together` (ou `OneByOne(Dist)`: itens da chegada um a um, com esse intervalo) |
+| `item_type` | nenhum: nome de um tipo de `item_types` |
+| `item_type_mix` | `[]`: `[("nome", peso), ...]`, pesos >= 0 com ao menos um > 0; não junto com `item_type` |
 
 Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
 
-Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não decrescente) ou `Sequence` (sem `at`; `interarrival` entre linhas); `repeat` é `Once` (padrão), `Cycle(d)` (só `Times`, `d > 0`, `at` em `[0, d)`) ou `Loop` (só `Sequence`); `count` (padrão 1, de 0 a 1.000.000) e `labels` (mapa de nome para número) por linha. Veja [Objetos](objetos.md#tabela-de-chegadas-table).
+Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não decrescente) ou `Sequence` (sem `at`; `interarrival` entre linhas); `repeat` é `Once` (padrão), `Cycle(d)` (só `Times`, `d > 0`, `at` em `[0, d)`) ou `Loop` (só `Sequence`); `count` (padrão 1, de 0 a 1.000.000), `labels` (mapa de nome para número) e `item_type` (nome de um tipo) por linha. Veja [Objetos](objetos.md#tabela-de-chegadas-table).
 
 ### `Queue`
 
