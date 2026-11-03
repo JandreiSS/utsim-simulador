@@ -658,12 +658,12 @@ dos dados.
 
 | Perfil | Vê | Faz |
 |---|---|---|
-| MBB | tudo do programa | papéis, metas, unidades, designação, revisão de tollgate, competência demonstrada, decisões do comitê, anonimização |
+| MBB | tudo do programa | papéis, metas, unidades, designação, revisão de tollgate, competência demonstrada, decisões do comitê, anonimização, ondas, turmas, currículo, seleção dos alunos e certificação |
 | Champion | sua unidade (ou todas, sem unidade no perfil) | triagem (enviar ao comitê), pauta do comitê, aprovação de tollgate |
 | Patrocinador | placar | aprovação de termo, tollgate e encerramento |
 | Belt | seus projetos e o próprio diário de mentoria | conduz projetos, registra a mentoria recebida |
 | Controladoria | ganhos de todo o programa | valida ganhos |
-| Instrutor | suas turmas (etapa L7) | registra estudo e prática |
+| Instrutor | suas turmas, o banco de questões e as notas | sessões, presença, provas e correção, estudo e prática |
 | Liderança | painel da liderança | comentar |
 | Aluno | espaço de treino (etapa L8) | exercícios e provas |
 
@@ -684,7 +684,8 @@ compartilhamento das pastas, que o app não confere (não usa a API do Drive):
   essas duas pessoas e tire o acesso herdado dos demais, ou mantenha `mentoria/` fora da pasta
   compartilhada geral);
 - valores financeiros sigilosos antes da validação numa pasta `financas/` só da controladoria
-  e do MBB; gabaritos, banco de questões e notas (etapa L7) em pastas do MBB e dos instrutores.
+  e do MBB; banco de questões, gabaritos e notas nas pastas restritas da formação (veja
+  Formação e certificação).
 
 Até a lista de papéis assinada (etapa P7), quem edita os arquivos à mão consegue gravar uma
 alteração, mas o app a ignora se o autor não tiver o perfil.
@@ -702,6 +703,149 @@ alteração, mas o app a ignora se o autor não tiver o perfil.
   em que um arquivo do diário muda depois de gravado, mantendo o mesmo identificador), para que
   o valor original não sobreviva em nenhum arquivo. Os projetos guardam o nome na equipe deles
   e não são reescritos.
+
+## Formação e certificação
+
+As telas **Formação: ondas, turmas e seleção**, **Currículo, sessões e presença**, **Provas e
+correção**, **Certificação** e **Minha formação** ficam na pasta do programa. O app sugere e
+confere; quem decide é o MBB.
+
+### Ondas, turmas e escolha dos candidatos
+
+- Uma **onda** é um ciclo do programa (um semestre, por exemplo) com metas de formação por
+  nível. Cada **turma** tem nível (yellow, green ou black belt), onda, datas, local ou forma,
+  vagas, instrutores e as mínimas de frequência (padrão 80 %) e de nota (padrão 70 %), escritas
+  como fração (0,8 = 80 %).
+- **Indicação**: pelo gestor, pelo champion ou pela própria pessoa, com justificativa, função,
+  tempo na empresa, desempenho declarado e horas disponíveis. Green e black belt precisam de
+  uma oportunidade candidata do funil, que é o projeto de formação.
+- **Critérios de indicação** da empresa: tempo na empresa, função, nível anterior concluído,
+  desempenho declarado pelo gestor, horas disponíveis e unidade com meta aberta, cada um
+  eliminatório ou classificatório com peso. "Criar os critérios padrão" grava seis meses de
+  empresa e, para black belt, o green belt concluído (eliminatórios), e desempenho (peso 2),
+  8 horas disponíveis e unidade com meta aberta (classificatórios).
+- **Aprovação do gestor imediato**: só o gestor indicado aprova ou recusa (com motivo),
+  nunca a própria pessoa; o MBB pode decidir no lugar dele. Aprovar compromete as horas de aula
+  e de projeto no período. A indicação só é alterada por quem a fez (ou pelo MBB), e a própria
+  pessoa pode desistir.
+- **Capacidade**: o app soma as horas por semana da turma e as do projeto de formação (padrão
+  do nível) e confere com as horas livres da pessoa na tela Capacidade e designação (ou com as
+  horas disponíveis da indicação, quando a capacidade não está cadastrada).
+- **Seleção**: escolhida a turma, a tela mostra a proposta: elegíveis (aprovados pelo gestor,
+  sem falhar critério eliminatório e com capacidade) até as vagas, os demais elegíveis na lista
+  de espera pela pontuação dos classificatórios, e os que ficam fora com o motivo. "Confirmar a
+  seleção" grava a decisão do MBB; quando alguém desiste, "Chamar o próximo da lista de espera"
+  dá a vaga ao primeiro. Alunos de green e black belt sem projeto aparecem na pauta do comitê de
+  seleção como pedidos de projeto de certificação.
+
+### Equipes de formação
+
+"Sugerir equipes" distribui os alunos da turma em grupos de exercício: tamanhos equilibrados,
+no máximo N pessoas da mesma área por grupo (padrão 5 por grupo e 2 da mesma área, ajustáveis
+na tela) e a menor repetição de unidade, área e função. O método é guloso com troca local e dá
+a mesma distribuição para a mesma entrada; cada restrição que sobra é explicada (por exemplo,
+aluno de green belt sem projeto candidato ou sem champion). O MBB usa a sugestão, move pessoas
+entre os grupos e confirma.
+
+### Currículo, instrutores e presença
+
+- **Currículo por nível**: "Criar a estrutura padrão" grava os módulos do nível pelas fases do
+  DMAIC (yellow belt 16 h, green belt 80 h, black belt 96 h), cada um com carga horária,
+  objetivos, pré-requisito e as **ferramentas do app** que ensina. A empresa edita os módulos,
+  as cargas e as ferramentas e anexa o próprio material. As cargas padrão são uma proposta.
+- **Instrutores**: cadastro com os módulos que cada um pode dar, horas dadas no ano (contam
+  para a renovação da certificação do próprio instrutor) e sessões; uma sessão dada por quem
+  não é qualificado para o módulo aparece em destaque.
+- **Sessões e presença**: na turma escolhida, cada sessão tem data, horas e módulos; a presença
+  é presente, ausente ou justificado (a ausência justificada continua sendo ausência para a
+  frequência, registrada com o motivo) e a caixa "ex." marca o exercício da sessão feito
+  corretamente. Quem esteve em todas as sessões de um módulo fica com **estudou** nas
+  ferramentas dele no mapa de competências; o exercício correto dá **praticou**. Um módulo dado
+  antes do pré-requisito aparece como aviso.
+
+### Provas
+
+- **Banco de questões** (pasta restrita `formacao/questoes.lss`, com o gabarito): múltipla
+  escolha, verdadeiro ou falso, resposta numérica com tolerância e **problema prático**. No
+  problema prático a resposta esperada é calculada pelo app a partir dos dados de cada caderno,
+  com as mesmas funções das telas de estatística (média, desvio-padrão, Cpk com sigma de curto
+  prazo pela amplitude móvel, Ppk, DPMO), nunca digitada. "Questões de exemplo dos módulos"
+  grava algumas questões para começar.
+- **Sorteio**: a prova escolhe os módulos e quantas questões fáceis, médias e difíceis; a
+  semente fica registrada e a mesma semente dá a mesma prova. A ordem das questões e os dados
+  do problema prático variam por aluno, gerados pela semente.
+- **Aplicação no app**: "Publicar os cadernos" grava na pasta da turma
+  (`formacao/turmas/<turma>.lss`) um caderno por aluno, sem gabarito. O aluno abre **Minha
+  formação**, "Fazer a prova", responde e entrega; depois de entregue, o caderno não muda. As
+  respostas voltam como alterações do próprio aluno e são corrigidas na máquina do instrutor
+  ("Corrigir as entregues"), que refaz o caderno pela semente e confere com o banco. Números
+  valem dentro da tolerância, com os limites incluídos; a vírgula decimal é aceita.
+- **Aplicação em papel**: o instrutor lança a nota de cada aluno (em %).
+- **Notas** (pasta restrita `formacao/notas.lss`): nota, aprovação pela nota mínima da prova
+  (padrão 70 %) e o detalhe de cada questão. O aluno vê a própria nota pela pasta da turma (só
+  a nota e o resultado, sem o detalhe). Cabe **uma reaplicação** por prova ("reaplicação de"
+  no sorteio); vale a melhor tentativa.
+- Sem servidor, a prova no app não impede consulta. A empresa decide se ela vale para a
+  certificação (caixa "vale para certificação" de cada prova, decisão MB3).
+
+### Requisitos e registro de certificação
+
+A tela **Certificação** confere os requisitos de um nível para uma pessoa com os dados do
+programa. Tabela padrão (decisão MB4), que a empresa edita em "Editar os requisitos deste
+nível":
+
+| Requisito | Yellow | Green | Black |
+|---|---|---|---|
+| Formação do nível concluída com a frequência mínima | sim | sim | sim |
+| Prova aprovada | sim | sim | sim |
+| Projetos encerrados com todos os tollgates aprovados | participação em 1 | 1 como líder | 2 como líder |
+| Ganho validado pela controladoria nos projetos liderados | não | valor da empresa | valor da empresa |
+| Ferramentas em aplicou ou demonstrou | 3 | lista mínima | lista mínima |
+| Mentoria dada (green belt acompanhado até o encerramento) | não | não | 1 |
+| Parecer do MBB | não | sim | sim |
+
+- Cada requisito mostra **atende**, **não atende** ou **ambíguo** com o motivo, e guarda a
+  evidência: o identificador e o hash do item que o comprova (a turma com a frequência, a nota
+  da prova, o projeto com os hashes dos tollgates, os ganhos validados, as ferramentas do mapa).
+  Ambíguo vai para o MBB: ganho só previsto ou realizado sem validação, ou projeto com
+  entregável alterado depois da aprovação do tollgate. Só o ganho validado conta; ganho
+  estimado por simulação nunca conta, e projetos de treino não contam.
+- O valor de ganho padrão é "algum ganho validado"; a empresa grava o seu. As listas mínimas
+  padrão são, para green belt, SIPOC, plano de coleta, Ishikawa, FMEA e plano de controle, e
+  para black belt também VOC/CTQ, matriz causa-efeito e plano de resposta.
+- A mentoria dada vem das designações em que a pessoa é a mentora de um green belt cujo
+  projeto encerrou com todos os tollgates aprovados.
+- O MBB registra o **parecer**; com tudo atendido, "Emitir a certificação" grava o registro:
+  número sequencial do programa, pessoa, nível, data, validade de **três anos**, os requisitos
+  com as evidências e o emissor. O nível e a data de certificação da pessoa são atualizados.
+- **Master black belt** e certificações anteriores ao programa são registradas à mão, com a
+  observação de em que se apoiam.
+- **Validade e renovação** (decisão MB5): aviso 90 dias antes do fim; vencida aparece como tal
+  aqui e nos painéis. A renovação vale quando, no período da certificação, a pessoa tem
+  qualquer uma das regras da empresa (padrão: 1 projeto encerrado como líder, 1 green belt
+  acompanhado até o encerramento ou 16 h de formação dadas). A nova certificação tem o número
+  seguinte e começa no dia seguinte ao fim da anterior. Uma certificação pode ser revogada, com
+  o motivo.
+- **Funil de certificação** (também no painel do MBB): indicados, aprovados pelo gestor,
+  selecionados, formados, com projeto e certificados, por onda e nível, com o motivo das
+  saídas.
+
+O certificado em PDF vem com os relatórios (etapa L5).
+
+### Pastas restritas da formação
+
+```
+Programa LSS.lss/
+  formacao/questoes.lss/        banco de questões e gabaritos: só MBB e instrutores
+  formacao/notas.lss/           notas: só MBB e instrutores
+  formacao/turmas/<turma>.lss/  cadernos sem gabarito, respostas e a nota de cada aluno
+```
+
+Cada pasta tem o próprio diário, criado pelo MBB ou por um instrutor na primeira gravação. No
+Drive, compartilhe `questoes.lss` e `notas.lss` só com o MBB e os instrutores, e cada pasta de
+turma só com eles e os alunos da turma (quem abre os arquivos da pasta da turma vê as notas dos
+colegas; o app mostra a cada aluno só a sua). O app confere quem grava: na pasta da turma cada
+aluno só grava as próprias respostas, e nada depois de entregar.
 
 ## A pasta do projeto
 
@@ -736,11 +880,9 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 ## O que vem depois
 
-Pela ordem do plano: as telas de estatística (sobre o `utsim-quality` e o `utsim-stats`),
-integração com o modelo de simulação (SIPOC e fluxograma gerados do modelo), os relatórios em
-PDF e os modelos da empresa, a formação e certificação dos belts (ondas, turmas, provas,
-requisitos e registro de certificação, que vão preencher o nível, a formação e o "estudou" do
-mapa de competências) e o modo de ensino. Do programa ficam para depois a lista de papéis
-assinada, a exportação dos painéis e o currículo ligado ao mapa. Da gestão do projeto ficam para
+Pela ordem do plano: integração com o modelo de simulação (SIPOC e fluxograma gerados do
+modelo), os relatórios em PDF (com o certificado) e os modelos da empresa, as telas de
+estatística (sobre o `utsim-quality` e o `utsim-stats`) com o MSA e o modo de ensino. Do
+programa ficam para depois a lista de papéis assinada e a exportação dos painéis. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
