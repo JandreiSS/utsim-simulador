@@ -301,7 +301,7 @@ aplicado por um `Document` (`utsim-edit`, sem dependência de interface gráfica
   português. Além dos tipos puros há predefinições: operador, empilhadeira e AGV são
   `Transporter` com o `visual` e as velocidades do papel. Coloca-se clicando no item e depois
   no chão (o fantasma mostra onde, Shift mantém a ferramenta) ou arrastando o item até o chão.
-- **Grade.** Colocar e arrastar encaixam na grade quando "Encaixar na grade" está ligado; o
+- **Grade.** Colocar e arrastar encaixam na grade quando "Grade" (encaixar na grade) está ligado; o
   passo é configurável e a grade desenhada segue o passo. As setas movem a seleção um passo.
 - **Seleção múltipla.** Shift + clique põe ou tira um bloco; Shift + arrastar no chão desenha
   uma caixa e soma à seleção os blocos cujo centro projetado cai nela. O primeiro selecionado é

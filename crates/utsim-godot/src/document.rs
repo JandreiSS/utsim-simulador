@@ -14,7 +14,7 @@ use std::path::Path;
 
 use utsim_core::RunReport;
 use utsim_edit::arrange::{self, Align, Axis, Clipboard};
-use utsim_edit::{Command, Document, Issue};
+use utsim_edit::{Command, Document, Issue, PaletteEntry};
 use utsim_model::replay::{Replay, ReplayBlock, kind_name};
 use utsim_model::{Model, VisualDef, is_mobile};
 
@@ -46,6 +46,51 @@ pub fn default_sample_interval(stop_time: f64, warmup: f64) -> f64 {
 
 /// Default number of histogram bins.
 pub const DEFAULT_HISTOGRAM_BINS: usize = 20;
+
+/// Library entry of a stack: a `Queue` with `discipline: Lifo` (the Godot library adds
+/// it right after "Fila", which stays FIFO).
+pub const STACK_ID: &str = "QueueLifo";
+
+/// The object library of the Godot editor: [`utsim_edit::PALETTE`] plus "Pilha (LIFO)"
+/// after "Fila".
+pub fn palette() -> Vec<PaletteEntry> {
+    let mut out = Vec::new();
+    for e in utsim_edit::PALETTE {
+        out.push(e);
+        if e.id == "Queue" {
+            out.push(PaletteEntry {
+                id: STACK_ID,
+                kind: "Queue",
+                label: "Pilha (LIFO)",
+                category: e.category,
+                name_base: "pilha",
+                asset: None,
+            });
+        }
+    }
+    out
+}
+
+pub fn palette_entry(id: &str) -> Option<PaletteEntry> {
+    palette().into_iter().find(|e| e.id == id)
+}
+
+/// The command that adds an object of library entry `id` called `name` at `position`
+/// (one undo step), or `None` for an unknown entry.
+pub fn add_command(id: &str, name: &str, position: [f64; 3]) -> Option<Command> {
+    if id == STACK_ID {
+        let queue = utsim_edit::from_palette("Queue", name, position)?;
+        return Some(Command::Batch(vec![
+            Command::Add(Box::new(queue)),
+            Command::Set {
+                key: format!("{name}.discipline"),
+                value: "Lifo".into(),
+            },
+        ]));
+    }
+    let object = utsim_edit::from_palette(id, name, position)?;
+    Some(Command::Add(Box::new(object)))
+}
 
 /// Mobile resources are not wired by ports: the message shown when the user tries to
 /// connect one (`None` for ordinary blocks).
@@ -197,12 +242,11 @@ impl Editor {
     /// Adds an object of palette entry `id` at `position` (model coordinates) with a free
     /// name; returns the name.
     pub fn add(&mut self, id: &str, position: [f64; 3]) -> Result<String, String> {
-        let entry =
-            utsim_edit::palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        let entry = palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
         let name = self.doc.unique_name(entry.name_base);
-        let object = utsim_edit::from_palette(id, &name, position)
-            .ok_or_else(|| format!("tipo desconhecido: {id}"))?;
-        self.apply(Command::Add(Box::new(object)))?;
+        let command =
+            add_command(id, &name, position).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        self.apply(command)?;
         Ok(name)
     }
 
@@ -675,9 +719,8 @@ pub fn look_model(model: &Model, name: &str, asset: &str) -> Option<Model> {
 /// A model with only palette entry `id` at the origin (the ghost shown while placing).
 pub fn palette_model(id: &str) -> Option<Model> {
     let mut doc = Document::new("fantasma");
-    let base = utsim_edit::palette_entry(id)?.name_base;
-    let object = utsim_edit::from_palette(id, base, [0.0; 3])?;
-    doc.apply(Command::Add(Box::new(object))).ok()?;
+    let base = palette_entry(id)?.name_base;
+    doc.apply(add_command(id, base, [0.0; 3])?).ok()?;
     Some(doc.model().clone())
 }
 
@@ -794,6 +837,44 @@ mod tests {
         assert!(!e.doc.undo());
         while e.doc.redo() {}
         assert_eq!(e.model().connections.len(), 3);
+    }
+
+    #[test]
+    fn the_library_has_a_stack_after_the_fifo_queue() {
+        let p = palette();
+        let at = p.iter().position(|e| e.id == "Queue").unwrap();
+        assert_eq!(p[at + 1].id, STACK_ID);
+        assert_eq!(p[at + 1].category, p[at].category);
+        let mut e = line();
+        let name = e.add(STACK_ID, [0.0, 6.0, 0.0]).unwrap();
+        assert_eq!(name, "pilha");
+        assert_eq!(
+            schema::read_field(object(&e, &name), "discipline").as_deref(),
+            Some("Lifo")
+        );
+        assert_eq!(
+            schema::read_field(object(&e, "fila"), "discipline").as_deref(),
+            Some("Fifo")
+        );
+        // The scene labels it and marks it for the turned-around look.
+        let p =
+            crate::playback::Playback::new(&edit_replay(e.model()), Some(e.model()), None, false);
+        let at = p.blocks.iter().position(|b| b.name == "pilha").unwrap();
+        assert!(p.blocks[at].stack);
+        assert_eq!(p.frame(0.0).label[at], "pilha · pilha");
+        let fila = p.blocks.iter().position(|b| b.name == "fila").unwrap();
+        assert!(!p.blocks[fila].stack);
+        assert!(e.doc.undo(), "one step");
+        assert!(e.model().objects.iter().all(|o| o.name != "pilha"));
+        let ghost = palette_model(STACK_ID).unwrap();
+        assert_eq!(
+            schema::read_field(&ghost.objects[0], "discipline").as_deref(),
+            Some("Lifo")
+        );
+    }
+
+    fn object<'a>(e: &'a Editor, name: &str) -> &'a utsim_model::ObjectDef {
+        e.model().objects.iter().find(|o| o.name == name).unwrap()
     }
 
     #[test]
@@ -996,7 +1077,7 @@ mod tests {
         let r = edit_replay(e.model());
         assert_eq!(r.blocks.len(), 5);
         assert_eq!(r.connections.len(), 4);
-        for entry in utsim_edit::PALETTE {
+        for entry in palette() {
             let m = palette_model(entry.id).unwrap();
             assert_eq!(m.objects.len(), 1, "{}", entry.id);
         }

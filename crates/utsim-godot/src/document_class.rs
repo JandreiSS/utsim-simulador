@@ -724,11 +724,11 @@ impl UtsimDocument {
     }
 
     /// The object library: `{id, kind, label, category, name_base, asset}` in
-    /// [`utsim_edit::PALETTE`] order.
+    /// [`document::palette`] order ([`utsim_edit::PALETTE`] plus the stack).
     #[func]
     fn palette() -> VarArray {
         let mut out = VarArray::new();
-        for e in utsim_edit::PALETTE {
+        for e in document::palette() {
             let mut d = VarDictionary::new();
             put(&mut d, "id", e.id);
             put(&mut d, "kind", e.kind);

@@ -76,6 +76,26 @@
 		{"tecla": "ctrl+o"},
 		{"dialogo": "{saida}/tutorial_01.ron"},
 		{"conferir": {"objetos": 4, "ligacoes": 3, "problemas": 0, "sujo": false,
-			"campo": {"objeto": "caixa", "campo": "process", "valor": "Exp(mean: 4.0)"}}}
+			"campo": {"objeto": "caixa", "campo": "process", "valor": "Exp(mean: 4.0)"}}},
+		{"nota": "A roda do mouse sobre um painel ou lista rola o painel, nunca a câmera; sobre a cena, aproxima."},
+		{"clicar": {"objeto": "caixa"}},
+		{"camera": {"alvo": [6, 0], "distancia": 18.0, "giro": 0.0, "inclinacao": 0.9}},
+		{"conferir": {"camera_distancia": [17.99, 18.01]}},
+		{"rolar": {"controle": "PainelPropriedades"}, "vezes": 6},
+		{"conferir": {"camera_distancia": [17.99, 18.01]}},
+		{"rolar": {"controle": "PainelPropriedades"}, "vezes": 6, "sentido": "cima"},
+		{"rolar": {"controle": "Objetos_Lista"}, "vezes": 4},
+		{"rolar": {"controle": "Biblioteca"}, "vezes": 4},
+		{"conferir": {"camera_distancia": [17.99, 18.01]}},
+		{"rolar": {"chao": [6, 3]}, "vezes": 2, "sentido": "cima"},
+		{"conferir": {"camera_distancia": [1.5, 17.9]}},
+		{"nota": "Pilha (LIFO) da Biblioteca: uma fila com disciplina LIFO, marcada na cena; a Fila continua FIFO."},
+		{"camera": {"alvo": [6, 2], "distancia": 20.0, "giro": 0.0, "inclinacao": 0.9}},
+		{"arrastar": {"de": {"controle": "Biblioteca_QueueLifo"}, "para": {"chao": [2.0, 5.0]}, "passos": 16}},
+		{"conferir": {"existe": ["pilha"], "selecao": ["pilha"], "campo": {"objeto": "pilha", "campo": "discipline", "valor": "Lifo"}}},
+		{"conferir": {"texto": {"controle": "Prop_discipline", "contem": "LIFO"}}},
+		{"capturar": "g3_pilha"},
+		{"tecla": "ctrl+z"},
+		{"conferir": {"nao_existe": ["pilha"], "campo": {"objeto": "fila", "campo": "discipline", "valor": "Fifo"}}}
 	]
 }

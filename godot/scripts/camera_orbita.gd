@@ -5,11 +5,17 @@
 class_name CameraOrbita
 extends Camera3D
 
+## Distance factor of one notch of the wheel.
+const WHEEL_STEP := 0.85
+
 var target := Vector3.ZERO
 var yaw := 0.0
 var pitch := 0.75
 var dist := 20.0
 var _dragging := false
+## `func(screen_point) -> bool`: whether a panel covers that point (the main scene's
+## `over_ui`), for events the GUI let go of.
+var over_ui := Callable()
 
 
 func _ready() -> void:
@@ -54,16 +60,31 @@ func update() -> void:
 	transform = Transform3D(Basis.IDENTITY, eye).looking_at(target, Vector3.UP)
 
 
+## Whether the pointer is over a control (a panel, a list, a field): the wheel and the
+## drags that start there belong to it, never to the 3D view, even when it lets them go
+## (a ScrollContainer at the end of its scroll, a label).
+func _over_gui(at: Vector2) -> bool:
+	if get_viewport().gui_get_hovered_control() != null:
+		return true
+	return over_ui.is_valid() and bool(over_ui.call(at))
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.pressed and _over_gui(mb.position):
+			return
 		match mb.button_index:
+			# A notch of the wheel is a press and a release: zoom once, on the press (the
+			# release of a notch over a panel must not reach the view either).
 			MOUSE_BUTTON_WHEEL_UP:
-				dist = maxf(1.5, dist * 0.9)
-				update()
+				if mb.pressed:
+					dist = maxf(1.5, dist * WHEEL_STEP)
+					update()
 			MOUSE_BUTTON_WHEEL_DOWN:
-				dist = minf(5000.0, dist / 0.9)
-				update()
+				if mb.pressed:
+					dist = minf(5000.0, dist / WHEEL_STEP)
+					update()
 			MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
 				_dragging = mb.pressed
 	elif event is InputEventMouseMotion and _dragging:

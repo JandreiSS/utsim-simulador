@@ -129,7 +129,9 @@ func build(pb: Object, keep_templates := false) -> void:
 			asset = _instance(b["asset"])
 		if asset != null:
 			asset.position = b.get("offset", Vector3.ZERO)
-			asset.rotation = Vector3(0, b.get("asset_yaw", 0.0), 0)
+			# A stack (LIFO queue) is drawn turned around: its arrow points back to
+			# where the items come in, which is also where they leave.
+			asset.rotation = Vector3(0, float(b.get("asset_yaw", 0.0)) + (PI if b.get("stack", false) else 0.0), 0)
 			asset.scale = Vector3.ONE * float(b.get("scale", 1.0))
 			root.add_child(asset)
 			rig["asset"] = asset

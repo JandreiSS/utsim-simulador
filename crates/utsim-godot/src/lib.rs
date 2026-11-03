@@ -507,6 +507,7 @@ impl UtsimPlayback {
             put(&mut e, "position", v3(position));
             put(&mut e, "size", v3(size));
             put(&mut e, "shape", simple_shape(&v.kind));
+            put(&mut e, "stack", v.stack);
             if let Some(l) = &v.look {
                 let a = AssetInfo::of(&l.source);
                 let mut asset = VarDictionary::new();

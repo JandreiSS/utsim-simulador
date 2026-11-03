@@ -29,6 +29,7 @@
 ##    - `{"clicar": <alvo>, "shift": false, "duplo": false, "botao": "esquerdo"}`
 ##    - `{"arrastar": {"de": <alvo>, "para": <alvo>, "shift": false, "passos": 12}}`
 ##    - `{"mover": <alvo>}` (mouse only)
+##    - `{"rolar": <alvo>, "vezes": 3, "sentido": "baixo"}` (the mouse wheel over it)
 ##    - `{"digitar": "texto", "em": <alvo>, "enter": true}` (clicks `em` first, if given)
 ##    - `{"escolher": {"controle": "Prop_visual_asset", "item": "bancada_kenney"}}`: picks
 ##      the item with that text in an OptionButton, as choosing it in the open list does
@@ -274,6 +275,18 @@ func _step(s: Dictionary, k: int) -> void:
 			return
 		_motion(p, p - _last_pos(), 0, false)
 		await _frames(2)
+	elif s.has("rolar"):
+		var p = _target(s["rolar"])
+		if p == null:
+			_fail("passo %d: alvo não encontrado: %s" % [k, s["rolar"]])
+			return
+		_motion(p, p - _last_pos(), 0, false)
+		await _frames(2)
+		var wheel := MOUSE_BUTTON_WHEEL_UP if s.get("sentido", "baixo") == "cima" else MOUSE_BUTTON_WHEEL_DOWN
+		for i in int(s.get("vezes", 3)):
+			_button(p, wheel, true, false)
+			_button(p, wheel, false, false)
+			await _frames(2)
 	elif s.has("digitar"):
 		if s.has("em"):
 			var p = _target(s["em"])
@@ -591,7 +604,7 @@ func _accept_dialog(path: String, k: int) -> void:
 ## b], altura_no_maximo: metres of the network as drawn, enquadrados: the whole network
 ## on screen}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que, legivel: boxes
 ## apart, text whole, zoom legible}), `pert` ({modo, caixas_maior_que, tem_histograma}),
-## `critico` (names outlined in red), `camera` (mode), `camera_livre` ({margem,
+## `critico` (names outlined in red), `camera` (mode), `camera_distancia` ([a, b]: the orbit distance), `camera_livre` ({margem,
 ## distancia}: no mesh within `margem` metres of a following camera nor on the first
 ## `distancia` metres of its sight line), `modelo_contem` (pieces of the model's RON
 ## text), `rotulos_no_maximo` (labels drawn) and `replay` (a recorded replay is playing).
@@ -795,6 +808,9 @@ func _check(c: Dictionary, k: int) -> void:
 				var text: String = doc.text()
 				for piece in want:
 					report.call("modelo contém %s" % piece, text.contains(piece), text.substr(maxi(text.find("run:"), 0), 240))
+			"camera_distancia":
+				var dd: float = _main.camera.dist
+				report.call("distância da câmera entre %s e %s" % [want[0], want[1]], dd >= float(want[0]) and dd <= float(want[1]), str(dd))
 			"camera_livre":
 				var cam: Camera3D = _main.camera
 				var eye := cam.global_position

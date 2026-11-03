@@ -56,6 +56,17 @@ pub struct BlockView {
     /// Model coordinates of the base, and the footprint `(x, y, z)` size.
     pub position: [f32; 3],
     pub size: [f32; 3],
+    /// A queue with `discipline: Lifo` (a stack): labelled and drawn as one.
+    pub stack: bool,
+}
+
+/// Whether `name` is a queue with `discipline: Lifo` in `model`.
+fn is_stack(model: Option<&Model>, name: &str) -> bool {
+    model
+        .and_then(|m| m.objects.iter().find(|o| o.name == name))
+        .and_then(|o| crate::schema::read_field(o, "discipline"))
+        .as_deref()
+        == Some("Lifo")
 }
 
 /// The asset a block is drawn with, as the Godot side needs it.
@@ -196,8 +207,10 @@ impl Playback {
                 model_dir,
             );
             index_of[b] = Some(blocks.len());
+            let stack = kind == "Queue" && is_stack(model, &name);
             blocks.push(BlockView {
                 b,
+                stack,
                 name,
                 kind,
                 role,
@@ -430,8 +443,13 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
+            let shown = if v.stack {
+                format!("{} · pilha", v.name)
+            } else {
+                v.name.clone()
+            };
             f.label
-                .push(style::label_text(&v.name, content, 0, received));
+                .push(style::label_text(&shown, content, 0, received));
         }
         // Items: where the scene puts them, moved onto forks, hands and decks.
         let mut stacked: HashMap<usize, usize> = HashMap::new();

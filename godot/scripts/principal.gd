@@ -158,6 +158,7 @@ func _build_world() -> void:
 	sun.transform = Transform3D(Basis.IDENTITY, Vector3(8, 14, 6)).looking_at(Vector3.ZERO, Vector3.UP)
 	add_child(sun)
 	camera = CameraOrbita.new()
+	camera.over_ui = over_ui
 	add_child(camera)
 	camera.current = true
 	var ground := MeshInstance3D.new()
@@ -182,19 +183,9 @@ func _build_world() -> void:
 # ---------------------------------------------------------------------------
 
 
-func _panel_style() -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = PANEL
-	s.border_color = Color(0.22, 0.24, 0.29)
-	s.set_border_width_all(1)
-	s.set_content_margin_all(8)
-	return s
-
-
 func _panel(name: String) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = name
-	p.add_theme_stylebox_override("panel", _panel_style())
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
 	_ui.add_child(p)
 	return p
@@ -220,11 +211,11 @@ func _build_ui() -> void:
 	_top.anchor_right = 1.0
 	_top.offset_bottom = TOP_HEIGHT
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 6)
+	top.add_theme_constant_override("separation", 4)
 	_top.add_child(top)
 	var brand := Label.new()
 	brand.text = "UTSim"
-	brand.add_theme_font_size_override("font_size", 18)
+	brand.theme_type_variation = &"TituloPainel"
 	top.add_child(brand)
 	var modes := ButtonGroup.new()
 	_mode_edit = _button(top, "Modo_Editar", "Editar", "Montar o modelo (Tab alterna)", func(): set_mode("editar"))
@@ -238,8 +229,8 @@ func _build_ui() -> void:
 	_button(top, "Botao_Salvar", "Salvar", "Salvar (Ctrl+S)", func(): save())
 	_button(top, "Botao_SalvarComo", "Salvar como...", "Salvar como (Ctrl+Shift+S)", func(): save_as_dialog())
 	top.add_child(VSeparator.new())
-	_undo = _button(top, "Botao_Desfazer", "↶ Desfazer", "Desfazer (Ctrl+Z)", func(): undo())
-	_redo = _button(top, "Botao_Refazer", "↷ Refazer", "Refazer (Ctrl+Y)", func(): redo())
+	_undo = _button(top, "Botao_Desfazer", "Desfazer", "Desfazer (Ctrl+Z)", func(): undo())
+	_redo = _button(top, "Botao_Refazer", "Refazer", "Refazer (Ctrl+Y)", func(): redo())
 	top.add_child(VSeparator.new())
 	var tools := ButtonGroup.new()
 	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
@@ -272,7 +263,8 @@ func _build_ui() -> void:
 	top.add_child(VSeparator.new())
 	_snap = CheckBox.new()
 	_snap.name = "Grade_Encaixe"
-	_snap.text = "Encaixar na grade"
+	_snap.text = "Grade"
+	_snap.tooltip_text = "Encaixar na grade ao pôr e arrastar (passo ao lado)"
 	_snap.button_pressed = snap_on
 	_snap.focus_mode = Control.FOCUS_NONE
 	_snap.toggled.connect(func(on): set_snap(on, grid_step))
@@ -299,7 +291,12 @@ func _build_ui() -> void:
 	top.add_child(analysis)
 	_button(top, "Botao_Resultados", "Resultados", "Tabela, gráficos, análises, cenários e otimização da última rodada", func(): analysis_action("resultados"))
 	_button(top, "Botao_Pert", "PERT/CPM", "PERT/CPM da seleção (com dois objetos, de um até o outro)", func(): analysis_action("pert_auto"))
-	_button(top, "Botao_Atalhos", "Atalhos (F1)", "Lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
+	_button(top, "Botao_Atalhos", "Atalhos", "F1: lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
+	# The top bar's buttons are compact (the theme's "BotaoBarra"), so the whole bar
+	# fits at 1600 px with the model name.
+	for c in top.get_children():
+		if c is Button and not (c is CheckBox or c is OptionButton):
+			(c as Button).theme_type_variation = &"BotaoBarra"
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(spacer)
@@ -337,7 +334,7 @@ func _build_ui() -> void:
 	_edit_left.add_child(HSeparator.new())
 	var olabel := Label.new()
 	olabel.text = "Objetos"
-	olabel.add_theme_font_size_override("font_size", 16)
+	olabel.theme_type_variation = &"TituloPainel"
 	_edit_left.add_child(olabel)
 	_objects_search = LineEdit.new()
 	_objects_search.name = "Objetos_Busca"
@@ -508,7 +505,7 @@ func _build_ui() -> void:
 	_fps.offset_left = LEFT_WIDTH + 10
 	_fps.offset_right = LEFT_WIDTH + 330
 	_fps.offset_top = TOP_HEIGHT + 6
-	_fps.add_theme_color_override("font_color", Color(0.7, 0.74, 0.8))
+	_fps.theme_type_variation = &"Ajuda"
 	_fps.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(_fps)
 
@@ -540,15 +537,12 @@ func _build_ui() -> void:
 		_pending = Callable())
 	_ui.add_child(_discard)
 	_results_panel = PainelResultados.new()
-	_results_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_results_panel)
 	_results_panel.build(self)
 	_pert_panel = PainelPert.new()
-	_pert_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_pert_panel)
 	_pert_panel.build(self)
 	_flows_panel = PainelFluxos.new()
-	_flows_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_flows_panel)
 	_flows_panel.build(self)
 	for panel in [_results_panel, _pert_panel, _flows_panel]:
@@ -870,7 +864,7 @@ func _show_link(link: Array) -> void:
 	_props.clear()
 	var title := Label.new()
 	title.text = "Ligação"
-	title.add_theme_font_size_override("font_size", 16)
+	title.theme_type_variation = &"TituloPainel"
 	_props.add_child(title)
 	var l := Label.new()
 	l.text = "%s → %s" % link
@@ -1597,7 +1591,7 @@ func _show_network() -> void:
 	var rede: EditorRede = editor.rede
 	var title := Label.new()
 	title.text = "Rede de caminhos"
-	title.add_theme_font_size_override("font_size", 16)
+	title.theme_type_variation = &"TituloPainel"
 	_props.add_child(title)
 	var c := rede.counts()
 	var info := Label.new()
@@ -1607,7 +1601,7 @@ func _show_network() -> void:
 	var help := Label.new()
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-	help.add_theme_color_override("font_color", Color(0.70, 0.74, 0.80))
+	help.theme_type_variation = &"Ajuda"
 	help.text = "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."
 	_props.add_child(help)
 	var both := CheckBox.new()
@@ -1619,7 +1613,7 @@ func _show_network() -> void:
 	if rede.selected_node != "":
 		var head := Label.new()
 		head.text = "Nó %s" % rede.selected_node
-		head.add_theme_font_size_override("font_size", 15)
+		head.theme_type_variation = &"RotuloSecao"
 		_props.add_child(head)
 		var row := HBoxContainer.new()
 		var l := Label.new()
@@ -1647,7 +1641,7 @@ func _show_network() -> void:
 		var e: Dictionary = rede._edge(rede.selected_edge[0], rede.selected_edge[1])
 		var head := Label.new()
 		head.text = "Trecho %s → %s" % [e["from"], e["to"]]
-		head.add_theme_font_size_override("font_size", 15)
+		head.theme_type_variation = &"RotuloSecao"
 		_props.add_child(head)
 		var len_label := Label.new()
 		len_label.text = "Comprimento %s m" % _num(float(e["length"]))
