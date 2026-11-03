@@ -20,7 +20,7 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 
 | Tarefa | Modelo | Situação |
 |---|---|---|
-| G2 Godot: edição do fluxo | Opus | em andamento |
+| G2 Godot: edição do fluxo | Opus | feita |
 | G5 Godot: empacotamento e instalador | Sonnet | em andamento |
 | Plano: PERT/CPM, estatística, motorista, desvio, CAD | Opus | em andamento |
 
