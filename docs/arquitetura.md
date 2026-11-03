@@ -14,6 +14,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Estatística | `utsim-stats` | funções puras sobre números (só depende de `utsim-core`); análise de saída e funções especiais |
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
+| Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
 
 O 3D não comanda o tempo. Um item "andando" é uma interpolação entre dois eventos
@@ -1274,6 +1275,35 @@ HTML), `utsim-objects` (`network::router` para as distâncias) e `utsim-scene`
 **Lacunas:** o campo `pert` do formato do modelo (análises salvas) ainda não existe; o modo
 simulado guarda o rastro do trecho de uma replicação inteira na memória (não em fluxo); a
 janela na interface Godot fica para depois.
+
+## 4s. Fluxograma do processo (`utsim-diagram`)
+
+A crate `utsim-diagram` é pura: lê um `Model` (e, se pedido, as estatísticas de uma rodada) e devolve texto. Não depende da cena, do Bevy nem do Godot, então a CLI, o editor e a interface Godot usam as mesmas funções. Manual: `docs/manual/src/fluxograma.md`.
+
+**Grafo.** `graph::build` transforma cada objeto fora do grafo de portas em uma etapa (`Node`) e cada ligação em uma seta (`Edge`). `Transporter` e `Dispatcher` não são etapas: viram `Resource` (painel lateral) e uma linha de recurso nas caixas de quem os usa (`transport`, `operators`). O número da porta de saída e de entrada de cada seta é a ordem das ligações no modelo, a mesma do motor.
+
+**Símbolos** (fluxograma de processo da engenharia de métodos):
+
+| Objeto | Símbolo |
+|---|---|
+| `Source` / `Sink` | Início / Fim (cápsula) |
+| `Processor`, `Combiner`, `Separator` | Operação (círculo) |
+| ... com nome de inspeção | Inspeção (quadrado) |
+| `Conveyor` | Transporte (seta larga) |
+| `Queue` | Espera ("D") |
+| `Rack` | Armazenagem (triângulo) |
+
+A inspeção sai do nome (trechos configuráveis em `Options::inspection_keywords`, comparados sem acento nem maiúsculas). `Options::overrides` troca o símbolo de um objeto por nome (CLI: `--simbolo objeto=simbolo`). O formato do modelo não mudou. **Proposta:** campo opcional `symbol: Option<String>` em `ObjectDef`, com `#[serde(default, skip_serializing_if = ...)]` como o `visual`, que valeria acima do nome; não foi feito porque `ObjectDef` é do núcleo do modelo.
+
+**Setas.** Texto de roteamento a partir de `OutputRule` com mais de uma saída: `Weighted` (porcentagem dos pesos, também guardada em `probability`), `RoundRobin` e `Random` (partes iguais), `FirstAvailable` (prioridade), `ByLabel`, `Script`. Entradas de `Combiner`: contêiner e componentes. **Retrabalho**: busca em profundidade a partir das entradas; a seta que fecha um laço (`rework`) fica fora das camadas e é desenhada pelo lado. **Transporte**: `transport` (distância pela rede quando o modelo tem `network`, senão em linha reta; tempo estimado = distância / velocidade + carga + descarga do primeiro veículo da equipe) ou `Model::effective_transfer` (`delay + distância / velocidade`). Sem posições (tudo em zero) a distância fica vazia.
+
+**Disposição** (`layout::apply`): camadas pelo maior caminho (algoritmo de Kahn, laços cortados), pontos virtuais nas camadas que uma seta atravessa, ordem por baricentro (4 varreduras para baixo e para cima) e alinhamento das colunas (duas passadas). Tudo é determinístico: sem sorteio e com desempate por índice. Direção vertical (padrão) ou horizontal.
+
+**Saídas.** `svg` / `svg_inline` (SVG com CSS próprio, claro e escuro), `html` (página autocontida: legenda, fluxograma, carta), `mermaid` (`flowchart LR`), `carta::build` (linhas do caminho principal, com `html_table` e `csv`). O caminho principal segue, a cada ramificação, a seta de maior `probability` (sem pesos, a primeira porta) e entra uma linha de transporte entre etapas ligadas por transporte. Com resultados (`stats_from_run` a partir de `analysis::object_stats`), as caixas mostram ocupação, fila média, espera média e itens por replicação.
+
+**Tipos de diagrama.** `TipoDiagrama` lista dez tipos, um módulo cada, e `gerar(tipo, modelo, opções)` devolve `Saida { svg, html, csv, mermaid }`. Do modelo: `carta`, `html` (blocos), `operacoes` (grafo reduzido: operações e inspeções, esperas/transportes/armazenagens contraídos nas setas, numeração O-n e I-n pela ordem das camadas), `raias` (raia pela equipe de operadores, tipo do objeto, `Options::areas` ou frota; um passo virtual de transporte por seta de frota; `cruza` quando a raia muda), `sipoc` (fontes, caminho principal, saídas). Da simulação (`rastro::capturar` roda `Model::replay` e guarda viagens dos itens, pernas dos recursos móveis, mudanças de estado e as rotas fonte-saída, da mais usada à menos): `mapa::mapofluxograma` (rota mais usada, com gancho `plant_background`), `mapa::espaguete` e `comparar` (segmentos idênticos somam e engrossam o traço), `depara` (pares, matriz e cordas), `homem_maquina` (estados agrupados em seis categorias, janela escolhida) e `vsm` (ciclo, preparação, disponibilidade, estoque pela fila média e lead time de `time_in_system`). Os tipos da simulação são determinísticos como a rodada: mesma semente e replicação, mesma página.
+
+**Interface.** A CLI chama `utsim fluxograma` (`crates/utsim-cli/src/fluxograma.rs`). O botão "Fluxograma" do Godot está no `docs/backlog_v02.md`.
 
 ## 5. Estatísticas
 

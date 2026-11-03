@@ -20,6 +20,7 @@
 # Analisando resultados
 
 - [Resultados e estatística](resultados.md)
+- [Fluxograma do processo](fluxograma.md)
 - [Ajuste de distribuições a partir de dados](ajuste-de-distribuicoes.md)
 - [Experimentos e otimização](experimentos-e-otimizacao.md)
 - [PERT/CPM de uma parte do processo](pert-cpm.md)

@@ -13,6 +13,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim experiment` | compara cenários | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim otimizar` | procura os melhores parâmetros | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
+| `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
@@ -32,6 +33,7 @@ utsim experiment examples/experimento_mm1.ron
 utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
 utsim emular examples/linha_com_bloqueio.ron --velocidade 10
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
+utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
 ```
@@ -44,6 +46,7 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
 - `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
   para ele e `--sorteios` só para `montecarlo`.
+- `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 ## Saída de `--help`
 

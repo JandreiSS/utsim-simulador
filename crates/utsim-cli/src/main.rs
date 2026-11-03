@@ -3,6 +3,7 @@ mod cena;
 mod emulate;
 mod experiment;
 mod fit;
+mod fluxograma;
 mod gerar;
 mod optimize;
 mod pert;
@@ -171,6 +172,58 @@ enum Cmd {
         /// Força a unidade do desenho: mm, cm, dm, m, km, pol ou pe
         #[arg(long)]
         unidades: Option<String>,
+    },
+    /// Gera o fluxograma do processo (SVG, HTML, Mermaid) e a carta de processo (HTML, CSV)
+    Fluxograma {
+        model: PathBuf,
+        /// Grava o fluxograma em SVG
+        #[arg(long)]
+        svg: Option<PathBuf>,
+        /// Grava a página HTML com legenda, fluxograma e carta de processo
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Grava o fluxograma em Mermaid (`flowchart LR`)
+        #[arg(long)]
+        mermaid: Option<PathBuf>,
+        /// Grava a carta de processo (caminho principal) em CSV
+        #[arg(long)]
+        csv: Option<PathBuf>,
+        /// Roda o modelo e põe ocupação, fila média e espera média nas caixas
+        #[arg(long)]
+        com_resultados: bool,
+        /// Desenha da esquerda para a direita (padrão: de cima para baixo)
+        #[arg(long)]
+        horizontal: bool,
+        /// Não mostra tempos médios
+        #[arg(long)]
+        sem_tempos: bool,
+        /// Não mostra distâncias das transferências
+        #[arg(long)]
+        sem_distancias: bool,
+        /// Troca o símbolo de um objeto: objeto=simbolo (inicio, fim, operacao, transporte,
+        /// inspecao, espera, armazenagem); pode repetir
+        #[arg(long = "simbolo", value_name = "OBJETO=SIMBOLO")]
+        simbolos: Vec<String>,
+        /// Tipo de diagrama: carta, blocos, operacoes, raias, sipoc, mapofluxograma, espaguete,
+        /// de-para, homem-maquina, vsm ou todos (HTML índice em --html, um arquivo por tipo).
+        /// Sem --tipo: fluxograma de blocos com a carta de processo
+        #[arg(long)]
+        tipo: Option<String>,
+        /// Replicação gravada nos diagramas da simulação (a primeira é a 0)
+        #[arg(long, default_value_t = 0)]
+        replica: u32,
+        /// Início do intervalo do gráfico homem-máquina
+        #[arg(long)]
+        de: Option<f64>,
+        /// Fim do intervalo do gráfico homem-máquina
+        #[arg(long)]
+        ate: Option<f64>,
+        /// Segundo modelo (o "depois") do diagrama de espaguete; o primeiro é o "antes"
+        #[arg(long)]
+        comparar: Option<PathBuf>,
+        /// Raia de um objeto no fluxograma multifuncional: objeto=nome; pode repetir
+        #[arg(long = "raia", value_name = "OBJETO=NOME")]
+        raias: Vec<String>,
     },
     /// Compara cenários de um arquivo de experimento
     Experiment {
@@ -419,6 +472,41 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             reps,
             stop,
             json,
+        })?,
+        Cmd::Fluxograma {
+            model,
+            svg,
+            html,
+            mermaid,
+            csv,
+            com_resultados,
+            horizontal,
+            sem_tempos,
+            sem_distancias,
+            simbolos,
+            tipo,
+            replica,
+            de,
+            ate,
+            comparar,
+            raias,
+        } => fluxograma::run(fluxograma::Args {
+            model,
+            svg,
+            html,
+            mermaid,
+            csv,
+            with_results: com_resultados,
+            horizontal,
+            no_times: sem_tempos,
+            no_distances: sem_distancias,
+            symbols: simbolos,
+            kind: tipo,
+            replication: replica,
+            from: de,
+            to: ate,
+            compare: comparar,
+            lanes: raias,
         })?,
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::Planta {

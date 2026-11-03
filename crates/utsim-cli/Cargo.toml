@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 utsim-core.workspace = true
 utsim-model.workspace = true
+utsim-diagram.workspace = true
 utsim-scene = { workspace = true, features = ["server"] }
 utsim-fit.workspace = true
 utsim-stats.workspace = true

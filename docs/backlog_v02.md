@@ -40,6 +40,8 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 | Tarefa | Modelo | Depende de |
 |---|---|---|
 | Interface PERT/CPM no Godot (seleção, diagrama de rede, Gantt, histograma) | Sonnet | `utsim-pert`, G3 |
+| Botão "Fluxograma" na interface Godot (G3 ou a seguinte): chama `utsim-diagram` pela ponte, mostra o SVG num painel, exporta SVG, HTML, Mermaid e CSV e acende no desenho a etapa selecionada no 3D | Sonnet | `utsim-diagram`, G3 |
+| Campo opcional `symbol` em `ObjectDef` (proposta): guarda no `.ron` o símbolo do fluxograma de cada objeto, em vez de depender do nome ou da opção `--simbolo`. Muda o formato do modelo: decisão do dono | Opus | `utsim-diagram` |
 | Painel de estatística avançada no Godot | Sonnet | estatística, G3 |
 | Planta CAD como fundo no piso, com encaixe nas linhas | Sonnet | DXF, G2 |
 | Obstáculos estáticos e roteamento automático (malha + A*) | Opus | plano, DXF |
