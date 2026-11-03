@@ -32,7 +32,13 @@ esac
 
 PASTA=$(mktemp -d)
 trap 'rm -rf "$PASTA"' EXIT
-bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release
+# A interface 3D entra quando já foi exportada (scripts/godot_exportar.sh).
+GODOT_EXPORT=target/godot-export/${PLATAFORMA%%-*}
+if [ -f "$GODOT_EXPORT/utsim-3d.pck" ]; then
+    bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release "$GODOT_EXPORT"
+else
+    bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release
+fi
 bash scripts/notas-versao.sh "$VERSAO" > "$PASTA/notas.md" || echo "(sem notas)" > "$PASTA/notas.md"
 
 "$PUBLICAR" publicar \
