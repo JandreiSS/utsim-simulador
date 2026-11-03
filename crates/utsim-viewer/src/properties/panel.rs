@@ -1202,6 +1202,7 @@ impl Editor<'_> {
                 labels,
                 on_blocked,
                 schedule,
+                ..
             } => {
                 self.dist_field(ui, "Tempo entre chegadas", "interarrival", interarrival);
                 self.bool_field(

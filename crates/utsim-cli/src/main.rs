@@ -580,6 +580,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             for line in m.person_lines() {
                 println!("pessoa: {line}");
             }
+            for line in m.arrival_lines() {
+                println!("chegadas: {line}");
+            }
         }
         Cmd::Rede { acao } => rede::run(acao)?,
         Cmd::Corredores { model, svg } => corredores::run(&model, svg.as_deref())?,

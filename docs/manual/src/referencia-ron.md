@@ -142,8 +142,11 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `labels` | `{}` (mapa de nome para `Dist`) |
 | `on_blocked` | `Wait` (ou `Drop`) |
 | `schedule` | nenhuma: `(cycle: n, periods: [(start: n, end: n, arrivals: ..., labels: {...}), ...])` |
+| `table` | nenhuma: `(mode: Times, repeat: Once, rows: [(at: n, count: 1, labels: {...}), ...])`; não junto com `schedule` |
 
 Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
+
+Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não decrescente) ou `Sequence` (sem `at`; `interarrival` entre linhas); `repeat` é `Once` (padrão), `Cycle(d)` (só `Times`, `d > 0`, `at` em `[0, d)`) ou `Loop` (só `Sequence`); `count` (padrão 1, de 0 a 1.000.000) e `labels` (mapa de nome para número) por linha. Veja [Objetos](objetos.md#tabela-de-chegadas-table).
 
 ### `Queue`
 
@@ -293,7 +296,7 @@ Tipos de nó: `Source(rate)`, `Tank(capacity, initial: 0, max_in: nenhum, max_ou
 | `scenarios` | obrigatório: `(name, set)`, com `set` padrão `{}` |
 | `measures` | `[]` (todas) |
 
-Chaves de `set` além de `<objeto>.<campo>` e `run.<campo>`: `<fonte>.schedule.cycle`, `<fonte>.schedule[n]` e `<fonte>.schedule[n].start`, `.end`, `.arrivals`, `.rate`, `.interarrival`, `.labels` (períodos contados a partir de 1); `<objeto>.shifts.on_end`; `calendars.<nome>` (a tabela inteira, ou `None` para apagar) e `calendars.<nome>.on_end`.
+Chaves de `set` além de `<objeto>.<campo>` e `run.<campo>`: `<fonte>.schedule.cycle`, `<fonte>.schedule[n]` e `<fonte>.schedule[n].start`, `.end`, `.arrivals`, `.rate`, `.interarrival`, `.labels` (períodos contados a partir de 1); `<fonte>.table.rows[n]` e `<fonte>.table.rows[n].at`, `.count`, `.labels`, `.labels.<nome>` (linhas contadas a partir de 1); `<objeto>.shifts.on_end`; `calendars.<nome>` (a tabela inteira, ou `None` para apagar) e `calendars.<nome>.on_end`.
 
 ## Arquivo de otimização (`OptProblem`)
 

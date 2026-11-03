@@ -35,6 +35,7 @@ Cria itens. É por aqui que o trabalho entra no modelo.
 | `labels` | vazio | rótulos sorteados para cada item, por exemplo `{ "tipo": Discrete([(1.0, 0.7), (2.0, 0.3)]) }` |
 | `on_blocked` | `Wait` | o que fazer com o item que não consegue sair no instante em que nasce |
 | `schedule` | nenhuma | chegadas por período: a taxa ou o tempo entre chegadas muda com a hora (veja abaixo) |
+| `table` | nenhuma | tabela de chegadas: instantes fixos ou sequência ordenada de linhas com quantidade e rótulos (veja abaixo) |
 
 Os dois valores de `on_blocked`:
 
@@ -83,6 +84,49 @@ Regras:
 No editor, a seção **Chegadas por período** das propriedades da fonte mostra a tabela: ciclo, uma linha por período com início, fim, modo (igual ao padrão, distribuição, taxa ou sem chegadas) e valor, o botão "copiar do padrão" e o número esperado de chegadas por período e por ciclo, para conferir com os dados. Com ciclo de 1440 (um dia em minutos) os horários aparecem e são digitados como hh:mm e as taxas são por hora; com 10080 (uma semana) como "dia N hh:mm". O modelo não tem unidade de tempo própria: com outros ciclos os horários e as taxas ficam na unidade do modelo.
 
 Nos experimentos, as chaves `chegada.schedule`, `chegada.schedule.cycle`, `chegada.schedule[n]` e `chegada.schedule[n].<campo>` (`start`, `end`, `arrivals`, `rate`, `interarrival`, `labels`) mudam a tabela; por exemplo `"chegada.schedule[2].rate": "0.5"`.
+
+### Tabela de chegadas (`table`)
+
+Quando as chegadas vêm de uma lista (caminhões com hora marcada, ordens de produção numa ordem definida, o mix de pedidos do dia), dê à fonte uma tabela. Há dois modos:
+
+- **`Times` (horário)**: cada linha cria `count` itens no instante `at`. Com `repeat: Cycle(d)` a tabela se repete a cada `d` unidades de tempo e os `at` ficam dentro de `[0, d)`; com `Once` (o padrão) a fonte cria as linhas uma vez e fica `idle`.
+- **`Sequence` (sequência)**: as linhas não têm instante. A fonte percorre a lista em ordem, uma linha por chegada, e sorteia `interarrival` entre uma linha e a próxima. Com `repeat: Loop` volta à primeira linha; com `Once` para no fim.
+
+```ron
+(name: "pedidos", kind: Source(
+    interarrival: Exp(mean: 5.0),            // só no modo Sequence, entre linhas
+    table: (
+        mode: Times,
+        repeat: Cycle(1440.0),
+        rows: [
+            (at: 480.0, count: 12, labels: { "prioridade": 2.0 }),
+            (at: 600.0, count: 5),
+            (at: 840.0, count: 8, labels: { "prazo": 1080.0 }),
+        ],
+    ),
+))
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `mode` | `Times` | `Times` (horário) ou `Sequence` (sequência) |
+| `repeat` | `Once` | `Once` (uma vez), `Cycle(d)` (só `Times`: repete a cada `d`) ou `Loop` (só `Sequence`: volta ao início) |
+| `rows[].at` | obrigatório em `Times` | instante da linha, em ordem não decrescente; não vale em `Sequence` |
+| `rows[].count` | `1` | itens criados de uma vez pela linha (0 é aceito: a linha não cria nada) |
+| `rows[].labels` | `{}` | rótulos constantes dos itens da linha; substituem os rótulos sorteados de mesmo nome |
+
+Regras:
+
+- Itens criados no mesmo instante saem na ordem da tabela.
+- No modo `Times` os instantes são fixos: com `on_blocked: Wait`, os itens que não conseguem sair esperam na fonte, e a linha seguinte chega no seu horário mesmo assim. Com `Drop`, os que não saem são perdidos.
+- No modo `Sequence` com `Wait`, o intervalo até a próxima linha começa quando o último item da linha saiu, como no modo normal. `first_at_zero: true` cria a primeira linha em t = 0.
+- `max_arrivals` limita o número de chegadas (linhas usadas), não de itens.
+- `table` e `schedule` juntos é erro: use um ou outro. Uma sequência em laço precisa de `interarrival` com média maior que 0.
+- Os erros apontam a linha, contada a partir de 1: `pedidos: table.rows[2]: at (300) antes da linha anterior (480); as linhas precisam estar em ordem de at`.
+- A fonte com tabela ganha as métricas `arrivals.count` (chegadas, isto é, linhas usadas) e `entered.count` (itens que saíram).
+- O `utsim check` resume a tabela: `chegadas: pedidos: horário com 3 linha(s), 25 item(ns) a cada ciclo de 1440`.
+
+Nos experimentos, as chaves `pedidos.table`, `pedidos.table.rows[n]` e `pedidos.table.rows[n].<campo>` (`at`, `count`, `labels`, `labels.<nome>`) mudam a tabela; por exemplo `"pedidos.table.rows[1].count": "15"`.
 
 ## Queue (Fila)
 
