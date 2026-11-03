@@ -213,6 +213,7 @@ Sem campos. Escreva `kind: Sink`.
 | `clearance` | pelo papel: pessoa 0,6, empilhadeira 0,9, outros 0,8 (finita, maior ou igual a 0) |
 | `home_at` / `home_object` | nenhum: casa num ponto, ou num objeto ou área (um ou outro; ligam a volta para casa) |
 | `break_at` / `break_object` | nenhum: local de pausa num ponto, ou num objeto ou área (um ou outro) |
+| `multitask` | nenhuma: um serviço por vez. `Some((max_open: n, slice: Dist, switch: Dist))`: até `n` serviços de operador abertos ao mesmo tempo (`max_open` maior ou igual a 1; com 1, igual a não ter o campo), trabalhados em turnos de `slice` (não pode ser `Const(0.0)`), perdendo `switch` (padrão `Const(0.0)`) a cada troca. Veja "Multitarefa" no capítulo Lean Office |
 
 ### `Dispatcher`
 
