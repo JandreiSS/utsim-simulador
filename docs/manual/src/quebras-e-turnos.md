@@ -21,6 +21,8 @@ Qualquer objeto pode quebrar ao acaso (`downtime`) e parar em horários fixos (`
 - Uma fonte quebrada para de gerar chegadas, e o relógio de chegadas fica pausado.
 - Um Processor quebrado **não libera** os operadores: eles ficam no posto e os tempos pausam.
 
+Para técnico que vai até a máquina, desgaste com a idade, manutenção preventiva, custos e OEE, veja [Manutenção de máquinas e OEE](manutencao.md).
+
 ### Disponibilidade
 
 Uma conta rápida: `disponibilidade = MTBF / (MTBF + MTTR)`. Com MTBF 300 e MTTR 20, a máquina fica disponível 300 / 320 = 93,75% do tempo. O relatório mostra a fração real no estado `down`.

@@ -83,7 +83,7 @@ Model(
 | `kind` | obrigatório | o tipo (tabelas abaixo) |
 | `output` | `FirstAvailable` | `FirstAvailable`, `RoundRobin`, `Random`, `ByLabel("r")`, `Weighted([..])` ou `Script("..")` |
 | `position` | `(0.0, 0.0, 0.0)` | `(x, y, z)` |
-| `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)` |
+| `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)`, mais os campos opcionais de manutenção `repair_crew`, `wear`, `basis`, `repair`, `preventive`, `cost` e `oee` ([Manutenção de máquinas e OEE](manutencao.md)) |
 | `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...], on_end: Pause)` ou `Calendar("nome")` (veja abaixo) |
 | `transport` | nenhum | nome de um `Transporter` ou `Dispatcher` que leva os itens que saem do objeto |
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |

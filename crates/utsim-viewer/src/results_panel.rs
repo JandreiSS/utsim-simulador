@@ -90,6 +90,8 @@ pub struct RunOutput {
     pub metrics: BTreeMap<String, Summary>,
 }
 
+// One message per finished job: the size of the biggest is irrelevant.
+#[allow(clippy::large_enum_variant)]
 enum Msg {
     Progress(usize, usize),
     Run(Result<Box<RunOutput>, String>),

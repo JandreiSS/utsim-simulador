@@ -541,6 +541,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             for line in m.movement_lines() {
                 println!("movimentação: {line}");
             }
+            for line in m.maintenance_lines() {
+                println!("manutenção: {line}");
+            }
         }
         Cmd::Rede { acao } => rede::run(acao)?,
         Cmd::Corredores { model, svg } => corredores::run(&model, svg.as_deref())?,

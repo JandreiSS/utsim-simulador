@@ -1024,6 +1024,20 @@ movimentação, com um padrão no modelo e sobrescrita por recurso.
 
 ## 8. Características físicas de pessoas e máquinas
 
+**Situação (2026-11-03):** a parte de **máquinas** dos itens 1 a 3 (manutenção corretiva com
+equipe, preventiva, desgaste) e as estatísticas de OEE e de manutenção estão prontas no
+núcleo (`utsim_core::maintenance`, `crates/utsim-core/src/engine/maint.rs`,
+`utsim_model::DowntimeDef`, exemplo `examples/manutencao.ron`, manual "Manutenção de
+máquinas e OEE"). Desvios do proposto: tudo fica no próprio `downtime` (`repair_crew`,
+`wear`, `basis`, `repair`, `preventive`, `cost`, `oee`) em vez de `team`/`maintenance` à
+parte; `requires` (habilidades) fica para o item 5 das pessoas; a preventiva só termina a
+peça (sem `policy: Interrupt`); os gatilhos são `Hours` (uso), `Cycles`, `Clock` (depois do
+fim da anterior) e `Calendar`; a corretiva admite `Partial(q)` (idade virtual) além de
+mínima e perfeita; o refugo do OEE vem de `oee.reject_to` (objetos ligados à saída) ou de
+um rótulo, e não de `quality: Reject` na `Sink`; custos por tempo parado, por reparo e por
+preventiva (sem hora de técnico nem peças à parte). Pendentes: energia, especificações de
+empilhadeira, aquecimento e partida, as características de pessoas e o visual no Godot.
+
 ### Objetivo
 Representar o que muda o desempenho real de pessoas e equipamentos (fadiga, aprendizado,
 limites de carga, habilidades, manutenção, desgaste, energia, especificações dos veículos), de
@@ -1261,8 +1275,8 @@ Contexto: G2 (edição) e G5 (empacotamento) em andamento; G3 (rede, fluidos, re
    rastro e dos gráficos.
 7. **Depois da G3:** conflitos determinísticos (nós, zonas, células, prioridade por classe),
    cruzamentos com regra e motorista como recurso (`DriverUse`); em seguida, as características
-   físicas, começando pelas de máquinas (manutenção com equipe, preventiva, desgaste, OEE, que
-   reaproveitam o kernel de quebras) e depois energia, especificações de empilhadeira e as de
+   físicas, começando pelas de máquinas ([x] manutenção com equipe, preventiva, desgaste, OEE,
+   que reaproveitam o kernel de quebras: feito no núcleo, seção 8) e depois energia, especificações de empilhadeira e as de
    pessoas (habilidades, fadiga, aprendizado, carga). São as partes que mudam tempos e pedem mais
    validação.
 8. **Por último:** estatística P3 (planejamento de experimentos, metamodelo), Parquet, planta por

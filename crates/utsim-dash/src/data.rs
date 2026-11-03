@@ -52,7 +52,7 @@ pub struct Package {
     pub wip_series: Vec<[f64; 6]>,
 }
 
-const ALL_STATES: [State; 18] = [
+const ALL_STATES: [State; 20] = [
     State::Idle,
     State::Empty,
     State::Generating,
@@ -71,14 +71,17 @@ const ALL_STATES: [State; 18] = [
     State::Unloading,
     State::Utilize,
     State::Stopped,
+    State::WaitingRepair,
+    State::Maintenance,
 ];
 
 /// States that are time lost (for the Pareto chart).
-const LOSS_STATES: [&str; 5] = [
+const LOSS_STATES: [&str; 6] = [
     "blocked",
     "waiting_operator",
     "waiting_transport",
     "down",
+    "waiting_repair",
     "stopped",
 ];
 
