@@ -226,7 +226,27 @@ comparação de cenários, verificação de consistência e visões no tempo e n
 
 ### O que falta, por prioridade
 
-**P1 (confiança nos números)**
+**P1 (confiança nos números).** *Feito no núcleo e na CLI (`crates/utsim-stats`,
+`utsim-model::analysis`, `utsim analisar`); falta a interface Godot.* Notas da
+implementação:
+- [x] 1: `utsim_stats::t_quantile`/`summary`; em 95 % continua a tabela `t_975` (tornada
+  pública), porque as faixas acima de 30 gl da tabela não são o quantil exato e trocá-las
+  mudaria resultados. `t_ppf` reproduz a tabela nas três casas (teste de referência).
+  `analysis::object_stats_at`, `model_stats_at`, `paired_difference_at`; `--confianca`.
+- [x] 2: `warmup.rs` (Welch, MSER/MSER-5) e `analysis::warmup` sobre o WIP amostrado ou as
+  observações de uma medida; `Simulation::keep_timed` + `Model::run_replications_timed`.
+  A CLI imprime a curva de Welch em texto; o gráfico e o "aplicar" ficam para a interface.
+- [x] 3: `precision::replications_needed`/`precision`; `--precisao 2%` ou absoluta.
+- [x] 4: `precision::batch_means` (tamanhos dobrando, no mínimo 10 lotes). A autocorrelação
+  lag 1 é calculada em `utsim-stats` (mesmo estimador de `utsim-fit::diagnostics`, que não
+  pode ser dependência porque `utsim-fit` depende de `utsim-stats`). `--lotes`.
+- [x] 5: `little.rs` e `analysis::little`; trânsito de `transfer` pelos eventos `Transit` do
+  rastro. Aviso quando o IC da diferença pareada exclui zero **e** a diferença relativa passa
+  de 2 % (`DEFAULT_TOLERANCE`): com muitas replicações, efeitos de ponta minúsculos já seriam
+  "significativos". Montagens e desmontagens ficam fora (o número de itens muda). `--little`.
+- [x] 6: `analysis::active_periods`, `shifting_bottleneck_times`, `shifting_bottleneck`;
+  trechos ativos que se tocam no mesmo instante formam um só período. `--gargalo-movel`.
+
 1. **Nível de confiança configurável e quantil t geral.** Trocar a tabela por `t_ppf(p, gl)` a
    partir de `beta_inc` (inversa por `brent`). Padrão continua 95 %, com resultados idênticos
    (a tabela fica como teste de referência).
@@ -1168,8 +1188,9 @@ Contexto: G2 (edição) e G5 (empacotamento) em andamento; G3 (rede, fluidos, re
 (VR/AR) depois. Recursos visuais novos só no Godot.
 
 1. **Agora, em paralelo com G2/G5 (só núcleo, sem interface):**
-   - `utsim-stats` P1 (quantil t geral, aquecimento, replicações necessárias, médias em lotes,
-     Little) e a CLI `utsim analisar`; não toca na interface nem no formato.
+   - [x] `utsim-stats` P1 (quantil t geral, aquecimento, replicações necessárias, médias em lotes,
+     Little) e a CLI `utsim analisar`; não toca na interface nem no formato. Feito, com o
+     gargalo móvel (item 6 da seção 2).
    - `utsim-pert` (derivação, CPM, PERT, Monte Carlo) e `utsim pert` com HTML; dá valor imediato
      pela linha de comando e pelo relatório.
 2. **Formato 2 cedo.** A migração (seção 7, `movement: Legacy`) é pequena, mas toca todos os
