@@ -165,7 +165,7 @@ fn playback_object(core: Playback) -> Gd<UtsimPlayback> {
 #[derive(GodotClass)]
 #[class(base = RefCounted, init)]
 pub struct UtsimDocument {
-    editor: Editor,
+    pub(crate) editor: Editor,
     last_error: String,
     fits: FitCache,
     base: Base<RefCounted>,
@@ -199,7 +199,7 @@ fn json_of(v: &Variant) -> serde_json::Value {
 }
 
 impl UtsimDocument {
-    fn data_list(&self) -> Vec<serde_json::Value> {
+    pub(crate) fn data_list(&self) -> Vec<serde_json::Value> {
         dados::data_fields(self.editor.model(), self.base_dir().as_deref(), &self.fits)
     }
 

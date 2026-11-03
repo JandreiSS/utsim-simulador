@@ -12,6 +12,11 @@
 //!   arrays (one entry per block and per drawn item), which GDScript reads without
 //!   allocating a dictionary per entity.
 //!
+//! - `UtsimUi` (`ui_class.rs`): a `Node2D` that draws the interface around the 3D view
+//!   with egui ([`egui_host`], [`ui_bar`]): it takes Godot's input, keeps the 3D view from
+//!   getting what belongs to a panel, and paints with `RenderingServer` canvas items
+//!   ([`egui_mesh`]); widgets keep stable names ([`egui_widgets`]) for the scripted runs.
+//!
 //! Every position is converted to Godot coordinates here ([`coords`]): `(x, y, z)` of
 //! the model becomes `(x, z, -y)` and a yaw is the rotation about `+Y`. The pure modules
 //! ([`coords`], [`playback`], [`document`], [`schema`]) have no Godot types and are unit
@@ -28,6 +33,10 @@ pub mod coords;
 pub mod dados;
 pub mod document;
 mod document_class;
+pub mod egui_host;
+pub mod egui_input;
+pub mod egui_mesh;
+pub mod egui_widgets;
 pub mod extras;
 pub mod jobs;
 mod jobs_class;
@@ -36,6 +45,9 @@ pub mod pert_view;
 pub mod playback;
 pub mod results;
 pub mod schema;
+pub mod ui_bar;
+mod ui_class;
+pub mod ui_props;
 
 pub use utsim_edit::ron_text;
 pub use utsim_look::{catalogue, visual as looks};

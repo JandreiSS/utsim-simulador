@@ -2019,11 +2019,13 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
             "interarrival" | "setup" | "process" | "load_time" | "unload_time" | "dwell"
         )
     };
-    if rest.is_empty() && !is_dist(head) && !TEXT_FIELDS.contains(&head) {
-        if let Value::Text(t) = value {
-            // The RON of the whole field: a choice (`Fifo`), a list, a map.
-            return Ok(set(&obj.name, head, t.clone()));
-        }
+    // The RON of the whole field: a choice (`Fifo`), a list, a map.
+    if rest.is_empty()
+        && !is_dist(head)
+        && !TEXT_FIELDS.contains(&head)
+        && let Value::Text(t) = value
+    {
+        return Ok(set(&obj.name, head, t.clone()));
     }
     let mut copy = obj.clone();
     mutate(&mut copy, head, rest, value)?;

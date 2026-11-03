@@ -18,6 +18,11 @@ Princípios:
 - Toda regra que puder ser testada sem o motor fica no Rust, com testes.
 - O controle visual é roteirizado: capturas de tela comparadas com as mesmas vistas do Bevy.
 
+**Interface em Rust (2026-11-03):** só a vista 3D central continua no Godot; a interface em
+volta (barra superior, painéis, janelas) passa do GDScript para Rust, desenhada com egui pela
+ponte. O plano, a ordem e o que já foi feito (fundação e barra superior) estão em
+`docs/plano_interface_rust.md`.
+
 ## Fases (estimativa em horas Opus 5.5)
 
 | Fase | Conteúdo | Estimativa |

@@ -42,6 +42,20 @@ Um modelo sem posições (tudo em 0, 0, 0) ganha um layout automático ao abrir.
 | **Fluxos** | abre o painel da lógica do usuário ([Fluxos de tokens](fluxos-e-scripts.md)) |
 | **Visual: simples / realista** | troca as formas simples pelos modelos 3D da biblioteca ([3D realista](visual-3d.md)) |
 
+### A barra superior do UTSim 3D (prévia)
+
+Na nova interface 3D (`utsim-3d`), a barra superior é organizada em grupos, da esquerda para a direita:
+
+| Grupo | Controles |
+|---|---|
+| Arquivo | **Novo** (`Ctrl+N`), **Abrir…** (`Ctrl+O`, modelos `.ron` e replays `.json`), **Salvar** (`Ctrl+S`), **Salvar como…** (`Ctrl+Shift+S`) |
+| Editar | **Desfazer** (`Ctrl+Z`), **Refazer** (`Ctrl+Y`) e o menu **Organizar** (alinhar, distribuir, copiar, recortar, colar, duplicar, excluir, selecionar tudo) |
+| Modos | **Editar \| Simular** (`Tab` alterna) e, no Editar, as ferramentas **Selecionar \| Ligar \| Rede \| Corredor** (`Esc`, `L`, `N`, `C`) |
+| Vista | **Grade** (encaixe, `G`) com o passo ao lado e **Atalhos** (`F1`) |
+| Análise | **Resultados**, **PERT/CPM** (da seleção; com dois objetos, de um até o outro) e, na seta ao lado, as variantes do PERT/CPM e os **Fluxos de tokens** |
+
+O nome do modelo fica à direita (com `*` quando há mudanças não salvas; o arquivo aparece ao parar o mouse sobre ele). No Simular, os grupos que só servem para editar saem da barra. Numa janela estreita, os grupos que não cabem vão para o menu **Mais**, no fim da barra, em vez de serem cortados. A roda do mouse sobre a barra (e sobre qualquer painel) nunca aproxima a câmera, e os atalhos de teclado valem sempre, exceto enquanto você digita num campo.
+
 A simulação nunca é conduzida pela janela. O botão **▶ Simular** roda o motor em outra tarefa e a janela apenas lê o resultado gravado. Por isso o que você vê é exatamente o que o `utsim run` calcula.
 
 ## Modo Editar

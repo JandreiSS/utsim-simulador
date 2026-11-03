@@ -62,6 +62,11 @@
 ##    `{"corredor": "corredor_1"}` (the middle of its first segment), `{"acesso": "objeto"}`
 ##    (the access point of an object, with the obstacles shown) or
 ##    `{"aba": ["Abas", "Título"]}` (a tab of a TabContainer).
+##
+## The widgets drawn by egui in Rust (`UtsimUi`, the top bar first) keep the names of the
+## Godot nodes they replaced: `{"controle": "Modo_Editar"}` finds the Godot control by that
+## name or, when there is none, the egui widget (`_widget`), and the steps act on it with
+## the same input events. `escolher`, `texto`, `visivel` and `oculto` work on both.
 extends Node
 
 var _out := ""
@@ -244,7 +249,14 @@ func _reveal(t: Variant) -> void:
 	if typeof(t) != TYPE_DICTIONARY or not (t as Dictionary).has("controle"):
 		return
 	var c := _control(t["controle"])
-	if c == null:
+	if c == null or not c.is_visible_in_tree():
+		var u := _egui()
+		if u != null:
+			u.update_now()
+			if u.reveal(String(t["controle"])):
+				for i in 4:
+					await _frames(1)
+					u.update_now()
 		return
 	var scroll := _scroll_of(c)
 	if scroll != null:
@@ -253,7 +265,7 @@ func _reveal(t: Variant) -> void:
 
 
 func _step(s: Dictionary, k: int) -> void:
-	for key in ["clicar", "mover", "em"]:
+	for key in ["clicar", "mover", "em", "escolher"]:
 		if s.has(key):
 			await _reveal(s[key])
 	if s.has("nota"):
@@ -318,6 +330,12 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("escolher"):
 		var e: Dictionary = s["escolher"]
 		var o := _control(String(e.get("controle", ""))) as OptionButton
+		if (o == null or not o.is_visible_in_tree()) and _egui() != null and _widget_visible(String(e.get("controle", ""))):
+			if not _egui().choose(String(e["controle"]), String(e["item"])):
+				_fail("passo %d: %s não tem o item %s" % [k, e["controle"], e["item"]])
+				return
+			await _frames(4)
+			return
 		if o == null or not o.is_visible_in_tree():
 			_fail("passo %d: lista não encontrada: %s" % [k, e])
 			return
@@ -389,6 +407,33 @@ func _control(name: String) -> Control:
 	return n as Control
 
 
+## The egui interface of the main scene (`UtsimUi`), or null.
+func _egui() -> Object:
+	if _main == null:
+		return null
+	var u = _main.get("ui")
+	return u if u is Object and u != null else null
+
+
+## The rectangle of the egui widget `name` on screen (pixels), or an empty one.
+func _widget(name: String) -> Rect2:
+	var u := _egui()
+	if u == null or name == "":
+		return Rect2()
+	u.update_now()
+	return u.widget_rect(name)
+
+
+func _widget_visible(name: String) -> bool:
+	var u := _egui()
+	if u == null:
+		return false
+	u.update_now()
+	# Drawn in the last frame, on screen or scrolled out of a panel (as a Godot control
+	# inside a ScrollContainer is still "visible").
+	return u.has_widget(name) or u.knows_widget(name)
+
+
 ## The screen point of a target, or null.
 func _target(t: Variant) -> Variant:
 	if typeof(t) != TYPE_DICTIONARY:
@@ -399,7 +444,8 @@ func _target(t: Variant) -> Variant:
 	if d.has("controle"):
 		var c := _control(d["controle"])
 		if c == null or not c.is_visible_in_tree():
-			return null
+			var r := _widget(String(d["controle"]))
+			return r.get_center() if r.has_area() else null
 		return c.get_global_rect().get_center()
 	if d.has("item"):
 		var list := _control(d["item"][0]) as ItemList
@@ -715,6 +761,9 @@ func _check(c: Dictionary, k: int) -> void:
 			"miniatura":
 				var view := _control("Prop_visual_asset_miniatura")
 				var shown: String = _main._props._mini_asset if view != null else "(sem miniatura)"
+				if view == null and _egui() != null and _egui().knows_widget("Prop_visual_asset_miniatura"):
+					# The egui panel: the miniature the main scene drew last.
+					shown = _main.mini_asset
 				report.call("miniatura", shown == want, shown)
 			"foco":
 				var owner := get_viewport().gui_get_focus_owner()
@@ -825,15 +874,17 @@ func _check(c: Dictionary, k: int) -> void:
 			"texto":
 				var ctl := _control(String(want["controle"]))
 				var shown := _text_of(ctl) if ctl != null else "(controle ausente)"
+				if (ctl == null or not ctl.is_visible_in_tree()) and _widget_visible(String(want["controle"])):
+					shown = String(_egui().widget_info(String(want["controle"])).get("text", ""))
 				report.call("texto de %s contém %s" % [want["controle"], want["contem"]], shown.contains(String(want["contem"])), shown.substr(0, 300))
 			"visivel":
 				for n in want:
 					var ctl := _control(String(n))
-					report.call("%s visível" % n, ctl != null and ctl.is_visible_in_tree(), "")
+					report.call("%s visível" % n, (ctl != null and ctl.is_visible_in_tree()) or _widget_visible(String(n)), "")
 			"oculto":
 				for n in want:
 					var ctl := _control(String(n))
-					report.call("%s oculto" % n, ctl == null or not ctl.is_visible_in_tree(), "")
+					report.call("%s oculto" % n, (ctl == null or not ctl.is_visible_in_tree()) and not _widget_visible(String(n)), "")
 			"replicacoes":
 				var n: int = _main.results.replications() if _main.results != null else 0
 				report.call("replicações dos resultados", n == int(want), str(n))
