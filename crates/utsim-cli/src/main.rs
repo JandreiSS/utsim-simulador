@@ -4,6 +4,7 @@ mod experiment;
 mod fit;
 mod gerar;
 mod optimize;
+mod pert;
 mod replay;
 
 use std::path::PathBuf;
@@ -185,6 +186,43 @@ enum Cmd {
         #[arg(long)]
         json: Option<PathBuf>,
     },
+    /// PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
+    Pert {
+        model: PathBuf,
+        /// Objetos da seleção, separados por vírgula
+        #[arg(long, conflicts_with_all = ["de", "ate"])]
+        objetos: Option<String>,
+        /// Início do trecho (todos os objetos em algum caminho de --de até --ate)
+        #[arg(long, requires = "ate")]
+        de: Option<String>,
+        /// Fim do trecho
+        #[arg(long, requires = "de")]
+        ate: Option<String>,
+        /// Prazo: calcula a probabilidade de terminar até ele
+        #[arg(long)]
+        prazo: Option<f64>,
+        /// simulado (caminho crítico observado na simulação), classico ou montecarlo
+        #[arg(long, default_value = "simulado")]
+        modo: String,
+        /// Momentos do PERT clássico: exatos (das distribuições) ou classicos (beta)
+        #[arg(long, default_value = "exatos")]
+        momentos: String,
+        /// Sorteios do Monte Carlo
+        #[arg(long, default_value_t = 10_000)]
+        sorteios: usize,
+        /// Semente (padrão: a do modelo)
+        #[arg(long)]
+        semente: Option<u64>,
+        /// Replicações do modo simulado (padrão: as do modelo)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+        /// Grava atividades, caminhos, tempo total, diagrama e sensibilidade em CSV neste diretório
+        #[arg(long)]
+        csv: Option<PathBuf>,
+        /// Grava o relatório completo, com a rede, o Gantt e os gráficos, em um HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -199,6 +237,33 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
+        Cmd::Pert {
+            model,
+            objetos,
+            de,
+            ate,
+            prazo,
+            modo,
+            momentos,
+            sorteios,
+            semente,
+            reps,
+            csv,
+            html,
+        } => pert::run(pert::Args {
+            model,
+            objects: objetos,
+            from: de,
+            to: ate,
+            deadline: prazo,
+            mode: modo,
+            moments: momentos,
+            samples: sorteios,
+            seed: semente,
+            reps,
+            csv,
+            html,
+        })?,
         Cmd::Fit {
             file,
             coluna,
