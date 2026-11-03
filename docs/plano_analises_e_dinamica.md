@@ -580,6 +580,12 @@ FIFO e detecção de impasse:
 
 ## 5. Planta CAD como base do layout
 
+**Situação (2026-11-02):** a crate `utsim-cad` e o comando `utsim planta` estão prontos (leitura de
+DXF 2D com blocos aninhados, unidades, calibração, simplificação, papéis por camada, obstáculos de
+paredes e colunas, SVG e arrays para a interface). Pendentes: encaixe nas linhas (extremidades,
+pontos médios, interseções) com índice espacial, contorno de HATCH, o campo `floor_plan` no modelo
+(proposta em `docs/arquitetura.md`), a planta por imagem com escala e o diálogo no Godot.
+
 ### Objetivo
 Carregar a planta da fábrica, colocá-la no piso na escala certa e posicionar os objetos sobre
 ela; paredes e colunas passam a ser obstáculos do recurso 4.

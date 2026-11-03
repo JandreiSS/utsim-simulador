@@ -15,6 +15,7 @@
 - [Quebras e turnos](quebras-e-turnos.md)
 - [Fluxos de tokens e scripts](fluxos-e-scripts.md)
 - [Fluidos](fluidos.md)
+- [Planta CAD (DXF)](planta-cad.md)
 
 # Analisando resultados
 
