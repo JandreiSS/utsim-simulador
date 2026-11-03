@@ -79,7 +79,109 @@ pub fn convert(prim: &ClippedPrimitive, ppp: f32, size: [f32; 2]) -> Option<Mesh
         out.colors.push(unmultiply(v.color));
         out.uvs.push([v.uv.x, v.uv.y]);
     }
-    Some(out)
+    clip_triangles(&mut out);
+    (!out.indices.is_empty()).then_some(out)
+}
+
+/// One vertex while clipping: position, colour, uv.
+#[derive(Clone, Copy)]
+struct V {
+    p: [f32; 2],
+    c: [f32; 4],
+    uv: [f32; 2],
+}
+
+fn lerp_v(a: V, b: V, t: f32) -> V {
+    let l = |x: f32, y: f32| x + (y - x) * t;
+    V {
+        p: [l(a.p[0], b.p[0]), l(a.p[1], b.p[1])],
+        c: [
+            l(a.c[0], b.c[0]),
+            l(a.c[1], b.c[1]),
+            l(a.c[2], b.c[2]),
+            l(a.c[3], b.c[3]),
+        ],
+        uv: [l(a.uv[0], b.uv[0]), l(a.uv[1], b.uv[1])],
+    }
+}
+
+/// Cuts the triangles to the clip rectangle on the CPU (the canvas item's own clip proved
+/// unreliable for items drawn by a `Node2D`: the windowed check showed text running past
+/// the bottom of a scrolled panel). Triangles inside are kept as they are, the ones outside
+/// dropped, and the ones across the edge cut (Sutherland-Hodgman) and fanned again, with
+/// colours and uvs interpolated.
+pub fn clip_triangles(m: &mut MeshArrays) {
+    let [x, y, w, h] = m.clip;
+    let (x0, y0, x1, y1) = (x, y, x + w, y + h);
+    let inside = |p: [f32; 2]| p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1;
+    let all_in = m.points.iter().all(|p| inside(*p));
+    if all_in {
+        return;
+    }
+    let get = |m: &MeshArrays, i: i32| V {
+        p: m.points[i as usize],
+        c: m.colors[i as usize],
+        uv: m.uvs[i as usize],
+    };
+    let mut kept = Vec::with_capacity(m.indices.len());
+    let mut extra: Vec<V> = Vec::new();
+    for t in m.indices.as_chunks::<3>().0 {
+        let tri = [get(m, t[0]), get(m, t[1]), get(m, t[2])];
+        if tri.iter().all(|v| inside(v.p)) {
+            kept.extend_from_slice(t);
+            continue;
+        }
+        let out_side = |f: &dyn Fn(&V) -> bool| tri.iter().all(f);
+        if out_side(&|v| v.p[0] < x0)
+            || out_side(&|v| v.p[0] > x1)
+            || out_side(&|v| v.p[1] < y0)
+            || out_side(&|v| v.p[1] > y1)
+        {
+            continue;
+        }
+        // Clip the polygon against each edge: (axis, limit, keep the side below?).
+        let mut poly: Vec<V> = tri.to_vec();
+        for (axis, limit, below) in [(0, x0, false), (0, x1, true), (1, y0, false), (1, y1, true)] {
+            let keep = |v: &V| {
+                if below {
+                    v.p[axis] <= limit
+                } else {
+                    v.p[axis] >= limit
+                }
+            };
+            let mut next = Vec::with_capacity(poly.len() + 2);
+            for k in 0..poly.len() {
+                let a = poly[k];
+                let b = poly[(k + 1) % poly.len()];
+                let (ka, kb) = (keep(&a), keep(&b));
+                if ka {
+                    next.push(a);
+                }
+                if ka != kb {
+                    let t = (limit - a.p[axis]) / (b.p[axis] - a.p[axis]);
+                    next.push(lerp_v(a, b, t));
+                }
+            }
+            poly = next;
+            if poly.len() < 3 {
+                break;
+            }
+        }
+        if poly.len() < 3 {
+            continue;
+        }
+        let base = (m.points.len() + extra.len()) as i32;
+        extra.extend_from_slice(&poly);
+        for k in 1..poly.len() as i32 - 1 {
+            kept.extend_from_slice(&[base, base + k, base + k + 1]);
+        }
+    }
+    for v in extra {
+        m.points.push(v.p);
+        m.colors.push(v.c);
+        m.uvs.push(v.uv);
+    }
+    m.indices = kept;
 }
 
 /// An egui texture kept on the CPU: straight-alpha RGBA8, row by row.
@@ -230,6 +332,43 @@ mod tests {
 
     fn image(w: usize, h: usize, c: Color32) -> ImageData {
         ImageData::Color(Arc::new(ColorImage::new([w, h], vec![c; w * h])))
+    }
+
+    #[test]
+    fn triangles_are_cut_to_the_clip() {
+        let v = |x: f32, y: f32| ([x, y], [1.0, 1.0, 1.0, 1.0], [x / 100.0, y / 100.0]);
+        let mut m = MeshArrays {
+            clip: [0.0, 0.0, 100.0, 50.0],
+            texture: Some(TextureId::default()),
+            ..MeshArrays::default()
+        };
+        // Inside, across the bottom edge, and outside.
+        for (p, c, uv) in [
+            v(10.0, 10.0),
+            v(20.0, 10.0),
+            v(10.0, 20.0),
+            v(10.0, 40.0),
+            v(30.0, 40.0),
+            v(10.0, 80.0),
+            v(10.0, 60.0),
+            v(20.0, 60.0),
+            v(10.0, 70.0),
+        ] {
+            m.points.push(p);
+            m.colors.push(c);
+            m.uvs.push(uv);
+        }
+        m.indices = vec![0, 1, 2, 3, 4, 5, 6, 7, 8];
+        clip_triangles(&mut m);
+        assert_eq!(&m.indices[..3], &[0, 1, 2], "o de dentro fica igual");
+        assert!(m.indices.len() >= 6, "o cortado vira triângulos");
+        for &i in &m.indices {
+            let p = m.points[i as usize];
+            assert!(p[1] <= 50.0 + 1e-4, "{p:?} passa da borda");
+            // The uv follows the position (the test mesh maps uv = position / 100).
+            let uv = m.uvs[i as usize];
+            assert!((uv[1] - p[1] / 100.0).abs() < 1e-5);
+        }
     }
 
     #[test]

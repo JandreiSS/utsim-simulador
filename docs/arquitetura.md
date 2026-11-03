@@ -1546,7 +1546,7 @@ foram feitos a fundação e a barra superior:
   texto, modificadores; área de transferência pelo `DisplayServer`; escala pelo
   `content_scale_factor` da janela), roda um quadro do egui só quando chega entrada, o
   estado muda, a janela muda ou o egui pede, e desenha cada malha tesselada num canvas item
-  filho com recorte e a textura do egui (cópia na CPU, atualizações parciais aplicadas e
+  filho, com os triângulos recortados na CPU, e a textura do egui (cópia na CPU, atualizações parciais aplicadas e
   enviadas como `Image` RGBA8; cores pré-multiplicadas convertidas para alfa direto). Sem
   `__codegen-full`, os eventos, a `Image` e o `DisplayServer` são usados por chamadas
   dinâmicas.

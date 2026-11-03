@@ -49,8 +49,8 @@ Godot (janela, vista 3D, câmera, cena)            Rust (ponte utsim-godot)
   (é a troca Editar/Simular), e um botão do egui não guarda o foco do teclado, então os
   atalhos (Ctrl+O/N/S, Tab, F, F1, F3, Del, L, N, C, G...) continuam do `principal.gd`.
 - **Desenho** (`egui_mesh.rs`, puro, e `ui_class.rs`): o egui tessela a saída em malhas;
-  cada malha vira um canvas item filho do nó (reaproveitado entre quadros), com o recorte
-  (`canvas_item_set_custom_rect` + `canvas_item_set_clip`) e um `canvas_item_add_triangle_array`
+  cada malha vira um canvas item filho do nó (reaproveitado entre quadros), com os triângulos cortados na CPU ao recorte do egui
+  (`egui_mesh::clip_triangles`; o recorte do canvas item não bastou) e um `canvas_item_add_triangle_array`
   com a textura certa. As texturas do egui (o atlas das fontes) têm uma cópia na CPU, onde
   as atualizações parciais são aplicadas, e são enviadas ao Godot como `Image` RGBA8. As
   cores do egui são pré-multiplicadas; a ponte as converte para alfa direto, que é a mistura
@@ -187,7 +187,24 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - Um clique no egui tira o foco de um campo Godot (`gui_release_focus`).
 - `principal.gd` sem a barra superior em GDScript: `_sync_bar()` e `bar_action()`; o
   `roteiro.gd` acha widgets do egui pelo nome.
-- A conferência visual com janela (capturas a 1600×900 e 1280×720) ficou pendente: a tela
-  estava em uso pelo dono; os testes de layout da barra (`ui_bar::tests`) conferem que nada
-  se sobrepõe nem sai da barra nas duas larguras e que o menu "Mais" só aparece a 1280, e
-  os do painel (`ui_props::tests`) os nomes, as colunas, a digitação e as seções.
+- Conferência visual com janela (roteiros g2_tutorial_01, g2_montar_linha, g3_cena,
+  g3_resultados e um roteiro do editor com um modelo aberto, a 1600×900 e 1280×720). Achados
+  e correções:
+  - o recorte dos canvas items (`canvas_item_set_clip` com o retângulo próprio) não cortava
+    o que o egui desenha num `Node2D`: o texto do painel rolado passava por cima da barra de
+    status. Os triângulos agora são cortados na CPU (`egui_mesh::clip_triangles`, com cor e
+    coordenada de textura interpoladas), e os testes conferem que nenhum vértice sai do
+    recorte;
+  - as setas pequenas (▾ ▸) e o ✕ não existem na fonte de interface e saíam como caixas: os
+    menus usam um ▼ pequeno (`widgets::down_arrow`), as seções um triângulo desenhado
+    (`widgets::paint_chevron`) e a remoção de ligação um ×; as seções ficaram alinhadas à
+    esquerda;
+  - a unidade dos campos numéricos (m, s, graus) só aparecia depois de uma edição;
+  - os rótulos ficaram centrados na altura dos campos e a borda das caixas de marcar mais
+    clara (as desmarcadas quase sumiam no painel);
+  - dentro do menu "Mais", "Organizar" ficava com duas setas.
+  Fontes (acentos ã ç é), cores e transparência, dicas ao parar o mouse, o menu "Mais" a
+  1280 e a rolagem do painel sem mexer na câmera ficaram certos. A 1280×720, os roteiros
+  g2_tutorial_01 e g2_montar_linha falham ao soltar objetos em pontos do chão escritos para
+  1600×900 (o ponto fica sob o painel da direita, de mesma largura que o painel Godot de
+  antes); são roteiros feitos para 1600×900.

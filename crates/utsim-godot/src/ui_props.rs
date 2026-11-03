@@ -348,13 +348,28 @@ fn section_header(ui: &mut Ui, reg: &mut Registry, st: &mut PropsState, title: &
     ui.add_space(2.0);
     ui.separator();
     let closed = st.closed.contains(title);
-    let text = format!("{}  {}", if closed { "▸" } else { "▾" }, title);
-    let r = ui
-        .add_sized(
-            [ui.available_width(), 26.0],
-            Button::new(RichText::new(&text).strong().color(colors::HEADING))
-                .frame_when_inactive(false),
-        )
+    let text = title.to_owned();
+    // A full-width row, left aligned: the triangle (drawn, not a glyph: the UI fonts lack
+    // the small ones) and the title.
+    let (rect, r) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::click());
+    if r.hovered() {
+        ui.painter().rect_filled(rect, 4.0, colors::HOVER);
+    }
+    widgets::paint_chevron(
+        ui.painter(),
+        rect.left_center() + Vec2::new(10.0, 0.0),
+        !closed,
+        colors::HEADING,
+    );
+    ui.painter().text(
+        rect.left_center() + Vec2::new(24.0, 0.0),
+        egui::Align2::LEFT_CENTER,
+        title,
+        egui::FontId::proportional(sizes::BODY),
+        colors::HEADING,
+    );
+    let r = r
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(format!(
             "{} a seção {title}",
             if closed { "Abre" } else { "Fecha" }
@@ -395,16 +410,21 @@ fn row_label<R>(
             ui.add_space(indent);
         }
         let lw = LABEL_W - indent;
-        ui.allocate_ui_with_layout(Vec2::new(lw, 0.0), Layout::top_down(Align::Min), |ui| {
-            ui.set_width(lw);
-            let tip = if help.is_empty() {
-                label.to_owned()
-            } else {
-                format!("{label}\n{help}")
-            };
-            ui.add(Label::new(RichText::new(label).color(colors::TEXT)).wrap())
-                .on_hover_text(tip);
-        });
+        ui.allocate_ui_with_layout(
+            Vec2::new(lw, 26.0),
+            Layout::left_to_right(Align::Center),
+            |ui| {
+                ui.set_width(lw);
+                ui.set_min_height(26.0);
+                let tip = if help.is_empty() {
+                    label.to_owned()
+                } else {
+                    format!("{label}\n{help}")
+                };
+                ui.add(Label::new(RichText::new(label).color(colors::TEXT)).wrap())
+                    .on_hover_text(tip);
+            },
+        );
         let w = ui.available_width().max(60.0);
         widget(ui, w)
     })
@@ -489,10 +509,11 @@ fn number(
         (width - unit_w).max(50.0),
         false,
         "",
-    )?;
+    );
     if !unit.is_empty() {
         ui.label(RichText::new(unit).color(colors::TEXT_WEAK));
     }
+    let typed = typed?;
     let t = typed.trim().replace(',', ".");
     Some(if integer {
         t.parse::<i64>()
@@ -1080,7 +1101,7 @@ fn outputs(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, p: &Prope
                 ),
                 (
                     "Remover",
-                    "✕",
+                    "×",
                     "Remove esta ligação",
                     true,
                     PropAction::Disconnect(to.clone()),

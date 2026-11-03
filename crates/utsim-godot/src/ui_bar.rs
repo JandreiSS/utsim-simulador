@@ -214,7 +214,7 @@ fn bar_contents(
         .collect();
     if !overflow.is_empty() {
         ui.separator();
-        let r = ui.menu_button("Mais ▾", |ui| {
+        let r = ui.menu_button(("Mais", widgets::down_arrow()), |ui| {
             ui.set_min_width(220.0);
             for (n, u) in overflow.iter().enumerate() {
                 if n > 0 {
@@ -325,7 +325,9 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
             }
         }
         Unit::Organizar => {
-            let r = ui.menu_button("Organizar ▾", |ui| {
+            // Inside "Mais" it is a submenu, which has its own arrow.
+            let in_menu = egui::containers::menu::is_in_menu(ui);
+            let contents = |ui: &mut Ui| {
                 ui.set_min_width(230.0);
                 let groups: [&[(&str, &str)]; 3] = [
                     &[
@@ -363,7 +365,12 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                         }
                     }
                 }
-            });
+            };
+            let r = if in_menu {
+                ui.menu_button("Organizar", contents)
+            } else {
+                ui.menu_button(("Organizar", widgets::down_arrow()), contents)
+            };
             reg.put("Menu_Organizar", &r.response, "Organizar");
             r.response
                 .on_hover_text("Alinhar, distribuir, copiar, colar e excluir a seleção");
@@ -438,7 +445,7 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     act("analisar:pert_auto");
                     ui.close();
                 }
-                let r = ui.menu_button("▾", |ui| {
+                let r = ui.menu_button(widgets::down_arrow(), |ui| {
                     ui.set_min_width(300.0);
                     for (text, what) in [
                         ("Resultados", "resultados"),

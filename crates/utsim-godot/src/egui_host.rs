@@ -473,6 +473,18 @@ mod tests {
                     "recorte fora {:?}",
                     m.clip
                 );
+                // Nothing is drawn outside the clip (cut on the CPU).
+                for &i in &m.indices {
+                    let p = m.points[i as usize];
+                    assert!(
+                        p[0] >= x - 0.01
+                            && p[0] <= x + w + 0.01
+                            && p[1] >= y - 0.01
+                            && p[1] <= y + hh + 0.01,
+                        "vértice {p:?} fora do recorte {:?}",
+                        m.clip
+                    );
+                }
             }
             for id in &delta.free {
                 textures.free(*id);
