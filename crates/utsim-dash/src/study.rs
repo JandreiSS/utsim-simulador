@@ -3,16 +3,24 @@
 //!
 //! Each replication is built and driven exactly as [`Model::run_replications`] does
 //! (`Model::build(r)` then `Model::drive`), so the results are the same as `utsim run`;
-//! only the scheduling is ours, to publish partial results.
+//! only the scheduling is ours, to publish partial results. The arrival instants at
+//! the sinks are kept (throughput per window); that changes no statistic.
+//!
+//! When the replications end, the analyses of [`crate::analyses`] run (exact Gantt and
+//! heat map from the trace of replication 0, scenarios, PERT) and their routes join the
+//! others; [`Progress::etapa`] says which one is running.
 
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use serde_json::Value;
 use utsim_core::RunReport;
 use utsim_model::Model;
 
+use crate::analyses::{self, ScenarioSet};
 use crate::config::Dashboard;
 use crate::data::{Package, Progress};
 
@@ -41,6 +49,12 @@ struct Inner {
     reports: Mutex<Vec<RunReport>>,
     package: RwLock<Arc<Package>>,
     last_rebuild: Mutex<Instant>,
+    scenarios: Option<ScenarioSet>,
+    /// Sinks whose arrival instants are kept.
+    sinks: Vec<String>,
+    /// Routes of the analyses run after the replications.
+    extras: RwLock<BTreeMap<String, Value>>,
+    stage: Mutex<&'static str>,
 }
 
 /// Fills in the settings the dashboard needs and the model leaves open: histograms (for
@@ -63,6 +77,18 @@ impl Study {
         reps: Option<u32>,
         config_origin: &str,
     ) -> Result<Study, String> {
+        Study::start_with(model, cfg, reps, config_origin, None)
+    }
+
+    /// Like [`Study::start`], also comparing the `scenarios` of an experiment over the
+    /// model once the replications end (view Cenários).
+    pub fn start_with(
+        model: Model,
+        cfg: Dashboard,
+        reps: Option<u32>,
+        config_origin: &str,
+        scenarios: Option<ScenarioSet>,
+    ) -> Result<Study, String> {
         let mut model = prepare_model(model);
         if let Some(n) = reps {
             model.run.replications = n.max(1);
@@ -81,7 +107,6 @@ impl Study {
             config_origin,
         );
         let inner = Arc::new(Inner {
-            model,
             cfg,
             origin: config_origin.to_string(),
             total,
@@ -92,6 +117,11 @@ impl Study {
             reports: Mutex::new(Vec::new()),
             package: RwLock::new(Arc::new(empty)),
             last_rebuild: Mutex::new(Instant::now()),
+            sinks: utsim_model::analysis::sinks(&model),
+            model,
+            scenarios,
+            extras: RwLock::new(BTreeMap::new()),
+            stage: Mutex::new(""),
         });
         let worker = Arc::clone(&inner);
         thread::spawn(move || worker.run());
@@ -105,7 +135,18 @@ impl Study {
         reps: Option<u32>,
         config_origin: &str,
     ) -> Result<Study, String> {
-        let s = Study::start(model, cfg, reps, config_origin)?;
+        Study::run_with(model, cfg, reps, config_origin, None)
+    }
+
+    /// [`Study::run`] with the scenarios of [`Study::start_with`].
+    pub fn run_with(
+        model: Model,
+        cfg: Dashboard,
+        reps: Option<u32>,
+        config_origin: &str,
+        scenarios: Option<ScenarioSet>,
+    ) -> Result<Study, String> {
+        let s = Study::start_with(model, cfg, reps, config_origin, scenarios)?;
         s.wait();
         match s.error() {
             Some(e) => Err(e),
@@ -126,12 +167,8 @@ impl Study {
     }
 
     pub fn progress(&self) -> Progress {
-        Progress {
-            feitas: self.inner.done.load(Ordering::Relaxed),
-            total: self.inner.total,
-            concluido: self.inner.finished.load(Ordering::Acquire),
-            cancelado: self.inner.cancel.load(Ordering::Relaxed),
-        }
+        self.inner
+            .progress(self.inner.finished.load(Ordering::Acquire))
     }
 
     pub fn error(&self) -> Option<String> {
@@ -171,17 +208,29 @@ impl Inner {
             total: self.total,
             concluido: finished,
             cancelado: self.cancel.load(Ordering::Relaxed),
+            etapa: self.stage.lock().map_or("", |s| *s),
+        }
+    }
+
+    fn set_stage(&self, stage: &'static str) {
+        if let Ok(mut s) = self.stage.lock() {
+            *s = stage;
         }
     }
 
     fn rebuild(&self, reports: &[RunReport], finished: bool) {
-        let package = Package::build(
+        let mut package = Package::build(
             &self.model,
             &self.cfg,
             reports,
             self.progress(finished),
             &self.origin,
         );
+        if let Ok(extras) = self.extras.read() {
+            package
+                .routes
+                .extend(extras.iter().map(|(k, v)| (k.clone(), v.clone())));
+        }
         if let Ok(mut slot) = self.package.write() {
             *slot = Arc::new(package);
         }
@@ -205,6 +254,11 @@ impl Inner {
                             return;
                         }
                         let mut sim = self.model.build(r);
+                        for sink in &self.sinks {
+                            if let Some(id) = sim.block_id(sink) {
+                                sim.keep_timed(id, "time_in_system");
+                            }
+                        }
                         match self.model.drive(&mut sim) {
                             Ok(report) => {
                                 self.done.fetch_add(1, Ordering::Relaxed);
@@ -223,6 +277,26 @@ impl Inner {
             }
         });
         let snapshot = self.reports.lock().map(|r| r.clone()).unwrap_or_default();
+        let failed = self.error.lock().map(|e| e.is_some()).unwrap_or(true);
+        if !snapshot.is_empty() && !failed && !self.cancel.load(Ordering::Relaxed) {
+            // Every replication is published before the slower analyses start.
+            self.set_stage("preparando as análises");
+            self.rebuild(&snapshot, false);
+            let extras = analyses::extras(
+                &self.model,
+                &self.cfg,
+                self.scenarios.as_ref(),
+                &|| !self.cancel.load(Ordering::Relaxed),
+                &|stage| {
+                    self.set_stage(stage);
+                    self.rebuild(&snapshot, false);
+                },
+            );
+            if let Ok(mut slot) = self.extras.write() {
+                *slot = extras;
+            }
+            self.set_stage("");
+        }
         self.rebuild(&snapshot, true);
         self.finished.store(true, Ordering::Release);
     }

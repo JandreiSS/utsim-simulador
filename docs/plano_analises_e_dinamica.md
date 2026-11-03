@@ -277,7 +277,29 @@ implementação:
    atual e o próximo é gargalo compartilhado. Saída: fração do tempo como gargalo único e
    compartilhado por recurso, complementando `bottleneck` e `bottleneck_in_shift`.
 
-**P2 (entender a dinâmica e comparar)**
+**P2 (entender a dinâmica e comparar)** *Feito no núcleo, na CLI (`utsim analisar --comparar |
+--correlacao | --mapa-calor | --exportar-observacoes`) e no painel web (abas Cenários,
+Correlação, Mapa de calor e PERT; Séries e Gantt completados); no Godot fica para depois.*
+Notas da implementação:
+- [x] 7: `analysis::state_gantt` (exato pelo rastro); no painel substitui o Gantt amostrado
+  quando as replicações terminam, com zoom e a paleta dos estados da cena.
+- [x] 8: `analysis::band`, `wip_band` (sistema ou grupo, `groups` no arquivo do painel),
+  `throughput_curves` (chegadas às saídas por janela, depois do aquecimento, pelos instantes
+  guardados com `keep_timed`).
+- [x] 9: `utsim_stats::compare` (ANOVA, Tukey-Kramer, Bonferroni pareado) e
+  `utsim_stats::range` (`ptukey`/`qtukey`), conferidos com NIST/SEMATECH 7.4.3.3 e 7.4.7.1,
+  o exemplo 3.1 de Montgomery, o teste t pareado dos dados de sono de Student e a tabela da
+  amplitude estudentizada (marcados "[conferir]" nos testes).
+- [x] 10: `utsim_stats::correlation` (Pearson, Spearman, valor-p, matriz), conferido com o
+  quarteto de Anscombe e o exemplo didático de Spearman.
+- [x] 11: `utsim_scene::heatmap` (células de 0,5 m, tempo e passagens, por recurso ou classe,
+  SVG sobre a planta); textura no piso do Godot fica para depois.
+- [ ] 12: CSV longo feito (`analysis::write_observations`); **Parquet não feito**: as
+  dependências `arrow`/`parquet` mudariam o `Cargo.lock` de todas as frentes e não há
+  ferramenta local para conferir o arquivo. Fica até haver pedido.
+- [x] Tornado da sensibilidade do PERT, que faltava na janela PERT: no painel web (aba
+  PERT, `pert` no arquivo do painel), não no Godot.
+
 7. **Gantt de estados** por objeto (faixas coloridas pelo estado ao longo do tempo), do rastro
    de uma replicação, com zoom; mesma paleta dos estados da cena.
 8. **Séries temporais de WIP** (soma dos conteúdos, por grupo de objetos ou do sistema) e

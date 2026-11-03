@@ -6,7 +6,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 |---|---|---|
 | `utsim run` | roda um modelo e mostra as estatísticas (também a partir de um estado, e grava o estado num instante) | [Resultados](resultados.md), [Simular a partir de um estado](estado-inicial.md) |
 | `utsim check` | valida um modelo sem rodar e mostra o modo de movimentação de cada recurso | [Formato `.ron`](referencia-ron.md), [Movimentação](movimentacao.md) |
-| `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little e gargalo móvel | [Resultados](resultados.md) |
+| `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little, gargalo móvel, comparação de cenários, correlação, mapa de calor e exportação das observações | [Resultados](resultados.md) |
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
 | `utsim cena` | grava a cena 3D para outros motores | [3D realista](visual-3d.md) |
 | `utsim fit` | ajusta distribuições a dados | [Ajuste de distribuições](ajuste-de-distribuicoes.md) |
@@ -58,7 +58,7 @@ utsim corredores modelo.ron --svg planta.svg
 ## Observações sobre as opções
 
 - `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução. Com `--estado`, a rodada parte do estado do arquivo, sem aquecimento a menos que o estado tenha `warmup` ou que se use `--warmup`. `--salvar-estado T ARQUIVO` grava o estado da replicação 0 em `T` antes da rodada pedida.
-- `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
+- `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel. `--comparar experimento.ron` (ANOVA, Tukey, Bonferroni), `--correlacao`, `--mapa-calor arquivo.svg` (com `--celula` e `--por recurso|classe`) e `--exportar-observacoes arquivo.csv` só rodam quando pedidas.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
 - `check`: depois de `ok`, uma linha `movimentação: recurso: modo (papel, folga)` por recurso móvel.
@@ -174,7 +174,8 @@ Options:
 ```text
 Análises de saída: aquecimento, precisão, lotes, lei de Little e gargalo móvel
 
-Sem nenhuma opção de análise, roda todas menos as médias em lotes.
+Sem nenhuma opção de análise, roda todas menos as médias em lotes. Comparação de cenários,
+correlação, mapa de calor e exportação das observações só rodam quando pedidas.
 
 Usage: utsim analisar [OPTIONS] <MODEL>
 
@@ -182,19 +183,25 @@ Arguments:
   <MODEL>  
 
 Options:
-      --aquecimento            Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
-      --precisao <ALVO>        Replicações necessárias para esta semiamplitude: 2% (da média) ou 0.5 (absoluta)
-      --lotes                  Intervalo por médias em lotes numa rodada única (padrão: tempo no sistema)
-      --little                 Verifica a lei de Little por objeto e no sistema
-      --gargalo-movel          Gargalo móvel pelo período ativo (único e compartilhado)
-      --confianca <CONFIANCA>  Nível de confiança dos intervalos [default: 95%]
-      --medida <MEDIDA>        Medida para aquecimento e lotes: objeto.medida (ex.: saida.time_in_system)
-      --metrica <METRICA>      Métrica para --precisao (repetível; padrão: ocupações, conteúdos e tempos)
-      --janela <JANELA>        Janela da média móvel de Welch [default: 5]
-  -n, --reps <REPS>            Número de replicações (sobrescreve run.replications)
-      --stop <STOP>            Tempo de parada (sobrescreve run.stop_time)
-      --json <JSON>            Grava os resultados em JSON
-  -h, --help                   Print help
+      --aquecimento                 Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
+      --precisao <ALVO>             Replicações necessárias para esta semiamplitude: 2% (da média) ou 0.5 (absoluta)
+      --lotes                       Intervalo por médias em lotes numa rodada única (padrão: tempo no sistema)
+      --little                      Verifica a lei de Little por objeto e no sistema
+      --gargalo-movel               Gargalo móvel pelo período ativo (único e compartilhado)
+      --confianca <CONFIANCA>       Nível de confiança dos intervalos [default: 95%]
+      --medida <MEDIDA>             Medida para aquecimento e lotes: objeto.medida (ex.: saida.time_in_system)
+      --metrica <METRICA>           Métrica para --precisao, --comparar e --correlacao (repetível; padrão: ocupações, conteúdos e tempos)
+      --janela <JANELA>             Janela da média móvel de Welch [default: 5]
+  -n, --reps <REPS>                 Número de replicações (sobrescreve run.replications)
+      --stop <STOP>                 Tempo de parada (sobrescreve run.stop_time)
+      --json <JSON>                 Grava os resultados em JSON
+      --comparar <EXPERIMENTO>      Compara os cenários de um experimento: ANOVA, Tukey e pares com Bonferroni
+      --correlacao                  Correlação (Pearson e Spearman) entre as métricas nas replicações
+      --mapa-calor <SVG>            Grava o mapa de calor de deslocamentos da replicação 0 em SVG
+      --celula <CELULA>             Lado da célula do mapa de calor, em metros [default: 0.5]
+      --por <POR>                   Camadas do mapa de calor: recurso ou classe [default: recurso]
+      --exportar-observacoes <CSV>  Grava cada observação em CSV longo (replicação, instante, objeto, medida, valor)
+  -h, --help                        Print help
 ```
 
 ### `utsim replay --help`

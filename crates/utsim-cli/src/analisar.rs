@@ -1,12 +1,17 @@
 //! `utsim analisar`: output analyses of a model (warm-up, precision, batch means,
 //! Little's law, shifting bottleneck). Without any analysis flag, runs all of them
-//! except batch means (which needs a long single run).
+//! except batch means (which needs a long single run). The analyses of the second
+//! group (scenario comparison, correlation, heat map, observations) run only when asked
+//! for, and asking for one of them alone does not run the first group.
 
+use std::io::Write;
 use std::path::PathBuf;
 
 use utsim_core::stats::Summary;
 use utsim_model::Model;
 use utsim_model::analysis::{self, WarmupSeries};
+use utsim_model::experiment::{Experiment, ExperimentResult, run_scenarios};
+use utsim_scene::heatmap::{HeatGroup, HeatMeasure, Heatmap};
 use utsim_stats::little::DEFAULT_TOLERANCE;
 
 pub struct Args {
@@ -23,6 +28,12 @@ pub struct Args {
     pub reps: Option<u32>,
     pub stop: Option<f64>,
     pub json: Option<PathBuf>,
+    pub compare: Option<PathBuf>,
+    pub correlation: bool,
+    pub heatmap: Option<PathBuf>,
+    pub cell: f64,
+    pub group: String,
+    pub observations: Option<PathBuf>,
 }
 
 pub fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
@@ -61,7 +72,21 @@ pub fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     for warning in model.warnings() {
         eprintln!("aviso: {warning}");
     }
-    let all = !(args.warmup || target.is_some() || args.batches || args.little || args.bottleneck);
+    let group = HeatGroup::parse(&args.group)
+        .ok_or_else(|| format!("--por inválido: \"{}\" (use recurso ou classe)", args.group))?;
+    if !(args.cell.is_finite() && args.cell > 0.0) {
+        return Err("--celula deve ser positiva (em metros)".into());
+    }
+    let second = args.compare.is_some()
+        || args.correlation
+        || args.heatmap.is_some()
+        || args.observations.is_some();
+    let all = !(args.warmup
+        || target.is_some()
+        || args.batches
+        || args.little
+        || args.bottleneck
+        || second);
     // 95, 99.5...: rounded so binary noise (0.995 · 100) does not show.
     let pct = (100.0 * level * 1e6).round() / 1e6;
     println!(
@@ -114,6 +139,94 @@ pub fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         let shares = analysis::shifting_bottleneck(&traced, level);
         print_bottleneck(&shares);
         json.insert("gargalo_movel".into(), serde_json::to_value(&shares)?);
+    }
+    if let Some(file) = &args.compare {
+        let experiment = Experiment::load(file)?;
+        let mut base = model.clone();
+        if args.reps.is_none()
+            && let Some(r) = experiment.replications
+        {
+            base.run.replications = r;
+        }
+        let scenarios = run_scenarios(
+            &base,
+            &experiment.scenarios,
+            &experiment.measures,
+            &|_, _| true,
+        )?;
+        let result = ExperimentResult {
+            name: experiment.name.clone(),
+            measures: experiment.measures.clone(),
+            scenarios,
+        };
+        let metrics = if args.metrics.is_empty() {
+            analysis::default_comparison_metrics(&result)
+        } else {
+            args.metrics.clone()
+        };
+        let rows: Vec<_> = metrics
+            .iter()
+            .map(|m| analysis::compare_scenarios(&result, m, level))
+            .collect();
+        print_comparison(&result, &rows, level);
+        json.insert("cenarios".into(), serde_json::to_value(&rows)?);
+    }
+    if args.correlation {
+        let reports = model.run_replications()?;
+        let metrics = if args.metrics.is_empty() {
+            analysis::default_correlation_metrics(&reports)
+        } else {
+            args.metrics.clone()
+        };
+        let m = analysis::correlation(&reports, &metrics);
+        print_correlation(&m);
+        json.insert("correlacao".into(), serde_json::to_value(&m)?);
+    }
+    if let Some(out) = &args.heatmap {
+        let replay = model.replay(0)?;
+        let map = Heatmap::build(
+            &replay,
+            Some(&model),
+            args.cell,
+            group,
+            replay.report.stats_from,
+            replay.report.end_time,
+        );
+        std::fs::write(out, map.to_svg(&replay, None, HeatMeasure::Time))?;
+        print_heatmap(&map);
+        println!("mapa de calor gravado em {}", out.display());
+        let layers: Vec<_> = std::iter::once(&map.total)
+            .chain(&map.layers)
+            .map(|l| {
+                serde_json::json!({
+                    "camada": l.name,
+                    "distancia": l.distance,
+                    "tempo_em_movimento": l.moving,
+                    "celulas": map.hottest(l, HeatMeasure::Time, 20),
+                })
+            })
+            .collect();
+        json.insert(
+            "mapa_calor".into(),
+            serde_json::json!({"celula": map.cell, "camadas": layers}),
+        );
+    }
+    if let Some(out) = &args.observations {
+        let reports = analysis::run_for_observations(&model)?;
+        let mut file = std::io::BufWriter::new(std::fs::File::create(out)?);
+        let rows = analysis::write_observations(&reports, &mut file)?;
+        file.flush()?;
+        println!(
+            "\n{rows} observações de {} replicação(ões) gravadas em {} (formato longo)",
+            reports.len(),
+            out.display()
+        );
+        if model.run.sample_interval.is_none() {
+            println!(
+                "o modelo não amostra o conteúdo (run.sample_interval); só as permanências e \
+                 medidas dos objetos foram gravadas"
+            );
+        }
     }
     if let Some(path) = args.json {
         let text = serde_json::to_string_pretty(&serde_json::Value::Object(json))?;
@@ -299,6 +412,170 @@ fn print_bottleneck(shares: &[analysis::BottleneckShare]) {
             "gargalo principal: {} ({:.2}% do tempo)",
             top.name,
             100.0 * top.total()
+        );
+    }
+}
+
+fn short(metric: &str) -> String {
+    metric.strip_suffix(".mean").unwrap_or(metric).to_string()
+}
+
+fn p_text(p: f64) -> String {
+    if p.is_nan() {
+        "-".to_string()
+    } else if p < 1e-4 {
+        "< 0.0001".to_string()
+    } else {
+        format!("= {p:.4}")
+    }
+}
+
+fn print_comparison(result: &ExperimentResult, rows: &[analysis::ScenarioComparison], level: f64) {
+    let pct = (100.0 * level * 1e6).round() / 1e6;
+    println!(
+        "\n== Comparação de cenários ({}: {} cenário(s), mesmas sementes) ==",
+        result.name,
+        result.scenarios.len()
+    );
+    if result.scenarios.len() < 2 {
+        println!("são precisos ao menos dois cenários");
+        return;
+    }
+    for c in rows {
+        println!("\n{}", c.metric);
+        for (name, s) in c.scenarios.iter().zip(&c.summaries) {
+            println!("  {name:<24} {:>26}", fmt(s));
+        }
+        match &c.anova {
+            Some(a) => println!(
+                "  ANOVA de um fator: F({}, {}) = {:.4}, p {} ({})",
+                a.df_between,
+                a.df_within,
+                a.f,
+                p_text(a.p_value),
+                if a.p_value < 1.0 - level {
+                    "os cenários diferem"
+                } else {
+                    "sem diferença detectada entre os cenários"
+                }
+            ),
+            None => println!("  ANOVA: são precisas ao menos duas replicações por cenário"),
+        }
+        if let Some(t) = &c.tukey {
+            println!(
+                "  Tukey HSD ({pct}% simultâneo, q = {:.4}; supõe cenários independentes):",
+                t.q_critical
+            );
+            for p in &t.pairs {
+                println!(
+                    "    {:<22} - {:<22} {:>+12.4} [{:+.4}; {:+.4}] p {:<10} {}",
+                    c.scenarios[p.i],
+                    c.scenarios[p.j],
+                    p.difference,
+                    p.low(),
+                    p.high(),
+                    p_text(p.p_value),
+                    if p.significant { "difere" } else { "≈" }
+                );
+            }
+        }
+        if let Some(b) = &c.bonferroni {
+            println!(
+                "  Pares com Bonferroni (números aleatórios comuns, {} comparação(ões), cada \
+                 intervalo a {:.4}%):",
+                b.comparisons,
+                100.0 * b.level_each
+            );
+            for p in &b.pairs {
+                println!(
+                    "    {:<22} - {:<22} {:>+12.4} [{:+.4}; {:+.4}] p {:<10} {}",
+                    c.scenarios[p.i],
+                    c.scenarios[p.j],
+                    p.difference,
+                    p.low(),
+                    p.high(),
+                    p_text(p.p_value),
+                    if p.significant { "difere" } else { "≈" }
+                );
+            }
+        }
+    }
+    println!(
+        "\nComo os cenários usam as mesmas sementes, os pares com Bonferroni costumam ser mais \
+         precisos que o Tukey (que trata os cenários como independentes); p é o valor-p ajustado."
+    );
+}
+
+fn print_correlation(m: &utsim_stats::correlation::CorrelationMatrix) {
+    println!("\n== Correlação entre métricas ({} replicações) ==", m.n);
+    if m.names.len() < 2 || m.n < 3 {
+        println!("são precisas ao menos duas métricas que variam e três replicações");
+        return;
+    }
+    let labels: Vec<String> = m.names.iter().map(|n| short(n)).collect();
+    println!("Pearson (acima da diagonal) e Spearman (abaixo):");
+    print!("{:>4}", "");
+    for k in 0..labels.len() {
+        print!(" {:>7}", format!("[{}]", k + 1));
+    }
+    println!();
+    for i in 0..labels.len() {
+        print!("{:>4}", format!("[{}]", i + 1));
+        for j in 0..labels.len() {
+            let v = if i == j {
+                f64::NAN
+            } else if j > i {
+                m.pearson[i][j]
+            } else {
+                m.spearman[i][j]
+            };
+            if v.is_nan() {
+                print!(" {:>7}", if i == j { "·" } else { "-" });
+            } else {
+                print!(" {v:>7.3}");
+            }
+        }
+        println!("  {}", labels[i]);
+    }
+    println!("pares mais fortes:");
+    for p in m.strongest().iter().take(8) {
+        println!(
+            "  {} x {}: Pearson {:+.3} (p {}), Spearman {:+.3} (p {})",
+            short(&p.a),
+            short(&p.b),
+            p.pearson,
+            p_text(p.p_pearson),
+            p.spearman,
+            p_text(p.p_spearman)
+        );
+    }
+    println!(
+        "correlação não é causa: duas métricas podem andar juntas porque ambas dependem de uma \
+         terceira (a chegada de itens, por exemplo)"
+    );
+}
+
+fn print_heatmap(map: &Heatmap) {
+    println!(
+        "\n== Mapa de calor de deslocamentos (replicação 0, células de {} m, {} x {}) ==",
+        map.cell, map.cols, map.rows
+    );
+    if map.total.moving <= 0.0 {
+        println!("nada se deslocou no intervalo (o modelo não tem transportadores nem transfer)");
+        return;
+    }
+    println!(
+        "{:<24} {:>14} {:>16}",
+        "camada", "distância (m)", "tempo em mov."
+    );
+    for l in &map.layers {
+        println!("{:<24} {:>14.1} {:>16.2}", l.name, l.distance, l.moving);
+    }
+    println!("células mais ocupadas (todas as camadas):");
+    for c in map.hottest(&map.total, HeatMeasure::Time, 5) {
+        println!(
+            "  ({:.2}; {:.2}) m: {:.2} de ocupação, {} passagens",
+            c.x, c.y, c.time, c.passes
         );
     }
 }

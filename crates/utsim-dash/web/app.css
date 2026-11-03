@@ -87,8 +87,17 @@ svg .band { opacity: .3; } svg .band2 { opacity: .13; }
 svg .s0 { fill: var(--s0); stroke: var(--s0); } svg .s1 { fill: var(--s1); stroke: var(--s1); }
 svg .s2 { fill: var(--s2); stroke: var(--s2); } svg .s3 { fill: var(--s3); stroke: var(--s3); }
 svg polyline.line { fill: none; }
+svg .cell-pos { fill: var(--s0); } svg .cell-neg { fill: var(--s1); }
+svg .cell-na { fill: var(--none-bg); }
+svg .cell-text { font-size: 10px; fill: var(--fg); } svg .cell-text.strong { fill: #fff; font-weight: 600; }
+svg .plan-bg { fill: var(--panel); stroke: var(--line); }
+svg .plan-link { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; }
+svg .plan-obj { fill: var(--accent); stroke: var(--fg); }
 svg polygon.band, svg polygon.band2 { stroke: none; }
 .legenda { font-size: .8rem; color: var(--muted); margin: .2rem 0; }
+select { font: inherit; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); color: var(--fg); }
+input[type="number"] { font: inherit; width: 7rem; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: .4rem; background: var(--panel); color: var(--fg); }
+.ok { color: var(--ok); font-weight: 600; } .ruim { color: var(--bad); font-weight: 600; }
 .legenda i { display: inline-block; width: .8rem; height: .8rem; vertical-align: -1px; margin: 0 .3rem 0 .6rem; }
 /* print: A4, cards in a grid, vector charts, no controls */
 @media print {

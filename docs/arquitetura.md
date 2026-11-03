@@ -14,7 +14,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Estatística | `utsim-stats` | funções puras sobre números (só depende de `utsim-core`); análise de saída e funções especiais |
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
-| Painel web | `utsim-dash` | só lê relatórios de replicações; servidor HTTP em `std::net` só em `127.0.0.1`, API JSON somente leitura, página e gráficos SVG embutidos (`include_str!`), todo cálculo em Rust; `.xlsx` atrás da feature `xlsx` |
+| Painel web | `utsim-dash` | só lê relatórios de replicações; servidor HTTP em `std::net` só em `127.0.0.1`, API JSON somente leitura, página e gráficos SVG embutidos (`include_str!`), todo cálculo em Rust; `.xlsx` atrás da feature `xlsx`; depois das replicações, `analyses` lê o rastro da replicação 0 (Gantt exato, mapa de calor), roda os cenários de um experimento e o Monte Carlo do `utsim-pert` (tornado), publicando rotas novas sem mexer no servidor |
 | Gêmeo digital | `utsim-twin` | só lê a planta (conectores OPC UA cliente, MQTT e Sparkplug B, nenhum escreve); nunca altera a simulação no modo sombra; o núcleo (`Twin`) não tem rede nem relógio, e a reprodução de uma gravação dá o mesmo relatório e as mesmas previsões (seções 4t e 4u) |
 | Navegação | `utsim-nav` | obstáculos, menor caminho livre (grade e A*), pontos de acesso e geração de rede; função pura dos dados (seção 4p, "Obstáculos, caminho livre e modos de movimentação") |
 | Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
@@ -1717,6 +1717,9 @@ e rastros nas séries que ela precisa, e `utsim analisar` imprime o resultado.
 | `warmup` | média entre replicações, média móvel de Welch, MSER e MSER-5 |
 | `precision` | replicações necessárias para uma semiamplitude alvo; médias em lotes |
 | `little` | `L = λ·W` com a diferença pareada por replicação e tolerância relativa |
+| `compare` | ANOVA de um fator, Tukey HSD (Tukey-Kramer com tamanhos diferentes) e comparações pareadas com Bonferroni |
+| `range` | distribuição da amplitude estudentizada: `ptukey` (integral dupla por Gauss-Legendre de 16 nós por painel) e `qtukey` (Brent) |
+| `correlation` | Pearson, Spearman (postos com empates na média), valor-p pela t com `n - 2` gl, matriz e pares mais fortes |
 
 - **Nível de confiança.** Em 95% `t_quantile` usa a tabela `t_975` do núcleo, então os
   intervalos de 95% ficam idênticos bit a bit aos de antes. Outros níveis usam `t_ppf`
@@ -1735,6 +1738,29 @@ e rastros nas séries que ela precisa, e `utsim analisar` imprime o resultado.
   `Utilize`; trechos que se tocam no mesmo instante viram um só. Em cada instante o gargalo
   é o recurso com o período ativo mais longo; a sobreposição entre o período do gargalo
   atual e o do seguinte é gargalo compartilhado dos dois (`shifting_bottleneck_times`).
+- **Amplitude estudentizada.** `P(Q ≤ q; k, gl) = ∫ g(s) P∞(q·s; k) ds`, com
+  `P∞(w; k) = k ∫ φ(z) [Φ(z) − Φ(z − w)]^(k−1) dz` e `g` a densidade de `χ_gl/√gl`. A
+  integral interna usa uma grade fixa em `z ∈ [−8,5; 8,5]` (12 painéis de 16 nós, `φ` e `Φ`
+  guardados); a externa, 12 painéis no intervalo de `s` que contém toda a massa, mais cortes
+  onde `q·s` cruza os valores em que `P∞` sobe (sem eles, `gl = 1` com `q` grande perde
+  precisão). Os testes conferem `qtukey` com a tabela publicada nas três casas e com a
+  identidade exata `q(p; 2, gl) = √2 · t((1+p)/2; gl)`.
+- **Análises da dinâmica (`utsim-model::analysis::dynamics`).** `state_gantt` (segmentos
+  exatos dos eventos `State` do rastro), `band` (média, IC e P5-P95 entre replicações),
+  `wip_band` (sistema ou grupo), `throughput_curves` (chegadas às saídas por janela, pelos
+  instantes de `time_in_system` guardados com `keep_timed`, `run_for_throughput`),
+  `compare_scenarios` (ANOVA, Tukey e Bonferroni de um `ExperimentResult`), `correlation`
+  e `write_observations` (CSV longo `replicacao,instante,objeto,medida,valor`, com
+  `run_for_observations`, que descobre as medidas numa rodada da replicação 0). A
+  exportação em Parquet ficou de fora: as dependências `arrow`/`parquet` mudariam o
+  `Cargo.lock` e o instalador, e nenhuma ferramenta local conferiria o arquivo.
+- **Mapa de calor (`utsim-scene::heatmap`).** Cada `Travel` (cortado no início do
+  `Travel` seguinte do mesmo recurso) e cada `Transit` (depois do `delay`) é percorrido a
+  velocidade constante; cada segmento é partido onde cruza as linhas da grade, e cada
+  pedaço soma à célula do seu ponto médio o tempo do trecho recortado à janela, com uma
+  passagem quando a célula muda. Camadas por recurso ou por classe (`compose::role_of`). A
+  grade cobre objetos e caminhos com uma célula de folga e engrossa a célula se passar de
+  um milhão de células. `Heatmap::to_svg` desenha sobre a planta; o painel desenha o JSON.
 
 ### Qualidade (`utsim-quality`)
 

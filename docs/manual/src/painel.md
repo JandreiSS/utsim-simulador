@@ -42,9 +42,19 @@ Uma tela para ler em segundos: a frase-resumo, os cartões e o Pareto de perdas 
 |---|---|
 | Objetos | tabela ordenável e filtrável (CSV e `.xlsx`); barras de ocupação com intervalo; estados por objeto. Clique abre o objeto: medidas, estados, Gantt, conteúdo no tempo com banda, histogramas |
 | Distribuições | gráfico "erro e risco" de cada KPI: pontos (replicações), caixa P25-P75, bigode P5-P95, média com intervalo de confiança; histograma do tempo no sistema |
-| Séries | WIP no tempo, média com banda do intervalo de confiança e faixa P5-P95 |
-| Gantt | estados de todos os objetos na primeira replicação |
+| Séries | WIP do sistema, vazão por janela e WIP de cada grupo de objetos (`groups`) no tempo, média com banda do intervalo de confiança e faixa P5-P95 |
+| Gantt | estados de todos os objetos na primeira replicação, exatos (lidos do rastro) depois que as replicações terminam, com zoom (de/até, aproximar, afastar, depois do aquecimento) |
 | Estatística | tabela completa dos KPIs (n, intervalos, replicações para ±2 %, probabilidade e Wilson), lei de Little, fórmula de cada número |
+| Cenários | com `scenarios` no arquivo do painel: média de cada cenário, ANOVA de um fator, pares com Bonferroni (mesmas sementes, a leitura recomendada) e Tukey HSD, em gráfico de intervalos e tabela |
+| Correlação | matriz de Pearson ou Spearman entre as medidas nas replicações, com cores, e os pares mais fortes com valor-p |
+| Mapa de calor | tempo de ocupação ou passagens por célula do piso (0,5 m) sobre a planta, por recurso ou por classe, com a distância de cada camada e as células mais ocupadas |
+| PERT | com `pert` no arquivo do painel: tempo total do trecho por Monte Carlo, probabilidade do prazo, tornado da sensibilidade e índice de criticidade |
+
+Cenários, mapa de calor, PERT e o Gantt exato são calculados quando as replicações terminam:
+a barra de progresso diz qual análise está rodando. A vazão por janela conta as chegadas às
+saídas depois do aquecimento, em janelas de um vigésimo da rodada (ou `throughput_window`),
+e aparece em itens por hora (por unidade de tempo nos modelos abstratos). Os métodos são os
+de `utsim analisar` (veja [Resultados](resultados.md), "Análises de saída").
 
 ## KPIs e fórmulas
 
@@ -94,8 +104,18 @@ Dashboard(
     targets: {"vazao": AtLeast(120.0), "lead_time_p90": AtMost(900.0)},
     lead_time_limit: Some(600.0),        // liga `nivel_servico`
     oee: [(object: "M2", ideal_cycle: 40.0, scrap_sinks: ["refugo"])],
+    // Análises opcionais:
+    scenarios: Some("experimento.ron"),  // cenários comparados na aba Cenários
+    groups: {"montagem": ["fila_m", "m1", "m2"]},   // WIP por grupo na aba Séries
+    throughput_window: Some(3600.0),     // janela da vazão (padrão: 1/20 da rodada)
+    heatmap_cell: Some(0.5),             // célula do mapa de calor, em metros
+    pert: Some((from: Some("corte"), to: Some("embalagem"), deadline: Some(480.0), samples: 10000)),
 )
 ```
+
+O caminho de `scenarios` é relativo ao arquivo do painel (ou ao modelo, quando não há
+arquivo); o experimento é o mesmo de `utsim experiment`, e os cenários rodam sobre o modelo do
+painel, com as replicações dele. Em `pert`, use `from` e `to` (trecho) ou `objects` (lista).
 
 Metas e cartões que não casam com nenhum KPI viram avisos na página. KPIs em `%` usam a
 escala 0 a 100 nas metas (`AtMost(80.0)` é 80 %).
@@ -115,7 +135,8 @@ escala 0 a 100 nas metas (`AtMost(80.0)` é 80 %).
 
 Somente leitura, JSON, em `127.0.0.1`: `/api/resumo`, `/api/kpis`, `/api/objetos`,
 `/api/objeto/{nome}`, `/api/series`, `/api/distribuicoes`, `/api/pareto`, `/api/gantt`,
-`/api/estados`, `/api/config`, `/api/progresso` e `/api/export/{kpis.csv,objetos.csv,painel.json,painel.xlsx}`.
+`/api/estados`, `/api/config`, `/api/correlacao`, `/api/progresso` e, depois das replicações,
+`/api/mapa_calor`, `/api/cenarios` e `/api/pert` e `/api/export/{kpis.csv,objetos.csv,painel.json,painel.xlsx}`.
 O único `POST` é `/api/cancelar`, que exige o cabeçalho `X-UTSim`.
 
 Ainda não há: gêmeo digital ao vivo, alertas, modo quiosque, acesso pela rede local com token,

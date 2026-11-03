@@ -10,6 +10,7 @@ utsim-core.workspace = true
 utsim-model.workspace = true
 utsim-stats.workspace = true
 utsim-scene.workspace = true
+utsim-pert.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ron.workspace = true
