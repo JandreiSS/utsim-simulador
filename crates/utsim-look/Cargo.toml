@@ -1,0 +1,15 @@
+[package]
+name = "utsim-look"
+description = "Engine-free appearance rules of UTSim scenes: asset of each entity, third-party catalogue, clips, loads and lights"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+utsim-scene.workspace = true
+utsim-assets.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ron.workspace = true

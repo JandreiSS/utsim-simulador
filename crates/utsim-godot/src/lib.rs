@@ -14,20 +14,22 @@
 //!
 //! Every position is converted to Godot coordinates here ([`coords`]): `(x, y, z)` of
 //! the model becomes `(x, z, -y)` and a yaw is the rotation about `+Y`. The pure modules
-//! ([`coords`], [`looks`], [`catalogue`], [`playback`], [`document`], [`schema`],
-//! [`ron_text`]) have no Godot types and are unit tested without the engine.
+//! ([`coords`], [`playback`], [`document`], [`schema`]) have no Godot types and are unit
+//! tested without the engine. The appearance rules ([`looks`]) and the third-party
+//! catalogue ([`catalogue`]) come from `utsim-look`, shared with the Bevy viewer, and the
+//! RON writer ([`ron_text`]) from `utsim-edit`.
 
 // `#[derive(GodotClass)]` with `init` writes `base: base` in the generated constructor.
 #![allow(clippy::redundant_field_names)]
 
-pub mod catalogue;
 pub mod coords;
 pub mod document;
 mod document_class;
-pub mod looks;
 pub mod playback;
-pub mod ron_text;
 pub mod schema;
+
+pub use utsim_edit::ron_text;
+pub use utsim_look::{catalogue, visual as looks};
 
 use std::path::PathBuf;
 

@@ -25,9 +25,9 @@
 
 use std::f64::consts::PI;
 
-use utsim_core::{Dist, OffWindow, OutputRule};
+use utsim_core::{Dist, OffWindow, OutputRule, ShiftEnd, ShiftTable};
 use utsim_edit::Command;
-use utsim_model::{Model, ObjectDef, ObjectKind, RunSettings, VisualDef, is_mobile};
+use utsim_model::{Model, ObjectDef, ObjectKind, RunSettings, ShiftSpec, VisualDef, is_mobile};
 
 use crate::catalogue;
 use crate::looks;
@@ -1159,7 +1159,32 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     out
 }
 
-fn downtime_fields(obj: &ObjectDef) -> Vec<Field> {
+/// Choices of `on_end` (what happens to work in progress when a shift ends).
+const ON_END: [(&str, &str); 2] = [("Pause", "Pausar"), ("Finish", "Terminar o trabalho")];
+
+fn on_end_id(e: ShiftEnd) -> &'static str {
+    match e {
+        ShiftEnd::Pause => "Pause",
+        ShiftEnd::Finish => "Finish",
+    }
+}
+
+fn windows_text(t: &ShiftTable) -> String {
+    let windows: Vec<String> = t
+        .off
+        .iter()
+        .map(|w| {
+            format!(
+                "(start: {}, duration: {})",
+                ron::float(w.start),
+                ron::float(w.duration)
+            )
+        })
+        .collect();
+    format!("[{}]", windows.join(", "))
+}
+
+fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let s = S_DOWNTIME;
     let mut out = vec![
         group(s, "downtime", "Quebras", obj.downtime.is_some())
@@ -1173,34 +1198,80 @@ fn downtime_fields(obj: &ObjectDef) -> Vec<Field> {
         group(s, "shifts", "Turnos", obj.shifts.is_some())
             .help("Janelas fora do turno, repetidas a cada período."),
     );
-    if let Some(t) = &obj.shifts {
-        out.push(
-            float(s, "shifts.period", "Período", t.period)
-                .min(0.001)
-                .depth(1),
-        );
-        let windows: Vec<String> = t
-            .off
-            .iter()
-            .map(|w| {
-                format!(
-                    "(start: {}, duration: {})",
-                    ron::float(w.start),
-                    ron::float(w.duration)
+    let Some(spec) = &obj.shifts else {
+        return out;
+    };
+    let source = if spec.calendar_name().is_some() {
+        "calendar"
+    } else {
+        "inline"
+    };
+    let mut from = pick(
+        s,
+        "shifts.source",
+        "Origem",
+        source,
+        &[
+            ("inline", "Personalizado"),
+            ("calendar", "Calendário do modelo"),
+        ],
+    )
+    .depth(1);
+    from.help = if model.calendars.is_empty() {
+        "O modelo não tem calendários: crie um em \"calendars\" para usá-lo aqui.".into()
+    } else {
+        "Um calendário é a mesma tabela de turnos usada por vários objetos.".into()
+    };
+    out.push(from);
+    match spec {
+        ShiftSpec::Inline(t) => {
+            out.push(
+                float(s, "shifts.period", "Período", t.period)
+                    .min(0.001)
+                    .depth(1),
+            );
+            out.push(
+                Field::new(
+                    s,
+                    "shifts.off",
+                    "Pausas",
+                    FieldType::Ron,
+                    Value::Text(windows_text(t)),
                 )
-            })
-            .collect();
-        out.push(
-            Field::new(
-                s,
-                "shifts.off",
-                "Pausas",
-                FieldType::Ron,
-                Value::Text(format!("[{}]", windows.join(", "))),
-            )
-            .depth(1)
-            .help("Início e duração de cada pausa dentro do período, em ordem."),
-        );
+                .depth(1)
+                .help("Início e duração de cada pausa dentro do período, em ordem."),
+            );
+            out.push(
+                pick(
+                    s,
+                    "shifts.on_end",
+                    "No fim do turno",
+                    on_end_id(t.on_end),
+                    &ON_END,
+                )
+                .depth(1),
+            );
+        }
+        ShiftSpec::Calendar { name, on_end } => {
+            let mut names: Vec<&str> = model.calendars.keys().map(String::as_str).collect();
+            if !names.contains(&name.as_str()) {
+                names.insert(0, name);
+            }
+            let choices: Vec<(&str, &str)> = names.iter().map(|n| (*n, *n)).collect();
+            out.push(pick(s, "shifts.calendar", "Calendário", name, &choices).depth(1));
+            let mut ends = vec![("", "(o do calendário)")];
+            ends.extend(ON_END);
+            out.push(
+                pick(
+                    s,
+                    "shifts.on_end",
+                    "No fim do turno",
+                    on_end.map_or("", on_end_id),
+                    &ends,
+                )
+                .depth(1),
+            );
+        }
     }
     out
 }
@@ -1307,7 +1378,7 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     if !is_mobile(&obj.kind) {
         out.extend(output_fields(model, obj));
     }
-    out.extend(downtime_fields(obj));
+    out.extend(downtime_fields(model, obj));
     out.extend(look_fields(obj));
     out
 }
@@ -1337,7 +1408,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
     match key {
         "output" => return Some(ron::output(&obj.output)),
         "downtime" => return Some(ron::option(&obj.downtime, ron::downtime)),
-        "shifts" => return Some(ron::option(&obj.shifts, ron::shifts)),
+        "shifts" => return Some(ron::option(&obj.shifts, ron::shift_spec)),
         "transport" => return Some(ron::option(&obj.transport, |t| ron::string(t))),
         "transfer" => return Some(ron::option(&obj.transfer, ron::transfer)),
         "on_entry" => return Some(ron::option(&obj.on_entry, |s| ron::string(s))),
@@ -1420,13 +1491,11 @@ fn default_on(model: &Model, obj: &ObjectDef, head: &str) -> Result<String, Stri
             mtbf: Dist::Exp { mean: 1000.0 },
             mttr: Dist::Exp { mean: 10.0 },
         }),
-        "shifts" => ron::shifts(&utsim_core::ShiftTable {
-            period: 1440.0,
-            off: vec![OffWindow {
-                start: 720.0,
-                duration: 60.0,
-            }],
-        }),
+        // The first calendar of the model, as the Bevy editor does; else a table.
+        "shifts" => match model.calendars.keys().next() {
+            Some(name) => ron::shift_spec(&ShiftSpec::calendar(name.clone())),
+            None => ron::shifts(&default_table()),
+        },
         _ => {
             return Err(format!(
                 "{}.{head} não pode ser ligado ou desligado",
@@ -1495,13 +1564,28 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
             };
         }
         "shifts" => {
-            let s = o.shifts.as_mut().ok_or("ligue os turnos antes")?;
-            match rest {
-                "period" => s.period = f64_of(v, w)?,
-                "off" => {
-                    let t = v.as_text().ok_or("texto RON esperado")?;
-                    s.off = ron::parse(t).map_err(|e| format!("pausas inválidas: {e}"))?;
+            let spec = o.shifts.as_mut().ok_or("ligue os turnos antes")?;
+            let end = |v: &Value| match v.as_text() {
+                Some("Pause") => Ok(Some(ShiftEnd::Pause)),
+                Some("Finish") => Ok(Some(ShiftEnd::Finish)),
+                Some("") | None => Ok(None),
+                Some(t) => Err(format!("fim do turno: Pause ou Finish, não {t}")),
+            };
+            match (spec, rest) {
+                (ShiftSpec::Inline(t), "period") => t.period = f64_of(v, w)?,
+                (ShiftSpec::Inline(t), "off") => {
+                    let text = v.as_text().ok_or("texto RON esperado")?;
+                    t.off = ron::parse(text).map_err(|e| format!("pausas inválidas: {e}"))?;
                 }
+                (ShiftSpec::Inline(t), "on_end") => t.on_end = end(v)?.unwrap_or_default(),
+                (ShiftSpec::Calendar { name, .. }, "calendar") => {
+                    let n = v.as_text().ok_or("nome do calendário esperado")?.trim();
+                    if n.is_empty() {
+                        return Err("escolha um calendário".into());
+                    }
+                    *name = n.to_string();
+                }
+                (ShiftSpec::Calendar { on_end, .. }, "on_end") => *on_end = end(v)?,
                 _ => return Err(format!("campo desconhecido: {w}")),
             }
             return Ok(());
@@ -1674,6 +1758,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
             return Ok(set(&obj.name, head, ron::string(t)));
         }
         ("output", _) => return edit_output(model, obj, rest, value),
+        ("shifts", "source") => return edit_shift_source(model, obj, value),
         ("mode", _) if matches!(obj.kind, ObjectKind::Separator { .. }) => {
             let current = read_field(obj, "mode").unwrap_or_default();
             let text = match (rest, value.as_text()) {
@@ -1706,6 +1791,50 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     let text = read_field(&copy, head)
         .ok_or_else(|| format!("{} não tem o campo \"{head}\"", obj.name))?;
     Ok(set(&obj.name, head, text))
+}
+
+/// The default table of new shifts: a one-hour break in the middle of a day.
+fn default_table() -> ShiftTable {
+    ShiftTable {
+        period: 1440.0,
+        off: vec![OffWindow {
+            start: 720.0,
+            duration: 60.0,
+        }],
+        on_end: ShiftEnd::Pause,
+    }
+}
+
+/// `shifts.source`: a calendar of the model (the first one) or a table of its own (a
+/// copy of the calendar it used, as the Bevy editor does).
+fn edit_shift_source(model: &Model, obj: &ObjectDef, value: &Value) -> Result<Command, String> {
+    let spec = obj.shifts.as_ref().ok_or("ligue os turnos antes")?;
+    let text = match (value.as_text(), spec) {
+        (Some("calendar"), ShiftSpec::Calendar { .. }) | (Some("inline"), ShiftSpec::Inline(_)) => {
+            ron::shift_spec(spec)
+        }
+        (Some("calendar"), ShiftSpec::Inline(_)) => {
+            let name = model
+                .calendars
+                .keys()
+                .next()
+                .ok_or("o modelo não tem calendários (crie um em \"calendars\")")?;
+            ron::shift_spec(&ShiftSpec::calendar(name.clone()))
+        }
+        (Some("inline"), ShiftSpec::Calendar { name, on_end }) => {
+            let mut t = model
+                .calendars
+                .get(name)
+                .cloned()
+                .unwrap_or_else(default_table);
+            if let Some(e) = on_end {
+                t.on_end = *e;
+            }
+            ron::shifts(&t)
+        }
+        _ => return Err("origem dos turnos: inline ou calendar".into()),
+    };
+    Ok(set(&obj.name, "shifts", text))
 }
 
 fn edit_run(path: &str, value: &Value) -> Result<Command, String> {
@@ -2007,7 +2136,15 @@ mod tests {
             "shifts.off",
             Value::Text("[(start: 10.0, duration: 5.0)]".into()),
         );
-        assert_eq!(object(&d, "p").shifts.as_ref().unwrap().off.len(), 1);
+        assert!(matches!(
+            object(&d, "p").shifts.as_ref(),
+            Some(ShiftSpec::Inline(t)) if t.off.len() == 1
+        ));
+        apply(&mut d, "p", "shifts.on_end", Value::Text("Finish".into()));
+        assert!(matches!(
+            object(&d, "p").shifts.as_ref(),
+            Some(ShiftSpec::Inline(t)) if t.on_end == ShiftEnd::Finish
+        ));
         apply(&mut d, "p", "transfer.on", Value::Bool(true));
         apply(&mut d, "p", "transfer.on", Value::Bool(false));
         assert!(object(&d, "p").transfer.is_none());

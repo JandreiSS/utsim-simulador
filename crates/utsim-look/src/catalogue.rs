@@ -2,8 +2,8 @@
 //! models (people, machines, belts, storage) that `visual.asset` can name, besides the
 //! built-in library of `utsim-assets`.
 //!
-//! The catalogue text is compiled into the viewer, so the asset picker lists the same
-//! names on the desktop and in the browser. The `.glb` files themselves are read from
+//! The catalogue text is compiled in, so the asset picker lists the same names on the
+//! desktop, in the browser and in the Godot interface. The `.glb` files themselves are read from
 //! disk (desktop only) from the folder found by [`dir`]. Each entry carries the numbers
 //! that put the file at real size facing `+x` (the front of the UTSim models):
 //! `escala_real`, `giro_y_graus` and the footprint (`minimo_m`, `centro_m`), see
@@ -14,7 +14,7 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-/// The catalogue as compiled into the viewer.
+/// The catalogue as compiled into the program.
 const TEXT: &str = include_str!("../../../assets/terceiros/catalogo.ron");
 
 #[derive(Debug, Deserialize)]
@@ -24,7 +24,7 @@ struct Catalogue {
     ativos: Vec<Entry>,
 }
 
-/// One third-party asset (the fields the viewer uses; the rest of the entry is ignored).
+/// One third-party asset (the fields the interfaces use; the rest of the entry is ignored).
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Entry {
     /// Name used in `visual.asset`.
@@ -44,19 +44,22 @@ pub struct Entry {
     pub giro_y_graus: f32,
     /// Factor that takes the file to real size in metres.
     pub escala_real: f32,
-    /// Animation clips (people); the viewer shows them at rest for now.
+    /// Animation clips (people).
     #[serde(default)]
     pub clipes: Vec<String>,
+    /// Size once placed at real size, metres (for the picker's help text).
+    #[serde(default)]
+    pub tamanho_real_m: (f32, f32, f32),
 }
 
-/// How the viewer places the glTF scene of an entry under the block's root.
+/// How an interface places the glTF scene of an entry under the block's root.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
     /// Uniform scale (catalogue `escala_real` times `visual.scale`).
     pub scale: f32,
     /// Rotation about the vertical, radians (`giro_y_graus` plus `visual.yaw`).
     pub yaw: f32,
-    /// Translation of the scene, in the root's (Bevy) space, that puts the footprint
+    /// Translation of the scene, in the root's space (Y up, the same in Bevy and Godot), that puts the footprint
     /// centre on the root and the lowest point on the floor.
     pub offset: [f32; 3],
 }
@@ -116,25 +119,38 @@ pub fn by_name(name: &str) -> Option<&'static Entry> {
 
 /// The `assets/terceiros` folder: `UTSIM_TERCEIROS` when set, else the first
 /// `assets/terceiros` holding `catalogo.ron` above the executable or the working
-/// directory, else the folder of the source tree the viewer was built from.
+/// directory, else the folder of the source tree this crate was built from.
 pub fn dir() -> PathBuf {
     static DIR: OnceLock<PathBuf> = OnceLock::new();
-    DIR.get_or_init(|| {
-        if let Some(d) = std::env::var_os("UTSIM_TERCEIROS") {
-            return PathBuf::from(d);
-        }
-        let starts = [std::env::current_exe().ok(), std::env::current_dir().ok()];
-        for start in starts.into_iter().flatten() {
-            for a in start.ancestors() {
-                let d = a.join("assets").join("terceiros");
-                if d.join("catalogo.ron").is_file() {
-                    return d;
-                }
+    DIR.get_or_init(|| search(None)).clone()
+}
+
+/// Like [`dir`], but looks above `start` (the model's folder) first.
+pub fn dir_from(start: Option<&Path>) -> PathBuf {
+    match start {
+        Some(s) => search(Some(s)),
+        None => dir(),
+    }
+}
+
+fn search(start: Option<&Path>) -> PathBuf {
+    if let Some(d) = std::env::var_os("UTSIM_TERCEIROS") {
+        return PathBuf::from(d);
+    }
+    let starts = [
+        start.map(Path::to_path_buf),
+        std::env::current_exe().ok(),
+        std::env::current_dir().ok(),
+    ];
+    for s in starts.into_iter().flatten() {
+        for a in s.ancestors() {
+            let d = a.join("assets").join("terceiros");
+            if d.join("catalogo.ron").is_file() {
+                return d;
             }
         }
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/terceiros")
-    })
-    .clone()
+    }
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/terceiros")
 }
 
 /// The file of `entry` on disk.
@@ -159,6 +175,12 @@ mod tests {
         }
         assert_eq!(by_name(" Maquina_Kenney ").unwrap().autor, "Kenney");
         assert!(by_name("maquina").is_none());
+        // The model's folder is searched first; any folder of the tree finds the same one.
+        let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(dir_from(Some(here)).join("catalogo.ron").is_file());
+        let p = by_name("pessoa_operador").unwrap();
+        assert!(p.arquivo.ends_with("UAL1_Standard.glb"));
+        assert!(p.tamanho_real_m.1 > 1.0, "{:?}", p.tamanho_real_m);
     }
 
     #[test]

@@ -1,11 +1,12 @@
 //! Realistic look ("Visual: realista"): which library asset (`utsim-assets`) each entity
 //! is drawn with, and the pure rules that drive the articulated nodes from the scene
-//! pose (forks, wheels, status light, walk cycle) and attach carried items. No Bevy
-//! types: the binary (`src/models.rs`) only applies these numbers.
+//! pose (forks, wheels, status light, walk cycle) and attach carried items. No engine
+//! types: the Bevy viewer (`utsim-viewer/src/models.rs`) and the Godot bridge
+//! (`utsim-godot/src/playback.rs`) only apply these numbers.
 //!
 //! # Default asset by role and kind
 //! - `visual.asset` wins: a library name ([`Spec::by_name`]), a name of the third-party
-//!   catalogue ([`crate::terceiros`], placed at real size facing `+x` with the
+//!   catalogue ([`crate::catalogue`], placed at real size facing `+x` with the
 //!   catalogue's `escala_real` and `giro_y_graus`) or a `.glb` file, relative to the
 //!   model file. Parametric library assets (rack, conveyor, floor area) still take their
 //!   size from the object's geometry.
@@ -29,12 +30,17 @@ use utsim_scene::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH, RACK_DEPTH};
 use utsim_scene::style::{self, Shape};
 use utsim_scene::{MobileRole, Motion};
 
-use crate::terceiros;
+use crate::catalogue;
 
 /// Where an asset comes from.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Source {
     Library(Spec),
+    /// An entry of the third-party catalogue: its name and its file on disk.
+    Catalogue {
+        name: String,
+        file: PathBuf,
+    },
     /// A `.glb` file (absolute, or relative to the working directory).
     File(PathBuf),
 }
@@ -51,6 +57,19 @@ pub enum Carry {
     Deck(f32),
     /// Unchanged (the simple shapes' stacking).
     Stack,
+}
+
+impl Carry {
+    /// Short name for interfaces that receive plain data (`forks`, `hands`, `deck`,
+    /// `stack`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Carry::Forks { .. } => "forks",
+            Carry::Hands => "hands",
+            Carry::Deck(_) => "deck",
+            Carry::Stack => "stack",
+        }
+    }
 }
 
 /// How one block is drawn in the realistic mode.
@@ -216,15 +235,18 @@ pub fn look_of(
     });
     let catalogue = asset
         .filter(|a| Spec::by_name(a).is_none())
-        .and_then(terceiros::by_name);
+        .and_then(catalogue::by_name);
     let default_person =
         (role == Some(MobileRole::Person) && ctx.skeletal_people && !library_or_file)
-            .then(|| terceiros::by_name(PERSON))
+            .then(|| catalogue::by_name(PERSON))
             .flatten();
     if let Some(entry) = catalogue.or(default_person) {
         let p = entry.placement(user_scale, user_yaw);
         return Some(Look {
-            source: Source::File(terceiros::file_of(entry)),
+            source: Source::Catalogue {
+                name: entry.nome.clone(),
+                file: catalogue::dir_from(model_dir).join(&entry.arquivo),
+            },
             scale: p.scale,
             yaw: p.yaw,
             color,
@@ -249,7 +271,7 @@ pub fn look_of(
     };
     let spec = match &source {
         Source::Library(s) => Some(*s),
-        Source::File(_) => None,
+        _ => None,
     };
     let belt_yaw = if geom.shape == Shape::Belt {
         geom.yaw
@@ -733,8 +755,14 @@ mod tests {
             None,
         )
         .unwrap();
-        let entry = crate::terceiros::by_name("bancada_kenney").unwrap();
-        assert_eq!(l.source, Source::File(crate::terceiros::file_of(entry)));
+        let entry = catalogue::by_name("bancada_kenney").unwrap();
+        assert_eq!(
+            l.source,
+            Source::Catalogue {
+                name: entry.nome.clone(),
+                file: catalogue::file_of(entry),
+            }
+        );
         // escala_real 4 times the user's 1.5; giro_y_graus 90 plus the user's 90.
         assert!((l.scale - 6.0).abs() < 1e-6);
         assert!((l.yaw - PI).abs() < 1e-5);
@@ -927,8 +955,14 @@ mod tests {
             ..Context::default()
         };
         let l = look_of("Transporter", person, None, &g, ctx, None).unwrap();
-        let entry = crate::terceiros::by_name(PERSON).unwrap();
-        assert_eq!(l.source, Source::File(crate::terceiros::file_of(entry)));
+        let entry = catalogue::by_name(PERSON).unwrap();
+        assert_eq!(
+            l.source,
+            Source::Catalogue {
+                name: entry.nome.clone(),
+                file: catalogue::file_of(entry),
+            }
+        );
         assert!(l.skeletal && l.carry == Carry::Hands);
         // Without the files: the procedural operator.
         let l = look_of("Transporter", person, None, &g, Context::default(), None).unwrap();
@@ -999,6 +1033,19 @@ mod tests {
         assert!(relative_uris(b"nada").is_empty());
         // The library models embed everything.
         assert!(relative_uris(&Spec::Maquina.glb()).is_empty());
+    }
+
+    #[test]
+    fn carry_names_are_the_plain_data_of_the_bridge() {
+        let forks = Carry::Forks {
+            forward: 1.0,
+            height: None,
+        };
+        let names: Vec<_> = [forks, Carry::Hands, Carry::Deck(0.3), Carry::Stack]
+            .into_iter()
+            .map(Carry::name)
+            .collect();
+        assert_eq!(names, ["forks", "hands", "deck", "stack"]);
     }
 
     #[test]

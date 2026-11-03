@@ -10,7 +10,7 @@
 pub mod network;
 pub(crate) mod panel;
 mod position;
-pub mod ron_text;
+pub use utsim_edit::ron_text;
 pub mod schedule;
 mod schedule_ui;
 mod shifts_ui;
