@@ -31,8 +31,35 @@ Por onde eles andam (caminho livre desviando dos objetos e das paredes, rede de 
 | `agv` | `false` | se `true`, segue a rede de caminhos aresta por aresta, com controle de tráfego |
 | `movement` | o de `run` | modo de movimentação deste recurso: `Free`, `Network`, `Legacy` (veja [Movimentação e obstáculos](movimentacao.md)) |
 | `clearance` | pelo papel | distância mínima (m) aos obstáculos nos modos `Free` e `Network`: pessoa 0,6, empilhadeira 0,9, outros 0,8 |
+| `home_at` | nenhum | casa num ponto próprio `(x, y, z)`; liga a volta para casa |
+| `home_object` | nenhum | casa num objeto ou numa área (`areas`): a posição dele; liga a volta para casa |
+| `break_at` | nenhum | local de pausa num ponto: para onde o membro vai quando o turno pausa |
+| `break_object` | nenhum | local de pausa num objeto ou numa área |
 
 A **posição** do transportador (campo `position` do objeto) é onde ele começa e, com `home: true`, para onde volta.
+
+### Casa, área de espera e local de pausa
+
+A casa pode ficar em outro lugar que não a posição do próprio transportador: um ponto (`home_at: (2.0, 8.0, 0.0)`), um objeto (`home_object: "doca"`) ou uma **área** do modelo. Com qualquer um dos dois campos o membro volta para lá quando fica ocioso, como com `home: true`; um serviço novo interrompe a volta.
+
+As áreas são marcadores no piso, fora do fluxo: áreas de espera, salas de pausa, zonas de escritório. Ficam numa lista própria do modelo, ao lado de `objects`, e não têm portas nem estados:
+
+```ron
+areas: [
+    (name: "espera_empilhadeiras", position: (12.0, -4.0, 0.0), size: (6.0, 3.0)),
+    (name: "copa", position: (30.0, 15.0, 0.0), size: (4.0, 4.0)),
+],
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `name` | obrigatório | nome único (não pode repetir o de um objeto) |
+| `position` | `(0.0, 0.0, 0.0)` | centro da área no piso |
+| `size` | `(2.0, 2.0)` | comprimento em x e largura em y, em metros |
+
+Com `break_at` ou `break_object`, quando o turno do membro pausa (janela `off` de `shifts`) e ele não tem serviço, ele **vai até o local de pausa**. O deslocamento fica dentro da pausa: aparece no 3D, mas não conta tempo da rodada (supõe-se que a pausa é mais longa que a caminhada). Quando o turno volta, ele caminha de volta para casa (ou para onde estava, sem casa); um serviço que chegou durante a pausa começa direto do local de pausa. Um membro no meio de um serviço quando a pausa começa segue as regras de `on_end` e fica onde está, como antes.
+
+A cena 3D (`utsim cena`) lista as áreas no cabeçalho, com nome, centro e tamanho, para os visualizadores desenharem no piso.
 
 ### Tempo de viagem
 

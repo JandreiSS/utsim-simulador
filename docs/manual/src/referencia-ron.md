@@ -25,6 +25,7 @@ Model(
     run: (stop_time: 1000.0),
     calendars: { "S1": (period: 1440.0, off: [...]) },
     item_types: [ (name: "A", color: "#3b82f6", asset: "caixa_pequena", labels: {...}), ... ],
+    areas: [ (name: "copa", position: (30.0, 15.0, 0.0), size: (4.0, 4.0)), ... ],
     objects: [ ... ],
     connections: [ ... ],
     network: Some((...)),
@@ -204,6 +205,8 @@ Sem campos. Escreva `kind: Sink`.
 | `agv` | `false` |
 | `movement` | o de `run` |
 | `clearance` | pelo papel: pessoa 0,6, empilhadeira 0,9, outros 0,8 (finita, maior ou igual a 0) |
+| `home_at` / `home_object` | nenhum: casa num ponto, ou num objeto ou área (um ou outro; ligam a volta para casa) |
+| `break_at` / `break_object` | nenhum: local de pausa num ponto, ou num objeto ou área (um ou outro) |
 
 ### `Dispatcher`
 
