@@ -1,3 +1,4 @@
+mod analisar;
 mod cena;
 mod emulate;
 mod experiment;
@@ -56,6 +57,47 @@ enum Cmd {
     },
     /// Valida um modelo sem executar
     Check { model: PathBuf },
+    /// Análises de saída: aquecimento, precisão, médias em lotes, lei de Little e
+    /// gargalo móvel (sem opção de análise, roda todas menos os lotes)
+    Analisar {
+        model: PathBuf,
+        /// Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
+        #[arg(long)]
+        aquecimento: bool,
+        /// Replicações necessárias para esta semiamplitude: 2% (da média) ou 0.5 (absoluta)
+        #[arg(long, value_name = "ALVO")]
+        precisao: Option<String>,
+        /// Intervalo por médias em lotes numa rodada única (padrão: tempo no sistema)
+        #[arg(long)]
+        lotes: bool,
+        /// Verifica a lei de Little por objeto e no sistema
+        #[arg(long)]
+        little: bool,
+        /// Gargalo móvel pelo período ativo (único e compartilhado)
+        #[arg(long = "gargalo-movel")]
+        gargalo_movel: bool,
+        /// Nível de confiança dos intervalos
+        #[arg(long, default_value = "95%")]
+        confianca: String,
+        /// Medida para aquecimento e lotes: objeto.medida (ex.: saida.time_in_system)
+        #[arg(long)]
+        medida: Option<String>,
+        /// Métrica para --precisao (repetível; padrão: ocupações, conteúdos e tempos)
+        #[arg(long)]
+        metrica: Vec<String>,
+        /// Janela da média móvel de Welch
+        #[arg(long, default_value_t = 5)]
+        janela: usize,
+        /// Número de replicações (sobrescreve run.replications)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+        /// Tempo de parada (sobrescreve run.stop_time)
+        #[arg(long)]
+        stop: Option<f64>,
+        /// Grava os resultados em JSON
+        #[arg(long)]
+        json: Option<PathBuf>,
+    },
     /// Grava o rastro completo de uma replicação para o visualizador 3D
     Replay {
         model: PathBuf,
@@ -263,6 +305,35 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 m.connections.len()
             );
         }
+        Cmd::Analisar {
+            model,
+            aquecimento,
+            precisao,
+            lotes,
+            little,
+            gargalo_movel,
+            confianca,
+            medida,
+            metrica,
+            janela,
+            reps,
+            stop,
+            json,
+        } => analisar::run(analisar::Args {
+            model,
+            warmup: aquecimento,
+            precision: precisao,
+            batches: lotes,
+            little,
+            bottleneck: gargalo_movel,
+            level: confianca,
+            measure: medida,
+            metrics: metrica,
+            window: janela,
+            reps,
+            stop,
+            json,
+        })?,
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::GerarModelo {
             objetos,
