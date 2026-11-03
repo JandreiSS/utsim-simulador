@@ -1093,6 +1093,15 @@ simulado.
 
 ## 8. Decisões do dono
 
+**Aprovadas em 2026-11-02:** as 13 escolhas abaixo, nos padrões propostos. Em resumo, o painel
+é uma página web servida pelo programa (os principais também no Godot), com gráficos SVG
+próprios; sensores e painel em arquivos separados; só leitura do equipamento; Sparkplug B
+decodificado a partir da especificação oficial; estado inicial começando por contagens, estados e
+tempos decorridos; calibração aplicada com um clique; PDF pela impressão do navegador; `.xlsx` no
+instalador padrão; semáforo pela probabilidade (90 % e 50 %); rótulo `prazo` nos itens;
+anonimização ligada e retenção de 30 dias; e o estado inicial adiantado na ordem de execução.
+
+
 1. **D1 Onde roda o painel.** Proposta: página web servida pelo programa (e a mesma página no
    modo navegador e no HTML exportado), com só os cartões e gráficos principais no Godot.
    Alternativa: painel completo dentro do Godot.
