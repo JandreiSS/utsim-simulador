@@ -86,6 +86,8 @@ Model(
 | `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)`, mais os campos opcionais de manutenção `repair_crew`, `wear`, `basis`, `repair`, `preventive`, `cost` e `oee` ([Manutenção de máquinas e OEE](manutencao.md)) |
 | `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...], on_end: Pause)` ou `Calendar("nome")` (veja abaixo) |
 | `transport` | nenhum | nome de um `Transporter` ou `Dispatcher` que leva os itens que saem do objeto |
+| `transport_priority` | `0` | só com `transport`: prioridade dos pedidos de transporte (maior vai primeiro) |
+| `transport_priority_label` | nenhum | só com `transport`: rótulo do item que substitui `transport_priority` |
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |
 | `on_entry` | nenhum | script executado na entrada de cada item |
 | `visual` | nenhuma | aparência no 3D |
@@ -158,7 +160,7 @@ Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de
 | `capacity` | `1` (mínimo 1) |
 | `setup` | nenhum |
 | `process` | obrigatório |
-| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None)`; `requires: "habilidade"` só aceita pessoas com ela |
+| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None)`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
 
 ### `Combiner`
 

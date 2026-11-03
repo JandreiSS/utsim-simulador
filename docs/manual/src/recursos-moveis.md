@@ -65,6 +65,22 @@ Aqui a empilhadeira leva o palete de `recebimento` até `porta_paletes`. O `tran
 
 Se `capacity` for maior que 1, o transportador também leva, na mesma viagem, outros serviços da fila que saem do mesmo objeto, até a sua capacidade. Ele nunca espera por mais itens para completar a carga.
 
+### Prioridade dos pedidos de transporte
+
+Quando vários objetos disputam a mesma equipe, a prioridade decide quem é atendido primeiro. O pedido de prioridade maior passa na frente na fila do despachante (e na fila do próprio transportador); entre iguais vale a ordem de chegada.
+
+```ron
+(name: "urgente", kind: Queue(), transport: "frota", transport_priority: 5),
+(name: "pedidos", kind: Queue(), transport: "frota", transport_priority_label: "prioridade"),
+```
+
+| Campo do objeto | Padrão | Significado |
+|---|---|---|
+| `transport_priority` | `0` | prioridade dos pedidos de transporte deste objeto (inteiro; maior vai primeiro) |
+| `transport_priority_label` | nenhum | rótulo do item cujo valor, arredondado, substitui `transport_priority`. Um item sem o rótulo usa o valor fixo |
+
+Os dois campos só valem num objeto com `transport`. Sem eles a prioridade é 0, como antes: os modelos antigos dão o mesmo resultado. A prioridade não interrompe um serviço já entregue a um membro; para desviar quem está indo vazio, veja a preempção no [Dispatcher](#dispatcher-despachante).
+
 ## Operadores numa máquina: `operators`
 
 Um Processor pode exigir pessoas durante o setup, o processamento ou os dois.
@@ -83,6 +99,9 @@ Um Processor pode exigir pessoas durante o setup, o processamento ou os dois.
 | `count` | `1` | quantos operadores a fase exige |
 | `setup` | `true` | o setup exige operador |
 | `process` | `true` | o processamento exige operador |
+| `requires` | nenhum | habilidade que o operador precisa ter |
+| `priority` | `0` | prioridade dos pedidos de operador desta máquina na fila do despachante (maior vai primeiro) |
+| `priority_label` | nenhum | rótulo do item em processo cujo valor substitui `priority` |
 
 Como funciona:
 
