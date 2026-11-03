@@ -199,7 +199,7 @@ O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
   da janela; o resumo do Simular ficou curto (o resto está em Resultados, que usa a largura
   toda da vista).
 - **Testes:**
-  - Rust (`cargo test -p utsim-godot`, 51 testes): rede desenhada clique a clique com desfazer,
+  - Rust (`cargo test -p utsim-godot`, 53 testes): rede desenhada clique a clique com desfazer,
     trechos (sentido, capacidade, inverter), nós (mover, renomear, achar, excluir); tanques
     mudando de nível com as cores; fluxos com tokens no tempo; tabela igual à do `utsim run`,
     com o gargalo; estados somando 1 com as cores da cena; "rodar mais" igual a uma rodada
@@ -216,38 +216,54 @@ O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
       objetos;
     - `g3_cena.json`: tanques, fluxos, câmeras, limite de rótulos, gravar e abrir o replay.
 
-**Conferência visual pendente** (os roteiros rodaram só sem janela; com janela eles também
-gravam as capturas de cada passo). Com o PC livre, rode:
+**Conferência visual feita** em 2026-11-03: os roteiros `g3_*` e `g2_*` rodaram com janela e as
+capturas (`godot/capturas/g3/*.png`, fora do git) foram olhadas. Ela achou e corrigiu:
+
+- **Fluidos fora do quadro:** a caixa da cena (`bounds_min`/`bounds_max` da ponte, ver
+  `extras::scene_bounds`) não incluía a rede de fluidos, que fica numa faixa abaixo dos blocos;
+  o enquadramento inicial deixava os tanques junto da câmera (um cilindro gigante no canto) e
+  os tubos saindo da tela. Agora a caixa, o piso e o enquadramento do Editar incluem os
+  fluidos. As posições, o raio e a altura já eram os do Bevy (`utsim-scene::fluids`).
+- **Câmera Do recurso dentro de uma "cúpula":** era a base do cone da chegada, no mesmo ponto
+  de partida do AGV, vista de trás. A câmera agora fica na posição de condução (acima do
+  veículo, olhando à frente e um pouco para baixo) e esconde, enquanto está ali, as peças do
+  próprio veículo na linha de visão e os blocos que contêm o olho (`CenaUtsim.clear_view`);
+  a Primeira pessoa também.
+- **Fluxos de tokens com caixas sobrepostas e texto cortado:** a ponte manda a camada e a
+  pista de cada atividade; o painel dimensiona as caixas pelo texto, rola e tem zoom (botões
+  e Ctrl + roda), começando ajustado à largura mas nunca abaixo de 75 %.
+- **Série e histograma vazios:** o gráfico oferece "Ligar e rodar de novo", que liga
+  `run.sample_interval` (cerca de 200 pontos na janela de estatística) e
+  `run.histogram_bins = 20` num passo de desfazer e simula de novo. Para isso o `patch` do
+  `utsim-model` passou a aceitar esses dois campos de `run`.
+- **PERT/CPM no Editar:** a janela vai até a linha de status e o painel de propriedades fica
+  oculto enquanto ela (ou Resultados) está aberta.
+- **Roda do mouse:** rolar um painel ou lista também aproximava a câmera (a soltura da roda
+  passava sempre). Agora a roda e os arrastos que começam sobre a interface não chegam à vista.
+- **Visual dos painéis:** tema único `godot/tema/utsim.tres` (projeto inteiro) com títulos de
+  painel e de seção, ajuda em cinza, caixas de marcar visíveis no escuro, campos e listas
+  contrastados; seções das propriedades recolhíveis; a barra superior cabe com o nome do
+  modelo. Os rótulos do painel de propriedades quebram a linha sem cortar (conferido com janela
+  no `g2_tutorial_01`).
+- **Pilha (LIFO)** na Biblioteca (Queue com `discipline: Lifo`), com "pilha" no rótulo e a seta
+  invertida na cena.
+
+Os roteiros ganharam conferências que pegariam esses defeitos: `fluidos` com `enquadrados` e
+`altura_no_maximo`, `camera_livre` (nada a menos de X m do olho nem no começo da linha de
+visão), `fluxos.legivel` (sem sobreposição, sem corte, zoom legível), `modelo_contem`,
+`camera_distancia` com o passo `rolar`, e as propriedades ocultas sob o PERT. Para repetir:
 
 ```bash
 bash scripts/godot.sh
 G="$HOME/Documents/Godot_v4.7.2-stable_win64.exe/Godot_v4.7.2-stable_win64_console.exe"
-for r in g3_rede g3_resultados g3_pert g3_cena; do
+for r in g3_rede g3_resultados g3_pert g3_cena g2_tutorial_01 g2_montar_linha; do
     "$G" --path godot -- --utsim-roteiro=roteiros/$r.json --utsim-capturas="$(pwd -W)/godot/capturas/g3"
 done
 ```
 
-e confira nas capturas (`godot/capturas/g3/*.png`, fora do git):
-
-- a rede sobre o chão: trechos âmbar, a pista controlada vermelha, a seta da mão única no meio
-  do trecho, os losangos dos nós e o nó armado verde com a linha até o mouse
-  (`g3_rede_01_caminho`, `g3_rede_02_controlada`, `g3_rede_03_editada`);
-- o painel Resultados: a tabela (colunas alinhadas, gargalo em laranja), as barras de ocupação
-  com o traço do IC, os estados com a legenda, a série e o histograma (eixos legíveis), a
-  curva de Welch com a linha do MSER-5, Little com os círculos coloridos, cenários e
-  otimização (`g3_res_*`);
-- a janela PERT/CPM: caixas sem sobreposição e o caminho crítico vermelho, o Gantt com a folga
-  clara, o histograma com a linha do prazo (`g3_pert_*`), e o contorno vermelho dos objetos
-  críticos na cena (feche a janela e olhe o Editar);
-- os tanques com o líquido na altura certa e a cor da taxa, os tubos acesos, os marcadores e
-  as linhas dos conversores (`g3_cena_01_tanques`); o grafo dos fluxos e a série
-  (`g3_cena_02_fluxos`); as câmeras Seguir, Primeira pessoa e Do recurso (`g3_cena_03` a
-  `g3_cena_05`: a primeira pessoa não deve ficar dentro do modelo do AGV);
-- o painel de propriedades sem rótulos cortados (abra `examples/tutorial_01_caixa.ron` e
-  clique na chegada) e o nome do modelo na barra superior.
-
-Abrir o projeto (`bash scripts/godot.sh --abrir`, F5) e desenhar uma rede à mão também vale a
-pena: a escolha de um trecho perto de um nó e o arrasto do nó só a mão no mouse confirma.
+Restou conferir à mão (abrindo o projeto, F5): desenhar uma rede no mouse real (escolha de
+trecho perto de um nó, arrasto do nó) e a roda num mouse de verdade (o roteiro usa eventos
+simulados).
 
 O plano original da G3:
 
@@ -373,7 +389,9 @@ Pendente:
 
 ## Lacunas conhecidas depois da G3
 
-- A aparência da G3 só foi conferida sem janela (ver "Conferência visual pendente" na G3).
+- A Pilha (LIFO) aparece com o asset da fila virado; não há um modelo 3D próprio de pilha.
+- A câmera Do recurso esconde o que bloqueia a vista, mas não desvia de paredes de um layout
+  CAD (não há colisão).
 - `operador_simples` sem braços e pernas animados no Godot (só o boneco é animado).
 - O Editar desenha os fluidos com o nível inicial, mas não cria nem edita os nós de fluido; os
   tanques são cilindros simples (os modelos do `utsim-assets` ainda não entram).

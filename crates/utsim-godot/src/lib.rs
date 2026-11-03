@@ -490,13 +490,7 @@ impl UtsimPlayback {
         let Some(c) = &self.core else {
             return d;
         };
-        let header = c.scene.static_scene();
-        let (a, b) = (
-            coords::to_godot(header.bounds.0),
-            coords::to_godot(header.bounds.1),
-        );
-        let lo = [a[0].min(b[0]), a[1].min(b[1]), a[2].min(b[2])];
-        let hi = [a[0].max(b[0]), a[1].max(b[1]), a[2].max(b[2])];
+        let (lo, hi) = extras::scene_bounds(c);
         put(&mut d, "end", c.end());
         put(&mut d, "bounds_min", v3(lo));
         put(&mut d, "bounds_max", v3(hi));
@@ -513,6 +507,7 @@ impl UtsimPlayback {
             put(&mut e, "position", v3(position));
             put(&mut e, "size", v3(size));
             put(&mut e, "shape", simple_shape(&v.kind));
+            put(&mut e, "stack", v.stack);
             if let Some(l) = &v.look {
                 let a = AssetInfo::of(&l.source);
                 let mut asset = VarDictionary::new();
@@ -630,6 +625,8 @@ impl UtsimPlayback {
                 put(&mut e, "label", n.label);
                 put(&mut e, "x", n.x);
                 put(&mut e, "y", n.y);
+                put(&mut e, "layer", n.layer as i64);
+                put(&mut e, "lane", n.lane);
                 nodes.push(&e.to_variant());
             }
             put(&mut d, "nodes", nodes);

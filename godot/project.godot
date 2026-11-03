@@ -27,6 +27,11 @@ Roteiro="*res://scripts/roteiro.gd"
 window/size/viewport_width=1600
 window/size/viewport_height=900
 
+[gui]
+
+; Tema único de todos os painéis (cores, botões, campos, listas, abas, títulos de seção).
+theme/custom="res://tema/utsim.tres"
+
 [editor_plugins]
 
 enabled=PackedStringArray()

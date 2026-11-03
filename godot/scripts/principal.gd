@@ -100,6 +100,8 @@ var _flows_panel: PainelFluxos
 var _camera_pick: OptionButton
 ## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
 var camera_mode := "orbita"
+## Point the following cameras look at (scripted checks: nothing may stand between).
+var camera_aim := Vector3.ZERO
 ## Block followed by the cameras other than the orbit one.
 var follow_name := ""
 var _frames := 0
@@ -156,6 +158,7 @@ func _build_world() -> void:
 	sun.transform = Transform3D(Basis.IDENTITY, Vector3(8, 14, 6)).looking_at(Vector3.ZERO, Vector3.UP)
 	add_child(sun)
 	camera = CameraOrbita.new()
+	camera.over_ui = over_ui
 	add_child(camera)
 	camera.current = true
 	var ground := MeshInstance3D.new()
@@ -180,19 +183,9 @@ func _build_world() -> void:
 # ---------------------------------------------------------------------------
 
 
-func _panel_style() -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = PANEL
-	s.border_color = Color(0.22, 0.24, 0.29)
-	s.set_border_width_all(1)
-	s.set_content_margin_all(8)
-	return s
-
-
 func _panel(name: String) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.name = name
-	p.add_theme_stylebox_override("panel", _panel_style())
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
 	_ui.add_child(p)
 	return p
@@ -218,11 +211,11 @@ func _build_ui() -> void:
 	_top.anchor_right = 1.0
 	_top.offset_bottom = TOP_HEIGHT
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 6)
+	top.add_theme_constant_override("separation", 4)
 	_top.add_child(top)
 	var brand := Label.new()
 	brand.text = "UTSim"
-	brand.add_theme_font_size_override("font_size", 18)
+	brand.theme_type_variation = &"TituloPainel"
 	top.add_child(brand)
 	var modes := ButtonGroup.new()
 	_mode_edit = _button(top, "Modo_Editar", "Editar", "Montar o modelo (Tab alterna)", func(): set_mode("editar"))
@@ -236,8 +229,8 @@ func _build_ui() -> void:
 	_button(top, "Botao_Salvar", "Salvar", "Salvar (Ctrl+S)", func(): save())
 	_button(top, "Botao_SalvarComo", "Salvar como...", "Salvar como (Ctrl+Shift+S)", func(): save_as_dialog())
 	top.add_child(VSeparator.new())
-	_undo = _button(top, "Botao_Desfazer", "↶ Desfazer", "Desfazer (Ctrl+Z)", func(): undo())
-	_redo = _button(top, "Botao_Refazer", "↷ Refazer", "Refazer (Ctrl+Y)", func(): redo())
+	_undo = _button(top, "Botao_Desfazer", "Desfazer", "Desfazer (Ctrl+Z)", func(): undo())
+	_redo = _button(top, "Botao_Refazer", "Refazer", "Refazer (Ctrl+Y)", func(): redo())
 	top.add_child(VSeparator.new())
 	var tools := ButtonGroup.new()
 	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
@@ -270,7 +263,8 @@ func _build_ui() -> void:
 	top.add_child(VSeparator.new())
 	_snap = CheckBox.new()
 	_snap.name = "Grade_Encaixe"
-	_snap.text = "Encaixar na grade"
+	_snap.text = "Grade"
+	_snap.tooltip_text = "Encaixar na grade ao pôr e arrastar (passo ao lado)"
 	_snap.button_pressed = snap_on
 	_snap.focus_mode = Control.FOCUS_NONE
 	_snap.toggled.connect(func(on): set_snap(on, grid_step))
@@ -297,7 +291,12 @@ func _build_ui() -> void:
 	top.add_child(analysis)
 	_button(top, "Botao_Resultados", "Resultados", "Tabela, gráficos, análises, cenários e otimização da última rodada", func(): analysis_action("resultados"))
 	_button(top, "Botao_Pert", "PERT/CPM", "PERT/CPM da seleção (com dois objetos, de um até o outro)", func(): analysis_action("pert_auto"))
-	_button(top, "Botao_Atalhos", "Atalhos (F1)", "Lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
+	_button(top, "Botao_Atalhos", "Atalhos", "F1: lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
+	# The top bar's buttons are compact (the theme's "BotaoBarra"), so the whole bar
+	# fits at 1600 px with the model name.
+	for c in top.get_children():
+		if c is Button and not (c is CheckBox or c is OptionButton):
+			(c as Button).theme_type_variation = &"BotaoBarra"
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(spacer)
@@ -335,7 +334,7 @@ func _build_ui() -> void:
 	_edit_left.add_child(HSeparator.new())
 	var olabel := Label.new()
 	olabel.text = "Objetos"
-	olabel.add_theme_font_size_override("font_size", 16)
+	olabel.theme_type_variation = &"TituloPainel"
 	_edit_left.add_child(olabel)
 	_objects_search = LineEdit.new()
 	_objects_search.name = "Objetos_Busca"
@@ -506,7 +505,7 @@ func _build_ui() -> void:
 	_fps.offset_left = LEFT_WIDTH + 10
 	_fps.offset_right = LEFT_WIDTH + 330
 	_fps.offset_top = TOP_HEIGHT + 6
-	_fps.add_theme_color_override("font_color", Color(0.7, 0.74, 0.8))
+	_fps.theme_type_variation = &"Ajuda"
 	_fps.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(_fps)
 
@@ -538,15 +537,12 @@ func _build_ui() -> void:
 		_pending = Callable())
 	_ui.add_child(_discard)
 	_results_panel = PainelResultados.new()
-	_results_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_results_panel)
 	_results_panel.build(self)
 	_pert_panel = PainelPert.new()
-	_pert_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_pert_panel)
 	_pert_panel.build(self)
 	_flows_panel = PainelFluxos.new()
-	_flows_panel.add_theme_stylebox_override("panel", _panel_style())
 	_ui.add_child(_flows_panel)
 	_flows_panel.build(self)
 	for panel in [_results_panel, _pert_panel, _flows_panel]:
@@ -560,6 +556,8 @@ func _build_ui() -> void:
 		panel.visible = false
 	_flows_panel.offset_left = -560
 	_flows_panel.anchor_left = 1.0
+	for panel in [_results_panel, _pert_panel]:
+		panel.visibility_changed.connect(_sync_panels)
 	_replay_dialog = FileDialog.new()
 	_replay_dialog.name = "Dialogo_Replay"
 	_replay_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -606,6 +604,17 @@ func over_ui(p: Vector2) -> bool:
 		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
+
+
+## The Resultados and PERT/CPM windows cover the view down to the playback bar in
+## Simular and down to the status line in Editar (no bar there); while one is open in
+## Editar, the properties panel, which they would half cover, is hidden.
+func _sync_panels() -> void:
+	var covering: bool = _results_panel.visible or _pert_panel.visible
+	for panel in [_results_panel, _pert_panel]:
+		panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
+	if mode == "editar":
+		_right.visible = not covering
 
 
 func is_editing() -> bool:
@@ -855,7 +864,7 @@ func _show_link(link: Array) -> void:
 	_props.clear()
 	var title := Label.new()
 	title.text = "Ligação"
-	title.add_theme_font_size_override("font_size", 16)
+	title.theme_type_variation = &"TituloPainel"
 	_props.add_child(title)
 	var l := Label.new()
 	l.text = "%s → %s" % link
@@ -937,6 +946,13 @@ func _frame_model() -> void:
 		lo = Vector3(minf(lo.x, p.x), 0, minf(lo.z, p.z))
 		hi = Vector3(maxf(hi.x, p.x), 0, maxf(hi.z, p.z))
 		any = true
+	# What the scene draws beyond the objects (the fluid network, the paths).
+	if cena.info.has("bounds_min"):
+		var blo: Vector3 = cena.info["bounds_min"]
+		var bhi: Vector3 = cena.info["bounds_max"]
+		lo = Vector3(minf(lo.x, blo.x), 0, minf(lo.z, blo.z))
+		hi = Vector3(maxf(hi.x, bhi.x), 0, maxf(hi.z, bhi.z))
+		any = true
 	if not any:
 		lo = Vector3(-8, 0, -8)
 		hi = Vector3(8, 0, 8)
@@ -966,6 +982,7 @@ func set_mode(which: String) -> bool:
 	_sim_left.visible = false
 	_right.visible = true
 	_bar.visible = false
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = true
 	_revision = -1
@@ -996,6 +1013,7 @@ func simulate(reps: int) -> bool:
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	_reps.value = reps
@@ -1427,6 +1445,26 @@ func open_pert(between: bool) -> void:
 
 
 ## Writes `warmup` to `run.warmup` of the document ("Aplicar" of the warm-up analysis).
+## Switches on the content series and the histograms in the model (one undo step, from
+## the Resultados charts) and runs the replications again, so the charts have data.
+func enable_samples_and_rerun() -> void:
+	if playing_replay:
+		set_status("Um replay gravado não roda de novo: abra o modelo.")
+		return
+	var r: Dictionary = doc.enable_samples()
+	if not r["ok"]:
+		set_status("Não ligou a série e os histogramas: %s" % doc.last_error())
+		return
+	after_edit()
+	var parts := PackedStringArray()
+	if float(r["sample_interval"]) > 0.0:
+		parts.append("run.sample_interval = %s" % _num(float(r["sample_interval"])))
+	if int(r["histogram_bins"]) > 0:
+		parts.append("run.histogram_bins = %d" % int(r["histogram_bins"]))
+	simulate(int(_reps.value))
+	set_status("Ligado no modelo (%s; Ctrl+Z desfaz). Simulando de novo..." % ", ".join(parts))
+
+
 func apply_warmup(warmup: float) -> void:
 	if doc.set_property("run", "warmup", warmup, PackedStringArray()):
 		doc.end_gesture()
@@ -1463,6 +1501,7 @@ func open_replay(path: String) -> bool:
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	on_results(model.replay_results())
@@ -1493,6 +1532,8 @@ func save_replay(path: String) -> bool:
 
 func set_camera_mode(which: String) -> void:
 	camera_mode = which
+	if which not in ["primeira_pessoa", "recurso"]:
+		cena.restore_view()
 	for k in CAMERAS.size():
 		if CAMERAS[k][0] == which:
 			_camera_pick.select(k)
@@ -1525,10 +1566,19 @@ func _drive_camera() -> void:
 			camera.update()
 		"primeira_pessoa":
 			var eye := at + Vector3(0, 1.6, 0) + forward * 0.35
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(eye + forward * 10.0 - Vector3(0, 1.2, 0), Vector3.UP)
+			camera_aim = eye + forward * 10.0 - Vector3(0, 1.2, 0)
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
+			cena.clear_view(eye, camera_aim, i)
 		"recurso":
-			var eye := at - forward * 6.0 + Vector3(0, 3.5, 0)
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(at + Vector3(0, 1.0, 0), Vector3.UP)
+			# The driving position: above the vehicle (an AGV has no cab; a forklift's
+			# seat is about its mast's height), looking ahead and a little down. The
+			# parts of the vehicle on the sight line and any block the eye goes through
+			# are hidden while the camera is there.
+			var eye_y := clampf(float(cena.rigs[i].get("top", 1.0)) + 0.6, 1.4, 2.4)
+			var eye := at + Vector3(0, eye_y, 0)
+			camera_aim = eye + forward * 10.0 - Vector3(0, eye_y * 0.8, 0)
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
+			cena.clear_view(eye, camera_aim, i)
 
 
 # ---------------------------------------------------------------------------
@@ -1541,7 +1591,7 @@ func _show_network() -> void:
 	var rede: EditorRede = editor.rede
 	var title := Label.new()
 	title.text = "Rede de caminhos"
-	title.add_theme_font_size_override("font_size", 16)
+	title.theme_type_variation = &"TituloPainel"
 	_props.add_child(title)
 	var c := rede.counts()
 	var info := Label.new()
@@ -1551,7 +1601,7 @@ func _show_network() -> void:
 	var help := Label.new()
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-	help.add_theme_color_override("font_color", Color(0.70, 0.74, 0.80))
+	help.theme_type_variation = &"Ajuda"
 	help.text = "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."
 	_props.add_child(help)
 	var both := CheckBox.new()
@@ -1563,7 +1613,7 @@ func _show_network() -> void:
 	if rede.selected_node != "":
 		var head := Label.new()
 		head.text = "Nó %s" % rede.selected_node
-		head.add_theme_font_size_override("font_size", 15)
+		head.theme_type_variation = &"RotuloSecao"
 		_props.add_child(head)
 		var row := HBoxContainer.new()
 		var l := Label.new()
@@ -1591,7 +1641,7 @@ func _show_network() -> void:
 		var e: Dictionary = rede._edge(rede.selected_edge[0], rede.selected_edge[1])
 		var head := Label.new()
 		head.text = "Trecho %s → %s" % [e["from"], e["to"]]
-		head.add_theme_font_size_override("font_size", 15)
+		head.theme_type_variation = &"RotuloSecao"
 		_props.add_child(head)
 		var len_label := Label.new()
 		len_label.text = "Comprimento %s m" % _num(float(e["length"]))

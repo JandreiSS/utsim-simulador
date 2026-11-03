@@ -48,6 +48,10 @@ var fluid_nodes: Array = []
 var fluid_pipes: Array = []
 var _fluid_materials: Array = []
 var _labels_shown := 0
+## Room kept around a following camera's eye (`clear_view`).
+const VIEW_MARGIN := 0.5
+## Meshes hidden by `clear_view` (shown again by `restore_view`).
+var _hidden_for_view: Array[MeshInstance3D] = []
 ## Editar draws its own connections (arrows, port numbers) and floor.
 var show_connections := true
 var show_floor := true
@@ -83,6 +87,7 @@ func clear(keep_templates := false) -> void:
 	fluid_nodes.clear()
 	fluid_pipes.clear()
 	_fluid_materials.clear()
+	_hidden_for_view.clear()
 	playback = null
 
 
@@ -124,7 +129,9 @@ func build(pb: Object, keep_templates := false) -> void:
 			asset = _instance(b["asset"])
 		if asset != null:
 			asset.position = b.get("offset", Vector3.ZERO)
-			asset.rotation = Vector3(0, b.get("asset_yaw", 0.0), 0)
+			# A stack (LIFO queue) is drawn turned around: its arrow points back to
+			# where the items come in, which is also where they leave.
+			asset.rotation = Vector3(0, float(b.get("asset_yaw", 0.0)) + (PI if b.get("stack", false) else 0.0), 0)
 			asset.scale = Vector3.ONE * float(b.get("scale", 1.0))
 			root.add_child(asset)
 			rig["asset"] = asset
@@ -164,6 +171,7 @@ func build(pb: Object, keep_templates := false) -> void:
 		label.position = Vector3(0, top + 0.3, 0)
 		root.add_child(label)
 		rig["label"] = label
+		rig["top"] = top
 		rigs.append(rig)
 		_last_color.append(null)
 		_last_label.append("")
@@ -758,3 +766,76 @@ func limit_labels(cam: Camera3D) -> void:
 ## Labels drawn after the last `limit_labels` (scripted checks).
 func labels_shown() -> int:
 	return _labels_shown
+
+
+# ---------------------------------------------------------------------------
+# Visual checks (G3)
+# ---------------------------------------------------------------------------
+
+
+## Meshes drawn between `eye` and `aim` or within `margin` of the eye (the floor, the
+## lines and hidden meshes aside): what would block a camera there. Each entry is
+## `"block/mesh"`, with the distance to the eye.
+func meshes_blocking(eye: Vector3, aim: Vector3, margin: float) -> PackedStringArray:
+	var out := PackedStringArray()
+	var stack: Array[Node] = [self]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if not (n is MeshInstance3D):
+			continue
+		var mi := n as MeshInstance3D
+		if not mi.is_visible_in_tree() or mi.mesh == null or String(mi.name) in ["Piso", "Linhas"]:
+			continue
+		var box := mi.global_transform * mi.get_aabb()
+		var near := box.grow(margin)
+		if near.has_point(eye) or box.intersects_segment(eye, aim):
+			var path := String(get_path_to(mi))
+			var d := eye.distance_to(box.get_center())
+			out.append("%s (%.1f m)" % [path, d])
+	return out
+
+
+## Hides what would block a camera at `eye` looking towards `aim`: the meshes of block
+## `own` (the vehicle the camera rides) on the first 3 m of the sight line, and the
+## meshes of any other block within `VIEW_MARGIN` of the eye or on its first metre (a
+## vehicle parked on a source or driving through a machine). What an earlier call hid is shown again first.
+func clear_view(eye: Vector3, aim: Vector3, own: int) -> void:
+	restore_view()
+	var dir := (aim - eye).normalized()
+	for i in rigs.size():
+		var root: Node3D = rigs[i]["root"]
+		if i != own and root.global_position.distance_to(eye) > 8.0:
+			continue
+		var near := eye + dir * (3.0 if i == own else 1.0)
+		for mi in Pessoa._meshes(root):
+			if not mi.visible:
+				continue
+			var box := mi.global_transform * mi.get_aabb()
+			if box.grow(VIEW_MARGIN).has_point(eye) or box.intersects_segment(eye, near):
+				mi.visible = false
+				_hidden_for_view.append(mi)
+
+
+## Shows again what `clear_view` hid.
+func restore_view() -> void:
+	for mi in _hidden_for_view:
+		if is_instance_valid(mi):
+			mi.visible = true
+	_hidden_for_view.clear()
+
+
+## Bounding box of the fluid network as drawn (tanks, markers, pipes), `[lo, hi]`; empty
+## without fluids.
+func fluid_bounds() -> Array:
+	var box := AABB()
+	var first := true
+	var parts: Array = []
+	for e in fluid_nodes:
+		parts.append_array(Pessoa._meshes(e["root"]))
+	parts.append_array(fluid_pipes)
+	for mi in parts:
+		var b: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return [] if first else [box.position, box.end]

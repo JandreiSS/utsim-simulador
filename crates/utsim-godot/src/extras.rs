@@ -15,7 +15,27 @@ use utsim_flow::Activity;
 use utsim_scene::fluids::{self, NodeShape};
 use utsim_scene::layout;
 
+use crate::coords;
 use crate::playback::Playback;
+
+/// Box `(lo, hi)` of everything drawn, Godot coordinates: the scene contract's bounds
+/// (blocks, network) grown by the fluid network (tanks and markers, base to top), so the
+/// first framing and the floor take the fluids in too, as in the Bevy viewer.
+pub fn scene_bounds(p: &Playback) -> ([f32; 3], [f32; 3]) {
+    let (a, b) = p.scene.static_scene().bounds;
+    let (a, b) = (coords::to_godot(a), coords::to_godot(b));
+    let mut lo = [a[0].min(b[0]), a[1].min(b[1]), a[2].min(b[2])];
+    let mut hi = [a[0].max(b[0]), a[1].max(b[1]), a[2].max(b[2])];
+    // The fluid layout is in the scene's layout space, which is Godot's.
+    for q in p.scene.fluid.bounds_points() {
+        let q = coords::layout_to_godot(q);
+        for k in 0..3 {
+            lo[k] = lo[k].min(q[k]);
+            hi[k] = hi[k].max(q[k]);
+        }
+    }
+    (lo, hi)
+}
 
 /// Colour of the liquid of a tank by its rate, and of the marker of the other nodes
 /// (the Bevy viewer's palette; a pipe is lit while fluid goes through it).
@@ -182,6 +202,11 @@ pub struct FlowNode {
     pub label: &'static str,
     pub x: f32,
     pub y: f32,
+    /// Column of the layered layout (`layout::layers`: longest path from the sources)
+    /// and place in it (`0` in the middle, `±1` the next lanes, halves when the column
+    /// has an even count): the panel spaces them by the size of its text.
+    pub layer: u32,
+    pub lane: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -221,6 +246,8 @@ pub fn flow_graphs(p: &Playback) -> Vec<FlowGraph> {
                         label: activity_label(&a.kind),
                         x: q[0],
                         y: q[2],
+                        layer: (q[0] / layout::LAYER_SPACING).round() as u32,
+                        lane: q[2] / layout::LANE_SPACING,
                     })
                     .collect(),
                 edges,
@@ -294,6 +321,16 @@ mod tests {
             }
         }
         assert!(changed, "algum tanque muda de nível");
+        // The scene's box takes every tank in, whole, and the tanks keep the size of the
+        // model (`tank_dims` of their capacity: a few metres, not tens).
+        let (lo, hi) = scene_bounds(&p);
+        for n in &nodes {
+            assert!(n.radius < 3.0 && n.height < 6.0, "{n:?}");
+            let base = n.position;
+            assert!(base[0] - n.radius >= lo[0] - 1e-4 && base[0] + n.radius <= hi[0] + 1e-4);
+            assert!(base[2] - n.radius >= lo[2] - 1e-4 && base[2] + n.radius <= hi[2] + 1e-4);
+            assert!(base[1] + n.height <= hi[1] + 1e-4, "{n:?} {hi:?}");
+        }
         assert_eq!(fluid_color(NodeShape::Tank, 1.0), [0.15, 0.70, 0.95]);
         assert_ne!(
             fluid_color(NodeShape::Tank, -1.0),
@@ -315,6 +352,10 @@ mod tests {
             counts.iter().flatten().any(|&c| c > 0),
             "algum token no tempo"
         );
+        // A chain: one column per activity, all on the middle lane.
+        for (i, n) in g.nodes.iter().enumerate() {
+            assert_eq!((n.layer, n.lane), (i as u32, 0.0), "{n:?}");
+        }
         let mid = flow_counts(&p, g, p.end() / 2.0);
         assert_eq!(mid.len(), g.nodes.len());
     }

@@ -29,6 +29,7 @@
 ##    - `{"clicar": <alvo>, "shift": false, "duplo": false, "botao": "esquerdo"}`
 ##    - `{"arrastar": {"de": <alvo>, "para": <alvo>, "shift": false, "passos": 12}}`
 ##    - `{"mover": <alvo>}` (mouse only)
+##    - `{"rolar": <alvo>, "vezes": 3, "sentido": "baixo"}` (the mouse wheel over it)
 ##    - `{"digitar": "texto", "em": <alvo>, "enter": true}` (clicks `em` first, if given)
 ##    - `{"escolher": {"controle": "Prop_visual_asset", "item": "bancada_kenney"}}`: picks
 ##      the item with that text in an OptionButton, as choosing it in the open list does
@@ -274,6 +275,18 @@ func _step(s: Dictionary, k: int) -> void:
 			return
 		_motion(p, p - _last_pos(), 0, false)
 		await _frames(2)
+	elif s.has("rolar"):
+		var p = _target(s["rolar"])
+		if p == null:
+			_fail("passo %d: alvo não encontrado: %s" % [k, s["rolar"]])
+			return
+		_motion(p, p - _last_pos(), 0, false)
+		await _frames(2)
+		var wheel := MOUSE_BUTTON_WHEEL_UP if s.get("sentido", "baixo") == "cima" else MOUSE_BUTTON_WHEEL_DOWN
+		for i in int(s.get("vezes", 3)):
+			_button(p, wheel, true, false)
+			_button(p, wheel, false, false)
+			await _frames(2)
 	elif s.has("digitar"):
 		if s.has("em"):
 			var p = _target(s["em"])
@@ -588,9 +601,13 @@ func _accept_dialog(path: String, k: int) -> void:
 ## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
 ## the document), `ocupado` (a run on the bridge's thread), `grafico` ({controle,
 ## maior_que}: things drawn by a `Grafico`), `fluidos` ({nos, tanques, nivel_entre: [a,
-## b]}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que}), `pert` ({modo,
-## caixas_maior_que, tem_histograma}), `critico` (names outlined in red), `camera`
-## (mode), `rotulos_no_maximo` (labels drawn) and `replay` (a recorded replay is playing).
+## b], altura_no_maximo: metres of the network as drawn, enquadrados: the whole network
+## on screen}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que, legivel: boxes
+## apart, text whole, zoom legible}), `pert` ({modo, caixas_maior_que, tem_histograma}),
+## `critico` (names outlined in red), `camera` (mode), `camera_distancia` ([a, b]: the orbit distance), `camera_livre` ({margem,
+## distancia}: no mesh within `margem` metres of a following camera nor on the first
+## `distancia` metres of its sight line), `modelo_contem` (pieces of the model's RON
+## text), `rotulos_no_maximo` (labels drawn) and `replay` (a recorded replay is playing).
 func _check(c: Dictionary, k: int) -> void:
 	var doc: Object = _main.doc
 	var objects: Array = doc.objects()
@@ -746,6 +763,19 @@ func _check(c: Dictionary, k: int) -> void:
 						if f >= lo and f <= hi:
 							inside = true
 					report.call("algum tanque com nível entre %s e %s" % [lo, hi], inside, str(fill))
+				var box: Array = cena.fluid_bounds()
+				if want.has("altura_no_maximo") and not box.is_empty():
+					var h: float = (box[1] as Vector3).y - (box[0] as Vector3).y
+					report.call("altura dos fluidos até %s m" % want["altura_no_maximo"], h <= float(want["altura_no_maximo"]), "%.2f m" % h)
+				if want.get("enquadrados", false):
+					var cam: Camera3D = _main.camera
+					var out := 0
+					if not box.is_empty():
+						var aabb := AABB(box[0], (box[1] as Vector3) - (box[0] as Vector3))
+						for corner in 8:
+							if not cam.is_position_in_frustum(aabb.get_endpoint(corner)):
+								out += 1
+					report.call("fluidos inteiros na tela", not box.is_empty() and out == 0, "%d canto(s) fora; caixa %s" % [out, box])
 			"fluxos":
 				var panel: PainelFluxos = _main._flows_panel
 				var acts := 0
@@ -754,6 +784,11 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("atividades do fluxo", acts > int(want.get("atividades_maior_que", 0)), str(acts))
 				if want.has("tokens_pico_maior_que"):
 					report.call("pico de tokens", panel.peak_tokens() > int(want["tokens_pico_maior_que"]), str(panel.peak_tokens()))
+				if want.get("legivel", false):
+					var graph: PainelFluxos.Grafo = panel._graph
+					report.call("caixas do fluxo sem sobreposição", graph.overlaps() == 0, str(graph.overlaps()))
+					report.call("texto do fluxo sem corte", graph.clipped() == 0, str(graph.clipped()))
+					report.call("zoom do fluxo legível", graph.zoom >= PainelFluxos.Grafo.MIN_FIT - 1e-3, str(graph.zoom))
 			"pert":
 				var panel: PainelPert = _main._pert_panel
 				var d: Dictionary = panel.data
@@ -769,6 +804,19 @@ func _check(c: Dictionary, k: int) -> void:
 					report.call("%s no caminho crítico" % n, _main.editor.critical.has(n), str(_main.editor.critical))
 			"camera":
 				report.call("câmera", _main.camera_mode == want, _main.camera_mode)
+			"modelo_contem":
+				var text: String = doc.text()
+				for piece in want:
+					report.call("modelo contém %s" % piece, text.contains(piece), text.substr(maxi(text.find("run:"), 0), 240))
+			"camera_distancia":
+				var dd: float = _main.camera.dist
+				report.call("distância da câmera entre %s e %s" % [want[0], want[1]], dd >= float(want[0]) and dd <= float(want[1]), str(dd))
+			"camera_livre":
+				var cam: Camera3D = _main.camera
+				var eye := cam.global_position
+				var near: Vector3 = eye + (_main.camera_aim - eye).normalized() * float(want.get("distancia", 2.0))
+				var hit: PackedStringArray = _main.cena.meshes_blocking(eye, near, float(want.get("margem", 0.5)))
+				report.call("nada entre a câmera e o alvo", hit.is_empty(), ", ".join(hit))
 			"rotulos_no_maximo":
 				var n: int = _main.cena.labels_shown()
 				report.call("rótulos desenhados", n <= int(want), str(n))
