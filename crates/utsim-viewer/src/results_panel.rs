@@ -92,9 +92,9 @@ pub struct RunOutput {
 
 enum Msg {
     Progress(usize, usize),
-    Run(Result<RunOutput, String>),
+    Run(Result<Box<RunOutput>, String>),
     Scenarios(Result<ExperimentResult, String>),
-    Optimized(Result<(OptProblem, OptResult), String>),
+    Optimized(Result<Box<(OptProblem, OptResult)>, String>),
 }
 
 struct Job {
@@ -249,7 +249,7 @@ impl Results {
                 if self.object.is_none() {
                     self.object = bottleneck(&out.stats).map(|i| out.stats[i].name.clone());
                 }
-                self.run = Some(out);
+                self.run = Some(*out);
             }),
             Msg::Scenarios(r) => r.map(|exp| {
                 self.status = format!("{} cenário(s) comparados", exp.scenarios.len());
@@ -259,7 +259,8 @@ impl Results {
                 }
                 self.experiment = Some(exp);
             }),
-            Msg::Optimized(r) => r.map(|(p, res)| {
+            Msg::Optimized(r) => r.map(|b| {
+                let (p, res) = *b;
                 self.status = format!(
                     "{} ponto(s) avaliados{}",
                     res.evaluations.len(),
@@ -305,7 +306,7 @@ impl Results {
                     form,
                     reports,
                 });
-            Msg::Run(result)
+            Msg::Run(result.map(Box::new))
         });
     }
 
@@ -364,7 +365,7 @@ impl Results {
             let result = utsim_opt::optimize_with(&problem, &base, &mut |d, t| progress(d, t))
                 .map_err(|e| e.to_string())
                 .map(|r| (problem, r));
-            Msg::Optimized(result)
+            Msg::Optimized(result.map(Box::new))
         });
     }
 }

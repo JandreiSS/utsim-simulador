@@ -1,5 +1,6 @@
 mod analisar;
 mod cena;
+mod corredores;
 mod dados;
 mod emulate;
 mod estado;
@@ -186,6 +187,13 @@ enum Cmd {
         /// Grava as paredes e colunas como `obstacles` deste modelo (e registra a planta em `floor_plan`)
         #[arg(long, value_name = "MODELO")]
         obstaculos: Option<PathBuf>,
+    },
+    /// Corredores de circulação: resumo, avisos e planta em SVG com as faixas
+    Corredores {
+        model: PathBuf,
+        /// Grava a planta com os corredores, as faixas e a rede gerada em SVG
+        #[arg(long)]
+        svg: Option<PathBuf>,
     },
     /// Rede de caminhos: gera pelo caminho livre, desviando dos obstáculos
     Rede {
@@ -530,6 +538,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Cmd::Rede { acao } => rede::run(acao)?,
+        Cmd::Corredores { model, svg } => corredores::run(&model, svg.as_deref())?,
         Cmd::Analisar {
             model,
             aquecimento,
