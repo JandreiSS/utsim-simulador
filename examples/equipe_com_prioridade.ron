@@ -8,7 +8,6 @@
 //   (área "sala_operadores") e, na pausa de 30 min no meio do turno de 8 h, vão até a
 //   copa (área "copa").
 Model(
-    format: 2,
     name: "Equipe com prioridade",
     description: "Dois operadores, uma máquina urgente, regra LeastBusy, preempção e local de pausa",
     run: (

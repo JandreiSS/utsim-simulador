@@ -8,7 +8,6 @@
 // As linhas consomem os lotes; quando o bordo fica vazio, a linha para à espera da
 // próxima ronda. O relatório do bloco "ronda" mostra a ocupação do abastecedor.
 Model(
-    format: 2,
     name: "Ronda de abastecimento",
     description: "Sequência de tarefa (buscar, levar, deixar, voltar) como fluxo de tokens",
     run: (

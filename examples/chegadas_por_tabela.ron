@@ -8,7 +8,6 @@
 // manda caixas para a separação e paletes para a conferência. A expedição registra o
 // tempo no sistema por tipo (time_in_system.caixa e time_in_system.palete).
 Model(
-    format: 2,
     name: "Chegadas por tabela",
     description: "Horário de caminhões, sequência de ordens e lotes avulsos com tipos de item",
     run: (
