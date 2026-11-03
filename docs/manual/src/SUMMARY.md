@@ -28,6 +28,7 @@
 
 - [Resultados e estatística](resultados.md)
 - [Fluxograma do processo](fluxograma.md)
+- [Estudo de tempos e métodos (homem-máquina)](tempos-e-metodos.md)
 - [Painel para gestores e engenheiros](painel.md)
 - [Ajuste de distribuições a partir de dados](ajuste-de-distribuicoes.md)
 - [Experimentos e otimização](experimentos-e-otimizacao.md)

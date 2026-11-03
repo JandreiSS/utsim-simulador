@@ -16,6 +16,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
 | `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
+| `utsim tempos` | estudo de tempos e métodos: ciclo homem-máquina, tempos por elemento, máquinas por operador, tempo padrão e comparação de métodos | [Estudo de tempos e métodos](tempos-e-metodos.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
@@ -46,6 +47,8 @@ utsim gemeo examples/gemeo/linha.ron --gravar gravacoes --painel 8080
 utsim gemeo reproduzir gravacoes/ --json relatorio.json
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
+utsim tempos examples/homem_maquina.ron --tolerancia 15 --html estudo.html
+utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron --csv elementos.csv
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
 utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
@@ -72,6 +75,8 @@ utsim corredores modelo.ron --svg planta.svg
 - `qualidade`: tem quatro subcomandos (`carta`, `capacidade`, `msa`, `arl`), cada um com o seu `--help`. Na `carta`, `--excluir` e `--revisar` são da fase I e `--limites` da fase II; `--regras` aceita `1`, `we`, `nelson` ou uma lista como `1,2,5`. Na `capacidade`, `--deslocamento` é o deslocamento somado ao Z no nível sigma (1,5 por convenção).
 - `estatistica`: tem sete subcomandos (`descritiva`, `teste-t`, `anova`, `qui-quadrado`, `proporcao`, `mann-whitney`, `wilcoxon`), cada um com o seu `--help`. `--coluna` e `--coluna2` aceitam o nome do cabeçalho ou o número da coluna; `--alternativa` é `diferente`, `menor` ou `maior`; no `teste-t`, Welch é o padrão e `--combinada` supõe variâncias iguais.
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
+
+- `tempos`: sem `--ator`, estuda cada operador que trabalhou em máquinas no intervalo; `--de` e `--ate` vão juntos (padrão: do fim do aquecimento ao fim da rodada); `--ciclo N` escolhe o ciclo desenhado (padrão: o mediano); `--ritmo` e `--tolerancia` são em %; `--custo-operador` e `--custo-maquina` vão juntos (por hora; `--unidade s|min|h` diz a unidade de tempo do modelo); `--comparar depois.ron` pareia os elementos dos dois métodos pelo nome. O resumo vai sempre para o terminal; `--html`, `--svg`, `--csv` e `--json` gravam os arquivos.
 
 ## Saída de `--help`
 
@@ -538,4 +543,49 @@ Options:
       --corridas <CORRIDAS>          Corridas simuladas [default: 10000]
       --semente <SEMENTE>            Semente dos números aleatórios [default: 1]
   -h, --help                         Print help
+```
+
+### `utsim tempos --help`
+
+```text
+Estudo de tempos e métodos (homem-máquina): ciclo, elementos, máquinas por operador, tempo padrão e comparação de métodos
+
+Usage: utsim tempos [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  Modelo (.ron)
+
+Options:
+      --ator <ATOR>
+          Operador (ou máquina) estudado; sem ele, todos os operadores que trabalham em máquinas
+      --replica <REPLICA>
+          Replicação gravada (a primeira é a 0) [default: 0]
+      --de <DE>
+          Início do intervalo analisado (padrão: fim do aquecimento)
+      --ate <ATE>
+          Fim do intervalo analisado (padrão: fim da rodada)
+      --ciclo <CICLO>
+          Ciclo desenhado, numerado a partir de 1 (padrão: o de duração mediana)
+      --ritmo <RITMO>
+          Ritmo (avaliação de desempenho) em %, 100 = normal [default: 100]
+      --tolerancia <TOLERANCIA>
+          Tolerâncias (pessoais, fadiga e esperas) em % do tempo normal; padrão: a `Allowance` do perfil do operador, se houver, senão 0
+      --custo-operador <CUSTO_OPERADOR>
+          Custo do operador por hora (com --custo-maquina, escolhe o número de máquinas)
+      --custo-maquina <CUSTO_MAQUINA>
+          Custo de uma máquina por hora
+      --unidade <UNIDADE>
+          Unidade de tempo do modelo: s, min ou h [default: s]
+      --comparar <COMPARAR>
+          Segundo modelo (o "depois", método novo) para comparar elemento a elemento
+      --html <HTML>
+          Grava o relatório completo (gráfico do ciclo, tabelas, comparação) em HTML
+      --svg <SVG>
+          Grava o gráfico homem-máquina do ciclo representativo (primeiro grupo) em SVG
+      --csv <CSV>
+          Grava a tabela de elementos em CSV (com --comparar, também <nome>-comparacao.csv)
+      --json <JSON>
+          Grava o estudo (e a comparação) em JSON
+  -h, --help
+          Print help
 ```

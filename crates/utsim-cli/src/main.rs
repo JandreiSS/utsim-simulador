@@ -18,6 +18,7 @@ mod prever;
 mod qualidade;
 mod rede;
 mod replay;
+mod tempos;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -398,6 +399,13 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Estudo de tempos e métodos (homem-máquina): ciclo de trabalho, tempos por elemento,
+    /// máquinas por operador, tempo padrão e comparação de métodos
+    #[command(disable_help_flag = true)]
+    Tempos {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Ajusta os campos de um modelo alimentados por dados reais e gera os relatórios
     Dados(dados::Args),
     /// PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
@@ -459,6 +467,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
         Cmd::Qualidade { args } => qualidade::run_args(args)?,
         Cmd::Estatistica { args } => estatistica::run_args(args)?,
+        Cmd::Tempos { args } => tempos::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,
