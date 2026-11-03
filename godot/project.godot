@@ -10,6 +10,13 @@ config/description="Interface 3D do UTSim: abre um modelo, simula e reproduz a c
 run/main_scene="res://cenas/principal.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icone.svg"
+; Abertura com a marca do UTSim (sem o logo do motor). A licença MIT do Godot só pede o
+; aviso de copyright em algum lugar acessível ao usuário: ver a tela "Sobre" (plano_godot.md).
+boot_splash/bg_color=Color(0.0862745, 0.196078, 0.309804, 1)
+boot_splash/show_image=true
+boot_splash/image="res://abertura.png"
+boot_splash/stretch_mode=0
+boot_splash/use_filter=true
 
 [autoload]
 
