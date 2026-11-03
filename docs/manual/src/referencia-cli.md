@@ -4,7 +4,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 
 | Comando | Para que serve | Capítulo |
 |---|---|---|
-| `utsim run` | roda um modelo e mostra as estatísticas | [Resultados](resultados.md) |
+| `utsim run` | roda um modelo e mostra as estatísticas (também a partir de um estado, e grava o estado num instante) | [Resultados](resultados.md), [Simular a partir de um estado](estado-inicial.md) |
 | `utsim check` | valida um modelo sem rodar | [Formato `.ron`](referencia-ron.md) |
 | `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little e gargalo móvel | [Resultados](resultados.md) |
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
@@ -24,6 +24,8 @@ O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso
 utsim check examples/mm1.ron
 utsim run examples/mm1.ron -n 20 --json resultado.json
 utsim run examples/mm1.ron --sample 100 --bins 20 --csv saida/
+utsim run examples/turnos.ron --estado examples/estados/turnos_21h30.ron
+utsim run examples/turnos.ron --salvar-estado 480 estado_14h.ron
 utsim analisar examples/mm1.ron --precisao 2% --little --confianca 90%
 utsim replay examples/mm1.ron --out replay.json
 utsim fit examples/dados/tempos_atendimento.csv --html relatorio.html
@@ -37,7 +39,7 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 
 ## Observações sobre as opções
 
-- `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução.
+- `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução. Com `--estado`, a rodada parte do estado do arquivo, sem aquecimento a menos que o estado tenha `warmup` ou que se use `--warmup`. `--salvar-estado T ARQUIVO` grava o estado da replicação 0 em `T` antes da rodada pedida.
 - `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
@@ -84,15 +86,17 @@ Arguments:
   <MODEL>  
 
 Options:
-  -n, --reps <REPS>      Número de replicações (sobrescreve run.replications)
-      --seed <SEED>      
-      --stop <STOP>      Tempo de parada (sobrescreve run.stop_time)
-      --warmup <WARMUP>  Tempo de aquecimento (sobrescreve run.warmup)
-      --json <JSON>      Grava os relatórios completos em JSON
-      --csv <CSV>        Grava resumo, replicações, séries e histogramas em CSV neste diretório
-      --sample <SAMPLE>  Intervalo de amostragem das séries temporais (sobrescreve run.sample_interval)
-      --bins <BINS>      Número de classes dos histogramas (sobrescreve run.histogram_bins)
-  -h, --help             Print help
+  -n, --reps <REPS>                  Número de replicações (sobrescreve run.replications)
+      --seed <SEED>                  
+      --stop <STOP>                  Tempo de parada (sobrescreve run.stop_time)
+      --warmup <WARMUP>              Tempo de aquecimento (sobrescreve run.warmup)
+      --json <JSON>                  Grava os relatórios completos em JSON
+      --csv <CSV>                    Grava resumo, replicações, séries e histogramas em CSV neste diretório
+      --sample <SAMPLE>              Intervalo de amostragem das séries temporais (sobrescreve run.sample_interval)
+      --bins <BINS>                  Número de classes dos histogramas (sobrescreve run.histogram_bins)
+      --estado <ARQUIVO>             Parte deste estado inicial (arquivo RON) em vez do sistema vazio
+      --salvar-estado <T> <ARQUIVO>  Grava o estado da replicação 0 no instante T neste arquivo, para encadear rodadas
+  -h, --help                         Print help
 ```
 
 ### `utsim check --help`
