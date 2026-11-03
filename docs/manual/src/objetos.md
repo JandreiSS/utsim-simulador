@@ -46,6 +46,8 @@ Os dois valores de `on_blocked`:
 - `Wait`: a fonte segura o item e para de gerar até ele sair. O próximo intervalo só começa quando o item sai. Para ter chegadas "puras", ponha uma fila logo depois da fonte.
 - `Drop`: o item é descartado e contado como perdido, e o relógio de chegadas continua. Serve para modelar clientes que vão embora quando a sala de espera está cheia.
 
+Na interface 3D, uma fonte mostra sempre as suas portas no Editar (as saídas também mostram a de entrada), tem sobre ela uma caixinha na cor que os seus itens recebem e, no rótulo, como cria os itens (`chegada · tabela`, `· sequência`, `· horário`, `· lote`) e, no Simular, quantos criou até o instante mostrado (`· 37 criados`).
+
 **Use** uma Source para cada fluxo de entrada independente (um tipo de peça, um cliente, um caminhão). Estados: `generating`, `blocked`, `idle` (quando chega a `max_arrivals`) e `off_shift` (fora do horário das chegadas por período, ou fora de turno).
 
 ### Chegadas por período (`schedule`)

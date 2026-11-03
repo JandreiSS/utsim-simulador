@@ -320,6 +320,17 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - Roteiro `g4_equipes.json` (tira e põe um membro, transporte, operadores, desfazer, Simular
   seguindo um membro) e o teste `team_lines_and_the_free_members_come_with_the_frame`.
 
+### Passo 5b, a fonte no 3D (C7), como foi feito
+
+- As fontes e as saídas mostram sempre as portas no Editar (`editor._port_blocks`).
+- Sobre cada fonte, uma caixinha na cor que os seus itens recebem (`preview_color` da cena
+  estática, `style::origin_color`).
+- No rótulo da fonte, o selo do modo (`tabela`, `sequência`, `horário`, `lote`) e, numa
+  rodada, os itens criados até o instante (dos eventos `Created` do replay). Teste
+  `a_source_label_says_how_it_creates_and_how_many`.
+- Ficaram para depois: o anel com as proporções dos tipos, o item preso na boca da porta com
+  `on_blocked: Wait` e os perdidos piscando, e os itens de um lote lado a lado.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do

@@ -549,6 +549,11 @@ impl UtsimPlayback {
             put(&mut e, "size", v3(size));
             put(&mut e, "shape", simple_shape(&v.kind));
             put(&mut e, "stack", v.stack);
+            if v.kind == "Source" {
+                // C7: the item a source creates, in the colour its items get.
+                let c = utsim_scene::style::origin_color(v.b);
+                put(&mut e, "preview_color", Color::from_rgb(c[0], c[1], c[2]));
+            }
             if let Some(l) = &v.look {
                 let a = AssetInfo::of(&l.source);
                 let mut asset = VarDictionary::new();

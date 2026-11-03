@@ -66,6 +66,39 @@ pub struct BlockView {
     pub size: [f32; 3],
     /// A queue with `discipline: Lifo` (a stack): labelled and drawn as one.
     pub stack: bool,
+    /// A source's arrival mode, for the badge of its label (`horário`, `tabela`,
+    /// `sequência`, `taxa`, with `lote` for batches); empty for the plain interval.
+    pub badge: String,
+}
+
+/// The badge of a source's label: how it creates items (`docs/plano_chegadas_e_equipes_3d.md`,
+/// C7).
+fn source_badge(model: Option<&Model>, name: &str) -> String {
+    let Some(obj) = model.and_then(|m| m.objects.iter().find(|o| o.name == name)) else {
+        return String::new();
+    };
+    let utsim_model::ObjectKind::Source {
+        schedule,
+        table,
+        batch,
+        ..
+    } = &obj.kind
+    else {
+        return String::new();
+    };
+    let mut parts = Vec::new();
+    if let Some(t) = table {
+        parts.push(match t.mode {
+            utsim_model::TableMode::Sequence => "sequência",
+            _ => "tabela",
+        });
+    } else if schedule.is_some() {
+        parts.push("horário");
+    }
+    if batch.is_some() {
+        parts.push("lote");
+    }
+    parts.join(", ")
 }
 
 /// Whether `name` is a queue with `discipline: Lifo` in `model`.
@@ -219,6 +252,8 @@ pub struct Playback {
     pub links: Vec<TeamLink>,
     /// Each dispatcher (index into [`Playback::blocks`]) and the members of its team.
     teams: Vec<(usize, Vec<usize>)>,
+    /// The instants each source created its items, by replay block (empty for others).
+    created: Vec<Vec<f64>>,
 }
 
 impl Playback {
@@ -271,9 +306,15 @@ impl Playback {
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
             let stack = kind == "Queue" && is_stack(model, &name);
+            let badge = if kind == "Source" {
+                source_badge(model, &name)
+            } else {
+                String::new()
+            };
             blocks.push(BlockView {
                 b,
                 stack,
+                badge,
                 name,
                 kind,
                 role,
@@ -309,6 +350,14 @@ impl Playback {
         let stations = (0..n)
             .filter(|&b| matches!(replay.blocks[b].kind.as_str(), "Processor" | "Combiner"))
             .collect();
+        let mut created = vec![Vec::new(); n];
+        for r in &replay.records {
+            if let utsim_core::TraceEvent::Created { block, .. } = r.event
+                && let Some(v) = created.get_mut(block)
+            {
+                v.push(r.t);
+            }
+        }
         let links = model.map_or_else(Vec::new, |m| {
             team_lines(m, |b| index_of.get(b).copied().flatten())
         });
@@ -333,6 +382,7 @@ impl Playback {
             model: model.cloned(),
             links,
             teams,
+            created,
         }
     }
 
@@ -534,11 +584,21 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
-            let shown = if v.stack {
+            let mut shown = if v.stack {
                 format!("{} · pilha", v.name)
             } else {
                 v.name.clone()
             };
+            if v.kind == "Source" {
+                // C7: the mode badge, and in a run the items created so far.
+                if !v.badge.is_empty() {
+                    shown.push_str(&format!(" · {}", v.badge));
+                }
+                let made = self.created[b].partition_point(|&c| c <= t);
+                if !self.created[b].is_empty() {
+                    shown.push_str(&format!(" · {made} criados"));
+                }
+            }
             // A queue drawn as a conveyor counts what does not fit on its belt.
             let hidden = v
                 .look
@@ -671,6 +731,36 @@ mod tests {
         let (model, path) = example(name);
         let replay = model.replay(0).expect("replay");
         Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    #[test]
+    fn a_source_label_says_how_it_creates_and_how_many() {
+        let pb = playback("chegadas_por_tabela.ron", false);
+        let (i, v) = pb
+            .blocks
+            .iter()
+            .enumerate()
+            .find(|(_, v)| v.kind == "Source" && !v.badge.is_empty())
+            .expect("a source with a table");
+        assert!(
+            v.badge.contains("tabela") || v.badge.contains("sequência"),
+            "{}",
+            v.badge
+        );
+        let first = pb.frame(0.0).label[i].clone();
+        let last = pb.frame(pb.end()).label[i].clone();
+        assert!(first.contains(&v.badge), "{first}");
+        assert!(last.contains(" criados"), "{last}");
+        let count = |l: &str| {
+            l.split(" · ")
+                .find_map(|p| p.strip_suffix(" criados")?.parse::<usize>().ok())
+                .unwrap_or(0)
+        };
+        assert!(count(&last) > count(&first), "{first} / {last}");
+        // A plain source has no badge.
+        let plain = playback("mm1.ron", false);
+        let s = plain.blocks.iter().find(|v| v.kind == "Source").unwrap();
+        assert!(s.badge.is_empty());
     }
 
     #[test]

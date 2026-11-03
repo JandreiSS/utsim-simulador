@@ -372,6 +372,12 @@ func _port_blocks() -> Array:
 	var out := selected.duplicate()
 	if _hover != "" and not out.has(_hover):
 		out.append(_hover)
+	# C7: sources and sinks always show their ports in Editar.
+	var c := cena()
+	if c != null:
+		for b in c.blocks:
+			if String(b["kind"]) in ["Source", "Sink"] and not out.has(b["name"]):
+				out.append(b["name"])
 	return out
 
 

@@ -183,6 +183,20 @@ func build(pb: Object, keep_templates := false) -> void:
 			top = minf(top, 2.2)
 		label.position = Vector3(0, top + 0.3, 0)
 		root.add_child(label)
+		if b.has("preview_color"):
+			# C7: a small item of the colour the source's items get, over it.
+			var item := MeshInstance3D.new()
+			item.name = "PreviaItem"
+			var box := BoxMesh.new()
+			box.size = Vector3.ONE * 0.22
+			item.mesh = box
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color("b8875a").lerp(b["preview_color"], 0.55)
+			item.material_override = m
+			item.position = Vector3(0, top + 0.12, 0)
+			item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(item)
+			rig["preview"] = item
 		rig["label"] = label
 		rig["top"] = top
 		rigs.append(rig)
