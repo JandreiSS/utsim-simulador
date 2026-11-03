@@ -42,6 +42,7 @@ trap 'rm -rf "$PASTA"' EXIT
 bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release target/godot-export/windows
 
 mkdir -p "$SAIDA"
+SAIDA_ABS=$(cd "$SAIDA" && pwd)
 ARQUIVO="utsim-v${ROTULO}-windows-x64-instalador.exe"
 
 # O makensis do Windows entende caminhos do Windows, não os do Git Bash.
@@ -51,7 +52,7 @@ MSYS2_ARG_CONV_EXCL='*' "$MAKENSIS" -V2 \
     "-DVERSAO=$VERSAO" \
     "-DORIGEM=$(nativo "$PASTA/utsim")" \
     "-DICONE=$(nativo "$PWD/assets/icone/utsim.ico")" \
-    "-DSAIDA=$(nativo "$PWD/$SAIDA/$ARQUIVO")" \
+    "-DSAIDA=$(nativo "$SAIDA_ABS/$ARQUIVO")" \
     "$(nativo "$PWD/empacotamento/windows/utsim.nsi")"
 
 echo "Instalador gerado: $SAIDA/$ARQUIVO"
