@@ -128,6 +128,7 @@ O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 | `team` | obrigatório | nomes dos transportadores da equipe (não pode ser vazia) |
 | `rule` | `FirstAvailable` | como escolher entre membros livres |
 | `pick` | `Priority` | qual serviço da fila um membro que fica livre pega |
+| `preempt` | `Never` | se um pedido mais urgente pode tirar o serviço de um membro que vai vazio buscá-lo |
 
 As regras:
 
@@ -146,7 +147,16 @@ Se todos estão ocupados, o serviço espera na fila do despachante, por priorida
 
 ```ron
 (name: "frota", kind: Dispatcher(team: ["emp1", "emp2", "emp3"], rule: LeastBusy, pick: Nearest))
-``` Um transportador só pode estar na equipe de um despachante.
+```
+
+### Preempção (`preempt`)
+
+Com `preempt: Empty`, quando chega um pedido e nenhum membro está livre, o despachante procura um membro ocupado cujo serviço tenha prioridade **menor** que a do pedido da frente da fila (o de menor prioridade; empate: o primeiro da equipe) e pede que ele desista:
+
+- se o membro está **indo vazio** buscar o item ou indo até a máquina (ainda sem nada carregado e sem ter chegado), ele para onde está, devolve o serviço e atende o pedido urgente saindo desse ponto. O serviço devolvido volta para a frente da fila, entre os da sua prioridade, e é feito depois;
+- se já está carregando, levando o item, descarregando ou trabalhando na máquina, ele **recusa** e o despachante pergunta ao próximo candidato. Um item carregado nunca é largado no caminho.
+
+A volta para casa (`home: true`) já era interrompida por qualquer pedido novo, com ou sem `preempt`. Com `preempt: Empty` o despachante ganha a métrica `preemptions.count` (membros que devolveram o serviço). Sem o campo (`Never`) tudo funciona como antes. A preempção de um trabalho em andamento na máquina, com retomada depois, não existe ainda. Um transportador só pode estar na equipe de um despachante.
 
 ## Rede de caminhos
 
