@@ -9,6 +9,7 @@
 //! `total = 0`, which the interface shows as "running". Cancelling stops at the next
 //! replication; the outcome is then the error [`CANCELLED`].
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -16,12 +17,14 @@ use std::thread::JoinHandle;
 use serde_json::Value;
 use utsim_core::{RunReport, TraceRecord};
 use utsim_model::analysis::{self, WarmupSeries};
+use utsim_model::dados::DataInput;
 use utsim_model::experiment::{Scenario, run_scenarios};
 use utsim_model::{Model, ModelError};
 use utsim_opt::OptProblem;
 use utsim_stats::DEFAULT_LEVEL;
 use utsim_stats::little::DEFAULT_TOLERANCE;
 
+use crate::dados::{self, FitCache};
 use crate::pert_view::{self, PertOutput, PertRequest};
 use crate::results::{self, RunOutput};
 
@@ -58,6 +61,18 @@ pub enum Task {
         model: Model,
         request: PertRequest,
     },
+    /// The automatic fit of the real data of one field (the view the panel draws).
+    DataFit {
+        input: Box<DataInput>,
+        base: Option<PathBuf>,
+        cache: FitCache,
+    },
+    /// The HTML reports of the real data of a model, written into `dir`.
+    DataReport {
+        model: Box<Model>,
+        base: Option<PathBuf>,
+        dir: PathBuf,
+    },
 }
 
 impl Task {
@@ -71,6 +86,8 @@ impl Task {
             Task::Little(_) => "Conferindo a lei de Little",
             Task::ShiftingBottleneck(_) => "Procurando o gargalo móvel",
             Task::Pert { .. } => "Calculando o PERT/CPM",
+            Task::DataFit { .. } => "Ajustando a distribuição aos dados",
+            Task::DataReport { .. } => "Gravando o relatório dos dados",
         }
     }
 
@@ -89,7 +106,7 @@ impl Task {
                 WarmupSeries::Wip => model.run.replications as usize,
                 WarmupSeries::Measure { .. } => 0,
             },
-            Task::Pert { .. } => 0,
+            Task::Pert { .. } | Task::DataFit { .. } | Task::DataReport { .. } => 0,
         }
     }
 }
@@ -392,6 +409,13 @@ fn execute(task: Task, p: &Progress) -> Result<Outcome, String> {
         Task::Pert { model, request } => {
             let out = pert_view::run(&model, &request)?;
             Ok(Outcome::Pert(Box::new(out)))
+        }
+        Task::DataFit { input, base, cache } => {
+            let fit = dados::fit_cached(&input, base.as_deref(), &cache)?;
+            Ok(Outcome::Data(fit.view.clone()))
+        }
+        Task::DataReport { model, base, dir } => {
+            dados::write_report(&model, base.as_deref(), &dir).map(Outcome::Data)
         }
     }
 }

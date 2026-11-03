@@ -14,7 +14,7 @@ use std::path::Path;
 
 use utsim_core::RunReport;
 use utsim_edit::arrange::{self, Align, Axis, Clipboard};
-use utsim_edit::{Command, Document, Issue, PaletteEntry};
+use utsim_edit::{Command, Document, FieldSource, Issue, PaletteEntry};
 use utsim_model::replay::{Replay, ReplayBlock, kind_name};
 use utsim_model::{Model, VisualDef, is_mobile};
 
@@ -461,7 +461,20 @@ impl Editor {
         value: &Value,
         others: &[String],
     ) -> Result<(), String> {
-        let command = schema::edit(self.model(), object, path, value)?;
+        let mut command = schema::edit(self.model(), object, path, value)?;
+        // Editing (or switching off) a field fed by real data takes it back to a plain
+        // distribution first, in the same undo step.
+        if let Some(field) = self.data_field_of(object, path) {
+            let current = utsim_model::dados::get_dist(self.model(), &field)?
+                .ok_or_else(|| format!("'{field}' não tem distribuição"))?;
+            command = Command::Batch(vec![
+                Command::SetFieldSource {
+                    field,
+                    source: FieldSource::Dist(current),
+                },
+                command,
+            ]);
+        }
         let mut all = vec![object.to_string()];
         all.extend(others.iter().cloned());
         let command = if others.is_empty() || path == "name" || path.starts_with("position.") {
@@ -475,6 +488,21 @@ impl Editor {
             .starts_with("visual.")
             .then(|| format!("aparencia:{}", all.join(",")));
         self.doc.apply_coalescing(command, key.as_deref())
+    }
+
+    /// The key of the data entry that feeds the distribution `path` of `object` belongs
+    /// to (`path` may be the field itself, `process.family`, `setup.on`...).
+    fn data_field_of(&self, object: &str, path: &str) -> Option<String> {
+        self.model()
+            .data
+            .iter()
+            .map(|i| i.field.as_str())
+            .find(|f| {
+                f.strip_prefix(object)
+                    .and_then(|r| r.strip_prefix('.'))
+                    .is_some_and(|field| path == field || path.starts_with(&format!("{field}.")))
+            })
+            .map(str::to_string)
     }
 
     pub fn objects(&self) -> Vec<ObjectRow> {

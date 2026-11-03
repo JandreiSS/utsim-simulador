@@ -12,7 +12,10 @@ use std::path::PathBuf;
 
 use godot::prelude::*;
 
+use crate::dados::{self, FitCache};
 use crate::document::{self, Editor, Properties, edit_replay, look_model, palette_model};
+use crate::jobs::Task;
+use crate::jobs_class::{UtsimJob, job_object, variant_of_json};
 use crate::network_edit;
 use crate::playback::Playback;
 use crate::schema::{self, Field, Value};
@@ -162,10 +165,59 @@ fn playback_object(core: Playback) -> Gd<UtsimPlayback> {
 pub struct UtsimDocument {
     editor: Editor,
     last_error: String,
+    fits: FitCache,
     base: Base<RefCounted>,
 }
 
+/// A Godot value as JSON (dictionaries of numbers, text, booleans and lists).
+fn json_of(v: &Variant) -> serde_json::Value {
+    use serde_json::Value as J;
+    match v.get_type() {
+        VariantType::BOOL => J::Bool(v.to::<bool>()),
+        VariantType::INT => J::from(v.to::<i64>()),
+        VariantType::FLOAT => J::from(v.to::<f64>()),
+        VariantType::STRING | VariantType::STRING_NAME => J::String(v.to::<GString>().to_string()),
+        VariantType::PACKED_FLOAT64_ARRAY => {
+            J::from(v.to::<PackedFloat64Array>().as_slice().to_vec())
+        }
+        VariantType::ARRAY => J::Array(
+            v.to::<VarArray>()
+                .iter_shared()
+                .map(|x| json_of(&x))
+                .collect(),
+        ),
+        VariantType::DICTIONARY => J::Object(
+            v.to::<VarDictionary>()
+                .iter_shared()
+                .map(|(k, x)| (k.stringify().to_string(), json_of(&x)))
+                .collect(),
+        ),
+        _ => J::Null,
+    }
+}
+
 impl UtsimDocument {
+    fn data_list(&self) -> Vec<serde_json::Value> {
+        dados::data_fields(self.editor.model(), self.base_dir().as_deref(), &self.fits)
+    }
+
+    fn base_dir(&self) -> Option<PathBuf> {
+        self.editor
+            .doc
+            .path()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+    }
+
+    /// A path from the panel: absolute, or relative to the model's folder.
+    fn data_path(&self, path: &str) -> PathBuf {
+        let p = PathBuf::from(path);
+        match self.base_dir() {
+            Some(b) if p.is_relative() => b.join(p),
+            _ => p,
+        }
+    }
+
     /// Records the outcome of an edit: `true` when it went through.
     fn done(&mut self, r: Result<(), String>) -> bool {
         match r {
@@ -657,7 +709,167 @@ impl UtsimDocument {
     /// `{name, kind, kind_label, fields, problems, warnings, outputs, inputs}`.
     #[func]
     fn properties(&self, object: GString) -> VarDictionary {
-        properties_dict(&self.editor.properties(&object.to_string()))
+        let name = object.to_string();
+        let mut d = properties_dict(&self.editor.properties(&name));
+        // `data`: the distribution fields of the object by path (`process`,
+        // `downtime.mtbf`...), each `{field, source: "dist" | "dados", ...}`.
+        let mut data = VarDictionary::new();
+        let prefix = format!("{name}.");
+        for f in self.data_list() {
+            let key = f["field"].as_str().unwrap_or_default().to_string();
+            if let Some(path) = key.strip_prefix(&prefix) {
+                data.set(&GString::from(path).to_variant(), &variant_of_json(&f));
+            }
+        }
+        put(&mut d, "data", data);
+        d
+    }
+
+    /// Every distribution field of the model: `{field, source: "dist" | "dados"}`; with
+    /// data also `{config, label, status, stale, changed_on_load, error, family, dist, n,
+    /// hash, view}` (`view` is the cached fit, `null` until it ran).
+    #[func]
+    fn data_fields(&self) -> VarArray {
+        let mut out = VarArray::new();
+        for f in self.data_list() {
+            out.push(&variant_of_json(&f));
+        }
+        out
+    }
+
+    /// The entry of `field` (`"processo.process"`) as `data_fields` lists it, or `{}`.
+    #[func]
+    fn data_entry(&self, field: GString) -> Variant {
+        let f = field.to_string();
+        self.data_list()
+            .into_iter()
+            .find(|v| v["field"] == f.as_str() && v["source"] == "dados")
+            .map_or_else(
+                || VarDictionary::new().to_variant(),
+                |v| variant_of_json(&v),
+            )
+    }
+
+    /// Names of the families a field can be fixed to ("Gama", "Lognormal"...).
+    #[func]
+    fn data_families() -> PackedStringArray {
+        let names: Vec<String> = utsim_fit::auto::family_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        strings(&names)
+    }
+
+    /// Columns of a data file: `{ok, columns, error}`.
+    #[func]
+    fn data_columns(&self, path: GString) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        match dados::columns_of(&self.data_path(&path.to_string())) {
+            Ok(c) => {
+                put(&mut d, "ok", true);
+                put(&mut d, "columns", strings(&c));
+                put(&mut d, "error", GString::new());
+            }
+            Err(e) => {
+                put(&mut d, "ok", false);
+                put(&mut d, "columns", PackedStringArray::new());
+                put(&mut d, "error", GString::from(e.as_str()));
+            }
+        }
+        d
+    }
+
+    /// Numbers pasted as text: `{ok, values, error}`.
+    #[func]
+    fn data_parse_values(text: GString) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        match dados::parse_values(&text.to_string()) {
+            Ok(v) => {
+                put(&mut d, "ok", true);
+                put(&mut d, "values", PackedFloat64Array::from(v.as_slice()));
+                put(&mut d, "error", GString::new());
+            }
+            Err(e) => {
+                put(&mut d, "ok", false);
+                put(&mut d, "values", PackedFloat64Array::new());
+                put(&mut d, "error", GString::from(e.as_str()));
+            }
+        }
+        d
+    }
+
+    /// `path` relative to the model's folder when it is inside it.
+    #[func]
+    fn data_relative(&self, path: GString) -> GString {
+        let base = self.base_dir();
+        GString::from(dados::relative_to(base.as_deref(), &path.to_string()).as_str())
+    }
+
+    /// Starts the automatic fit of `config` for `field` on a thread (`UtsimJob` of kind
+    /// `ajuste`; its `data()` is the view the panel draws). `config`: `{source, column,
+    /// timestamps, values, choose, criterion}`. `null` on a bad config (`last_error`).
+    #[func]
+    fn data_fit(&mut self, field: GString, config: VarDictionary) -> Option<Gd<UtsimJob>> {
+        let field = field.to_string();
+        match dados::input_from_config(&field, &json_of(&config.to_variant())) {
+            Ok(input) => Some(job_object(Task::DataFit {
+                input: Box::new(input),
+                base: self.base_dir(),
+                cache: self.fits.clone(),
+            })),
+            Err(e) => {
+                self.last_error = e;
+                None
+            }
+        }
+    }
+
+    /// Makes `field` fed by the data of `config` (one undo step). The fit is the one
+    /// `data_fit` already made when there is one; otherwise it runs here.
+    #[func]
+    fn data_apply(&mut self, field: GString, config: VarDictionary) -> bool {
+        let field = field.to_string();
+        let r = dados::input_from_config(&field, &json_of(&config.to_variant()))
+            .and_then(|i| dados::seeded(&i, self.base_dir().as_deref(), &self.fits))
+            .and_then(|input| {
+                self.editor.apply(utsim_edit::Command::SetFieldSource {
+                    field: field.clone(),
+                    source: utsim_edit::FieldSource::Data(Box::new(input)),
+                })
+            });
+        self.done(r)
+    }
+
+    /// Takes `field` back to a plain distribution, keeping the one it has now (one undo
+    /// step).
+    #[func]
+    fn data_to_dist(&mut self, field: GString) -> bool {
+        let field = field.to_string();
+        let r = utsim_model::dados::get_dist(self.editor.model(), &field)
+            .and_then(|d| d.ok_or_else(|| format!("'{field}' não tem distribuição")))
+            .and_then(|dist| {
+                self.editor.apply(utsim_edit::Command::SetFieldSource {
+                    field: field.clone(),
+                    source: utsim_edit::FieldSource::Dist(dist),
+                })
+            });
+        self.done(r)
+    }
+
+    /// Starts writing the reports of all the fields with data (`index.html`, one HTML and
+    /// one CSV per field) into `dir` on a thread (`UtsimJob` of kind `relatorio_dados`;
+    /// `data()` is `{index, files, failed}`). `null` when no field uses data.
+    #[func]
+    fn data_report(&mut self, dir: GString) -> Option<Gd<UtsimJob>> {
+        if self.editor.model().data.is_empty() {
+            self.last_error = "nenhum campo do modelo usa dados reais".into();
+            return None;
+        }
+        Some(job_object(Task::DataReport {
+            model: Box::new(self.editor.model().clone()),
+            base: self.base_dir(),
+            dir: PathBuf::from(dir.to_string()),
+        }))
     }
 
     /// The model as it is now, ready to run (`UtsimModel.run` and `playback`). It is not

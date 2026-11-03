@@ -52,6 +52,8 @@ pub(crate) fn job_object(task: Task) -> Gd<UtsimJob> {
         Task::Little(_) => "little",
         Task::ShiftingBottleneck(_) => "gargalo_movel",
         Task::Pert { .. } => "pert",
+        Task::DataFit { .. } => "ajuste",
+        Task::DataReport { .. } => "relatorio_dados",
     };
     let job = Job::start(task);
     Gd::from_init_fn(|base| UtsimJob {
