@@ -105,6 +105,7 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 |---|---|
 | Modo sala de aula: exercícios com enunciado, dados e gabarito; correção automática do modelo do aluno pelas métricas, com tolerância | Opus (projeto) e Sonnet (interface) |
 | Pacotes de exercícios a partir dos estudos de caso e dos tutoriais | Sonnet |
+| **Jogo de resolução de problemas da indústria pela simulação** (ideia do dono, 2026-11-03, marcada como muito importante): o aluno resolve problemas reais com o que o núcleo simula, sem precisar usar o simulador no começo; trilha do básico da engenharia de produção (gargalo, filas, balanceamento, arranjo físico, capacidade, tempos e métodos) a problemas complexos, terminando num caso que exige Lean Seis Sigma (DMAIC no app UTSim Seis Sigma). Antes do plano, perguntar ao dono o formato (app próprio no launcher ou modo dentro do UTSim). Reaproveita o modo de ensino do Seis Sigma (L8), as linhas especializadas, o estudo de tempos e o modo sala de aula | Opus (projeto) e Sonnet |
 
 ## Qualidade e distribuição
 
