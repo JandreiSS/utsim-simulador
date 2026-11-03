@@ -445,6 +445,17 @@ empilhadeira só anda com um operador de uma equipe, que vai até ela, embarca e
 
 ## 4. Nenhum objeto passa por dentro de outro; recursos desviam
 
+**Situação (2026-11-03):** a parte (a) está pronta no núcleo: crate `utsim-nav` (áreas ocupadas
+pelos tipos e tamanhos, obstáculos da planta e do modelo, folga por papel, grade + A\* com
+suavização, pontos de acesso padrão por tipo e `access` no objeto, geração de rede com impressão
+digital dos obstáculos em `NetworkDef.generated`), `utsim rede gerar` e os avisos de trecho sobre
+obstáculo, ponto de acesso inalcançável e recurso sem caminho. Desvios do texto abaixo: grade +
+A\* em vez do grafo de visibilidade (cresce com a área, não com os vértices; ver
+`docs/arquitetura.md`); um ponto de acesso por objeto (`access: (x, y)`, sem papel `Pick`/`Drop`
+nem vão sorteado do `Rack`), padrão no lado `-y` para todos os tipos; os pontos de acesso valem
+nos modos `Free` e `Network` (seção 7) em vez de `run.access_points`. Pendentes: a parte (b) e a
+interface no Godot.
+
 ### Objetivo
 Os recursos móveis contornam máquinas, porta-paletes e paredes, encostam no ponto certo de
 cada objeto e, quando dois disputam o mesmo espaço, a disputa é resolvida pela simulação de
@@ -587,6 +598,8 @@ DXF 2D com blocos aninhados, unidades, calibração, simplificação, papéis po
 paredes e colunas, SVG e arrays para a interface). Pendentes: encaixe nas linhas (extremidades,
 pontos médios, interseções) com índice espacial, contorno de HATCH, o campo `floor_plan` no modelo
 (proposta em `docs/arquitetura.md`), a planta por imagem com escala e o diálogo no Godot.
+**Atualização (2026-11-03):** `floor_plan` (registro, `Option<Box<FloorPlanDef>>`) e `obstacles`
+estão no modelo; `utsim planta arquivo.dxf --obstaculos modelo.ron` grava as paredes e colunas.
 
 ### Objetivo
 Carregar a planta da fábrica, colocá-la no piso na escala certa e posicionar os objetos sobre
@@ -873,6 +886,17 @@ crossings: [ (at: "corredor_A x passeio_1", rule: PedestrianPriority, stop: 2.0)
 ---
 
 ## 7. Modos de movimentação dos recursos
+
+**Situação (2026-11-03):** formato 2 com a migração `(1, v1_to_v2)` pronto; `Legacy`, `Free` e
+`Network` funcionam, com roteador por recurso (`Transporter::router`, montados uma vez por folga
+em `Model::nav_set` e compartilhados pelas replicações) e `utsim check` listando o modo de cada
+recurso. Desvios: a migração só grava `movement: Legacy` quando o modelo tem transportadores
+(sem eles o modo não significa nada, e o modelo migrado fica igual ao novo); `Aisles` existe no
+formato, mas a validação o recusa até os corredores (seção 6); AGVs com rede seguem o `Traffic`
+em qualquer modo; o roteador é por folga, não por classe (a classe vem da seção 6); o cache é por
+par exato origem-destino (bits das coordenadas, sem quantização em milímetros, para não depender
+da ordem das consultas). Pendentes: `TransferPath::Free`, convivência com corredores e a
+interface no Godot.
 
 Os corredores não são a única forma de deslocamento. Cada recurso móvel tem um modo de
 movimentação, com um padrão no modelo e sobrescrita por recurso.
@@ -1201,10 +1225,10 @@ Contexto: G2 (edição) e G5 (empacotamento) em andamento; G3 (rede, fluidos, re
      gargalo móvel (item 6 da seção 2).
    - `utsim-pert` (derivação, CPM, PERT, Monte Carlo) e `utsim pert` com HTML; dá valor imediato
      pela linha de comando e pelo relatório.
-2. **Formato 2 cedo.** A migração (seção 7, `movement: Legacy`) é pequena, mas toca todos os
+2. [x] **Formato 2 cedo.** A migração (seção 7, `movement: Legacy`) é pequena, mas toca todos os
    modelos e exemplos; fazê-la antes de qualquer recurso que mude tempos evita duas migrações e
    deixa os golden conferidos uma vez só. Combinar com a G2, que já grava modelos pelo Godot.
-3. **Ainda no núcleo:** `utsim-cad` (leitura, camadas, calibração, obstáculos) e `utsim-nav`
+3. [x] **Ainda no núcleo:** `utsim-cad` (leitura, camadas, calibração, obstáculos) e `utsim-nav`
    (obstáculos inflados, visibilidade, A\*), com os avisos de cruzamento de objeto, e o modo
    livre com roteador por recurso (seção 7). Independem da interface e destravam 4, 5, 6 e 7.
 4. **Motorista visual** (recurso 3, parte visual): pequeno, depende só da ponte da G1; pode

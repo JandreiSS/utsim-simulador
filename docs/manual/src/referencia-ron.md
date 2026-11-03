@@ -19,7 +19,7 @@ Os modelos são arquivos de texto em [RON](https://github.com/ron-rs/ron) (*Rust
 
 ```ron
 Model(
-    format: 1,
+    format: 2,
     name: "Meu modelo",
     description: "Texto livre",
     run: (stop_time: 1000.0),
@@ -30,12 +30,14 @@ Model(
     flows: [ ... ],
     fluids: Some((...)),
     spans: [ ... ],
+    obstacles: [ ... ],
+    floor_plan: Some((...)),
 )
 ```
 
 | Campo | Padrão | Significado |
 |---|---|---|
-| `format` | `1` | versão do formato do arquivo. Versão mais nova que a do programa é recusada |
+| `format` | `1` | versão do formato do arquivo (a atual é `2`). Ausente vale 1: o arquivo passa pela migração, que grava `movement: Legacy` quando há recursos móveis. Versão mais nova que a do programa é recusada |
 | `name` | obrigatório | nome do modelo |
 | `description` | `""` | descrição |
 | `run` | obrigatório | configurações da rodada |
@@ -46,6 +48,8 @@ Model(
 | `flows` | `[]` | fluxos de tokens |
 | `fluids` | nenhuma | rede de fluidos |
 | `spans` | `[]` | tempo entre dois pontos do fluxo: `(name, from, to)`. Veja [Resultados](resultados.md) |
+| `obstacles` | `[]` | polígonos que os recursos não atravessam nos modos `Free` e `Network`: `(name, polygon: [(x, y), ...])`, ao menos 3 pontos, nomes únicos. Veja [Movimentação e obstáculos](movimentacao.md) |
+| `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
 
 ## `run`
 
@@ -59,6 +63,7 @@ Model(
 | `histogram_bins` | nenhum | número de classes dos histogramas; pelo menos 1 |
 | `default_decision` | nenhuma | opção usada quando o modelo pede uma decisão externa e não há agente |
 | `transfer` | nenhuma | tempo de viagem padrão das ligações diretas (veja `transfer`) |
+| `movement` | `Free` | modo de movimentação dos recursos móveis: `Free`, `Network`, `Legacy` (`Aisles` ainda não). `Network` exige `network` |
 
 ## Objeto
 
@@ -78,6 +83,7 @@ Model(
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |
 | `on_entry` | nenhum | script executado na entrada de cada item |
 | `visual` | nenhuma | aparência no 3D |
+| `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
 
 ### `transfer`
 
@@ -179,6 +185,8 @@ Sem campos. Escreva `kind: Sink`.
 | `unload_time` | `Const(0.0)` |
 | `home` | `false` |
 | `agv` | `false` |
+| `movement` | o de `run` |
+| `clearance` | pelo papel: pessoa 0,6, empilhadeira 0,9, outros 0,8 (finita, maior ou igual a 0) |
 
 ### `Dispatcher`
 
@@ -227,6 +235,7 @@ network: Some((
 | `edges[].from`, `edges[].to` | obrigatórios, nós existentes |
 | `edges[].two_way` | `true` |
 | `edges[].capacity` | ilimitada |
+| `generated` | nenhum | só na rede gerada por `utsim rede gerar`: `(fingerprint: "fnv1a64:...", clearance: 0.9)` |
 
 A rede precisa permitir ir de qualquer nó a qualquer outro.
 

@@ -22,13 +22,21 @@ Cada camada tem um papel: `fundo`, `parede`, `coluna`, `porta` ou `ignorar`. O p
 ```text
 utsim planta arquivo.dxf [--camadas] [--svg saida.svg] [--calibrar x1,y1,x2,y2,distancia]
                          [--origem x,y] [--unidades mm|cm|dm|m|km|pol|pe]
+                         [--obstaculos modelo.ron]
 ```
 
 - sem opções: mostra o hash do arquivo, a unidade, a caixa envolvente (em metros) e o número de camadas e segmentos;
 - `--camadas`: tabela com entidades, segmentos, rótulos e o papel sugerido de cada camada;
 - `--svg`: grava a planta em SVG (as camadas ignoradas não aparecem), para conferir a leitura num navegador;
 - `--calibrar`: lê o desenho sem converter unidades e aplica a escala;
-- `--origem`: desloca a planta para que o ponto dado vire (0, 0).
+- `--origem`: desloca a planta para que o ponto dado vire (0, 0);
+- `--obstaculos modelo.ron`: grava as paredes e colunas (com a calibração e a origem dadas)
+  como `obstacles` do modelo, com os nomes `planta_1`, `planta_2`... (os da importação anterior
+  saem; os desenhados à mão ficam), e registra a planta em `floor_plan` (arquivo, hash,
+  transformação, calibração e papéis das camadas). A simulação não lê o DXF: os obstáculos ficam
+  no `.ron`. Os recursos nos modos livre e pela rede desviam deles (veja
+  [Movimentação e obstáculos](movimentacao.md)); se o modelo tiver uma rede gerada, gere-a de
+  novo com `utsim rede gerar`.
 
 ## Limites conhecidos
 

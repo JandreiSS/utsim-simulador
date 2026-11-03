@@ -7,6 +7,8 @@ Há dois objetos:
 - `Transporter`: um operador, uma empilhadeira ou um AGV;
 - `Dispatcher`: o despachante, que reparte o serviço entre os membros de uma equipe de transportadores.
 
+Por onde eles andam (caminho livre desviando dos objetos e das paredes, rede de caminhos ou o modo legado do formato 1) e onde param em cada objeto está em [Movimentação e obstáculos](movimentacao.md).
+
 ## Transporter (Transportador)
 
 ```ron
@@ -27,6 +29,8 @@ Há dois objetos:
 | `unload_time` | `Const(0.0)` | tempo para descarregar cada item |
 | `home` | `false` | se `true`, quando ocioso e sem serviço, volta para a posição do próprio objeto |
 | `agv` | `false` | se `true`, segue a rede de caminhos aresta por aresta, com controle de tráfego |
+| `movement` | o de `run` | modo de movimentação deste recurso: `Free`, `Network`, `Legacy` (veja [Movimentação e obstáculos](movimentacao.md)) |
+| `clearance` | pelo papel | distância mínima (m) aos obstáculos nos modos `Free` e `Network`: pessoa 0,6, empilhadeira 0,9, outros 0,8 |
 
 A **posição** do transportador (campo `position` do objeto) é onde ele começa e, com `home: true`, para onde volta.
 
@@ -114,7 +118,7 @@ Se todos estão ocupados, o serviço espera na fila do despachante, por priorida
 
 ## Rede de caminhos
 
-Sem rede, os veículos andam em **linha reta** entre os pontos. Com `network`, seguem os corredores:
+No modo `Legacy` (o dos modelos do formato 1), sem rede os veículos andam em **linha reta** entre os pontos e, com `network`, seguem os corredores como descrito abaixo. No modo `Network`, a rede é a mesma, mas a ligação até ela e o ponto de parada seguem o caminho livre (veja [Movimentação e obstáculos](movimentacao.md)). A rede pode ser desenhada ou gerada com `utsim rede gerar`:
 
 ```ron
 network: Some((

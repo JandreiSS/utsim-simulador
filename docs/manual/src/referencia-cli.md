@@ -5,7 +5,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | Comando | Para que serve | Capítulo |
 |---|---|---|
 | `utsim run` | roda um modelo e mostra as estatísticas (também a partir de um estado, e grava o estado num instante) | [Resultados](resultados.md), [Simular a partir de um estado](estado-inicial.md) |
-| `utsim check` | valida um modelo sem rodar | [Formato `.ron`](referencia-ron.md) |
+| `utsim check` | valida um modelo sem rodar e mostra o modo de movimentação de cada recurso | [Formato `.ron`](referencia-ron.md), [Movimentação](movimentacao.md) |
 | `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little e gargalo móvel | [Resultados](resultados.md) |
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
 | `utsim cena` | grava a cena 3D para outros motores | [3D realista](visual-3d.md) |
@@ -16,7 +16,8 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
-| `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
+| `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) e grava paredes e colunas como obstáculos do modelo | [Planta CAD](planta-cad.md) |
+| `utsim rede gerar` | gera a rede de caminhos pelo caminho livre, desviando dos obstáculos, e grava no modelo | [Movimentação e obstáculos](movimentacao.md) |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
 
@@ -38,6 +39,8 @@ utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
+utsim planta galpao.dxf --obstaculos modelo.ron
+utsim rede gerar modelo.ron --usar
 ```
 
 ## Observações sobre as opções
@@ -46,6 +49,8 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 - `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
+- `check`: depois de `ok`, uma linha `movimentação: recurso: modo (papel, folga)` por recurso móvel.
+- `rede gerar`: sobrescreve o modelo (ou grava em `--saida`), mantendo os comentários do topo; `--folga` troca a folga (padrão: a maior entre os recursos); `--usar` grava `movement: Network` em `run`; uma rede desenhada à mão só é trocada com `--substituir`.
 - `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
   para ele e `--sorteios` só para `montecarlo`.
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
@@ -115,6 +120,24 @@ Arguments:
 
 Options:
   -h, --help  Print help
+```
+
+### `utsim rede gerar --help`
+
+```text
+Gera a rede de caminhos pelo caminho livre (desviando dos obstáculos) e grava no modelo
+
+Usage: utsim rede gerar [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>
+
+Options:
+      --saida <SAIDA>  Grava neste arquivo em vez de sobrescrever o modelo
+      --folga <FOLGA>  Folga em metros (padrão: a maior entre os recursos móveis)
+      --usar           Também muda `run.movement` para Network (os recursos passam a usar a rede)
+      --substituir     Substitui uma rede desenhada à mão (sem isso, só uma rede gerada é trocada)
+  -h, --help           Print help
 ```
 
 ### `utsim analisar --help`
