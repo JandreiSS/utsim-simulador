@@ -36,6 +36,10 @@
 - [Qualidade: cartas de controle, capacidade e MSA](qualidade.md)
 - [Estatística: descritiva e testes de hipótese](estatistica.md)
 
+# Linhas especializadas
+
+- [Lean Office](linhas/lean-office.md)
+
 # Recursos avançados
 
 - [Simular a partir de um estado](estado-inicial.md)

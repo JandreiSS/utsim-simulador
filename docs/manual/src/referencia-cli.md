@@ -17,6 +17,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim tempos` | estudo de tempos e métodos: ciclo homem-máquina, tempos por elemento, máquinas por operador, tempo padrão e comparação de métodos | [Estudo de tempos e métodos](tempos-e-metodos.md) |
+| `utsim linha` | linhas especializadas (Lean Office): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
@@ -49,6 +50,9 @@ utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim tempos examples/homem_maquina.ron --tolerancia 15 --html estudo.html
 utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron --csv elementos.csv
+utsim linha lean_office relatorio examples/aprovacao_de_compras.ron --html relatorio.html
+utsim linha lean_office colocar escritorio.ron posto --area Compras --campo ca=0.9
+utsim run examples/aprovacao_de_compras.ron --linha lean_office
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
 utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
@@ -63,7 +67,7 @@ utsim corredores modelo.ron --svg planta.svg
 
 ## Observações sobre as opções
 
-- `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução. Com `--estado`, a rodada parte do estado do arquivo, sem aquecimento a menos que o estado tenha `warmup` ou que se use `--warmup`. `--salvar-estado T ARQUIVO` grava o estado da replicação 0 em `T` antes da rodada pedida.
+- `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução. `--linha lean_office` mostra, depois do resultado, os indicadores da linha especializada. Com `--estado`, a rodada parte do estado do arquivo, sem aquecimento a menos que o estado tenha `warmup` ou que se use `--warmup`. `--salvar-estado T ARQUIVO` grava o estado da replicação 0 em `T` antes da rodada pedida.
 - `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel. `--comparar experimento.ron` (ANOVA, Tukey, Bonferroni), `--correlacao`, `--mapa-calor arquivo.svg` (com `--celula` e `--por recurso|classe`) e `--exportar-observacoes arquivo.csv` só rodam quando pedidas.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
@@ -77,6 +81,7 @@ utsim corredores modelo.ron --svg planta.svg
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 - `tempos`: sem `--ator`, estuda cada operador que trabalhou em máquinas no intervalo; `--de` e `--ate` vão juntos (padrão: do fim do aquecimento ao fim da rodada); `--ciclo N` escolhe o ciclo desenhado (padrão: o mediano); `--ritmo` e `--tolerancia` são em %; `--custo-operador` e `--custo-maquina` vão juntos (por hora; `--unidade s|min|h` diz a unidade de tempo do modelo); `--comparar depois.ron` pareia os elementos dos dois métodos pelo nome. O resumo vai sempre para o terminal; `--html`, `--svg`, `--csv` e `--json` gravam os arquivos.
+- `linha`: `utsim linha lista` mostra as linhas instaladas; `utsim linha <linha>` resume a linha; as ações são `predefinicoes`, `vocabulario`, `modelos`, `relatorio` (indicadores no terminal; `-n`, `--html`, `--json` e `--comparar futuro.ron` para o estado futuro) e `colocar` (cria o arquivo se não existir, grava `line` no modelo; `--campo chave=valor` repetível com valores em RON, `--posicao x y`, `--area`, `--nome`, `--saida`). Cada ação tem o seu `--help`.
 
 ## Saída de `--help`
 
@@ -128,6 +133,7 @@ Options:
       --bins <BINS>                  Número de classes dos histogramas (sobrescreve run.histogram_bins)
       --estado <ARQUIVO>             Parte deste estado inicial (arquivo RON) em vez do sistema vazio
       --salvar-estado <T> <ARQUIVO>  Grava o estado da replicação 0 no instante T neste arquivo, para encadear rodadas
+      --linha <LINHA>                Mostra também os indicadores desta linha especializada (por exemplo lean_office)
   -h, --help                         Print help
 ```
 
@@ -588,4 +594,64 @@ Options:
           Grava o estudo (e a comparação) em JSON
   -h, --help
           Print help
+```
+
+### `utsim linha --help`
+
+```text
+Linhas especializadas (Lean Office): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha
+
+Usage: utsim linha <LINHA> [COMMAND]
+
+Commands:
+  predefinicoes  Predefinições da biblioteca da linha, com os campos e os valores padrão
+  vocabulario    Vocabulário da linha (termo do núcleo -> termo da linha)
+  modelos        Modelos prontos da linha
+  relatorio      Indicadores da linha (com IC de 95% entre replicações) e, com --html, o relatório
+  colocar        Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
+  help           Print this message or the help of the given subcommand(s)
+
+Arguments:
+  <LINHA>  Linha (por exemplo lean_office), ou "lista" para ver as linhas instaladas
+
+Options:
+  -h, --help  Print help
+```
+
+### `utsim linha lean_office relatorio --help`
+
+```text
+Indicadores da linha (com IC de 95% entre replicações) e, com --html, o relatório
+
+Usage: utsim linha <LINHA> relatorio [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  Modelo (.ron)
+
+Options:
+  -n, --reps <REPS>          Número de replicações (sobrescreve run.replications)
+      --html <HTML>          Grava o relatório completo (indicadores, gráficos, VSM de escritório, raias)
+      --comparar <COMPARAR>  Cenário do estado futuro (outro .ron): VSM e indicadores lado a lado
+      --json <JSON>          Grava os indicadores de cada replicação em JSON
+  -h, --help                 Print help
+```
+
+### `utsim linha lean_office colocar --help`
+
+```text
+Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
+
+Usage: utsim linha <LINHA> colocar [OPTIONS] <MODEL> <PREDEFINICAO>
+
+Arguments:
+  <MODEL>         Modelo (.ron)
+  <PREDEFINICAO>  Predefinição (veja `utsim linha <linha> predefinicoes`)
+
+Options:
+      --nome <NOME>          Nome do objeto (padrão: o nome base da predefinição, numerado se preciso)
+      --campo <CHAVE=VALOR>  Valor de um campo em RON (repetível), por exemplo --campo 'tempo=Exp(mean: 20.0)'
+      --posicao <X> <Y>      Posição (x y) em metros
+      --area <AREA>          Área (departamento) dos objetos criados
+      --saida <SAIDA>        Grava em outro arquivo (padrão: o próprio modelo)
+  -h, --help                 Print help
 ```
