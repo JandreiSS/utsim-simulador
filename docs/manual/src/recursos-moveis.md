@@ -127,14 +127,26 @@ O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 |---|---|---|
 | `team` | obrigatório | nomes dos transportadores da equipe (não pode ser vazia) |
 | `rule` | `FirstAvailable` | como escolher entre membros livres |
+| `pick` | `Priority` | qual serviço da fila um membro que fica livre pega |
 
 As regras:
 
 - `FirstAvailable`: o primeiro membro livre, na ordem da equipe;
 - `RoundRobin`: os membros livres em rodízio;
-- `Nearest`: o membro livre mais próximo de onde o serviço começa (distância em linha reta, sem considerar a rede de caminhos). Empates vão para o primeiro da equipe.
+- `Nearest`: o membro livre mais próximo de onde o serviço começa (distância em linha reta, sem considerar a rede de caminhos). Empates vão para o primeiro da equipe;
+- `LeastBusy`: o membro livre com o menor tempo ocupado acumulado (do serviço entregue até o aviso de livre), para equilibrar a carga. Empates vão para o primeiro da equipe;
+- `LongestIdle`: o membro livre há mais tempo. No início todos estão livres desde 0, e o primeiro da equipe vence;
+- `Random`: um membro livre ao acaso, com o fluxo de números aleatórios do próprio despachante (a mesma semente dá as mesmas escolhas).
 
-Se todos estão ocupados, o serviço espera na fila do despachante, por prioridade e, entre iguais, por ordem de chegada. Quando um membro fica livre, pega o serviço que está na frente da fila. Um transportador só pode estar na equipe de um despachante.
+Se todos estão ocupados, o serviço espera na fila do despachante, por prioridade e, entre iguais, por ordem de chegada. Quando um membro fica livre, `pick` diz qual serviço ele pega:
+
+- `Priority` (padrão): o da frente da fila;
+- `Nearest`: entre os serviços da maior prioridade que espera, o que começa mais perto do membro (empate: o mais antigo);
+- `NearestAny`: o mais perto do membro, qualquer que seja a prioridade. Diminui as viagens vazias, mas um serviço longe ou de prioridade baixa pode esperar muito (inanição): confira a espera máxima nos resultados.
+
+```ron
+(name: "frota", kind: Dispatcher(team: ["emp1", "emp2", "emp3"], rule: LeastBusy, pick: Nearest))
+``` Um transportador só pode estar na equipe de um despachante.
 
 ## Rede de caminhos
 

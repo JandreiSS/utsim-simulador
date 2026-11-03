@@ -210,7 +210,8 @@ Sem campos. Escreva `kind: Sink`.
 | Campo | Padrão |
 |---|---|
 | `team` | obrigatório (lista de nomes de `Transporter`; não vazia; um transportador só em uma equipe) |
-| `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`) |
+| `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`, `LeastBusy`, `LongestIdle`, `Random`) |
+| `pick` | `Priority` (ou `Nearest`, `NearestAny`): qual serviço da fila o membro que fica livre pega |
 
 ### `Conveyor`
 
