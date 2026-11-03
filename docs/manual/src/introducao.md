@@ -60,10 +60,11 @@ Cada versão publicada na página de [Releases](https://github.com/JandreiSS/uts
 
 Baixe e abra o instalador. Ele **não pede administrador**: instala só para o seu usuário em `%LOCALAPPDATA%\Programs\UTSim` (você pode trocar a pasta). Como o instalador ainda não é assinado digitalmente, o Windows pode mostrar o aviso do SmartScreen; escolha "Mais informações" e "Executar assim mesmo".
 
-O instalador oferece três componentes:
+O instalador oferece até quatro componentes:
 
 - **UTSim** (obrigatório): `bin\utsim.exe` (linha de comando), `bin\utsim-view.exe` (editor e visualizador 3D), a pasta `examples\` (modelos de exemplo), `assets\` (modelos 3D e ativos de terceiros, cada pacote com a sua licença e os créditos em `assets\terceiros\CREDITOS.md`), `manual\` (este manual em HTML, abra `manual\index.html`) e os arquivos `README.md` e `CHANGELOG.md`.
 - **Atalhos no Menu Iniciar**: a pasta "UTSim" com "UTSim" (abre o editor com um modelo novo), "UTSim (exemplos)" (abre a pasta dos exemplos; copie um para outro lugar antes de editar, pois o editor salva por cima do arquivo aberto), "Manual do UTSim" e "Desinstalar o UTSim".
+- **UTSim 3D (prévia)** (só nos instaladores gerados com a exportação do Godot): a nova interface 3D, em `3d\utsim-3d.exe`, com o atalho "UTSim 3D (prévia)" no Menu Iniciar e o arquivo `3d\AVISOS-TERCEIROS.txt` (avisos de copyright e licenças do motor Godot). Convive com o editor `utsim-view`, que continua sendo o programa principal da versão 0.1.
 - **Adicionar o comando `utsim` ao PATH** (desmarcado por padrão): acrescenta `bin\` ao `PATH` do seu usuário, para digitar `utsim` em qualquer terminal novo.
 
 Para remover, use Configurações > Aplicativos > UTSim, ou "Desinstalar o UTSim" no Menu Iniciar. A desinstalação apaga só o que o instalador criou e tira o `PATH`, se ele foi mexido. Para instalar sem janelas, rode o instalador com `/S` (e `/D=C:\pasta` para escolher a pasta, sempre como último argumento).
@@ -89,6 +90,8 @@ cd utsim-v0.1.0-linux-x64
 ```
 
 O script copia o programa para `~/.local/share/utsim`, cria os comandos em `~/.local/bin`, os atalhos no menu e os ícones. Para remover, rode `./instalar.sh --desinstalar`. Também dá para usar direto da pasta, sem instalar: `./bin/utsim-view --novo`.
+
+Nos pacotes que trazem o UTSim 3D (prévia), a pasta `3d/` fica ao lado de `bin/`, o comando `utsim-3d` aponta para ela e o atalho "UTSim 3D (prévia)" aparece no menu de aplicativos. Os avisos do motor Godot estão em `3d/AVISOS-TERCEIROS.txt`.
 
 Em ambos, o visualizador usa as bibliotecas de áudio e de janela do sistema (ALSA, udev, xkbcommon, Wayland ou X11, Vulkan). Numa distribuição de mesa comum, elas já estão presentes.
 

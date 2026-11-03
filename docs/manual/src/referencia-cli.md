@@ -6,6 +6,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 |---|---|---|
 | `utsim run` | roda um modelo e mostra as estatísticas | [Resultados](resultados.md) |
 | `utsim check` | valida um modelo sem rodar | [Formato `.ron`](referencia-ron.md) |
+| `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little e gargalo móvel | [Resultados](resultados.md) |
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
 | `utsim cena` | grava a cena 3D para outros motores | [3D realista](visual-3d.md) |
 | `utsim fit` | ajusta distribuições a dados | [Ajuste de distribuições](ajuste-de-distribuicoes.md) |
@@ -22,6 +23,7 @@ O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso
 utsim check examples/mm1.ron
 utsim run examples/mm1.ron -n 20 --json resultado.json
 utsim run examples/mm1.ron --sample 100 --bins 20 --csv saida/
+utsim analisar examples/mm1.ron --precisao 2% --little --confianca 90%
 utsim replay examples/mm1.ron --out replay.json
 utsim fit examples/dados/tempos_atendimento.csv --html relatorio.html
 utsim experiment examples/experimento_mm1.ron
@@ -34,6 +36,7 @@ utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 ## Observações sobre as opções
 
 - `run`: as opções `-n`, `--seed`, `--stop`, `--warmup`, `--sample` e `--bins` substituem os campos de `run` do arquivo, só nesta execução.
+- `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
 
@@ -50,6 +53,7 @@ Usage: utsim <COMMAND>
 Commands:
   run           Executa um modelo e mostra as estatísticas
   check         Valida um modelo sem executar
+  analisar      Análises de saída: aquecimento, precisão, lotes, lei de Little e gargalo móvel
   replay        Grava o rastro completo de uma replicação para o visualizador 3D
   cena          Grava a cena 3D de uma replicação (protocolo utsim-scene/1, JSON em linhas)
   gerar-modelo  Gera um modelo sintético de qualquer tamanho (testes de desempenho e de escala)
@@ -98,6 +102,34 @@ Arguments:
 
 Options:
   -h, --help  Print help
+```
+
+### `utsim analisar --help`
+
+```text
+Análises de saída: aquecimento, precisão, lotes, lei de Little e gargalo móvel
+
+Sem nenhuma opção de análise, roda todas menos as médias em lotes.
+
+Usage: utsim analisar [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  
+
+Options:
+      --aquecimento            Sugere o aquecimento (Welch e MSER-5) a partir do WIP ou de --medida
+      --precisao <ALVO>        Replicações necessárias para esta semiamplitude: 2% (da média) ou 0.5 (absoluta)
+      --lotes                  Intervalo por médias em lotes numa rodada única (padrão: tempo no sistema)
+      --little                 Verifica a lei de Little por objeto e no sistema
+      --gargalo-movel          Gargalo móvel pelo período ativo (único e compartilhado)
+      --confianca <CONFIANCA>  Nível de confiança dos intervalos [default: 95%]
+      --medida <MEDIDA>        Medida para aquecimento e lotes: objeto.medida (ex.: saida.time_in_system)
+      --metrica <METRICA>      Métrica para --precisao (repetível; padrão: ocupações, conteúdos e tempos)
+      --janela <JANELA>        Janela da média móvel de Welch [default: 5]
+  -n, --reps <REPS>            Número de replicações (sobrescreve run.replications)
+      --stop <STOP>            Tempo de parada (sobrescreve run.stop_time)
+      --json <JSON>            Grava os resultados em JSON
+  -h, --help                   Print help
 ```
 
 ### `utsim replay --help`
