@@ -570,7 +570,7 @@ func _combo(text: String) -> void:
 func _accept_dialog(path: String, k: int) -> void:
 	await _frames(3)
 	var dialog: FileDialog = null
-	for name in ["Dialogo_Salvar", "Dialogo_Abrir", "Dialogo_Replay"]:
+	for name in ["Dialogo_Salvar", "Dialogo_Abrir", "Dialogo_Replay", "Dialogo_Dados", "Dialogo_Relatorio"]:
 		var d := get_tree().root.find_child(name, true, false) as FileDialog
 		if d != null and d.visible:
 			dialog = d
@@ -581,7 +581,10 @@ func _accept_dialog(path: String, k: int) -> void:
 	dialog.current_file = path.get_file()
 	await _frames(2)
 	dialog.hide()
-	dialog.file_selected.emit(path)
+	if dialog.file_mode == FileDialog.FILE_MODE_OPEN_DIR:
+		dialog.dir_selected.emit(path)
+	else:
+		dialog.file_selected.emit(path)
 	await _frames(5)
 
 
@@ -596,7 +599,7 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
 ## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
 ##
-## G3: `rede` ({nos, trechos, controlados}), `no_posicao` ({no, x, y, tolerancia}), `texto` ({controle, contem}: the text of a
+## G3: `dados` ({campo, fonte, familia, familia_contem, n_maior_que, defasado, analisado}: the real data of a field, `objeto.campo`), `grafico_dados` ({controle, barras_maior_que, curva}: the mini histogram of a field), `rede` ({nos, trechos, controlados}), `no_posicao` ({no, x, y, tolerancia}), `texto` ({controle, contem}: the text of a
 ## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
 ## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
 ## the document), `ocupado` (a run on the bridge's thread), `grafico` ({controle,
@@ -822,6 +825,28 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("rótulos desenhados", n <= int(want), str(n))
 			"replay":
 				report.call("replay", _main.playing_replay == bool(want), str(_main.playing_replay))
+			"dados":
+				# {campo, fonte: "dados" | "dist", familia, n_maior_que, defasado, selo}
+				var entry: Dictionary = doc.data_entry(want["campo"])
+				var uses := not entry.is_empty()
+				if want.has("fonte"):
+					report.call("fonte de %s" % want["campo"], uses == (want["fonte"] == "dados"), "usa dados: %s" % uses)
+				if want.has("familia"):
+					report.call("família de %s" % want["campo"], String(entry.get("family", "")) == String(want["familia"]), str(entry.get("family", "(sem dados)")))
+				if want.has("familia_contem"):
+					report.call("família de %s contém %s" % [want["campo"], want["familia_contem"]], String(entry.get("family", "")).contains(String(want["familia_contem"])), str(entry.get("family", "(sem dados)")))
+				if want.has("n_maior_que"):
+					report.call("n de %s" % want["campo"], int(entry.get("n", 0)) > int(want["n_maior_que"]), str(entry.get("n", 0)))
+				if want.has("defasado"):
+					report.call("dados defasados de %s" % want["campo"], bool(entry.get("stale", false)) == bool(want["defasado"]), str(entry.get("stale", false)))
+				if want.has("analisado"):
+					report.call("análise de %s" % want["campo"], (typeof(entry.get("view")) == TYPE_DICTIONARY) == bool(want["analisado"]), "")
+			"grafico_dados":
+				var mini := _control(String(want["controle"])) as MiniHistograma
+				var bars := mini.bars() if mini != null else -1
+				report.call("barras de %s" % want["controle"], bars > int(want.get("barras_maior_que", 0)), str(bars))
+				if want.get("curva", false):
+					report.call("curva de %s" % want["controle"], mini != null and mini.curve_points() > 1, "")
 			"pode_desfazer":
 				report.call("pode desfazer", doc.can_undo() == bool(want), str(doc.can_undo()))
 			"pode_refazer":
