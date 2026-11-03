@@ -6,7 +6,7 @@ Os tempos do modelo (atendimento, chegadas, reparo) devem vir de **dados reais**
 utsim fit examples/dados/tempos_atendimento.csv --html relatorio.html
 ```
 
-O [tutorial 05](tutoriais/05-ajuste.md) percorre um caso completo.
+O [tutorial 05](tutoriais/05-ajuste.md) percorre um caso completo. Para o modelo apontar direto para os dados, sem copiar parâmetros, veja [Dados reais e ajuste automático](dados-reais.md).
 
 ## Que dados servem
 

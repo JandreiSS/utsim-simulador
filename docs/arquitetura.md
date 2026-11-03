@@ -278,6 +278,51 @@ ordem em que ocorrem. Um `Observer` recebe os mesmos eventos ao vivo.
 > (Gama verdadeira), a Weibull deslocada, com 3 parâmetros, tinha AIC 0,3 menor. A regra
 > escolhe a Gama, com 2, e diz por quê.
 
+### Campos alimentados por dados reais (`data`, `utsim_fit::auto`, `utsim_model::dados`)
+
+Qualquer campo `Dist` de qualquer objeto pode vir de valores observados. A ligação fica
+**fora do campo**, numa lista opcional `Model.data` (aditiva: sem ela o modelo é o mesmo,
+byte a byte, e não é serializada):
+
+```ron
+data: [(field: "torno.process", source: "dados/t.csv", column: "processo",
+        choose: Best, criterion: Aic, fitted: (family: "Gama", dist: Gamma(...),
+        hash: "fnv1a64:...", n: 200, settings: "auto1 Best Aic alpha=0.05 bootstrap=300 seed=1"))]
+```
+
+Por que fora do campo e não uma variante nova de `Dist`: o campo continua guardando uma
+distribuição concreta (o último ajuste), então o motor, o PERT, o visualizador, a ponte
+Godot e versões antigas leem o modelo sem saber de `data`, e nenhum `match` sobre `Dist`
+muda.
+
+- **Endereço do campo**: `objeto.campo[.subcampo...]` (ou `run.`, `flows.` etc.).
+  `dados::locate` percorre o modelo serializado em `serde_json::Value`, atravessa `kind`
+  e as variantes de enum sem nomeá-las, aceita nomes ou índices em listas, e devolve um
+  ponteiro JSON. `set_dist` troca o nó e desserializa o modelo de volta (ida e volta
+  testada em todos os exemplos); `dist_fields` lista todos os campos endereçáveis.
+- **Carga** (`Model::parse_in`, chamada por `parse` e `load`): depois da leitura tipada,
+  `dados::resolve` lê os valores (arquivo relativo ao modelo ou `values`), calcula o hash
+  (FNV-1a sobre os bits dos valores, na ordem) e, se hash e `settings` batem com
+  `fitted`, usa o registro sem reajustar; senão chama `auto::auto_fit` e reescreve o
+  registro. O que aconteceu fica em `DataInput::status` (não salvo, fora do `PartialEq`)
+  e vira aviso em `Model::warnings` (dados mudaram; arquivo ilegível com registro).
+- **Escolha** (`utsim_fit::auto`, funções puras sobre `&[f64]`): famílias discretas só
+  com dados inteiros; o resto do pipeline de `utsim fit` (ajuste, aderência, regra
+  publicada); ordem por `Criterion` (AIC com a regra de parcimônia; BIC, KS ou AD sobre as
+  aceitas); `Choice::Best | Family(nome) | Empirical`; empírica com aviso quando nenhuma
+  é aceita. Avisos: os do diagnóstico, mais poucos pontos (n < 10), mistura (picos de uma
+  estimativa de densidade por núcleo com a largura de Silverman, vale profundo entre
+  eles) e valores além de 3·IQR.
+- **Relatório**: `AutoFit::to_html` acrescenta a escolha, a justificativa, os avisos e a
+  tabela pelo critério em cima da página de `FitReport` (`to_html_with`); `to_csv`;
+  `auto::index_html` para o índice por modelo; `dados::write_reports` grava tudo.
+- **Edição**: `utsim_edit::Command::SetFieldSource { field, source: Dist | Data }`; depois
+  de cada comando `dados::resolve_pending` ajusta só as entradas novas ou alteradas, e um
+  erro de leitura ou ajuste desfaz o comando inteiro. `Rename`/`Remove` acompanham as
+  entradas. `Document::data_analysis(campo)` devolve o `AutoFit` para a interface.
+- **CLI**: `utsim dados modelo.ron [--relatorio pasta] [--gravar]`;
+  `utsim fit dados.csv --relatorio x.html [--criterio aic|bic|ks|ad]`.
+
 ## 4e. Editor (fases 3 e 9)
 O editor não altera o modelo diretamente: toda ação vira um `Command` (adicionar,
 remover, renomear, mover, alterar campo, alterar aparência, ligar, desligar, lote)
