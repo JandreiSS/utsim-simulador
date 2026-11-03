@@ -21,7 +21,7 @@ use godot::classes::notify::CanvasItemNotification;
 use godot::classes::rendering_server::CanvasItemTextureFilter;
 use godot::classes::{
     ClassDb, Engine, INode2D, Input as GdInput, InputEvent, Node2D, Object, Os, RenderingServer,
-    Viewport,
+    Resource, Viewport,
 };
 use godot::prelude::*;
 
@@ -31,6 +31,8 @@ use crate::egui_input::{Input, Mods};
 use crate::egui_mesh::{self, Change, Textures};
 use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
+use crate::ui_bottom::{PlayView, StatusView};
+use crate::ui_left::{EditView, Entry, ObjectItem, Summary};
 use crate::ui_props::{self, PropAction, PropsView};
 use crate::{put, strings};
 
@@ -64,6 +66,16 @@ pub struct UtsimUi {
     props_key: Option<(u64, String)>,
     /// The texture of the miniature's `SubViewport` (owned by Godot, never freed here).
     miniature: Option<Rid>,
+    /// The library icons: entry id to egui texture, and those textures to Godot's (owned
+    /// by Godot's resources, kept alive by `icon_refs`).
+    icons: HashMap<String, TextureId>,
+    user: HashMap<TextureId, Rid>,
+    icon_refs: Vec<Gd<Resource>>,
+    /// The revision the object list was built for (`None`: read it again).
+    objects_rev: Option<u64>,
+    /// What the main scene set for the left panel of Editar (the objects come from the
+    /// document).
+    edit_state: EditView,
     base: Base<Node2D>,
 }
 
@@ -86,6 +98,11 @@ impl INode2D for UtsimUi {
             props_on: false,
             props_key: None,
             miniature: None,
+            icons: HashMap::new(),
+            user: HashMap::new(),
+            icon_refs: Vec::new(),
+            objects_rev: None,
+            edit_state: EditView::default(),
             base,
         }
     }
@@ -304,11 +321,150 @@ impl UtsimUi {
         self.props_on
     }
 
-    /// Pixels at the bottom that stay Godot's (the status bar): the panels stop above.
+    /// The icons of the library: `{id: Texture2D}` (`res://icones/<id>.svg`).
     #[func]
-    fn set_reserved_bottom(&mut self, pixels: f32) {
-        self.host.bottom_reserved = pixels.max(0.0);
+    fn set_library_icons(&mut self, icons: VarDictionary) {
+        self.icons.clear();
+        self.user.clear();
+        self.icon_refs.clear();
+        for (k, (id, tex)) in icons.iter_shared().enumerate() {
+            let Ok(res) = tex.try_to::<Gd<Resource>>() else {
+                continue;
+            };
+            let t = TextureId::User(100 + k as u64);
+            self.user.insert(t, res.get_rid());
+            self.icons.insert(id.to_string(), t);
+            self.icon_refs.push(res);
+        }
+        self.objects_rev = None;
+        self.edit_state.library.clear();
         self.host.invalidate();
+    }
+
+    /// The left panel of Editar: `{armed, selected, obstacles}` (missing keys keep their
+    /// value); the library and the objects come from the bridge and the document.
+    #[func]
+    fn set_edit_state(&mut self, state: VarDictionary) {
+        let get = |k: &str| state.get(&k.to_variant());
+        if let Some(v) = get("armed") {
+            self.edit_state.armed = v.to_string();
+        }
+        if let Some(v) = get("selected")
+            && let Ok(list) = v.try_to::<PackedStringArray>()
+        {
+            self.edit_state.selected = list.as_slice().iter().map(|s| s.to_string()).collect();
+        }
+        if let Some(v) = get("obstacles") {
+            self.edit_state.obstacles = v.try_to::<bool>().unwrap_or(false);
+        }
+        // The main scene calls this after every change of the document, also after
+        // opening another model (whose revision may equal the old one's): the objects are
+        // read again.
+        self.objects_rev = None;
+        self.refresh_edit();
+    }
+
+    /// The left panel of Simular: `{reps, status, blocks, follow, camera, labels, shadows,
+    /// summary: {title, bottleneck, lines}}` (missing keys keep their value; `follow` is
+    /// the index into `blocks`, -1 for none).
+    #[func]
+    fn set_sim_state(&mut self, state: VarDictionary) {
+        let mut v = self.host.sim().clone();
+        let get = |k: &str| state.get(&k.to_variant());
+        if let Some(x) = get("reps") {
+            v.reps = x.try_to::<i64>().unwrap_or(v.reps);
+        }
+        if let Some(x) = get("status") {
+            v.status = x.to_string();
+        }
+        if let Some(x) = get("blocks")
+            && let Ok(list) = x.try_to::<PackedStringArray>()
+        {
+            v.blocks = list.as_slice().iter().map(|s| s.to_string()).collect();
+        }
+        if let Some(x) = get("follow") {
+            v.follow = x
+                .try_to::<i64>()
+                .ok()
+                .filter(|k| *k >= 0)
+                .map(|k| k as usize);
+        }
+        if let Some(x) = get("camera") {
+            v.camera = x.to_string();
+        }
+        if let Some(x) = get("labels") {
+            v.labels = x.try_to::<bool>().unwrap_or(v.labels);
+        }
+        if let Some(x) = get("shadows") {
+            v.shadows = x.try_to::<bool>().unwrap_or(v.shadows);
+        }
+        if let Some(x) = get("summary")
+            && let Ok(d) = x.try_to::<VarDictionary>()
+        {
+            let text = |k: &str| {
+                d.get(&k.to_variant())
+                    .map(|x| x.to_string())
+                    .unwrap_or_default()
+            };
+            v.summary = Summary {
+                title: text("title"),
+                bottleneck: text("bottleneck"),
+                lines: d
+                    .get(&"lines".to_variant())
+                    .and_then(|x| x.try_to::<PackedStringArray>().ok())
+                    .map(|l| l.as_slice().iter().map(|s| s.to_string()).collect())
+                    .unwrap_or_default(),
+            };
+        }
+        self.host.set_sim(v);
+    }
+
+    /// The status bar: `{text, progress, percent}`; `progress` below 0 hides the progress
+    /// bar and "Cancelar" (no job).
+    #[func]
+    fn set_status_bar(&mut self, state: VarDictionary) {
+        let mut v: StatusView = self.host.status().clone();
+        let get = |k: &str| state.get(&k.to_variant());
+        if let Some(x) = get("text") {
+            v.text = x.to_string();
+        }
+        if let Some(x) = get("progress") {
+            let p = x.try_to::<f64>().unwrap_or(-1.0);
+            v.progress = (p >= 0.0).then_some(p as f32);
+        }
+        if let Some(x) = get("percent") {
+            v.percent = x.try_to::<bool>().unwrap_or(v.percent);
+        }
+        self.host.set_status(v);
+    }
+
+    /// The text of the status bar.
+    #[func]
+    fn status_text(&self) -> GString {
+        GString::from(self.host.status().text.as_str())
+    }
+
+    /// The playback bar: `{visible, playing, t, end, speed}` (missing keys keep their value).
+    #[func]
+    fn set_playback_bar(&mut self, state: VarDictionary) {
+        let mut v: PlayView = self.host.play().clone();
+        let get = |k: &str| state.get(&k.to_variant());
+        if let Some(x) = get("visible") {
+            v.visible = x.try_to::<bool>().unwrap_or(v.visible);
+        }
+        if let Some(x) = get("playing") {
+            v.playing = x.try_to::<bool>().unwrap_or(v.playing);
+        }
+        if let Some(x) = get("t") {
+            v.t = x.try_to::<f64>().unwrap_or(v.t);
+        }
+        if let Some(x) = get("end") {
+            v.end = x.try_to::<f64>().unwrap_or(v.end);
+        }
+        if let Some(x) = get("speed") {
+            v.speed = x.try_to::<f64>().unwrap_or(v.speed);
+        }
+        self.host.set_play(v);
     }
 
     /// The `SubViewport` the asset miniature is drawn in: its texture is shown in the panel.
@@ -364,6 +520,7 @@ impl UtsimUi {
             return;
         }
         self.refresh_props_view();
+        self.refresh_edit();
         let frame = self.host.frame(now, size, ppp);
         let mut output = frame.output;
         let mut textures = std::mem::take(&mut output.textures_delta);
@@ -405,6 +562,44 @@ impl UtsimUi {
             GString::from(what).to_variant(),
         ];
         self.base_mut().call_deferred("emit_signal", &args);
+    }
+
+    /// The left panel of Editar: the library with its icons, the document's objects (read
+    /// again only when the document changed) and the state the main scene set.
+    fn refresh_edit(&mut self) {
+        let rev = self.doc.as_ref().map(|d| d.bind().editor.doc.revision());
+        if rev != self.objects_rev || self.edit_state.library.is_empty() {
+            self.objects_rev = rev;
+            self.edit_state.library = crate::document::palette()
+                .iter()
+                .map(|p| Entry {
+                    id: p.id.to_owned(),
+                    label: p.label.to_owned(),
+                    category: p.category.to_owned(),
+                    icon: self.icons.get(p.id).copied(),
+                })
+                .collect();
+            self.edit_state.categories = utsim_edit::CATEGORIES
+                .iter()
+                .map(|c| c.to_string())
+                .collect();
+            self.edit_state.objects = match &self.doc {
+                Some(d) => d
+                    .bind()
+                    .editor
+                    .objects()
+                    .into_iter()
+                    .map(|o| ObjectItem {
+                        name: o.name,
+                        kind_label: o.kind_label.to_owned(),
+                        problems: o.problems,
+                        warnings: o.warnings,
+                    })
+                    .collect(),
+                None => Vec::new(),
+            };
+        }
+        self.host.set_edit(self.edit_state.clone());
     }
 
     /// The properties view from the document, rebuilt only when the document or the
@@ -595,6 +790,8 @@ impl UtsimUi {
                 .and_then(|t| {
                     if t == ui_props::MINIATURE {
                         self.miniature
+                    } else if let Some(rid) = self.user.get(&t) {
+                        Some(*rid)
                     } else {
                         self.gpu.get(&t).copied()
                     }

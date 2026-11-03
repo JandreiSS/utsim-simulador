@@ -1450,8 +1450,9 @@ do projeto; só as capturas de tela são puladas.
 - **mover:** o ponto do chão sob o mouse (projeção no plano `y = 0`) dá o deslocamento, com
   encaixe na grade (`G` liga e desliga, passo de 0,25 a 5 m); o arrasto inteiro é um passo de
   desfazer;
-- **colocar:** da Biblioteca (`biblioteca.gd`, ícones em `godot/icones/`), clicando e
-  clicando no chão ou arrastando até o chão, com o fantasma do objeto sob o mouse;
+- **colocar:** da Biblioteca (em egui, `crates/utsim-godot/src/ui_left.rs`, ícones em
+  `godot/icones/`), clicando e clicando no chão ou arrastando até o chão, com o fantasma do
+  objeto sob o mouse: o arrasto começa no egui e o `editor.gd` resolve a soltura na vista;
 - **ligar:** cada bloco tem a porta de saída (`+x`, verde) e a de entrada (`-x`, azul),
   mostradas no selecionado e no que está sob o mouse; arrastar da saída até outro bloco (ou a
   porta de entrada dele) liga; a ferramenta Ligar (`L`) liga arrastando de bloco a bloco ou

@@ -56,6 +56,17 @@ Na nova interface 3D (`utsim-3d`), a barra superior é organizada em grupos, da 
 
 O nome do modelo fica à direita (com `*` quando há mudanças não salvas; o arquivo aparece ao parar o mouse sobre ele). No Simular, os grupos que só servem para editar saem da barra. Numa janela estreita, os grupos que não cabem vão para o menu **Mais**, no fim da barra, em vez de serem cortados. A roda do mouse sobre a barra (e sobre qualquer painel) nunca aproxima a câmera, e os atalhos de teclado valem sempre, exceto enquanto você digita num campo.
 
+### Os painéis do UTSim 3D (prévia)
+
+O painel da esquerda muda com o modo.
+
+- **No Editar**, em cima fica a **Biblioteca**, com os objetos por categoria e o ícone de cada um. Clique numa entrada (ela fica marcada) e depois clique no chão para colocar; ou arraste a entrada até o chão e solte onde o objeto deve ficar. Soltar sobre um painel cancela a colocação. Embaixo fica a lista **Objetos**, com a caixa de busca (por nome ou tipo; o `×` limpa a busca). Um clique seleciona e um duplo clique enquadra o objeto. Objetos com problema aparecem em vermelho e com aviso em amarelo (o número aparece ao parar o mouse sobre eles). No pé do painel fica a caixa **Mostrar obstáculos e folgas**.
+- **No Simular**, em cima ficam as **Replicações** (digite o número e tecle Enter, ou use `−` e `+`) e o botão **Simular de novo**. Logo abaixo vêm a linha de situação e a lista de **Blocos**: um clique foca o bloco na órbita e é o bloco que as câmeras Seguir, Primeira pessoa e Do recurso acompanham. Depois vêm o menu **Câmera**, os botões **Fluxos** e **Gravar replay** e as caixas **Rótulos** e **Sombras**. No pé fica o resumo da rodada, com o gargalo em laranja e as saídas de cada bloco. A tabela completa fica em **Resultados**.
+
+A **barra de status**, no pé da janela, mostra o que acabou de acontecer. Quando o texto não cabe, ele termina em "…" e aparece inteiro ao parar o mouse sobre ele. Enquanto uma rodada ou análise corre, a barra mostra o progresso e o botão **Cancelar**. No Simular, a **barra de reprodução** fica logo acima dela, sobre a vista: **◀ evento**, **Reproduzir** (ou **Pausar**, também com `Espaço`), **evento ▶**, a velocidade, a linha do tempo (clique ou arraste para ir a um instante) e o tempo atual sobre o fim.
+
+No painel de propriedades, um rótulo que não cabe na coluna quebra em duas linhas, e a coluna de rótulos cresce com o painel. Um rótulo nunca é cortado sem que o texto inteiro apareça ao parar o mouse sobre ele.
+
 A simulação nunca é conduzida pela janela. O botão **▶ Simular** roda o motor em outra tarefa e a janela apenas lê o resultado gravado. Por isso o que você vê é exatamente o que o `utsim run` calcula.
 
 ## Modo Editar
