@@ -52,6 +52,7 @@
 		{"conferir": {"ativo": {"objeto": "processo", "valor": ""}}},
 		{"nota": "Simular a partir do documento."},
 		{"clicar": {"controle": "Modo_Simular"}},
+		{"esperar_trabalho": 120},
 		{"conferir": {"modo": "simular"}},
 		{"clicar": {"controle": "Reproducao_Play"}},
 		{"esperar_s": 1.5},

@@ -43,13 +43,19 @@
 ##    - `{"abrir": "../../examples/agvs.ron"}`, `{"novo": true}`, `{"modo": "simular"}`
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
+##    - `{"esperar_trabalho": 120}` (G3): waits until the run on the bridge's thread ends
+##      (at most that many seconds; a failure if it does not). `modo` and the captures of
+##      models wait by themselves.
+##    - `{"tempo": 120.0}`: jumps the playback to that instant.
 ##
 ##    A target (<alvo>) is one of: `{"ponto": [x, y]}` (pixels), `{"controle": "Nome"}`
 ##    (a control by node name, its centre), `{"chao": [x, y]}` (a floor point in model
 ##    plan coordinates), `{"objeto": "nome"}` (where a block is drawn),
 ##    `{"item": ["Lista", 0]}` (an item of an ItemList),
 ##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
-##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's ports).
+##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's ports),
+##    `{"no": "nome"}` (a node of the path network), `{"trecho": ["de", "para"]}` (the
+##    middle of an edge) or `{"aba": ["Abas", "Título"]}` (a tab of a TabContainer).
 extends Node
 
 var _out := ""
@@ -154,6 +160,9 @@ func _run_models(models: Array) -> void:
 			continue
 		if not _main.simulate(int(m.get("replicacoes", 1))):
 			_fail("simulação falhou: %s" % path)
+			continue
+		if not await _wait_idle(300.0):
+			_fail("simulação não terminou: %s" % path)
 			continue
 		# Let the imported scenes settle (shaders, shadows).
 		await _frames(20)
@@ -279,8 +288,12 @@ func _step(s: Dictionary, k: int) -> void:
 				(c as SpinBox).get_line_edit().select_all()
 			elif c is TextEdit:
 				(c as TextEdit).select_all()
-		for ch in String(s["digitar"]):
-			await _key(KEY_NONE, ch.unicode_at(0), false, false, false)
+		for ch in String(s["digitar"]).replace("{saida}", _out):
+			if ch == "
+":
+				await _key(KEY_ENTER, 0, false, false, false)
+			else:
+				await _key(KEY_NONE, ch.unicode_at(0), false, false, false)
 		if s.get("enter", true):
 			await _key(KEY_ENTER, 0, false, false, false)
 		await _frames(3)
@@ -330,7 +343,16 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("modo"):
 		if not _main.set_mode(String(s["modo"])):
 			_fail("passo %d: não entrou no modo %s" % [k, s["modo"]])
+		if not await _wait_idle(300.0):
+			_fail("passo %d: a simulação não terminou" % k)
 		await _frames(5)
+	elif s.has("esperar_trabalho"):
+		if not await _wait_idle(float(s["esperar_trabalho"])):
+			_fail("passo %d: o trabalho não terminou em %s s" % [k, s["esperar_trabalho"]])
+		await _frames(3)
+	elif s.has("tempo"):
+		_main.seek(float(s["tempo"]), true)
+		await _frames(3)
 	elif s.has("conferir"):
 		_check(s["conferir"], k)
 	else:
@@ -377,6 +399,19 @@ func _target(t: Variant) -> Variant:
 		if at == null or cam.is_position_behind(at):
 			return null
 		return cam.unproject_position(at)
+	if d.has("no"):
+		return _main.editor.rede.node_screen(String(d["no"]))
+	if d.has("trecho"):
+		return _main.editor.rede.edge_screen(String(d["trecho"][0]), String(d["trecho"][1]))
+	if d.has("aba"):
+		var tabs := _control(String(d["aba"][0])) as TabContainer
+		if tabs == null or not tabs.is_visible_in_tree():
+			return null
+		var bar := tabs.get_tab_bar()
+		for i in tabs.get_tab_count():
+			if tabs.get_tab_title(i) == String(d["aba"][1]):
+				return bar.get_global_transform() * bar.get_tab_rect(i).get_center()
+		return null
 	if d.has("ligacao"):
 		var l: Array = d["ligacao"]
 		var a = _main.editor.block_position(l[0])
@@ -387,6 +422,31 @@ func _target(t: Variant) -> Variant:
 		m.y = 0.06
 		return cam.unproject_position(m)
 	return null
+
+
+## Waits until no run is going on the bridge's thread; false after `seconds`.
+func _wait_idle(seconds: float) -> bool:
+	var start := Time.get_ticks_msec()
+	while _main.busy():
+		if Time.get_ticks_msec() - start > int(seconds * 1000.0):
+			return false
+		await get_tree().process_frame
+	return true
+
+
+## Text shown by a control (labels, rich text, buttons, fields).
+func _text_of(c: Control) -> String:
+	if c is RichTextLabel:
+		return (c as RichTextLabel).get_parsed_text()
+	if c is Label:
+		return (c as Label).text
+	if c is Button:
+		return (c as Button).text
+	if c is LineEdit:
+		return (c as LineEdit).text
+	if c is TextEdit:
+		return (c as TextEdit).text
+	return ""
 
 
 func _scroll_of(c: Control) -> ScrollContainer:
@@ -497,7 +557,7 @@ func _combo(text: String) -> void:
 func _accept_dialog(path: String, k: int) -> void:
 	await _frames(3)
 	var dialog: FileDialog = null
-	for name in ["Dialogo_Salvar", "Dialogo_Abrir"]:
+	for name in ["Dialogo_Salvar", "Dialogo_Abrir", "Dialogo_Replay"]:
 		var d := get_tree().root.find_child(name, true, false) as FileDialog
 		if d != null and d.visible:
 			dialog = d
@@ -522,6 +582,15 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
 ## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
+##
+## G3: `rede` ({nos, trechos, controlados}), `no_posicao` ({no, x, y, tolerancia}), `texto` ({controle, contem}: the text of a
+## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
+## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
+## the document), `ocupado` (a run on the bridge's thread), `grafico` ({controle,
+## maior_que}: things drawn by a `Grafico`), `fluidos` ({nos, tanques, nivel_entre: [a,
+## b]}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que}), `pert` ({modo,
+## caixas_maior_que, tem_histograma}), `critico` (names outlined in red), `camera`
+## (mode), `rotulos_no_maximo` (labels drawn) and `replay` (a recorded replay is playing).
 func _check(c: Dictionary, k: int) -> void:
 	var doc: Object = _main.doc
 	var objects: Array = doc.objects()
@@ -617,6 +686,94 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("reproduzindo", _main.playing == bool(want), str(_main.playing))
 			"tempo_maior_que":
 				report.call("tempo > %s" % want, _main.t > float(want), str(_main.t))
+			"rede":
+				var got: Dictionary = _main.editor.rede.counts()
+				for key2 in want:
+					report.call("rede.%s" % key2, int(got.get(key2, -1)) == int(want[key2]), str(got))
+			"no_posicao":
+				var found := false
+				for n in _main.editor.rede.net["nodes"]:
+					if n["name"] == want["no"]:
+						found = true
+						var mp: Vector3 = n["model_position"]
+						var tol := float(want.get("tolerancia", 1e-6))
+						var good := absf(mp.x - float(want.get("x", mp.x))) <= tol and absf(mp.y - float(want.get("y", mp.y))) <= tol
+						report.call("posição do nó %s" % want["no"], good, "está em (%s, %s)" % [mp.x, mp.y])
+				report.call("nó %s" % want["no"], found, str(_main.editor.rede.net["nodes"]))
+			"texto":
+				var ctl := _control(String(want["controle"]))
+				var shown := _text_of(ctl) if ctl != null else "(controle ausente)"
+				report.call("texto de %s contém %s" % [want["controle"], want["contem"]], shown.contains(String(want["contem"])), shown.substr(0, 300))
+			"visivel":
+				for n in want:
+					var ctl := _control(String(n))
+					report.call("%s visível" % n, ctl != null and ctl.is_visible_in_tree(), "")
+			"oculto":
+				for n in want:
+					var ctl := _control(String(n))
+					report.call("%s oculto" % n, ctl == null or not ctl.is_visible_in_tree(), "")
+			"replicacoes":
+				var n: int = _main.results.replications() if _main.results != null else 0
+				report.call("replicações dos resultados", n == int(want), str(n))
+			"execucao":
+				var value := NAN
+				for f in doc.properties("run").get("fields", []):
+					if f["path"] == want["campo"]:
+						value = float(f["value"])
+				report.call("run.%s > %s" % [want["campo"], want["maior_que"]], value > float(want["maior_que"]), str(value))
+			"ocupado":
+				report.call("ocupado", _main.busy() == bool(want), str(_main.busy()))
+			"grafico":
+				var g := _control(String(want["controle"])) as Grafico
+				var n := g.count() if g != null else -1
+				report.call("gráfico %s" % want["controle"], n > int(want.get("maior_que", 0)), str(n))
+			"fluidos":
+				var cena: CenaUtsim = _main.cena
+				var fill := cena.fluid_fill()
+				var tanks := 0
+				for f in fill:
+					if f >= 0.0:
+						tanks += 1
+				if want.has("nos"):
+					report.call("nós de fluido", cena.fluid_nodes.size() == int(want["nos"]), str(cena.fluid_nodes.size()))
+				if want.has("tanques"):
+					report.call("tanques", tanks == int(want["tanques"]), str(tanks))
+				if want.has("nivel_entre"):
+					var lo := float(want["nivel_entre"][0])
+					var hi := float(want["nivel_entre"][1])
+					var inside := false
+					for f in fill:
+						if f >= lo and f <= hi:
+							inside = true
+					report.call("algum tanque com nível entre %s e %s" % [lo, hi], inside, str(fill))
+			"fluxos":
+				var panel: PainelFluxos = _main._flows_panel
+				var acts := 0
+				if not panel.flows.is_empty():
+					acts = (panel.flows[panel.flow]["nodes"] as Array).size()
+				report.call("atividades do fluxo", acts > int(want.get("atividades_maior_que", 0)), str(acts))
+				if want.has("tokens_pico_maior_que"):
+					report.call("pico de tokens", panel.peak_tokens() > int(want["tokens_pico_maior_que"]), str(panel.peak_tokens()))
+			"pert":
+				var panel: PainelPert = _main._pert_panel
+				var d: Dictionary = panel.data
+				if want.has("modo"):
+					report.call("modo do PERT", d.get("mode", "") == want["modo"], str(d.get("mode", "(nenhum)")))
+				if want.has("caixas_maior_que"):
+					var n: int = (d.get("diagram", {}).get("boxes", []) as Array).size()
+					report.call("caixas do diagrama", n > int(want["caixas_maior_que"]), str(n))
+				if want.has("tem_histograma"):
+					report.call("histograma do PERT", (d.get("histogram") != null) == bool(want["tem_histograma"]), str(d.get("histogram") != null))
+			"critico":
+				for n in want:
+					report.call("%s no caminho crítico" % n, _main.editor.critical.has(n), str(_main.editor.critical))
+			"camera":
+				report.call("câmera", _main.camera_mode == want, _main.camera_mode)
+			"rotulos_no_maximo":
+				var n: int = _main.cena.labels_shown()
+				report.call("rótulos desenhados", n <= int(want), str(n))
+			"replay":
+				report.call("replay", _main.playing_replay == bool(want), str(_main.playing_replay))
 			"pode_desfazer":
 				report.call("pode desfazer", doc.can_undo() == bool(want), str(doc.can_undo()))
 			"pode_refazer":
