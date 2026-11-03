@@ -23,7 +23,8 @@ Godot (janela, vista 3D, câmera, cena)            Rust (ponte utsim-godot)
 │ principal.gd                         │ set_bar │ UtsimUi (Node2D, ui_class.rs)    │
 │  ├─ CanvasLayer "Interface"          │────────▶│  ├─ Host (egui_host.rs)          │
 │  │   ├─ painéis GDScript (a migrar)  │         │  │   ├─ egui::Context            │
-│  │   └─ InterfaceRust (UtsimUi) ─────┼─────────┼──┤   ├─ ui_bar.rs (barra)        │
+│  │   └─ InterfaceRust (UtsimUi) ─────┼─────────┼──┤   ├─ ui_bar.rs, ui_left.rs,   │
+│  │                                   │         │  │   │  ui_props.rs, ui_bottom.rs│
 │  ├─ editor.gd, camera_orbita.gd      │ action  │  │   └─ Registry (nomes)          │
 │  └─ cena.gd (vista 3D)               │◀────────│  ├─ egui_input.rs (entrada)      │
 └──────────────────────────────────────┘         │  └─ egui_mesh.rs (desenho)       │
@@ -118,7 +119,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 1 | Fundação: nó `UtsimUi`, entrada, desenho, área livre, registro de nomes, tema comum, testes | 6–8 h | **feito** |
 | 2a | Barra superior em egui, com grupos e menu "Mais" | 2–3 h | **feito** |
 | 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | **feito** |
-| 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | a fazer |
+| 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | **feito** |
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | a fazer |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
 
@@ -154,6 +155,67 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   `_show_properties` e mostra um ou outro.
 - Roteiros: `reveal(nome)` rola o painel até um widget fora da vista antes do clique;
   um nó Godot oculto com o mesmo nome (o painel Godot) cede ao widget do egui.
+
+### Passo 3 (painel da esquerda, status e reprodução), como foi feito
+
+- `ui_left.rs` (puro, testado): no Editar, a **Biblioteca** (as entradas de
+  `document::palette()` por categoria, com os ícones `res://icones/<id>.svg` que o
+  `principal.gd` passa uma vez por `set_library_icons` e a ponte mostra como texturas
+  `TextureId::User`), a lista **Objetos** com a busca e **Mostrar obstáculos e folgas**; no
+  Simular, replicações (campo com − e +), **Simular de novo**, a linha de situação, os blocos,
+  a câmera, **Fluxos**, **Gravar replay**, **Rótulos**, **Sombras** e o resumo com o gargalo.
+  `ui_bottom.rs` (puro, testado): a barra de status (texto cortado com "…" e o texto inteiro
+  na dica, progresso com porcentagem ou indeterminado, **Cancelar**) e a barra de reprodução
+  (◀ evento, Reproduzir/Pausar, evento ▶, velocidade, linha do tempo e `t = … / …`).
+- O que mostram vem do `principal.gd` em dicionários pequenos (`set_edit_state`,
+  `set_sim_state`, `set_status_bar`, `set_playback_bar`), e um quadro só roda quando algo muda
+  (durante a reprodução, o tempo muda a cada quadro). Os objetos da lista a ponte lê do
+  documento (`Editor::objects`), de novo a cada `set_edit_state`, que o `after_edit` chama.
+- Ações novas no sinal `action`: `biblioteca:<id>`, `biblioteca_arrastar:<id>`,
+  `objeto:<nome>`, `objeto_focar:<nome>`, `obstaculos:ligar|desligar`, `replicacoes:<n>`,
+  `rodar_de_novo`, `bloco:<k>`, `camera:<modo>`, `gravar_replay`, `rotulos:…`, `sombras:…`,
+  `cancelar`, `evento:±1`, `reproduzir`, `velocidade:<x>`, `tempo:<s>`. "Fluxos" reusa
+  `analisar:fluxos`.
+- **Arrastar da biblioteca**: o arrasto começa no egui (o ponteiro andou 8 pontos desde o
+  aperto numa entrada) e sai como `biblioteca_arrastar:<id>`; o `editor.gd` passa a seguir o
+  mouse (`start_palette_drag`) e resolve a soltura na vista 3D: o `_input` dele roda antes do
+  `_input` do `UtsimUi`, então vê o movimento e a soltura mesmo com o egui dono do arrasto, e
+  coloca o objeto quando o botão sobe sobre a área livre central (`over_ui` falso). Soltar
+  sobre um painel cancela, como antes.
+- Nomes mantidos: `Biblioteca`, `Biblioteca_<id>`, `Objetos_Busca`, `Objetos_Lista`,
+  `Ver_Obstaculos`, `Status`, `Progresso`, `Botao_Cancelar`, `Simular_Replicacoes`,
+  `Botao_RodarDeNovo`, `Simular_Blocos`, `Simular_Camera`, `Botao_Fluxos`,
+  `Botao_GravarReplay`, `Reproducao_Anterior`, `Reproducao_Play`, `Reproducao_Proximo`,
+  `Reproducao_Velocidade`. Novos: `PainelEsquerdo`, `Objeto_<nome>`, `Objetos_Limpar`,
+  `Bloco_<k>`, `Simular_Status`, `Simular_Menos`, `Simular_Mais`, `Simular_Rotulos`,
+  `Simular_Sombras`, `Simular_Resumo`, `BarraInferior`, `BarraReproducao`,
+  `Reproducao_Tempo`, `Reproducao_T`. O `roteiro.gd` lê a linha de status em
+  `principal.status_text` e revela (rola até) a origem de um `arrastar` antes do arrasto.
+- Removidos: `biblioteca.gd` e, do `principal.gd`, o painel esquerdo, a barra de status e a
+  barra de reprodução em Godot (e `set_reserved_bottom`: a barra de status agora é do egui, e o
+  painel de propriedades para acima dela). Sem a ponte, uma linha Godot diz que ela não
+  carregou.
+- Painel de propriedades: a coluna dos rótulos passou a ser 40 % da linha, entre 140 e 200
+  pontos (`ui_props::label_width`), e a coluna dos valores fica com o resto; um rótulo maior
+  quebra em mais linhas e nunca é cortado (a dica tem o texto inteiro com a ajuda). Na
+  conferência a 1280×720 nenhum rótulo saiu cortado.
+- Roteiros a 1280×720: o passo `camera` agora põe o alvo no meio da área livre (entre os
+  painéis) e, numa janela em que essa área mostra menos chão que a 1600×900, afasta a câmera
+  na mesma proporção (as conferências `camera_distancia` usam a mesma escala). Assim os pontos
+  do chão de `g2_tutorial_01` e `g2_montar_linha` caem na área livre e os dois roteiros
+  passam com janela a 1600×900 e a 1280×720; sem janela (1600×900) nada muda. O `main`
+  tinha a mesma falha a 1280×720: com o `main` do início deste passo, o passo 19 de
+  `g2_tutorial_01` falha (a `saida` solta em x = 11,7 m cai sob o painel de propriedades), e
+  antes da frente egui o painel de propriedades em Godot tinha a mesma largura (420) e o mesmo
+  lugar, então o ponto caía sob ele do mesmo jeito.
+- Conferência com janela a 1600×900 e 1280×720 (`g2_tutorial_01`, `g2_montar_linha`,
+  `g3_cena` e um roteiro do editor com `centro_de_distribuicao.ron`: busca, dica da
+  biblioteca, entrada armada, obstáculos, Simular, seguir um bloco, linha do tempo,
+  velocidade, sombras, 40 replicações). Achados e correções: a lista de objetos ficava vazia ao
+  abrir um modelo (a revisão do documento novo podia ser igual à do anterior; a lista é lida de
+  novo a cada `set_edit_state`); "Desmontagem" saía cortada na biblioteca (ícone e margens
+  menores); as listas cortadas não mostravam que rolam (alça fina visível em repouso); a
+  biblioteca ocupa até 60 % do painel.
 
 ### Plano original do passo 2b
 

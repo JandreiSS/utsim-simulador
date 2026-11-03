@@ -46,7 +46,9 @@ pub mod playback;
 pub mod results;
 pub mod schema;
 pub mod ui_bar;
+pub mod ui_bottom;
 mod ui_class;
+pub mod ui_left;
 pub mod ui_props;
 
 pub use utsim_edit::ron_text;

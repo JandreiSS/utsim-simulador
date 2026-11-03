@@ -11,25 +11,30 @@
 ##
 ## The model being edited is a `UtsimDocument` (the bridge over `utsim_edit::Document`):
 ## every change is a command, validated and undoable. Editar draws the document with the
-## same scene code as the playback (`UtsimDocument.edit_scene`), the 3D interaction is
-## `editor.gd`, the library `biblioteca.gd` and the properties `painel_propriedades.gd`.
+## same scene code as the playback (`UtsimDocument.edit_scene`) and the 3D interaction is
+## `editor.gd`.
 ##
 ## Everything visible is built here in code (lights, floor, grid, camera, panels), so the
 ## `.tscn` stays a single node and the layout is easy to read in one file. Panels are
 ## opaque, so the 3D labels never show through them.
 ##
-## The top bar is drawn in Rust with egui (`UtsimUi`, `crates/utsim-godot/src/ui_bar.rs`):
-## it shows `_sync_bar()`'s state and its clicks come back as `bar_action(what)`. Its
-## widgets keep the names of the Godot buttons they replaced (`Modo_Editar`,
-## `Botao_Novo`...), which the scripted runs find through the bridge.
+## The interface around the 3D view is drawn in Rust with egui (`UtsimUi`,
+## `crates/utsim-godot/src/ui_*.rs`): the top bar (`_sync_bar`), the left panel with the
+## library, the objects and the run (`_sync_edit`, `_sync_sim`), the properties, the status
+## bar (`set_status`, the job's progress) and the playback bar (`_sync_play`). Its clicks
+## come back as `bar_action(what)`, and its widgets keep the names of the Godot controls
+## they replaced (`Modo_Editar`, `Biblioteca_Queue`, `Reproducao_Play`...), which the
+## scripted runs find through the bridge. The Godot panels that remain (Resultados,
+## PERT/CPM, Fluxos, the Rede and Corredor subpanels, the dialogs) come in later steps.
 extends Node3D
 
-const SPEEDS := [0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
+## The widths of the side panels and the heights of the bars, as the egui interface draws
+## them (`ui_left::WIDTH`, `ui_props::WIDTH`, the bar, `ui_bottom::STATUS_HEIGHT`): the
+## Godot panels that remain are placed by them.
 const LEFT_WIDTH := 290
 const RIGHT_WIDTH := 420
 const TOP_HEIGHT := 46
 const BOTTOM_HEIGHT := 40
-const PANEL := Color(0.12, 0.13, 0.16)
 const RED := Color(1.0, 0.45, 0.42)
 const YELLOW := Color(0.98, 0.80, 0.35)
 const CAMERAS := [["orbita", "Órbita"], ["seguir", "Seguir"], ["primeira_pessoa", "Primeira pessoa"], ["recurso", "Do recurso"]]
@@ -64,47 +69,36 @@ var mini_asset := "-"
 var _mini_view: SubViewport
 var _mini_scene: CenaUtsim
 var _mini_camera: Camera3D
-var _left: PanelContainer
 var _right: PanelContainer
-var _bottom: PanelContainer
-var _bar: PanelContainer
-var _edit_left: VBoxContainer
-var _sim_left: VBoxContainer
-var _library: Biblioteca
-var _objects_list: ItemList
-var _objects_search: LineEdit
 var _props: PainelPropriedades
 var _props_scroll: ScrollContainer
-var _status: Label
-var _sim_status: Label
-var _summary: RichTextLabel
-var _reps: SpinBox
-var _play: Button
-var _slider: HSlider
-var _time: Label
-var _blocks: ItemList
+## The status line (the egui status bar shows it; the scripted runs read it).
+var status_text := ""
+## The status line of the Simular panel ("Simulando..." while the run goes).
+var _sim_status := ""
+## Only when the bridge did not load: the line that says so.
+var _status_fallback: Label
+## The results summary of the Simular panel (`UtsimUi.set_sim_state`).
+var _summary := {}
+var _block_labels := PackedStringArray()
+var labels_on := true
 var _open_dialog: FileDialog
 var _save_dialog: FileDialog
 var _discard: ConfirmationDialog
 var _shortcuts: AcceptDialog
 var _grid: MeshInstance3D
-var _slider_lock := false
 var _fps: Label
 var _revision := -1
-var _listed: Array = []
 var _pending := Callable()
+## The replications of Simular (the field of the Simular panel).
 var _run_reps := 5
 ## The run shown in Resultados (`UtsimResults`), and the job running now (`UtsimJob`).
 var results: Object
 var job: Object
 var _job_done := Callable()
-var _progress: ProgressBar
-var _cancel: Button
-var _show_obstacles: CheckBox
 var _results_panel: PainelResultados
 var _pert_panel: PainelPert
 var _flows_panel: PainelFluxos
-var _camera_pick: OptionButton
 ## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
 var camera_mode := "orbita"
 ## Point the following cameras look at (scripted checks: nothing may stand between).
@@ -133,13 +127,12 @@ func _ready() -> void:
 	doc.new_model("novo_modelo")
 	if ui != null:
 		ui.set_document(doc)
-		ui.set_reserved_bottom(BOTTOM_HEIGHT)
+		ui.set_library_icons(_library_icons())
 		_build_miniature()
 	editor = EditorUtsim.new()
 	editor.name = "Editor"
 	add_child(editor)
 	editor.setup(self, _ui)
-	_library.build(doc.palette(), doc.categories())
 	_props.families = doc.families()
 	_props.data_families = doc.data_families()
 	_fill_shortcuts()
@@ -209,131 +202,10 @@ func _panel(name: String) -> PanelContainer:
 	return p
 
 
-func _button(parent: Node, name: String, text: String, tip: String, action: Callable) -> Button:
-	var b := Button.new()
-	b.name = name
-	b.text = text
-	b.tooltip_text = tip
-	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(action)
-	parent.add_child(b)
-	return b
-
-
 func _build_ui() -> void:
 	_ui = CanvasLayer.new()
 	_ui.name = "Interface"
 	add_child(_ui)
-
-	_left = _panel("PainelEsquerdo")
-	_left.anchor_bottom = 1.0
-	_left.offset_top = TOP_HEIGHT
-	_left.offset_right = LEFT_WIDTH
-	_left.offset_bottom = -BOTTOM_HEIGHT
-	var left := VBoxContainer.new()
-	_left.add_child(left)
-	_edit_left = VBoxContainer.new()
-	_edit_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.add_child(_edit_left)
-	_library = Biblioteca.new()
-	_library.name = "Biblioteca"
-	_library.chosen.connect(func(id):
-		if editor.tool == "colocar" and editor.place_id == id:
-			editor.set_tool("selecionar")
-		else:
-			editor.set_tool("colocar", id))
-	_library.drag_started.connect(func(id): editor.start_palette_drag(id))
-	_edit_left.add_child(_library)
-	_edit_left.add_child(HSeparator.new())
-	var olabel := Label.new()
-	olabel.text = "Objetos"
-	olabel.theme_type_variation = &"TituloPainel"
-	_edit_left.add_child(olabel)
-	_objects_search = LineEdit.new()
-	_objects_search.name = "Objetos_Busca"
-	_objects_search.placeholder_text = "Buscar por nome ou tipo"
-	_objects_search.clear_button_enabled = true
-	_objects_search.text_changed.connect(func(_t): _fill_objects())
-	_edit_left.add_child(_objects_search)
-	_objects_list = ItemList.new()
-	_objects_list.name = "Objetos_Lista"
-	_objects_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_objects_list.focus_mode = Control.FOCUS_NONE
-	_objects_list.item_clicked.connect(func(k, _at, _button):
-		editor.select_only(_listed[k]))
-	_objects_list.item_activated.connect(func(k): focus_block(_listed[k], 8.0))
-	_edit_left.add_child(_objects_list)
-	_show_obstacles = CheckBox.new()
-	_show_obstacles.name = "Ver_Obstaculos"
-	_show_obstacles.text = "Mostrar obstáculos e folgas"
-	_show_obstacles.tooltip_text = "Mostra a área ocupada dos objetos, as paredes, a folga dos recursos e o ponto de acesso de cada objeto (arraste-o com a ferramenta Selecionar)"
-	_show_obstacles.focus_mode = Control.FOCUS_NONE
-	_show_obstacles.toggled.connect(func(on): editor.corredores.set_obstacles_visible(on))
-	_edit_left.add_child(_show_obstacles)
-
-	_sim_left = VBoxContainer.new()
-	_sim_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.add_child(_sim_left)
-	var row := HBoxContainer.new()
-	_sim_left.add_child(row)
-	var reps_label := Label.new()
-	reps_label.text = "Replicações"
-	row.add_child(reps_label)
-	_reps = SpinBox.new()
-	_reps.name = "Simular_Replicacoes"
-	_reps.min_value = 1
-	_reps.max_value = 1000
-	_reps.value = 5
-	row.add_child(_reps)
-	_button(_sim_left, "Botao_RodarDeNovo", "▶ Simular de novo", "Roda as replicações outra vez", func(): simulate(int(_reps.value)))
-	_sim_status = Label.new()
-	_sim_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_sim_status.custom_minimum_size = Vector2(260, 0)
-	_sim_left.add_child(_sim_status)
-	var blocks_label := Label.new()
-	blocks_label.text = "Blocos (clique para focar)"
-	_sim_left.add_child(blocks_label)
-	_blocks = ItemList.new()
-	_blocks.name = "Simular_Blocos"
-	_blocks.custom_minimum_size = Vector2(260, 200)
-	_blocks.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_blocks.item_selected.connect(func(k):
-		follow_name = cena.blocks[k]["name"]
-		if camera_mode == "orbita":
-			focus_block(follow_name, 8.0))
-	_sim_left.add_child(_blocks)
-	var cam_row := HBoxContainer.new()
-	_sim_left.add_child(cam_row)
-	var cam_label := Label.new()
-	cam_label.text = "Câmera"
-	cam_row.add_child(cam_label)
-	_camera_pick = OptionButton.new()
-	_camera_pick.name = "Simular_Camera"
-	_camera_pick.focus_mode = Control.FOCUS_NONE
-	_camera_pick.tooltip_text = "Seguir, Primeira pessoa e Do recurso acompanham o bloco escolhido na lista"
-	for k in CAMERAS.size():
-		_camera_pick.add_item(CAMERAS[k][1], k)
-	_camera_pick.item_selected.connect(func(k): set_camera_mode(CAMERAS[k][0]))
-	cam_row.add_child(_camera_pick)
-	var sim_row := HBoxContainer.new()
-	_sim_left.add_child(sim_row)
-	_button(sim_row, "Botao_Fluxos", "Fluxos", "Fluxos de tokens em 2D, com as contagens no tempo", func(): analysis_action("fluxos"))
-	_button(sim_row, "Botao_GravarReplay", "Gravar replay", "Grava o replay desta replicação em .json (abre de novo com Abrir)", func(): _replay_dialog.popup_centered_ratio(0.7))
-	var labels := CheckBox.new()
-	labels.text = "Rótulos"
-	labels.button_pressed = true
-	labels.toggled.connect(func(on): cena.set_labels_visible(on))
-	_sim_left.add_child(labels)
-	var shadows := CheckBox.new()
-	shadows.text = "Sombras"
-	shadows.button_pressed = true
-	shadows.toggled.connect(func(on): sun.shadow_enabled = on)
-	_sim_left.add_child(shadows)
-	_summary = RichTextLabel.new()
-	_summary.custom_minimum_size = Vector2(260, 180)
-	_summary.bbcode_enabled = true
-	_summary.scroll_active = true
-	_sim_left.add_child(_summary)
 
 	_right = _panel("PainelPropriedades")
 	_right.anchor_left = 1.0
@@ -382,62 +254,6 @@ func _build_ui() -> void:
 		if doc.disconnect_objects(editor.selected[0], to):
 			after_edit.call_deferred())
 	_props_scroll.add_child(_props)
-
-	_bottom = _panel("BarraInferior")
-	_bottom.anchor_top = 1.0
-	_bottom.anchor_right = 1.0
-	_bottom.anchor_bottom = 1.0
-	_bottom.offset_top = -BOTTOM_HEIGHT
-	var bottom := HBoxContainer.new()
-	_bottom.add_child(bottom)
-	_status = Label.new()
-	_status.name = "Status"
-	_status.clip_text = true
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bottom.add_child(_status)
-	_progress = ProgressBar.new()
-	_progress.name = "Progresso"
-	_progress.custom_minimum_size = Vector2(220, 0)
-	_progress.visible = false
-	bottom.add_child(_progress)
-	_cancel = _button(bottom, "Botao_Cancelar", "Cancelar", "Para na próxima replicação", func(): cancel_job())
-	_cancel.visible = false
-
-	# Playback bar (Simular), above the status bar.
-	_bar = _panel("BarraReproducao")
-	_bar.anchor_top = 1.0
-	_bar.anchor_right = 1.0
-	_bar.anchor_bottom = 1.0
-	_bar.offset_left = LEFT_WIDTH + 10
-	_bar.offset_right = -10
-	_bar.offset_top = -BOTTOM_HEIGHT - 52
-	_bar.offset_bottom = -BOTTOM_HEIGHT - 6
-	var h := HBoxContainer.new()
-	_bar.add_child(h)
-	_button(h, "Reproducao_Anterior", "◀ evento", "Evento anterior", func(): step_event(-1))
-	_play = _button(h, "Reproducao_Play", "Reproduzir", "Reproduzir ou pausar (espaço)", func(): set_playing(not playing))
-	_play.custom_minimum_size = Vector2(110, 0)
-	_button(h, "Reproducao_Proximo", "evento ▶", "Próximo evento", func(): step_event(1))
-	var sp := OptionButton.new()
-	sp.name = "Reproducao_Velocidade"
-	sp.focus_mode = Control.FOCUS_NONE
-	for k in SPEEDS.size():
-		sp.add_item("%sx" % str(SPEEDS[k]), k)
-	sp.selected = SPEEDS.find(1.0)
-	sp.item_selected.connect(func(k): speed = SPEEDS[k])
-	h.add_child(sp)
-	_slider = HSlider.new()
-	_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_slider.step = 0.0
-	_slider.focus_mode = Control.FOCUS_NONE
-	_slider.value_changed.connect(func(v):
-		if not _slider_lock:
-			seek(v, true))
-	h.add_child(_slider)
-	_time = Label.new()
-	_time.custom_minimum_size = Vector2(170, 0)
-	h.add_child(_time)
 
 	_fps = Label.new()
 	_fps.offset_left = LEFT_WIDTH + 10
@@ -532,6 +348,26 @@ func _build_ui() -> void:
 		ui.name = "InterfaceRust"
 		ui.action.connect(bar_action)
 		_ui.add_child(ui)
+	else:
+		# Without the bridge there is no interface: one line says why.
+		_status_fallback = Label.new()
+		_status_fallback.name = "Status"
+		_status_fallback.anchor_top = 1.0
+		_status_fallback.anchor_right = 1.0
+		_status_fallback.anchor_bottom = 1.0
+		_status_fallback.offset_left = 12
+		_status_fallback.offset_top = -BOTTOM_HEIGHT
+		_ui.add_child(_status_fallback)
+
+
+## The icons of the library (`res://icones/<id>.svg`), for the egui panel.
+func _library_icons() -> Dictionary:
+	var icons := {}
+	for e in doc.palette():
+		var path := "res://icones/%s.svg" % e["id"]
+		if ResourceLoader.exists(path):
+			icons[e["id"]] = load(path)
+	return icons
 
 
 func _fill_shortcuts() -> void:
@@ -571,10 +407,10 @@ func toggle_shortcuts() -> void:
 ## Left and right x of the 3D view not covered by the side panels (`CameraOrbita.free_span`).
 func free_span() -> Vector2:
 	var w := get_viewport().get_visible_rect().size.x
-	var lo := float(LEFT_WIDTH) if _left != null and _left.visible else 0.0
+	var lo := 0.0
 	var hi := w - float(RIGHT_WIDTH) if _right != null and _right.visible else w
 	if ui != null:
-		# The free area egui leaves (its side panels, once they move to Rust).
+		# The free area egui leaves (the library or the run on the left, the properties).
 		var free: Rect2 = ui.central_rect()
 		if free.size.x > 0.0:
 			lo = maxf(lo, free.position.x)
@@ -586,7 +422,7 @@ func free_span() -> Vector2:
 func over_ui(p: Vector2) -> bool:
 	if ui != null and ui.is_over(p):
 		return true
-	for c in [_left, _right, _bottom, _bar, _results_panel, _pert_panel, _flows_panel]:
+	for c in [_right, _results_panel, _pert_panel, _flows_panel]:
 		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
@@ -632,14 +468,19 @@ func set_snap(on: bool, step: float) -> void:
 
 
 func set_status(text: String) -> void:
-	_status.text = text
-	if _sim_status != null and mode == "simular":
-		_sim_status.text = text
+	status_text = text
+	if ui != null:
+		ui.set_status_bar({"text": text})
+	elif _status_fallback != null:
+		_status_fallback.text = text
+	if mode == "simular":
+		_sim_status = text
+		_sync_sim()
 
 
 func on_tool_changed() -> void:
 	_sync_bar()
-	_library.mark(editor.place_id)
+	_sync_edit()
 	_show_properties()
 
 
@@ -655,7 +496,7 @@ func on_aisle_selection() -> void:
 
 func on_selection_changed() -> void:
 	_show_properties()
-	_mark_listed()
+	_sync_edit()
 
 
 func on_dragging() -> void:
@@ -692,7 +533,7 @@ func bar_action(what: String) -> void:
 	if what.contains("\t"):
 		_panel_action(what.split("\t"))
 		return
-	var arg := what.get_slice(":", 1) if what.contains(":") else ""
+	var arg := what.substr(what.find(":") + 1) if what.contains(":") else ""
 	match what.get_slice(":", 0):
 		"modo":
 			set_mode(arg)
@@ -723,7 +564,101 @@ func bar_action(what: String) -> void:
 			analysis_action(arg)
 		"atalhos":
 			toggle_shortcuts()
+		# The left panel of Editar.
+		"biblioteca":
+			if editor.tool == "colocar" and editor.place_id == arg:
+				editor.set_tool("selecionar")
+			else:
+				editor.set_tool("colocar", arg)
+		"biblioteca_arrastar":
+			# The drag started in the egui library; the editor follows the mouse and the
+			# drop is resolved over the 3D view (the free central area).
+			editor.start_palette_drag(arg)
+		"objeto":
+			editor.select_only(arg)
+		"objeto_focar":
+			focus_block(arg, 8.0)
+		"obstaculos":
+			editor.corredores.set_obstacles_visible(arg == "ligar")
+			_sync_edit()
+		# The left panel of Simular.
+		"replicacoes":
+			_run_reps = clampi(int(arg), 1, 1000)
+			_sync_sim()
+		"rodar_de_novo":
+			simulate(_run_reps)
+		"bloco":
+			var k := int(arg)
+			if k >= 0 and k < cena.blocks.size():
+				follow_name = cena.blocks[k]["name"]
+				if camera_mode == "orbita":
+					focus_block(follow_name, 8.0)
+				_sync_sim()
+		"camera":
+			set_camera_mode(arg)
+		"gravar_replay":
+			_replay_dialog.popup_centered_ratio(0.7)
+		"rotulos":
+			labels_on = arg == "ligar"
+			cena.set_labels_visible(labels_on)
+			_sync_sim()
+		"sombras":
+			sun.shadow_enabled = arg == "ligar"
+			_sync_sim()
+		# The status bar and the playback bar.
+		"cancelar":
+			cancel_job()
+		"evento":
+			step_event(int(arg))
+		"reproduzir":
+			set_playing(not playing)
+		"velocidade":
+			speed = float(arg)
+			_sync_play()
+		"tempo":
+			seek(float(arg), true)
 	_sync_bar()
+
+
+## What the left panel of Editar shows besides the library and the objects (which the
+## bridge reads from the document): the entry armed, the selection, the obstacles.
+func _sync_edit() -> void:
+	if ui == null or editor == null:
+		return
+	ui.set_edit_state({
+		"armed": editor.place_id if editor.tool == "colocar" else "",
+		"selected": PackedStringArray(editor.selected),
+		"obstacles": editor.corredores.show_obstacles,
+	})
+
+
+## What the left panel of Simular shows.
+func _sync_sim() -> void:
+	if ui == null:
+		return
+	ui.set_sim_state({
+		"reps": _run_reps,
+		"status": _sim_status,
+		"blocks": _block_labels,
+		"follow": cena.block_index(follow_name) if follow_name != "" else -1,
+		"camera": camera_mode,
+		"labels": labels_on,
+		"shadows": sun.shadow_enabled,
+		"summary": _summary,
+	})
+
+
+## What the playback bar shows (only in Simular).
+func _sync_play() -> void:
+	if ui == null:
+		return
+	ui.set_playback_bar({
+		"visible": mode == "simular",
+		"playing": playing,
+		"t": t,
+		"end": playback.end() if playback != null else 0.0,
+		"speed": speed,
+	})
 
 
 ## What the egui properties panel did (the edits are already applied by the bridge).
@@ -879,7 +814,7 @@ func after_edit(force := false) -> void:
 	editor.corredores.sync()
 	if mode == "editar":
 		_build_edit_scene()
-	_fill_objects()
+	_sync_edit()
 	_show_properties()
 	_update_title()
 
@@ -903,34 +838,6 @@ func _update_title() -> void:
 	if is_inside_tree():
 		get_window().title = "UTSim 3D: %s%s (%s)" % [doc.name(), dirty, file]
 	_sync_bar()
-
-
-func _fill_objects() -> void:
-	if _objects_list == null or doc == null:
-		return
-	_objects_list.clear()
-	_listed.clear()
-	var wanted := _objects_search.text.strip_edges().to_lower()
-	for o in doc.objects():
-		var text := "%s (%s)" % [o["name"], o["kind_label"]]
-		if wanted != "" and not text.to_lower().contains(wanted):
-			continue
-		var k := _objects_list.add_item(text)
-		if int(o["problems"]) > 0:
-			_objects_list.set_item_custom_fg_color(k, RED)
-			_objects_list.set_item_tooltip(k, "%d problema(s)" % o["problems"])
-		elif int(o["warnings"]) > 0:
-			_objects_list.set_item_custom_fg_color(k, YELLOW)
-			_objects_list.set_item_tooltip(k, "%d aviso(s)" % o["warnings"])
-		_listed.append(o["name"])
-	_mark_listed()
-
-
-func _mark_listed() -> void:
-	_objects_list.deselect_all()
-	for k in _listed.size():
-		if editor.selected.has(_listed[k]):
-			_objects_list.select(k, false)
 
 
 func _show_properties() -> void:
@@ -1269,10 +1176,8 @@ func set_mode(which: String) -> bool:
 	set_playing(false)
 	mode = "editar"
 	playing_replay = false
-	_edit_left.visible = true
-	_sim_left.visible = false
 	_set_right(true)
-	_bar.visible = false
+	_sync_play()
 	_sync_panels()
 	_sync_bar()
 	_revision = -1
@@ -1296,13 +1201,10 @@ func simulate(reps: int) -> bool:
 		_sync_bar()
 		return false
 	mode = "simular"
-	_edit_left.visible = false
-	_sim_left.visible = true
 	_set_right(false)
-	_bar.visible = true
+	_sync_play()
 	_sync_panels()
 	_sync_bar()
-	_reps.value = reps
 	playing_replay = false
 	if job != null:
 		set_status("Aguarde: %s." % job.what())
@@ -1311,7 +1213,8 @@ func simulate(reps: int) -> bool:
 	if j == null:
 		set_status("A simulação não começou: %s" % model.last_error())
 		return false
-	_sim_status.text = "Simulando %d replicações..." % reps
+	_sim_status = "Simulando %d replicações..." % reps
+	_sync_sim()
 	cena.clear(true)
 	playback = null
 	start_job(j, func(done): _on_run(done))
@@ -1339,12 +1242,9 @@ func _show_playback() -> void:
 	var info := cena.info
 	_update_shadows(info["bounds_min"], info["bounds_max"])
 	_draw_grid(info)
-	_blocks.clear()
+	_block_labels = PackedStringArray()
 	for b in cena.blocks:
-		_blocks.add_item("%s (%s)" % [b["name"], b["kind"]])
-	_slider_lock = true
-	_slider.max_value = playback.end()
-	_slider_lock = false
+		_block_labels.append("%s (%s)" % [b["name"], b["kind"]])
 	_flows_panel.set_playback(playback)
 	if follow_name == "" or cena.block_index(follow_name) < 0:
 		follow_name = ""
@@ -1352,6 +1252,7 @@ func _show_playback() -> void:
 			if b["mobile"]:
 				follow_name = b["name"]
 				break
+	_sync_sim()
 	seek(0.0, true)
 
 
@@ -1365,16 +1266,17 @@ func on_results(res: Object) -> void:
 
 
 func _show_summary() -> void:
-	var lines := PackedStringArray()
 	var s: Dictionary = results.summary()
-	lines.append("[b]Resultados (%d replicações)[/b]" % s["replications"])
-	var b = s.get("bottleneck")
-	if b != null:
-		lines.append("[color=#ff9a3d]Gargalo: %s[/color]" % b)
+	var lines := PackedStringArray()
 	for r in results.table():
 		lines.append("%s: %s saídas" % [r["name"], PainelResultados.mh(r["output"])])
-	lines.append("[color=#aab2be]A tabela completa, os gráficos e as análises estão em Resultados.[/color]")
-	_summary.text = "\n".join(lines)
+	var b = s.get("bottleneck")
+	_summary = {
+		"title": "Resultados (%d replicações)" % s["replications"],
+		"bottleneck": str(b) if b != null else "",
+		"lines": lines,
+	}
+	_sync_sim()
 
 
 ## A number with about four significant digits.
@@ -1467,8 +1369,7 @@ func _grid_lines(lo: Vector3, hi: Vector3, step: float) -> void:
 
 func set_playing(on: bool) -> void:
 	playing = on and playback != null and mode == "simular"
-	if _play != null:
-		_play.text = "Pausar" if playing else "Reproduzir"
+	_sync_play()
 
 
 ## Jumps to `time` (no crossfade when `snap`).
@@ -1491,10 +1392,7 @@ func step_event(direction: int) -> void:
 
 
 func _show_time() -> void:
-	_slider_lock = true
-	_slider.value = t
-	_slider_lock = false
-	_time.text = "t = %.2f / %.2f" % [t, playback.end()]
+	_sync_play()
 
 
 func _process(dt: float) -> void:
@@ -1637,9 +1535,8 @@ func start_job(j: Object, done: Callable) -> void:
 		return
 	job = j
 	_job_done = done
-	_progress.visible = true
-	_progress.value = 0
-	_cancel.visible = true
+	if ui != null:
+		ui.set_status_bar({"progress": 0.0, "percent": true})
 	set_status("%s..." % j.what())
 
 
@@ -1654,23 +1551,20 @@ func _poll_job() -> void:
 		return
 	var p: Dictionary = job.progress()
 	var total := int(p["total"])
-	if total > 0:
-		_progress.max_value = total
-		_progress.value = int(p["done"])
-		_progress.show_percentage = true
-	else:
-		# Unknown length: a bar that goes back and forth.
-		_progress.max_value = 100
-		_progress.value = absf(sin(Time.get_ticks_msec() / 400.0)) * 100.0
-		_progress.show_percentage = false
+	if ui != null:
+		if total > 0:
+			ui.set_status_bar({"progress": float(p["done"]) / total, "percent": true})
+		else:
+			# Unknown length: a bar that goes back and forth.
+			ui.set_status_bar({"progress": absf(sin(Time.get_ticks_msec() / 400.0)), "percent": false})
 	if not p["finished"]:
 		return
 	var j := job
 	var done := _job_done
 	job = null
 	_job_done = Callable()
-	_progress.visible = false
-	_cancel.visible = false
+	if ui != null:
+		ui.set_status_bar({"progress": -1.0})
 	if not j.ok():
 		if j.cancelled():
 			set_status("%s: cancelado." % j.what())
@@ -1755,7 +1649,7 @@ func enable_samples_and_rerun() -> void:
 		parts.append("run.sample_interval = %s" % _num(float(r["sample_interval"])))
 	if int(r["histogram_bins"]) > 0:
 		parts.append("run.histogram_bins = %d" % int(r["histogram_bins"]))
-	simulate(int(_reps.value))
+	simulate(_run_reps)
 	set_status("Ligado no modelo (%s; Ctrl+Z desfaz). Simulando de novo..." % ", ".join(parts))
 
 
@@ -1789,10 +1683,8 @@ func open_replay(path: String) -> bool:
 		return false
 	playing_replay = true
 	mode = "simular"
-	_edit_left.visible = false
-	_sim_left.visible = true
 	_set_right(false)
-	_bar.visible = true
+	_sync_play()
 	_sync_panels()
 	_sync_bar()
 	on_results(model.replay_results())
@@ -1825,16 +1717,18 @@ func set_camera_mode(which: String) -> void:
 	camera_mode = which
 	if which not in ["primeira_pessoa", "recurso"]:
 		cena.restore_view()
-	for k in CAMERAS.size():
-		if CAMERAS[k][0] == which:
-			_camera_pick.select(k)
+	var label := which
+	for c in CAMERAS:
+		if c[0] == which:
+			label = c[1]
+	_sync_sim()
 	if which == "orbita":
 		camera.update()
 		set_status("Câmera de órbita.")
 	elif follow_name == "":
 		set_status("Escolha na lista o bloco que a câmera acompanha.")
 	else:
-		set_status("Câmera %s: %s." % [CAMERAS[_camera_pick.selected][1].to_lower(), follow_name])
+		set_status("Câmera %s: %s." % [label.to_lower(), follow_name])
 
 
 ## Places the camera for the modes that follow a block (called every frame in Simular).

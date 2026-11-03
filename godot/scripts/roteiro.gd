@@ -40,7 +40,10 @@
 ##    - `{"capturar": "nome"}`
 ##    - `{"dialogo": "{saida}/modelo.ron"}`: accepts the open file dialog with that path
 ##    - `{"camera": {"alvo": [x, y], "distancia": 18, "giro": 0.3, "inclinacao": 0.9}}`
-##      (model plan coordinates)
+##      (model plan coordinates): the target is drawn in the middle of the free area
+##      between the panels, and in a window whose free area shows less floor than at
+##      1600x900 the camera backs off in proportion (the `camera_distancia` checks too), so
+##      the floor points of a script written for 1600x900 stay out of the panels
 ##    - `{"focar": {"objeto": "empilhadeira_1", "distancia": 4.0, "giro": 0.5, "inclinacao": 0.3}}`:
 ##      the orbit camera on a block (as the `focar` of the model captures)
 ##    - `{"abrir": "../../examples/agvs.ron"}`, `{"novo": true}`, `{"modo": "simular"}`
@@ -74,6 +77,9 @@ var _base := ""
 var _log := PackedStringArray()
 var _failed := false
 var _main: Node
+## How much the last `camera` step backed off (1 at 1600x900, more in a smaller window):
+## the `camera_distancia` checks are scaled by it.
+var _cam_scale := 1.0
 var _buttons := 0
 
 
@@ -268,6 +274,8 @@ func _step(s: Dictionary, k: int) -> void:
 	for key in ["clicar", "mover", "em", "escolher"]:
 		if s.has(key):
 			await _reveal(s[key])
+	if s.has("arrastar"):
+		await _reveal(s["arrastar"]["de"])
 	if s.has("nota"):
 		_say("— %s" % s["nota"])
 	elif s.has("clicar"):
@@ -366,7 +374,13 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("camera"):
 		var c: Dictionary = s["camera"]
 		var at: Array = c.get("alvo", [0, 0])
-		_main.camera.focus(Vector3(float(at[0]), 0, -float(at[1])), float(c.get("distancia", 20.0)), c.get("giro"), c.get("inclinacao"))
+		var p := Vector3(float(at[0]), 0, -float(at[1]))
+		# The scripts are written for 1600x900: in a smaller window the camera backs off so
+		# the free area shows as much floor, and the target goes to the middle of it.
+		await _frames(1)
+		_cam_scale = _view_scale()
+		_main.camera.focus(p, float(c.get("distancia", 20.0)) * _cam_scale, c.get("giro"), c.get("inclinacao"))
+		_center_in_free_area(p)
 		await _frames(2)
 	elif s.has("focar"):
 		var f: Dictionary = s["focar"]
@@ -398,6 +412,38 @@ func _step(s: Dictionary, k: int) -> void:
 		_check(s["conferir"], k)
 	else:
 		_fail("passo %d desconhecido: %s" % [k, s])
+
+
+## The ratio of the free area (between the side panels) to the window's height, at
+## 1600x900 with the library and the properties open: 890 / 900.
+const FREE_RATIO := 890.0 / 900.0
+
+
+## How much farther the camera must be for the free area of this window to show as much
+## floor as at 1600x900 (1 when it is as wide or wider).
+func _view_scale() -> float:
+	var screen := get_viewport().get_visible_rect().size
+	var span: Vector2 = _main.free_span()
+	var width := span.y - span.x
+	if screen.y <= 0.0 or width <= 1.0:
+		return 1.0
+	return maxf(1.0, FREE_RATIO / (width / screen.y))
+
+
+## Moves the camera sideways so floor point `p` is drawn in the middle of the free area
+## (not under a side panel).
+func _center_in_free_area(p: Vector3) -> void:
+	var cam: CameraOrbita = _main.camera
+	var screen := get_viewport().get_visible_rect().size
+	var span: Vector2 = _main.free_span()
+	if cam.is_position_behind(p) or screen.y <= 0.0:
+		return
+	var off := cam.unproject_position(p).x - (span.x + span.y) * 0.5
+	var per_px := 2.0 * cam.dist * tan(deg_to_rad(cam.fov) * 0.5) / screen.y
+	var right := cam.global_basis.x
+	right.y = 0.0
+	cam.target += right.normalized() * off * per_px
+	cam.update()
 
 
 func _control(name: String) -> Control:
@@ -772,7 +818,7 @@ func _check(c: Dictionary, k: int) -> void:
 			"ligando":
 				report.call("ligando", _main.editor.connect_from == want, _main.editor.connect_from)
 			"status_contem":
-				var status: String = _main._status.text
+				var status: String = _main.status_text
 				report.call("status contém %s" % want, status.contains(want), status)
 			"reproduzindo":
 				report.call("reproduzindo", _main.playing == bool(want), str(_main.playing))
@@ -965,7 +1011,8 @@ func _check(c: Dictionary, k: int) -> void:
 				for piece in want:
 					report.call("modelo contém %s" % piece, text.contains(piece), text.substr(maxi(text.find("run:"), 0), 240))
 			"camera_distancia":
-				var dd: float = _main.camera.dist
+				# Distances of a 1600x900 script, scaled as the last `camera` step was.
+				var dd: float = _main.camera.dist / _cam_scale
 				report.call("distância da câmera entre %s e %s" % [want[0], want[1]], dd >= float(want[0]) and dd <= float(want[1]), str(dd))
 			"motorista":
 				# {"objeto", "existe", "visivel", "t", "clipe"}: the seated driver of a forklift

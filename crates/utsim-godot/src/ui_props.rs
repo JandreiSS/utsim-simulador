@@ -33,8 +33,17 @@ use crate::schema::{Field, FieldType, Value};
 
 /// Width of the panel, in points.
 pub const WIDTH: f32 = 420.0;
-/// Width of the label column.
-const LABEL_W: f32 = 150.0;
+/// Width of the label column: a share of the row, between a minimum and a maximum (the
+/// value column takes the rest). A label wider than the column wraps to more lines; it is
+/// never cut, and its tooltip has the whole text with the help.
+const LABEL_SHARE: f32 = 0.4;
+const LABEL_MIN: f32 = 140.0;
+const LABEL_MAX: f32 = 200.0;
+
+/// The width of the label column for a row `width` points wide.
+pub fn label_width(width: f32) -> f32 {
+    (width * LABEL_SHARE).clamp(LABEL_MIN, LABEL_MAX)
+}
 /// Indent per nesting level.
 const INDENT: f32 = 14.0;
 /// The texture of the asset miniature (a Godot `SubViewport` the bridge registers).
@@ -106,7 +115,7 @@ pub fn widget_name(path: &str) -> String {
 }
 
 /// Records a widget clipped to what is visible, and scrolls to it when a script asked.
-fn named(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text: &str) {
+pub(crate) fn named(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text: &str) {
     if reg.take_reveal(name) {
         r.scroll_to_me(Some(Align::Center));
         ui.ctx().request_repaint();
@@ -124,7 +133,14 @@ fn named(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text: &str) {
     reg.put_info(name, info);
 }
 
-fn named_toggle(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text: &str, on: bool) {
+pub(crate) fn named_toggle(
+    ui: &Ui,
+    reg: &mut Registry,
+    name: &str,
+    r: &Response,
+    text: &str,
+    on: bool,
+) {
     named(ui, reg, name, r, text);
     if let Some(w) = reg.get(name).cloned() {
         reg.put_info(
@@ -137,7 +153,7 @@ fn named_toggle(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text: &st
     }
 }
 
-fn named_list(
+pub(crate) fn named_list(
     ui: &Ui,
     reg: &mut Registry,
     name: &str,
@@ -404,12 +420,13 @@ fn row_label<R>(
     depth: u8,
     widget: impl FnOnce(&mut Ui, f32) -> R,
 ) -> R {
+    let full = ui.available_width();
     ui.horizontal(|ui| {
         let indent = INDENT * depth as f32;
         if indent > 0.0 {
             ui.add_space(indent);
         }
-        let lw = LABEL_W - indent;
+        let lw = label_width(full) - indent;
         ui.allocate_ui_with_layout(
             Vec2::new(lw, 26.0),
             Layout::left_to_right(Align::Center),
@@ -1022,7 +1039,7 @@ fn asset(
     }
     let typed = ui
         .horizontal(|ui| {
-            ui.add_space(LABEL_W + 6.0);
+            ui.add_space(label_width(ui.available_width()) + 6.0);
             let w = ui.available_width();
             let filter = st.asset_filter.clone();
             line_edit(

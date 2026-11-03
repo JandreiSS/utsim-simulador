@@ -17,6 +17,8 @@ use egui::{Context, Event, FullOutput, Order, Pos2, RawInput, Rect, Vec2, Viewpo
 use crate::egui_input::{self, Input};
 use crate::egui_widgets::Registry;
 use crate::ui_bar::{self, BarMemory, BarState};
+use crate::ui_bottom::{self, PlayView, StatusView};
+use crate::ui_left::{self, EditView, LeftMemory, SimView};
 use crate::ui_props::{self, PropAction, PropsState, PropsView};
 
 /// What one frame produced.
@@ -37,8 +39,13 @@ pub struct Host {
     /// The properties panel (shown when set).
     pub props: Option<PropsView>,
     pub props_state: PropsState,
-    /// Pixels at the bottom left to Godot (the status bar).
-    pub bottom_reserved: f32,
+    /// Whether the left panel is shown (the library in Editar, the run in Simular).
+    pub left: bool,
+    edit: EditView,
+    sim: SimView,
+    pub left_mem: LeftMemory,
+    status: StatusView,
+    play: PlayView,
     /// The egui panels of the last frame, in points.
     panels: Vec<Rect>,
     /// The last pointer event was over egui.
@@ -74,7 +81,12 @@ impl Host {
             bar_mem: BarMemory::default(),
             props: None,
             props_state: PropsState::default(),
-            bottom_reserved: 0.0,
+            left: false,
+            edit: EditView::default(),
+            sim: SimView::default(),
+            left_mem: LeftMemory::default(),
+            status: StatusView::default(),
+            play: PlayView::default(),
             panels: Vec::new(),
             was_over: false,
             central: Rect::NOTHING,
@@ -142,6 +154,56 @@ impl Host {
         }
     }
 
+    /// Sets what the left panel shows in Editar; a frame runs only if it changed.
+    pub fn set_edit(&mut self, v: EditView) {
+        self.left = true;
+        if v != self.edit {
+            self.edit = v;
+            self.dirty = true;
+        }
+    }
+
+    pub fn edit(&self) -> &EditView {
+        &self.edit
+    }
+
+    /// Sets what the left panel shows in Simular.
+    pub fn set_sim(&mut self, v: SimView) {
+        self.left = true;
+        if v != self.sim {
+            self.sim = v;
+            self.dirty = true;
+        }
+    }
+
+    pub fn sim(&self) -> &SimView {
+        &self.sim
+    }
+
+    /// Sets what the status bar shows.
+    pub fn set_status(&mut self, v: StatusView) {
+        if v != self.status {
+            self.status = v;
+            self.dirty = true;
+        }
+    }
+
+    pub fn status(&self) -> &StatusView {
+        &self.status
+    }
+
+    /// Sets what the playback bar shows (Simular).
+    pub fn set_play(&mut self, v: PlayView) {
+        if v != self.play {
+            self.play = v;
+            self.dirty = true;
+        }
+    }
+
+    pub fn play(&self) -> &PlayView {
+        &self.play
+    }
+
     /// Asks for a frame (something outside egui changed what it shows).
     pub fn invalidate(&mut self) {
         self.dirty = true;
@@ -182,9 +244,10 @@ impl Host {
         let mut props_out = Vec::new();
         let mut central = self.central;
         let mut panels = Vec::new();
-        let bottom = self.bottom_reserved / ppp;
         let (reg, bar, mem) = (&mut self.reg, &self.bar, &mut self.bar_mem);
         let (props, pst) = (&self.props, &mut self.props_state);
+        let (left, edit, sim, lmem) = (self.left, &self.edit, &self.sim, &mut self.left_mem);
+        let (status, play) = (&self.status, &self.play);
         let output = self.ctx.run_ui(raw, |ui| {
             // A pass may run twice (egui discards the first when the layout changed):
             // only the last one counts.
@@ -194,20 +257,44 @@ impl Host {
             panels.clear();
             let screen = ui.max_rect();
             ui_bar::show(ui, bar, mem, reg, &mut actions);
+            ui_bottom::show_status(ui, status, reg, &mut actions);
             let below = ui.available_rect_before_wrap();
             panels.push(Rect::from_min_max(
                 screen.min,
                 Pos2::new(screen.max.x, below.min.y),
             ));
+            panels.push(Rect::from_min_max(
+                Pos2::new(screen.min.x, below.max.y),
+                screen.max,
+            ));
             central = below;
+            if left {
+                let rect = Rect::from_min_max(
+                    below.min,
+                    Pos2::new(below.min.x + ui_left::WIDTH, below.max.y),
+                );
+                ui_left::show(ui, rect, bar.editing, edit, sim, lmem, reg, &mut actions);
+                panels.push(rect);
+                central.min.x = rect.max.x;
+            }
             if let Some(v) = props {
                 let rect = Rect::from_min_max(
                     Pos2::new(below.max.x - ui_props::WIDTH, below.min.y),
-                    Pos2::new(below.max.x, (below.max.y - bottom).max(below.min.y + 40.0)),
+                    Pos2::new(below.max.x, below.max.y.max(below.min.y + 40.0)),
                 );
                 ui_props::show(ui, rect, v, pst, reg, &mut props_out);
                 panels.push(rect);
                 central.max.x = rect.min.x;
+            }
+            if !bar.editing && play.visible {
+                let bottom = central.max.y - ui_bottom::PLAY_GAP;
+                let rect = Rect::from_min_max(
+                    Pos2::new(central.min.x + 10.0, bottom - ui_bottom::PLAY_HEIGHT),
+                    Pos2::new((central.max.x - 10.0).max(central.min.x + 300.0), bottom),
+                );
+                ui_bottom::show_playback(ui, rect, play, reg, &mut actions);
+                panels.push(rect);
+                central.max.y = rect.min.y;
             }
         });
         self.central = central;
@@ -444,7 +531,7 @@ mod tests {
                 vertices += m.points.len();
                 let t = m.texture.expect("textura");
                 assert!(
-                    textures.images.contains_key(&t) || t == crate::ui_props::MINIATURE,
+                    textures.images.contains_key(&t) || matches!(t, egui::TextureId::User(_)),
                     "textura {t:?} usada antes de ser criada"
                 );
                 assert_eq!(m.points.len(), m.colors.len());
@@ -518,7 +605,6 @@ mod tests {
         let name = e.add("Processor", [0.0, 0.0, 0.0]).unwrap();
         for size in [[1600.0, 900.0], [1280.0, 720.0]] {
             let mut h = Host::new();
-            h.bottom_reserved = 40.0;
             h.props = Some(crate::ui_props::PropsView {
                 props: e.properties(&name),
                 families: crate::schema::FAMILIES
@@ -537,10 +623,174 @@ mod tests {
                 (c[0] + c[2] - (size[0] - crate::ui_props::WIDTH)).abs() < 1.0,
                 "{c:?}"
             );
-            // The panel is egui's; the status bar under it stays Godot's.
+            // The panel and the status bar under it are egui's.
             assert!(h.is_over([size[0] - 100.0, 300.0]));
-            assert!(!h.is_over([size[0] - 100.0, size[1] - 10.0]));
+            assert!(h.is_over([size[0] - 100.0, size[1] - 10.0]));
             assert!(!h.is_over([size[0] / 3.0, 400.0]));
+            // The panel stops above the status bar.
+            let panel = h.reg.get("PainelPropriedades").unwrap().rect;
+            assert!(
+                (panel.max.y - (size[1] - crate::ui_bottom::STATUS_HEIGHT)).abs() < 1.5,
+                "{panel:?}"
+            );
+        }
+    }
+
+    fn edit_view() -> crate::ui_left::EditView {
+        use crate::ui_left::{Entry, ObjectItem};
+        crate::ui_left::EditView {
+            library: crate::document::palette()
+                .iter()
+                .map(|p| Entry {
+                    id: p.id.into(),
+                    label: p.label.into(),
+                    category: p.category.into(),
+                    icon: Some(egui::TextureId::User(100)),
+                })
+                .collect(),
+            categories: utsim_edit::CATEGORIES
+                .iter()
+                .map(|c| c.to_string())
+                .collect(),
+            armed: "Queue".into(),
+            objects: (0..40)
+                .map(|k| ObjectItem {
+                    name: format!("objeto_com_um_nome_comprido_{k}"),
+                    kind_label: "Processo".into(),
+                    problems: k % 3,
+                    warnings: k % 2,
+                })
+                .collect(),
+            selected: vec!["objeto_com_um_nome_comprido_1".into()],
+            obstacles: true,
+        }
+    }
+
+    fn sim_view() -> crate::ui_left::SimView {
+        crate::ui_left::SimView {
+            status: "5 replicações concluídas. Reproduzindo a replicação 0.".into(),
+            blocks: (0..30).map(|k| format!("bloco_{k} (Processo)")).collect(),
+            follow: Some(1),
+            summary: crate::ui_left::Summary {
+                title: "Resultados (5 replicações)".into(),
+                bottleneck: "processo".into(),
+                lines: (0..12).map(|k| format!("bloco_{k}: 120 saídas")).collect(),
+            },
+            ..crate::ui_left::SimView::default()
+        }
+    }
+
+    #[test]
+    fn the_canvas_commands_with_the_left_panel_and_the_status_are_consistent() {
+        for size in [[1600.0, 900.0], [1280.0, 720.0]] {
+            let mut h = Host::new();
+            h.set_edit(edit_view());
+            h.set_status(crate::ui_bottom::StatusView {
+                text: "Arraste um objeto da Biblioteca para o chão, ou abra um modelo (Ctrl+O). "
+                    .repeat(4),
+                progress: Some(0.3),
+                percent: true,
+            });
+            let (meshes, vertices) = check_canvas(&mut h, size, 3);
+            assert!(meshes > 0 && vertices > 100, "{size:?}");
+            let c = h.central_pixels();
+            assert!((c[0] - crate::ui_left::WIDTH).abs() < 1.0, "{c:?}");
+            assert!(
+                (c[1] + c[3] - (size[1] - crate::ui_bottom::STATUS_HEIGHT)).abs() < 1.5,
+                "{c:?}"
+            );
+            assert!(h.is_over([100.0, 300.0]), "a biblioteca é do egui");
+            for name in [
+                "Biblioteca_Source",
+                "Objetos_Lista",
+                "Ver_Obstaculos",
+                "Status",
+            ] {
+                assert!(h.reg.get(name).is_some(), "{name} {size:?}");
+            }
+            // The status line is cut to its place, never under the progress bar.
+            let status = h.reg.get("Status").unwrap().rect;
+            let progress = h.reg.get("Progresso").unwrap().rect;
+            assert!(
+                status.max.x <= progress.min.x + 0.5,
+                "{status:?} {progress:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_canvas_commands_of_simular_are_consistent() {
+        for size in [[1600.0, 900.0], [1280.0, 720.0]] {
+            let mut h = Host::new();
+            h.set_bar(BarState {
+                editing: false,
+                ..BarState::default()
+            });
+            h.set_sim(sim_view());
+            h.set_play(crate::ui_bottom::PlayView {
+                visible: true,
+                playing: true,
+                t: 12.5,
+                end: 480.0,
+                speed: 2.0,
+            });
+            let (meshes, _) = check_canvas(&mut h, size, 3);
+            assert!(meshes > 0);
+            for name in [
+                "Simular_Replicacoes",
+                "Botao_RodarDeNovo",
+                "Simular_Camera",
+                "Simular_Resumo",
+                "Reproducao_Play",
+                "Reproducao_Tempo",
+                "Reproducao_T",
+            ] {
+                assert!(h.reg.get(name).is_some(), "{name} {size:?}");
+            }
+            let bar = h.reg.get("BarraReproducao").unwrap().rect;
+            let c = h.central_pixels();
+            assert!(bar.min.x >= c[0] && bar.max.x <= size[0], "{bar:?}");
+            assert!(
+                bar.max.y <= size[1] - crate::ui_bottom::STATUS_HEIGHT,
+                "{bar:?}"
+            );
+            assert_eq!(h.reg.get("Reproducao_Play").unwrap().text, "Pausar");
+            assert!(h.is_over([bar.center().x, bar.center().y]));
+        }
+    }
+
+    /// In Simular, with the panel's field and the playback bar on screen, a click outside
+    /// egui and the keys typed after it stay Godot's (a field of a Godot panel gets them).
+    #[test]
+    fn keys_typed_in_a_godot_field_stay_godots_in_simular() {
+        let mut h = Host::new();
+        h.set_bar(BarState {
+            editing: false,
+            ..BarState::default()
+        });
+        h.set_sim(crate::ui_left::SimView::default());
+        h.set_play(crate::ui_bottom::PlayView {
+            visible: true,
+            end: 100.0,
+            ..Default::default()
+        });
+        for k in 0..3 {
+            drop_frame(h.frame(k as f64, SIZE, 1.0));
+        }
+        assert!(!h.push(&button([900.0, 300.0], 1, true), no_clip));
+        drop_frame(h.frame(4.0, SIZE, 1.0));
+        assert!(!h.push(&button([900.0, 300.0], 1, false), no_clip));
+        drop_frame(h.frame(5.0, SIZE, 1.0));
+        for (code, uni) in [(0i64, 97u32), ((1 << 22) | 5, 0)] {
+            let key = Input::Key {
+                keycode: code,
+                unicode: uni,
+                pressed: true,
+                echo: false,
+                mods: Mods::default(),
+            };
+            assert!(!h.push(&key, no_clip), "tecla {code} consumida");
+            drop_frame(h.frame(6.0, SIZE, 1.0));
         }
     }
 }
