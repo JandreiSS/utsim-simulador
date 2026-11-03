@@ -140,6 +140,26 @@ enum Cmd {
         /// inspecao, espera, armazenagem); pode repetir
         #[arg(long = "simbolo", value_name = "OBJETO=SIMBOLO")]
         simbolos: Vec<String>,
+        /// Tipo de diagrama: carta, blocos, operacoes, raias, sipoc, mapofluxograma, espaguete,
+        /// de-para, homem-maquina, vsm ou todos (HTML índice em --html, um arquivo por tipo).
+        /// Sem --tipo: fluxograma de blocos com a carta de processo
+        #[arg(long)]
+        tipo: Option<String>,
+        /// Replicação gravada nos diagramas da simulação (a primeira é a 0)
+        #[arg(long, default_value_t = 0)]
+        replica: u32,
+        /// Início do intervalo do gráfico homem-máquina
+        #[arg(long)]
+        de: Option<f64>,
+        /// Fim do intervalo do gráfico homem-máquina
+        #[arg(long)]
+        ate: Option<f64>,
+        /// Segundo modelo (o "depois") do diagrama de espaguete; o primeiro é o "antes"
+        #[arg(long)]
+        comparar: Option<PathBuf>,
+        /// Raia de um objeto no fluxograma multifuncional: objeto=nome; pode repetir
+        #[arg(long = "raia", value_name = "OBJETO=NOME")]
+        raias: Vec<String>,
     },
     /// Compara cenários de um arquivo de experimento
     Experiment {
@@ -307,6 +327,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             sem_tempos,
             sem_distancias,
             simbolos,
+            tipo,
+            replica,
+            de,
+            ate,
+            comparar,
+            raias,
         } => fluxograma::run(fluxograma::Args {
             model,
             svg,
@@ -318,6 +344,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             no_times: sem_tempos,
             no_distances: sem_distancias,
             symbols: simbolos,
+            kind: tipo,
+            replication: replica,
+            from: de,
+            to: ate,
+            compare: comparar,
+            lanes: raias,
         })?,
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
         Cmd::GerarModelo {
