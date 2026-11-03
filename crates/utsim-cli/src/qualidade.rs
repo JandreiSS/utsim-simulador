@@ -112,8 +112,10 @@ pub enum Cmd {
         /// Nível de confiança dos intervalos
         #[arg(long, default_value = "95%")]
         confianca: String,
+        /// Grava o relatório com o histograma em HTML
         #[arg(long)]
         html: Option<PathBuf>,
+        /// Grava os índices em JSON
         #[arg(long)]
         json: Option<PathBuf>,
     },
@@ -127,8 +129,10 @@ pub enum Cmd {
         /// Tolerância LSE − LIE (para a %tolerância)
         #[arg(long)]
         tolerancia: Option<f64>,
+        /// Limite inferior de especificação (com --lse, dá a tolerância)
         #[arg(long)]
         lie: Option<f64>,
+        /// Limite superior de especificação
         #[arg(long)]
         lse: Option<f64>,
         /// Multiplicador de σ da variação do estudo (6 ou 5,15)
@@ -137,8 +141,10 @@ pub enum Cmd {
         /// Linearidade: variação do processo (6σ) para a linearidade absoluta
         #[arg(long)]
         variacao_processo: Option<f64>,
+        /// Grava o relatório com os gráficos em HTML
         #[arg(long)]
         html: Option<PathBuf>,
+        /// Grava o resultado em JSON
         #[arg(long)]
         json: Option<PathBuf>,
     },
@@ -150,17 +156,22 @@ pub enum Cmd {
         /// Deslocamento da média em σ (0: alarmes falsos)
         #[arg(long, default_value_t = 0.0)]
         deslocamento: f64,
+        /// EWMA: peso λ
         #[arg(long, default_value_t = 0.2)]
         lambda: f64,
+        /// EWMA: largura L dos limites em σ
         #[arg(long, default_value_t = 3.0)]
         l: f64,
+        /// CUSUM: folga k em σ
         #[arg(long, default_value_t = 0.5)]
         k: f64,
+        /// CUSUM: intervalo de decisão h em σ
         #[arg(long, default_value_t = 5.0)]
         h: f64,
         /// Corridas simuladas
         #[arg(long, default_value_t = 10_000)]
         corridas: usize,
+        /// Semente dos números aleatórios
         #[arg(long, default_value_t = 1)]
         semente: u64,
     },

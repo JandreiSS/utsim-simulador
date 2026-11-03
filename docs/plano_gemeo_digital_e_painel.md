@@ -860,6 +860,14 @@ gestor.
 
 ### E4. Controle estatístico de processo sobre dados reais e simulados
 
+*Feito na crate `utsim-quality` (comando `utsim qualidade carta` e `arl`; manual "Qualidade").* Notas da implementação:
+- [x] I-MR, X̄-R, X̄-S, p, np, c, u; fase I com exclusões e fase II com limites congelados.
+- [x] Limites a partir do modelo: `charts::limits_from_model` (quantis 0,135%, 50% e 99,865% do KPI entre replicações, ao menos 100). Falta ligar ao `utsim-model` (gerar as amostras por subgrupo a partir das replicações) e ao painel.
+- [x] EWMA e CUSUM tabular; ARL de qualquer esquema por simulação, Shewhart em fórmula fechada e CUSUM por Siegmund; testes contra 370, 91,75 (Western Electric), as tabelas do CUSUM e de Lucas e Saccucci.
+- [x] Regras de Western Electric e de Nelson, uma a uma.
+- [x] Resíduos real − simulado padronizados (`memory::standardized_residuals`), entrada do T8.
+- [ ] Aviso de autocorrelação alta no relatório da carta (o diagnóstico existe em `utsim-stats::lag1_autocorrelation`; falta ligar).
+
 - Gráficos I-MR, X̄-R e X̄-S, p e u (proporção de refugo, contagem de paradas), EWMA e CUSUM
   tabular.
 - **Limites a partir do modelo** (o que um simulador acrescenta ao CEP): em vez de estimar os
@@ -888,6 +896,11 @@ gestor.
   médio; série sem mudança dá zero pontos com a penalidade padrão na maioria das sementes.
 
 ### E6. Capacidade
+
+*Feito na crate `utsim-quality` (comando `utsim qualidade capacidade`), menos o takt.*
+- [x] Cp, Cpk, Cpu, Cpl, Pp, Ppk, Cpm, σ dentro e global, IC de Bissell e χ², PPM, Z bench, nível sigma com 1,5σ explícito.
+- [x] Não normal: percentis com a distribuição do `utsim-fit` (pelo CLI) e Box-Cox; aviso do Anderson-Darling.
+- [ ] Capacidade de cumprir o takt (proporção com Wilson, E2) e real × simulado lado a lado no painel.
 
 - Cp, Cpk (dentro do subgrupo) e Pp, Ppk (global) de tempos de ciclo, lead time ou medidas,
   contra limites de especificação dados (por exemplo, lead time ≤ 15 min, só limite superior:
@@ -965,9 +978,9 @@ gestor.
 | E1 predição, percentis por estatística de ordem, tolerância, textos | 3–4 | Opus |
 | E2 probabilidade de meta (Wilson), risco por pedido | 2–3 | Opus |
 | E3 leque de previsão, cobertura, PIT, pinball, CRPS | 4–6 | Opus |
-| E4 CEP com limites pelo modelo e ARL por simulação | 6–8 | Opus |
+| E4 CEP com limites pelo modelo e ARL por simulação — **feito** em `utsim-quality` (falta ligar ao modelo e ao painel) | 6–8 | Opus |
 | E5 Page–Hinkley, PELT | 4–6 | Opus |
-| E6 capacidade normal e não normal, takt | 3–4 | Opus |
+| E6 capacidade normal e não normal, takt — **feito** em `utsim-quality`, menos o takt | 3–4 | Opus |
 | E7 testes de duas amostras, contagens, proporções, BH/Holm, tamanho de efeito | 4–5 | Opus |
 | E8 relatório de validação | 3–4 | Sonnet |
 | E9 seleção de subconjunto, KN, gráfico erro e risco | 6–8 | Opus |
@@ -1089,7 +1102,7 @@ estatística P1–P3) e `utsim-emu/src/runner.rs` (T3/T4).
 | T3 modo sombra + T10 CLI + reprodução de histórico | Sonnet | T1, T2 (arquivo) |
 | D4, D5, D8, D9 visões, exportação e configuração do painel | Sonnet | D2, D3 |
 | T5 estado inicial no kernel (**feito**, sem mudar o formato do modelo: arquivo à parte) | Opus | formato 2 (ordem do `plano_analises_e_dinamica.md`, item 2), para conferir os golden uma vez; não roda junto com "capacidade por hora do dia" nem com conflitos determinísticos (mesmos arquivos do kernel) |
-| E4, E5 CEP e mudança | Opus | E7 |
+| E4, E5 CEP e mudança (E4 **feito** em `utsim-quality`) | Opus | E7 |
 
 **Leva 3 (depois da G3 e de T5)**
 

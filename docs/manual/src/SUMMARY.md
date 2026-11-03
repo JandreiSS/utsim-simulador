@@ -25,6 +25,7 @@
 - [Ajuste de distribuições a partir de dados](ajuste-de-distribuicoes.md)
 - [Experimentos e otimização](experimentos-e-otimizacao.md)
 - [PERT/CPM de uma parte do processo](pert-cpm.md)
+- [Qualidade: cartas de controle, capacidade e MSA](qualidade.md)
 
 # Recursos avançados
 

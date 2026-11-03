@@ -1424,6 +1424,45 @@ e rastros nas séries que ela precisa, e `utsim analisar` imprime o resultado.
   é o recurso com o período ativo mais longo; a sobreposição entre o período do gargalo
   atual e o do seguinte é gargalo compartilhado dos dois (`shifting_bottleneck_times`).
 
+### Qualidade (`utsim-quality`)
+
+Crate pura comum ao simulador, ao painel do gêmeo digital (itens E4 e E6 de
+`docs/plano_gemeo_digital_e_painel.md`) e ao futuro aplicativo Lean Seis Sigma (seção 3.6 de
+`docs/plano_lean_seis_sigma.md`). Depende só de `utsim-stats` (funções especiais, quantil t),
+`serde` e `rand` (ARL por simulação); não lê arquivos: o `utsim qualidade` lê o CSV e passa
+o texto para `data`. O método dos percentis recebe uma função quantil, então quem chama
+escolhe a distribuição (o CLI usa a melhor do `utsim-fit`) sem que a crate dependa dele.
+
+| Módulo | Conteúdo |
+|---|---|
+| `constants` | `d2` (integral simples), `d3` (integral dupla), `c4` (fórmula fechada), `A`, `A2`, `A3`, `B3` a `B6`, `D1` a `D4`, `d2*` de Duncan |
+| `charts` | I-MR, X̄-R, X̄-S, p, np, c, u; `Limits` serializável; fase I (`phase1`, exclusões, `phase1_revised`) e fase II (`apply`); `limits_from_model` por quantis |
+| `rules` | regras de Western Electric e de Nelson, uma a uma, sobre `z = (x − LC)/((LSC − LC)/3)` |
+| `memory` | EWMA (limites exatos ou assintóticos), CUSUM tabular, resíduos padronizados real − simulado |
+| `arl` | ARL por Monte Carlo de qualquer esquema, fórmula fechada de Shewhart, aproximação de Siegmund |
+| `capability` | Cp, Cpk, Pp, Ppk, Cpm, IC (χ² e Bissell), PPM, Z bench, nível sigma com deslocamento explícito, DPMO, RTY, Box-Cox, percentis |
+| `normality` | Anderson-Darling da normal com p-valor de D'Agostino e Stephens, Box-Cox por verossimilhança de perfil |
+| `msa` | Gage R&R por ANOVA (interação incorporada com p > 0,25) e por médias e amplitudes, viés, linearidade |
+| `attribute` | concordância com IC de Clopper-Pearson, kappa de Cohen e de Fleiss (com kappa por categoria) |
+| `prob` | cauda da F, χ² e sua inversa, inversa da beta, Clopper-Pearson, Simpson |
+| `data`, `report` | layouts de CSV (UTF-8 ou Latin-1) e relatórios em texto e HTML autocontido |
+
+- **Limites guardados como `(μ, σ, n)`.** As cartas de variáveis guardam a média, o σ e o
+  tamanho do subgrupo e calculam os limites com os fatores de σ conhecido (`A`, `D1`, `D2`,
+  `B5`, `B6`). Com σ̂ = R̄/d2 (ou S̄/c4) isso é exatamente `x̿ ± A2·R̄`, `D3·R̄`, `D4·R̄`, e a fase
+  II com padrão dado usa o mesmo caminho.
+- **Regras só na carta de posição.** Na carta de dispersão vale apenas "fora dos limites".
+  Pontos excluídos na fase I saem da sequência avaliada pelas regras.
+- **Testes de referência.** Constantes contra a tabela (n = 2 a 25), ARL ≈ 370 da regra 1
+  por simulação, ≈ 91,75 com as quatro regras de Western Electric, CUSUM e EWMA contra as
+  tabelas publicadas, valores críticos do Anderson-Darling, níveis sigma clássicos, somas de
+  quadrados calculadas à mão, kappas calculados à mão, propriedades (Cpk = min(Cpu, Cpl), Cpk
+  = Cp com média centrada, percentis iguais ao clássico na normal). Os números de livros estão
+  marcados com a fonte e "[conferir]" no código.
+- **CLI.** O `utsim qualidade` tem o próprio analisador `clap`, chamado depois do principal:
+  como mais um subcomando dele, a construção do analisador em debug estourava a pilha de 1 MB
+  da thread principal no Windows.
+
 ## 6. Pontos de extensão já previstos
 
 - `position` em cada objeto: layout para o 3D.

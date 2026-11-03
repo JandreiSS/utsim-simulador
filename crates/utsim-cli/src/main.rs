@@ -310,8 +310,9 @@ enum Cmd {
         #[arg(long)]
         json: Option<PathBuf>,
     },
+    // Arguments parsed by `qualidade::run_args`, so the main parser stays small (its
+    // debug build overflowed the main-thread stack on Windows).
     /// Controle estatístico de processo, capacidade e análise do sistema de medição
-    /// (`utsim qualidade --help`; analisado à parte para não crescer a pilha do `main`)
     #[command(disable_help_flag = true)]
     Qualidade {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
