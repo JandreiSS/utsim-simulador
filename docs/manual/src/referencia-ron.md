@@ -143,6 +143,8 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `on_blocked` | `Wait` (ou `Drop`) |
 | `schedule` | nenhuma: `(cycle: n, periods: [(start: n, end: n, arrivals: ..., labels: {...}), ...])` |
 | `table` | nenhuma: `(mode: Times, repeat: Once, rows: [(at: n, count: 1, labels: {...}), ...])`; não junto com `schedule` |
+| `batch` | nenhum (um item por chegada): `Dist` de itens por chegada, arredondada; não junto com `table` |
+| `release` | `Together` (ou `OneByOne(Dist)`: itens da chegada um a um, com esse intervalo) |
 
 Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
 

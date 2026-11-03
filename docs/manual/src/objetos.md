@@ -36,6 +36,8 @@ Cria itens. É por aqui que o trabalho entra no modelo.
 | `on_blocked` | `Wait` | o que fazer com o item que não consegue sair no instante em que nasce |
 | `schedule` | nenhuma | chegadas por período: a taxa ou o tempo entre chegadas muda com a hora (veja abaixo) |
 | `table` | nenhuma | tabela de chegadas: instantes fixos ou sequência ordenada de linhas com quantidade e rótulos (veja abaixo) |
+| `batch` | um item | itens criados em cada chegada (`Dist`, arredondada, mínimo 0), por exemplo `Const(6.0)` para caixas de seis. Sem `table` |
+| `release` | `Together` | como os itens de uma chegada (lote ou linha da tabela) saem: `Together` (todos no instante da chegada) ou `OneByOne(Dist)` (um a um, com esse intervalo entre eles) |
 
 Os dois valores de `on_blocked`:
 
@@ -125,6 +127,15 @@ Regras:
 - Os erros apontam a linha, contada a partir de 1: `pedidos: table.rows[2]: at (300) antes da linha anterior (480); as linhas precisam estar em ordem de at`.
 - A fonte com tabela ganha as métricas `arrivals.count` (chegadas, isto é, linhas usadas) e `entered.count` (itens que saíram).
 - O `utsim check` resume a tabela: `chegadas: pedidos: horário com 3 linha(s), 25 item(ns) a cada ciclo de 1440`.
+
+### Lote por chegada (`batch` e `release`)
+
+Com `batch`, cada chegada cria vários itens de uma vez: `batch: Const(6.0)` cria seis, `batch: Poisson(mean: 4.0)` um número sorteado (arredondado; 0 não cria nada). Com `release: OneByOne(Const(2.0))` os itens do lote saem um a um, com 2 unidades de tempo entre eles; com `Together` (o padrão) saem juntos e o próximo objeto decide quantos cabem. O espaçamento vale também para os itens de uma linha da tabela.
+
+- Com `on_blocked: Wait`, o intervalo até a próxima chegada começa quando o **último** item do lote saiu. Com `Drop`, cada item que não cabe é perdido.
+- `max_arrivals` conta chegadas (lotes), não itens.
+- A fonte com `batch` ganha as métricas `arrivals.count` (chegadas) e `entered.count` (itens que saíram); com `Drop` continuam `lost.count` e `loss_fraction`.
+- `batch` não vale com `table`: na tabela a quantidade de cada linha vem de `count`.
 
 Nos experimentos, as chaves `pedidos.table`, `pedidos.table.rows[n]` e `pedidos.table.rows[n].<campo>` (`at`, `count`, `labels`, `labels.<nome>`) mudam a tabela; por exemplo `"pedidos.table.rows[1].count": "15"`.
 
