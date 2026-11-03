@@ -1083,7 +1083,7 @@ Crate pura (`crates/utsim-nav`), sem relógio nem sorteio:
   relatados. `NetworkDef.generated` guarda a folga e a impressão digital dos obstáculos.
 
 **Modos** (`utsim_model::Movement`): `Legacy` (formato 1: linha reta ou rede até o centro),
-`Free`, `Network` e `Aisles` (reservado para os corredores, recusado na validação por enquanto).
+`Free`, `Network` e `Aisles` (pelos corredores, seção seguinte).
 O modo do recurso é o seu (`Transporter.movement`), senão `run.movement`, senão `Free`.
 `Model::nav_set` monta um roteador por folga (e modo) uma vez e as replicações o compartilham
 (`Model::build_with`); `Transporter::router` troca o roteador da simulação pelo do recurso. O
@@ -1100,6 +1100,58 @@ ao que o editor cria. Os exemplos ficam no formato 1 e os golden não mudam.
 de um obstáculo ou na folga, recurso sem caminho até os objetos que atende ou até um deles,
 trecho da rede que cruza a área de um objeto ou parede (com recurso em `Network` ou rede gerada)
 e rede gerada com outra impressão digital dos obstáculos.
+
+### Corredores de circulação e modo `Aisles` (`utsim-nav::aisles`, formato 2 aditivo)
+
+**Formato.** Campos novos e opcionais no formato 2, sem passo de migração (ausentes, nada
+muda e nada é gravado): `aisles: [(name, kind: Pedestrian | Forklift | Mixed, points, width,
+two_way, secondary, profile)]` e `floor_marking: Some((profile: Brasil | Branco |
+Custom(ProfileSpec), line_width: 0.10, crossing_stop: 2.0))`. `floor_marking` fica em
+`Option<Box<_>>` para não crescer o `Model` (as strings do perfil). O `Transporter` do formato
+não ganhou campo: a classe (pessoa ou veículo, `utsim_nav::User`) vem do papel
+(`Model::role_of`), e `L` (largura do veículo e da carga) da largura do papel ou da folga dada,
+`2 × (clearance − 0,3)`.
+
+**Rede gerada** (`utsim_nav::aisle_network`, função pura): cada trecho de eixo é cortado nas
+pontas, nos cruzamentos com outros eixos, nas junções em T (tolerância `JOIN_TOL` = 1 cm, que
+também funde nós) e onde entra e sai de um obstáculo; pedaços com o meio dentro de um obstáculo
+ficam em `blocked`. Nós `n1`, `n2`... na ordem dos corredores e dos pontos. Cruzamento = nó
+tocado por corredores de tipos diferentes, com raio = metade da maior largura. Pontos
+(posição de cada recurso em `Aisles`, pontos de acesso dos objetos que ele atende, com a sua
+folga) ligam-se ao ponto mais próximo de um trecho compatível cuja ligação reta não cruza
+obstáculo (o trecho é cortado ali); a ligação é `EdgeUse::Connector(User)`, só da classe.
+`AisleNet::network_for(user)` dá a sub-rede da classe; `AislesRouter` (um por classe e folga,
+em `Model::nav_set`) é um `NetworkRouter` sobre ela, com o destino-objeto trocado pelo ponto de
+acesso. A rede dos corredores não é gravada no `.ron` (é função dos corredores e dos objetos).
+
+**Cruzamentos** (`utsim_objects::traffic::{Crossings, crossing_plan}`): `NavSet` guarda as
+`CrossingSpec` e quem participa; `Model::build_with` cria um `Crossings` por simulação
+(`NavSet::crossing_board`) e o passa aos transportadores em `Aisles` com `Transporter::crossings`.
+Ao viajar, `crossing_plan` corta o caminho nas zonas dos cruzamentos por onde ele passa
+(vértices sobre um cruzamento): pedestre com o perfil da viagem inteira; veículo em trechos de
+repouso a repouso com uma peça parada de `crossing_stop` antes de cada zona. O transportador
+reaproveita a mecânica de rota por peças dos AGVs (`Route`/`Seg`, com `cross` e `stop`): no
+início da zona, `cross_wait` consulta as reservas; o veículo só entra se nenhuma reserva de
+pedestre cruza o seu intervalo (senão insere uma espera em `Blocked` e consulta de novo); o
+pedestre reserva ao chegar e espera só por veículo já dentro. Sem cruzamento no caminho a
+viagem é a de sempre (golden inalterados). Limitações: uma quebra no meio da travessia não
+atualiza a reserva; dois veículos não se reservam entre si; AGVs com `network` seguem o
+`Traffic`.
+
+**Validação e avisos.** Erros: corredor com menos de 2 pontos, coordenada não finita, largura
+não positiva, nome repetido, cor inválida, `movement: Aisles` sem `aisles`. Avisos
+(`Model::aisle_warnings`): largura abaixo do mínimo do perfil com o veículo mais largo que usa
+os corredores (os em `Aisles`, senão todos; sem veículo, a empilhadeira padrão), eixo que cruza
+obstáculo e faixa que invade obstáculo, ponto de acesso sem corredor da classe, ligação sobre
+obstáculo, recurso que não alcança o ponto pelos corredores, recurso sem corredor da sua
+classe, faixa fora de 0,05 a 0,15 m.
+
+**Desenho.** `utsim_nav::floor_marks` (via `Model::floor_marks`) devolve `MarkShape { source,
+pattern: Continuous | Zebra | Arrow, color, polygon }`: um quadrilátero por trecho de cada
+faixa de delimitação (deslocamento da polilinha com esquadria limitada a `MITER_LIMIT` = 2),
+listras zebradas sobre o corredor de veículos alinhadas ao de pedestres, triângulos de seta a
+cada `arrow_spacing` nos corredores de mão única. `Model::aisles_svg` desenha a planta; `utsim
+corredores modelo.ron [--svg]` imprime o resumo (`Model::aisle_lines`) e os avisos.
 
 ### Pessoas animadas por esqueleto (A3D-3)
 
