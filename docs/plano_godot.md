@@ -387,7 +387,25 @@ Pendente:
 - **Assinatura** do instalador e do `.apk`.
 - Capturas roteirizadas como artefato do CI (precisam de GPU).
 
+### Dados reais nos campos de distribuição (feito)
+
+Todo campo de distribuição do painel de propriedades tem a linha **Fonte** (Distribuição ou Dados
+reais); o ajuste automático de `utsim_fit::auto` roda numa thread da ponte e o resultado (família,
+parâmetros, n, histograma com a curva, avisos e ranking das candidatas) aparece no próprio painel.
+Na ponte (`crates/utsim-godot/src/dados.rs`): `UtsimDocument.data_fields`, `data_entry`,
+`data_families`, `data_columns`, `data_parse_values`, `data_relative`, `data_fit` (job `ajuste`),
+`data_apply` e `data_to_dist` (ambos por `Command::SetFieldSource`, um passo de desfazer) e
+`data_report` (job `relatorio_dados`, o `index.html` do modelo e um HTML e um CSV por campo); um
+cache compartilhado com a thread evita ajustar de novo ao aplicar, desfazer e refazer. Na interface:
+`godot/scripts/dados_reais.gd` (formulário e resultado), `mini_histograma.gd` e os tipos `Selo`,
+`AvisoDados` e `ErroDados` do tema. Roteiro `godot/roteiros/g3_dados_reais.json` (sem janela no
+`scripts/godot_teste.sh`; com janela, capturas em `godot/capturas/dados/`).
+
 ## Lacunas conhecidas depois da G3
+
+- O ajuste de dados reais não cobre ainda os campos fora dos objetos (fluxos de tokens, fluidos,
+  calendários): eles aparecem no painel só quando a interface passar a editá-los.
+
 
 - A Pilha (LIFO) aparece com o asset da fila virado; não há um modelo 3D próprio de pilha.
 - A câmera Do recurso esconde o que bloqueia a vista, mas não desvia de paredes de um layout

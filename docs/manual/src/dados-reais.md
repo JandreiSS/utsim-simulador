@@ -141,6 +141,39 @@ utsim fit dados.csv --coluna tempo --relatorio tempo.html --criterio ks
 
 grava `tempo.html` e `tempo.csv` com a escolha automática pelo critério pedido.
 
-## Na interface (em preparação)
+## Na interface 3D
 
-O núcleo já tem o que a interface 3D vai usar: o comando de edição `SetFieldSource` troca um campo entre **Distribuição** e **Dados** como um passo de desfazer (Ctrl+Z); em **Dados** o ajuste é feito na hora e, se os valores não puderem ser lidos ou ajustados, nada muda. Voltar para **Distribuição** mantém no campo a distribuição que você informar (por exemplo, a última ajustada). Renomear o objeto atualiza as entradas de `data`; apagar o objeto remove as dele. O botão no painel de propriedades chega numa próxima versão da interface; até lá, escreva a lista `data` no `.ron` e use `utsim dados`.
+No painel de propriedades do modo Editar, **todo campo de distribuição de todo objeto**
+(processamento, setup, chegadas, carga e descarga, quebras e reparo, permanência...) tem uma linha
+**Fonte** com duas opções:
+
+- **Distribuição**: como sempre, família e parâmetros, ou o texto RON.
+- **Dados reais**: o formulário mostra a *origem* (arquivo CSV, com o botão **Escolher...** e a
+  coluna, ou valores colados, um por linha), se os valores são **instantes** (o ajuste usa os
+  intervalos entre eles) ou durações, a *escolha* (melhor automática, empírica ou uma família
+  fixa) e o *critério* (AIC, BIC, Kolmogorov-Smirnov ou Anderson-Darling).
+
+**Aplicar** roda o ajuste numa thread, com o indicador de progresso e sem travar a janela, e o
+resultado aparece no próprio painel, abaixo do formulário:
+
+- a família escolhida, os parâmetros, o número de valores e a origem dos dados;
+- um mini-gráfico: o histograma dos dados com a curva da distribuição escolhida por cima;
+- os avisos sobre os dados (poucos pontos, tendência, valores atípicos, mistura...);
+- um ranking curto das candidatas: um clique numa delas troca a família do campo;
+- **Usar a empírica** e o botão **Relatório**.
+
+Um campo que vem de dados leva o selo **dados** ao lado do nome. Se o arquivo mudou depois do
+último ajuste, o painel avisa (`Os dados mudaram desde o último ajuste`) e oferece
+**Reajustar aos dados atuais**; ao abrir um modelo cujos dados mudaram, o aviso diz a família de
+antes e a de agora.
+
+**Relatório** pede uma pasta, grava nela o `index.html` do modelo e um relatório completo por
+campo com dados (`<campo>.html` e `<campo>.csv`, os mesmos do `utsim dados --relatorio`) e abre o
+índice no navegador padrão do sistema.
+
+Tudo isso é desfazível (Ctrl+Z, Ctrl+Y): trocar a fonte, aplicar, trocar de candidata e voltar para
+**Distribuição** são passos do comando `SetFieldSource`. Voltar para **Distribuição** mantém no
+campo a última distribuição ajustada; editar a distribuição de um campo com dados (por exemplo
+pelo texto RON) também o devolve para **Distribuição**, no mesmo passo de desfazer. O ajuste feito
+uma vez fica guardado na sessão: desfazer e refazer não ajustam de novo. Salve o modelo (Ctrl+S)
+para gravar a lista `data` e o registro `fitted` no `.ron`.
