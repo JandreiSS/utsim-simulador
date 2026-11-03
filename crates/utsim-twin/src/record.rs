@@ -4,6 +4,7 @@
 //! - `sessao.json`: the `.gemeo.ron` text, the model path and hash, the start;
 //! - `observacoes-AAAAMMDD.jsonl`: one JSON object per line, one file per day (UTC):
 //!   `{"tipo":"obs","t":…,"ts":…,"fonte":…,"seq":…,"tag":…,"valor":…,"qualidade":…,"regra":…}`
+//!   `{"tipo":"previsao","t":…,"pedido":…}` where a forecast was taken (with `--previsao`)
 //!   and, on a clean end, `{"tipo":"fim","t":…}`.
 //!
 //! People: with `anonymize_people` (the default), the tags of rules marked `person` and
@@ -54,6 +55,14 @@ pub enum Line {
     Obs(Observation),
     #[serde(rename = "fim")]
     End { t: f64 },
+    /// A forecast was taken from the observed state at twin time `t` (scheduled, or on
+    /// request): the replay takes it at the same point of the sequence.
+    #[serde(rename = "previsao")]
+    Forecast {
+        t: f64,
+        #[serde(default, rename = "pedido")]
+        on_request: bool,
+    },
 }
 
 /// Civil date `(year, month, day)` of a day count since 1970-01-01 (H. Hinnant).

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Previsão · Gêmeo · UTSim</title>
+<link rel="stylesheet" href="/gemeo.css">
+</head>
+<body>
+<header>
+  <h1>Gêmeo digital <span class="modo">previsão das próximas horas</span></h1>
+  <nav><a href="/gemeo">Gêmeo (sombra)</a> · <a href="/">Painel do modelo</a> · <a href="/api/gemeo/previsao">JSON</a></nav>
+  <p><button id="agora" type="button">Prever agora</button> <span id="situacao">Carregando…</span></p>
+</header>
+<main>
+  <section>
+    <h2>Resumo</h2>
+    <p id="resumo" class="vazio">Nenhuma previsão ainda.</p>
+    <div id="cartoes" class="cartoes"></div>
+  </section>
+  <section>
+    <h2>Duas faixas, duas perguntas</h2>
+    <p class="explica"><b>Precisão da média</b> (intervalo de confiança): quanto a média calculada pode
+    errar. Encolhe quando se rodam mais replicações. Responde "quanto produzo, em média, a partir deste
+    estado?".</p>
+    <p class="explica"><b>Faixa do que pode acontecer</b> (P5 a P95 entre as replicações): onde o
+    resultado deste turno deve cair em 9 de cada 10 casos. Não encolhe com mais replicações, porque mede
+    a variação da própria fábrica. Responde "quanto vou produzir hoje?".</p>
+    <p class="explica">A <b>probabilidade de cumprir a meta</b> é a fração das replicações que cumprem,
+    com o intervalo de Wilson. O semáforo usa essa probabilidade: verde a partir de 90 %, amarelo de
+    50 % a 90 %, vermelho abaixo de 50 %.</p>
+  </section>
+  <section><h2>No tempo</h2><div id="series"></div>
+    <p class="legenda"><span class="sw p90"></span> P5 a P95 · <span class="sw p50"></span> P25 a P75 ·
+    <span class="sw mediana"></span> mediana · <span class="sw media"></span> média e sua precisão ·
+    <span class="sw meta"></span> meta</p>
+  </section>
+  <section><h2>Indicadores no horizonte</h2><div id="kpis"></div></section>
+  <section><h2>Limites</h2><div id="eventos"></div></section>
+  <section><h2>E se…</h2>
+    <p class="explica">Cada cenário parte do mesmo estado, com as mesmas sementes (números aleatórios
+    comuns): a diferença para o "como está" é calculada replicação a replicação. "≈" quer dizer que a
+    diferença não é significativa.</p>
+    <div id="cenarios"></div></section>
+  <section><h2>Avisos</h2><div id="avisos"></div></section>
+</main>
+<script src="/previsao.js"></script>
+</body>
+</html>

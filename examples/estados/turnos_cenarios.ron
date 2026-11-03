@@ -1,0 +1,7 @@
+// Variações "e se" para `utsim prever examples/turnos.ron --estado examples/estados/turnos_21h30.ron
+// --horizonte 2h --unidade min --cenarios examples/estados/turnos_cenarios.ron`. Cada cenário parte
+// do mesmo estado, com as mesmas sementes do "como está" (números aleatórios comuns).
+[
+    (name: "montagem mais rápida", set: {"montagem.process": "Exp(mean: 3.0)"}),
+    (name: "fila maior", set: {"fila.capacity": "40"}),
+]

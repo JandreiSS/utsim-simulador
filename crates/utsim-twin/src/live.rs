@@ -10,13 +10,14 @@
 //! so the replay does not depend on when the packets arrived.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, sync_channel};
+use std::sync::mpsc::{Receiver, Sender, channel, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::config::ClockSpec;
 use crate::connect::{CHANNEL_CAPACITY, Connector, Health, Sink};
+use crate::forecast::{self, Snapshot};
 use crate::obs::{Quality, RawObservation, now_ms};
 use crate::twin::Twin;
 
@@ -101,7 +102,42 @@ pub struct LiveOptions {
 
 /// Runs the loop until `until`, the wall limit or the cancel flag; then stops the
 /// connectors and ends the twin (writing the end of the recording).
+///
+/// With the forecast on ([`Twin::enable_forecast`]), a worker thread computes the
+/// forecast of every snapshot the twin takes, outside the twin's lock, so the loop is
+/// never held up by it; the results go back to the twin (the panel reads them there).
+/// The session waits for the forecasts still running when it ends.
 pub fn run(shared: &Shared, started: Started, opts: &LiveOptions) -> f64 {
+    let job = shared.twin.lock().expect("twin lock").forecast_job();
+    std::thread::scope(|sc| {
+        let (tx, rx) = channel::<Snapshot>();
+        let worker = job.map(|(model, settings, unit)| {
+            sc.spawn(move || {
+                for snap in rx {
+                    let r = forecast::of_snapshot(&model, &settings, unit, &snap);
+                    match &r {
+                        Ok(f) => println!("[previsão t={:.1}] {}", f.instante, f.resumo),
+                        Err(e) => eprintln!("[previsão t={:.1}] erro: {e}", snap.t),
+                    }
+                    shared.twin.lock().expect("twin lock").add_forecast(r);
+                }
+            })
+        });
+        let end = run_loop(shared, started, opts, &tx);
+        drop(tx);
+        if let Some(w) = worker {
+            let _ = w.join();
+        }
+        end
+    })
+}
+
+fn run_loop(
+    shared: &Shared,
+    started: Started,
+    opts: &LiveOptions,
+    forecasts: &Sender<Snapshot>,
+) -> f64 {
     let Started {
         rx,
         handles,
@@ -201,6 +237,9 @@ pub fn run(shared: &Shared, started: Started, opts: &LiveOptions) -> f64 {
                 now_t = now_t.min(u.max(twin.now()));
             }
             twin.advance(now_t);
+            for snap in twin.take_snapshots() {
+                let _ = forecasts.send(snap);
+            }
             if last_flush.elapsed() >= Duration::from_secs(1) {
                 twin.flush();
                 last_flush = Instant::now();
@@ -217,6 +256,9 @@ pub fn run(shared: &Shared, started: Started, opts: &LiveOptions) -> f64 {
     }
     let mut twin = shared.twin.lock().expect("twin lock");
     twin.finish(now_t);
+    for snap in twin.take_snapshots() {
+        let _ = forecasts.send(snap);
+    }
     now_t
 }
 

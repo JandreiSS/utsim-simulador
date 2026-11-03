@@ -77,6 +77,20 @@ Uma atividade que já durou `a` não recomeça do zero: o tempo que falta é sor
 
 Vale para o processamento e o setup, a permanência no porta-paletes, o reparo (`down`, sobre o `mttr`), a próxima quebra (`up`, sobre o `mtbf`) e a próxima chegada (`elapsed` da fonte). Se `a` passa do máximo possível da distribuição (por exemplo 7 num `Triangular` que vai até 6), o restante é zero e o `utsim run` avisa: o dado provavelmente está errado. Itens dados só por `count` também geram aviso: entram com permanência zero, e a permanência e o tempo no sistema dos primeiros ficam subestimados.
 
+## Prever a partir do estado
+
+`utsim prever` roda várias replicações a partir do estado até um horizonte e resume o que
+deve acontecer: a produção esperada com a precisão da média e a faixa do que pode
+acontecer, a chance de cumprir uma meta, quando uma fila passa de um limite e o efeito de
+variações "e se" comparadas com as mesmas sementes:
+
+```bash
+utsim prever examples/turnos.ron --estado examples/estados/turnos_21h30.ron --horizonte 2h --unidade min --meta "producao>=10"
+```
+
+Veja a seção [Previsão](gemeo-digital.md#previsão) do gêmeo digital, que faz o mesmo a
+partir do estado observado na fábrica.
+
 ## Aquecimento
 
 Com estado inicial, o padrão é **sem aquecimento**: o estado já é o sistema em operação, e o que interessa é justamente o que acontece a partir dele. Para descartar o começo mesmo assim, ponha `warmup` no arquivo ou use `--warmup` na linha de comando (que, com `--estado`, vale para o estado).

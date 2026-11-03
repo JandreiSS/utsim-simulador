@@ -15,3 +15,24 @@ th { color: var(--muted); font-weight: 600; }
 .ok { color: var(--ok); } .aviso { color: var(--warn); } .desvio { color: var(--bad); font-weight: 600; }
 .vazio { color: var(--muted); }
 svg.spark { vertical-align: middle; }
+h3 { font-size: 1em; margin: 12px 0 4px; }
+button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.explica { color: var(--muted); max-width: 70em; }
+.cartoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.cartao { border: 1px solid var(--line); border-left: 6px solid var(--muted); border-radius: 6px; padding: 8px 12px; min-width: 14em; }
+.cartao.verde { border-left-color: var(--ok); } .cartao.amarelo { border-left-color: var(--warn); } .cartao.vermelho { border-left-color: var(--bad); }
+.cartao .nome { color: var(--muted); } .cartao .valor { font-size: 1.4em; font-weight: 600; }
+.luz { font-weight: 600; } .luz.verde { color: var(--ok); } .luz.amarelo { color: var(--warn); } .luz.vermelho { color: var(--bad); }
+svg.leque { width: 100%; max-width: 760px; height: auto; display: block; }
+svg.leque .grade { stroke: var(--line); } svg.leque .eixo { fill: var(--muted); font-size: 11px; }
+svg.leque .p90 { fill: #4a78c2; fill-opacity: .18; } svg.leque .p50 { fill: #4a78c2; fill-opacity: .32; }
+svg.leque .mediana { fill: none; stroke: #4a78c2; stroke-width: 2; }
+svg.leque .media { fill: none; stroke: var(--fg); stroke-width: 1.2; stroke-dasharray: 4 3; }
+svg.leque .ic { fill: none; stroke: var(--fg); stroke-width: .8; stroke-opacity: .6; }
+svg.leque .meta { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.legenda { color: var(--muted); font-size: .9em; }
+.sw { display: inline-block; width: 18px; height: 10px; vertical-align: middle; border-radius: 2px; }
+.sw.p90 { background: rgba(74, 120, 194, .18); } .sw.p50 { background: rgba(74, 120, 194, .32); }
+.sw.mediana { border-top: 2px solid #4a78c2; height: 0; } .sw.media { border-top: 1.5px dashed currentColor; height: 0; }
+.sw.meta { border-top: 2px dashed var(--bad); height: 0; }

@@ -1,5 +1,6 @@
 //! `utsim gemeo`: the digital twin in shadow mode (only observes the plant), with
-//! recording, and `utsim gemeo reproduzir`, the replay of a recording without network.
+//! recording and, with `--previsao`, the forecast ahead from the observed state; and
+//! `utsim gemeo reproduzir`, the replay of a recording without network.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -38,6 +39,10 @@ pub struct Args {
     /// Grava o estado observado no fim como estado inicial (.ron, para `utsim run --estado`)
     #[arg(long, value_name = "ARQUIVO")]
     estado: Option<PathBuf>,
+    /// Liga a previsão: a cada intervalo (seção forecast do .gemeo.ron) e sob pedido no
+    /// painel, R replicações a partir do estado observado até o horizonte
+    #[arg(long)]
+    previsao: bool,
 }
 
 #[derive(clap::Subcommand)]
@@ -58,6 +63,10 @@ enum Action {
         /// Grava o estado observado no fim como estado inicial (.ron)
         #[arg(long, value_name = "ARQUIVO")]
         estado: Option<PathBuf>,
+        /// Refaz as previsões da sessão (nos mesmos instantes e com as mesmas sementes);
+        /// sem previsões gravadas, faz uma no fim
+        #[arg(long)]
+        previsao: bool,
     },
 }
 
@@ -118,11 +127,44 @@ fn summary(r: &TwinReport) {
     }
 }
 
+/// Turns the forecast on with the `forecast` section of the file (or the defaults), the
+/// time unit and the goals of the model's dashboard file.
+fn enable_forecast(twin: &mut Twin, model_path: &Path) {
+    let dash = Dashboard::load_next_to(model_path).unwrap_or_default();
+    let (settings, unit) =
+        crate::prever::settings_with_dashboard(twin.config().forecast.clone(), &dash);
+    eprintln!(
+        "Previsão ligada: {}, horizonte {:?}, {} replicações",
+        match settings.interval(unit) {
+            Some(e) => format!("a cada {e} unidades do modelo"),
+            None => "só sob pedido".to_string(),
+        },
+        settings.horizon,
+        settings.replications
+    );
+    twin.enable_forecast(settings, unit);
+}
+
 fn outputs(twin: &Twin, json: Option<&Path>, estado: Option<&Path>) -> Result<(), String> {
     let report = twin.report(json.is_some());
     summary(&report);
+    if let Some(last) = twin.forecasts().last() {
+        println!(
+            "\n{} previsão(ões); a última (t = {:.1}):",
+            twin.forecasts().len(),
+            last.instante
+        );
+        crate::prever::print(last);
+    }
+    for e in twin.forecast_errors() {
+        eprintln!("aviso: previsão: {e}");
+    }
     if let Some(path) = json {
-        let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
+        let mut value = serde_json::to_value(&report).map_err(|e| e.to_string())?;
+        if !twin.forecasts().is_empty() {
+            value["previsoes"] = serde_json::to_value(twin.forecasts()).unwrap_or_default();
+        }
+        let text = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
         std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
         eprintln!("Relatório em {}", path.display());
     }
@@ -146,9 +188,10 @@ pub fn run(a: Args) -> Result<(), String> {
         config,
         json,
         estado,
+        previsao,
     }) = a.action
     {
-        return reproduce(&gravacao, modelo, config, json, estado);
+        return reproduce(&gravacao, modelo, config, json, estado, previsao);
     }
     let model_path = a.model.expect("clap exige o modelo");
     let config_path = a.config.unwrap_or_else(|| default_config(&model_path));
@@ -160,6 +203,9 @@ pub fn run(a: Args) -> Result<(), String> {
     }
     let sim = simulate(&p)?;
     let mut twin = Twin::new(p.model.clone(), p.config.clone(), sim);
+    if a.previsao {
+        enable_forecast(&mut twin, &model_path);
+    }
     if let Some(dir) = &a.gravar {
         let header = SessionHeader {
             formato: 1,
@@ -209,6 +255,9 @@ pub fn run(a: Args) -> Result<(), String> {
                 "Painel do gêmeo em {}gemeo (só este computador)",
                 server.url()
             );
+            if a.previsao {
+                println!("Previsão em {}gemeo/previsao", server.url());
+            }
             Some(server)
         }
         None => None,
@@ -244,6 +293,7 @@ fn reproduce(
     config: Option<PathBuf>,
     json: Option<PathBuf>,
     estado: Option<PathBuf>,
+    previsao: bool,
 ) -> Result<(), String> {
     let rec = Recording::open(path)?;
     let (config_text, config_dir) = match &config {
@@ -273,6 +323,20 @@ fn reproduce(
     );
     let sim = simulate(&p)?;
     let mut twin = Twin::new(p.model, p.config, sim);
+    if previsao {
+        enable_forecast(&mut twin, &model_path);
+    }
     utsim_twin::replay(&mut twin, &rec);
+    if previsao {
+        let recorded = rec
+            .lines
+            .iter()
+            .any(|l| matches!(l, utsim_twin::record::Line::Forecast { .. }));
+        if !recorded {
+            eprintln!("a gravação não tem previsões; prevendo a partir do fim da sessão");
+            twin.request_forecast();
+        }
+        twin.run_forecasts();
+    }
     outputs(&twin, json.as_deref(), estado.as_deref())
 }

@@ -29,6 +29,13 @@ const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 pub trait Extra: Send + Sync {
     /// Content type and body for `path`, or `None` to fall through.
     fn get(&self, path: &str) -> Option<(&'static str, Vec<u8>)>;
+
+    /// Answer to a `POST` of `path` (an action such as "forecast now"), or `None` to
+    /// fall through. Only asked when the request carries the `X-UTSim` header, which a
+    /// cross-site form cannot send.
+    fn post(&self, _path: &str) -> Option<(&'static str, Vec<u8>)> {
+        None
+    }
 }
 
 /// A running dashboard server.
@@ -252,10 +259,11 @@ fn serve(
         )
     } else {
         let decoded = percent_decode(&req.path);
-        match extra
-            .filter(|_| req.method == "GET" || req.method == "HEAD")
-            .and_then(|x| x.get(&decoded))
-        {
+        match extra.and_then(|x| match req.method.as_str() {
+            "GET" | "HEAD" => x.get(&decoded),
+            "POST" if req.csrf_header => x.post(&decoded),
+            _ => None,
+        }) {
             Some((content_type, body)) => Response::new("200 OK", content_type, body),
             None => route(&req, study),
         }

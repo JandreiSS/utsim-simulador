@@ -16,4 +16,15 @@ Twin(
     ],
     shadow: (window: 200.0, replications: 20, warmup: 400.0, samples_per_window: 20),
     record: (anonymize_people: true, keep_days: 30),
+    // Previsão (com --previsao): a cada 500 unidades do gêmeo e sob pedido no painel,
+    // 20 replicações das próximas 400 unidades a partir do estado observado.
+    forecast: (
+        every: 500.0,
+        horizon: Time(400.0),
+        replications: 20,
+        targets: {"producao": AtLeast(380.0)},
+        limits: [(object: "fila", above: 10.0)],
+        watch: ["fila"],
+        scenarios: [(name: "máquina mais rápida", set: {"maquina.process": "Exp(mean: 0.5)"})],
+    ),
 )

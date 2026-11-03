@@ -137,6 +137,24 @@ impl Accumulator {
             .collect()
     }
 
+    /// The objects as of `t`: a pending state whose debounce ended by `t` counts, whether
+    /// or not a window closed since (the same state live and in the replay).
+    pub fn objects_at(&self, t: f64) -> BTreeMap<String, ObjectState> {
+        self.objects
+            .iter()
+            .map(|(k, tr)| {
+                let mut o = tr.obs.clone();
+                if let Some((class, at)) = tr.pending {
+                    if at <= t {
+                        o.estado = Some(class);
+                        o.estado_desde = Some(at);
+                    }
+                }
+                (k.clone(), o)
+            })
+            .collect()
+    }
+
     /// Integrates one object's step functions up to `to`, applying a pending state when
     /// its debounce ends before `to`.
     fn integrate(t: &mut Track, win_start: f64, to: f64) {

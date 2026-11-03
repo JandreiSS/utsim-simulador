@@ -15,7 +15,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
 | Painel web | `utsim-dash` | só lê relatórios de replicações; servidor HTTP em `std::net` só em `127.0.0.1`, API JSON somente leitura, página e gráficos SVG embutidos (`include_str!`), todo cálculo em Rust; `.xlsx` atrás da feature `xlsx` |
-| Gêmeo digital | `utsim-twin` | só lê a planta (conectores OPC UA cliente, MQTT e Sparkplug B, nenhum escreve); nunca altera a simulação no modo sombra; o núcleo (`Twin`) não tem rede nem relógio, e a reprodução de uma gravação dá o mesmo relatório (seção 4t) |
+| Gêmeo digital | `utsim-twin` | só lê a planta (conectores OPC UA cliente, MQTT e Sparkplug B, nenhum escreve); nunca altera a simulação no modo sombra; o núcleo (`Twin`) não tem rede nem relógio, e a reprodução de uma gravação dá o mesmo relatório e as mesmas previsões (seções 4t e 4u) |
 | Navegação | `utsim-nav` | obstáculos, menor caminho livre (grade e A*), pontos de acesso e geração de rede; função pura dos dados (seção 4p, "Obstáculos, caminho livre e modos de movimentação") |
 | Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
@@ -1620,15 +1620,75 @@ arquivo/SQL/Modbus, T3 em sombra, T8 parcial, T9 parcial, T10). Manual: "Gêmeo 
   `server::Extra` (`get(caminho) -> Option<(tipo, corpo)>`) e `Server::start_with`; o
   `TwinPanel` responde `/gemeo`, `/gemeo.js`, `/gemeo.css`, `/api/gemeo`,
   `/api/gemeo/estado` e `/api/gemeo/estado.ron`. O resto do servidor (só `127.0.0.1`,
-  `Host` local, somente `GET`) vale para essas rotas.
+  `Host` local, `GET`, e `POST` só com o cabeçalho `X-UTSim`) vale para essas rotas.
 - **Estado observado** sai como `utsim_model::InitialState` (contagens, quebras em curso,
-  posições), conferido objeto a objeto com `Model::check_state`, para a futura previsão.
+  posições), conferido objeto a objeto com `Model::check_state`, ponto de partida da
+  previsão (seção 4u).
 - **Testes** (`crates/utsim-twin/tests`): fábrica sintética do `utsim-emu` no mesmo
   processo (sem alarme com o modelo certo, desvio com o ciclo maior, ao vivo pelo
   `ChannelConnector` com gravação e reprodução idêntica, anonimização, retenção, validação)
   e por OPC UA em `127.0.0.1` (servidor da emulação, cliente do gêmeo, desvio e reprodução
   idêntica); MQTT e Sparkplug B com um broker mínimo embutido no teste; Sparkplug com
   mensagens codificadas byte a byte; rotas do painel.
+
+## 4u. Previsão do gêmeo (`utsim-twin::forecast`, `utsim prever`)
+
+Item T6 de `docs/plano_gemeo_digital_e_painel.md` (seção 1.4, "Previsão"). Manual:
+"Gêmeo digital", seção "Previsão", e "Simular a partir de um estado".
+
+```
+ Twin (sombra)  --a cada `every` ou sob pedido-->  Snapshot { t, pedido, objetos observados }
+        |  linha {"tipo":"previsao","t":…,"pedido":…} na gravação, antes da leitura seguinte
+        v
+ live::run: fio de previsão (fora do lock)    reprodução: Twin::run_forecasts (mesma função)
+        v
+ forecast::of_snapshot  shadow::initial_state(t) + start_clock -> InitialState
+        |                semente = seed_for(semente base, t)
+        v
+ forecast::forecast     modelo do horizonte (stop = H, warmup 0, R replicações, semente)
+        |  replicate: build_from(r, estado), run_until em `points` instantes (produção, WIP,
+        |             conteúdo acompanhado, cruzamento de limites), run_until(∞), finish
+        |  KPIs: produção + utsim_dash::kpi::compute + conteúdo final (Kpi::build: média, IC,
+        |        P5–P95, P(meta) com Wilson, semáforo)
+        |  cenários: apply_patches + o mesmo estado, as mesmas sementes -> diferença pareada
+        v
+ Forecast (JSON)  ->  Twin (até 200)  ->  /gemeo/previsao, /api/gemeo/previsao[s]
+```
+
+- **Sementes.** A replicação `r` de uma previsão usa `RunConfig { seed: seed_for(base, t),
+  replication: r }`, com `seed_for` uma mistura SplitMix64 da semente com os bits do instante.
+  Previsões em instantes diferentes são independentes; a mesma previsão se repete; os
+  cenários usam exatamente os mesmos *streams* que o "como está" (números aleatórios
+  comuns), então o restante das atividades em curso também é o mesmo sorteio. O `utsim
+  prever` usa a semente do modelo sem mistura: a previsão de um estado é a rodada do `utsim
+  run --estado --stop H` (teste de ponta a ponta).
+- **Amostrar não muda a rodada.** `run_until(t)` só pausa: a replicação amostrada é
+  idêntica, bit a bit, à rodada sem pausas (teste com o estado vazio contra
+  `run_replications`). As séries são lidas como no `simdist` (`block_status` e `report()`).
+- **Determinismo com o gêmeo.** O instantâneo é tirado *antes* da primeira leitura (ou do
+  avanço do relógio) posterior ao instante marcado, e o estado vem de
+  `Accumulator::objects_at(t)` (um estado pendente de *debounce* que já venceu conta,
+  fechando a janela ou não). A gravação recebe a linha `previsao` naquele ponto da
+  sequência, no arquivo do dia das leituras vizinhas; a reprodução tira os instantâneos nas
+  linhas (não pelo relógio), então as previsões saem idênticas. Vários instantes sem
+  nenhuma leitura viram um só (o último).
+- **Laço principal livre.** O cálculo roda num fio próprio dentro de `live::run`
+  (`std::thread::scope`, canal), e as replicações em até 8 fios; o resultado não depende do
+  número de fios. O `Twin` só guarda o instantâneo (os objetos observados), barato.
+- **Painel.** A trait `server::Extra` ganhou `post` (padrão `None`), chamada só com o
+  cabeçalho `X-UTSim`: `POST /api/gemeo/previsao` pede uma previsão agora. A página
+  `/gemeo/previsao` (`web/previsao.html`, `previsao.js`) desenha o leque (P5–P95, P25–P75,
+  mediana, média com IC, meta), os cartões com semáforo, os limites e a tabela de cenários.
+- **Configuração.** Seção opcional `forecast` (`previsao`) do `.gemeo.ron`, validada com o
+  resto (`ForecastSettings::validate`: objetos de `limits` e `watch`, cenários aplicáveis,
+  faixas dos números); também arquivo próprio `Forecast(...)` para `utsim prever --config`.
+  Unidade de tempo e metas do `<modelo>.painel.ron` entram por baixo das da previsão.
+- **Testes** (`crates/utsim-twin/tests/previsao.rs`, `crates/utsim-cli/tests/prever.rs`):
+  estado vazio igual à rodada normal; M/M/1 com 50 na fila esvazia e converge para `L ≈ 1`,
+  com o instante do cruzamento por volta de 50; probabilidade de meta e Wilson conferidos
+  numa linha determinística; mais capacidade melhora com diferença pareada significativa;
+  gravação com previsões agendadas e pedidas reproduzida com previsões idênticas; seção
+  validada; rotas e `POST` do painel; `utsim prever` igual ao `utsim run --estado`.
 
 ## 5. Estatísticas
 
