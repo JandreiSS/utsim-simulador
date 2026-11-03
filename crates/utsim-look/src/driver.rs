@@ -327,7 +327,7 @@ mod tests {
             .as_ref()
             .expect("motorista no catálogo")
             .quadril_m;
-        // A smaller driver for a smaller cab.
+        // The driver at the catalogue entry's size (the real size for this forklift).
         assert!((m.scale - 0.96 * entry.motorista.as_ref().unwrap().escala).abs() < 1e-5);
         let hip = hip_of(&m);
         assert!((hip[0] - q.0).abs() < 1e-4 && (hip[1] - q.1).abs() < 1e-4);
