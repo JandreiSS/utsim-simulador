@@ -46,6 +46,10 @@ bash scripts/notas-versao.sh "$VERSAO" > "$PASTA/notas.md" || echo "(sem notas)"
     --produto utsim \
     --nome "UTSim" \
     --descricao "Editor de modelos de simulação a eventos discretos" \
+    --subtitulo "Simulação de processos" \
+    --autor "UTSim" \
+    --cor "#22B5FF" \
+    --icone assets/icone/familia/utsim_256.png \
     --versao "$VERSAO" \
     --canal "$CANAL" \
     --plataforma "$PLATAFORMA" \
