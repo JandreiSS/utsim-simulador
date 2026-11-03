@@ -9,11 +9,15 @@
 //! - [`kpi`]: the KPIs and their formulas, intervals and traffic lights;
 //! - [`data`]: one JSON per API route (also embedded in the static export);
 //! - [`study`]: runs the replications in the background, publishing partial results;
+//! - [`analyses`]: what runs after them: the exact Gantt and the heat map from the
+//!   trace, the comparison of the scenarios of an experiment (ANOVA, Tukey,
+//!   Bonferroni), the correlation between metrics and the PERT/CPM tornado;
 //! - [`server`]: the HTTP server on `std::net`;
 //! - [`export`] and [`page`]: CSV, JSON, `.xlsx` and the frozen HTML page.
 //!
 //! See `docs/manual_painel.md` for the user's guide.
 
+pub mod analyses;
 pub mod config;
 pub mod data;
 pub mod export;

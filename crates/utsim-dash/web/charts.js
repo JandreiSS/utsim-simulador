@@ -7,6 +7,7 @@ const UT = (() => {
   const fin = (x) => typeof x === "number" && isFinite(x);
   const fmt = (x, d) => {
     if (!fin(x)) return "-";
+    if (x === 0) x = 0; /* no "-0" */
     if (d === undefined) {
       const a = Math.abs(x);
       d = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 3;
@@ -22,7 +23,10 @@ const UT = (() => {
     const mag = Math.pow(10, Math.floor(Math.log10(raw)));
     const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || raw;
     const out = [];
-    for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(+v.toPrecision(12));
+    /* From the multiple of the step at or below lo to the one at or above hi, so the
+       axis always covers the data. */
+    const first = Math.floor(lo / step + 1e-9) * step, last = Math.ceil(hi / step - 1e-9) * step;
+    for (let v = first; v <= last + step * 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : +v.toPrecision(12));
     return out.length ? out : [lo, hi];
   }
 
@@ -144,21 +148,26 @@ const UT = (() => {
     const used = new Set();
     linhas.forEach((l) => l.segmentos.forEach((s) => used.add(s[2])));
     const legend = [...used];
-    const H = T + linhas.length * rowH + 40 + 18 * Math.ceil(legend.length / 4);
-    const t0 = Math.min(...linhas.flatMap((l) => l.segmentos.map((s) => s[0])));
-    const t1 = fin(fim) ? fim : Math.max(...linhas.flatMap((l) => l.segmentos.map((s) => s[1])));
-    const tx = ticks(t0, t1, 8);
-    const sx = linear(tx[0], Math.max(tx[tx.length - 1], t1), L, W - R);
+    const H = T + linhas.length * rowH + 54 + 18 * Math.ceil(legend.length / 4);
+    let t0 = Math.min(...linhas.flatMap((l) => l.segmentos.map((s) => s[0])));
+    let t1 = fin(fim) ? fim : Math.max(...linhas.flatMap((l) => l.segmentos.map((s) => s[1])));
+    /* Zoom: only the window [o.t0, o.t1], segments clipped to it. */
+    if (fin(o.t0) && fin(o.t1) && o.t1 > o.t0) { t0 = o.t0; t1 = o.t1; }
+    const tx = ticks(t0, t1, 8).filter((t) => t >= t0 - 1e-9 && t <= t1 + 1e-9);
+    if (tx.length < 2) tx.splice(0, tx.length, t0, t1);
+    const sx = linear(t0, t1, L, W - R);
     let b = xAxis(sx, tx, T, T + linhas.length * rowH, "Tempo", o.unidadeX);
     linhas.forEach((l, k) => {
       const y = T + k * rowH;
       b += text(L - 8, y + rowH / 2 + 4, l.rotulo, "label", "end");
-      for (const [a, z, st] of l.segmentos) {
+      for (const [a0, z0, st] of l.segmentos) {
+        if (z0 <= t0 || a0 >= t1) continue;
+        const a = Math.max(a0, t0), z = Math.min(z0, t1);
         const info = estados[st] || {};
         b += `<rect x="${sx(a).toFixed(1)}" y="${y + 3}" width="${Math.max(0.6, sx(z) - sx(a)).toFixed(1)}" height="${rowH - 6}" fill="${info.cor || "#9aa0a6"}"><title>${esc(l.rotulo)}: ${esc(info.rotulo || st)} (${fmt(a)} a ${fmt(z)})</title></rect>`;
       }
     });
-    const ly = T + linhas.length * rowH + 40;
+    const ly = T + linhas.length * rowH + 54;
     legend.forEach((st, k) => {
       const info = estados[st] || {};
       const x = L + (k % 4) * 150, y = ly + Math.floor(k / 4) * 18;
@@ -267,6 +276,121 @@ const UT = (() => {
     return `<svg class="spark-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="valor em cada replicação" xmlns="http://www.w3.org/2000/svg"><title>Valor em cada replicação</title>${b}</svg>`;
   }
 
+  /* Differences with simultaneous intervals around zero (forest plot).
+     items: [{rotulo, valor, lo, hi, destaque}] */
+  function intervalos(items, o = {}) {
+    items = items.filter((i) => fin(i.valor));
+    if (!items.length) return semDados(o.titulo);
+    const longest = Math.max(...items.map((i) => String(i.rotulo).length));
+    const W = 760, left = o.left || Math.min(340, 24 + 6.6 * longest), right = 20, rowH = 26, top = 8;
+    const H = top + items.length * rowH + 40;
+    const vals = items.flatMap((i) => [i.lo, i.hi, i.valor]).filter(fin).concat([0]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo || 1) * 0.06;
+    const tk = ticks(lo - pad, hi + pad, 6);
+    const sx = linear(tk[0], tk[tk.length - 1], left, W - right);
+    let b = xAxis(sx, tk, top, top + items.length * rowH, o.rotuloX || "Diferença", o.unidade);
+    b += `<line class="goal" x1="${sx(0).toFixed(1)}" x2="${sx(0).toFixed(1)}" y1="${top}" y2="${top + items.length * rowH}"/>`;
+    items.forEach((it, k) => {
+      const m = top + k * rowH + rowH / 2;
+      b += text(left - 8, m + 4, it.rotulo, "label", "end");
+      if (fin(it.lo) && fin(it.hi)) {
+        b += `<line class="${it.destaque ? "ci" : "whisker"}" x1="${sx(it.lo).toFixed(1)}" x2="${sx(it.hi).toFixed(1)}" y1="${m}" y2="${m}"/>`;
+      }
+      b += `<circle class="${it.destaque ? "mean" : "dot"}" cx="${sx(it.valor).toFixed(1)}" cy="${m}" r="4"><title>${esc(it.rotulo)}: ${fmt(it.valor)} (${fmt(it.lo)} a ${fmt(it.hi)})</title></circle>`;
+    });
+    return wrap(W, H, o.titulo || "Intervalos", b);
+  }
+
+  /* Correlation matrix: blue for positive, orange for negative, stronger colour for a
+     larger |r|. rotulos: names; valores: k x k (null for undefined). */
+  function matriz(rotulos, valores, o = {}) {
+    const k = rotulos.length;
+    if (k < 2) return semDados(o.titulo);
+    const cell = Math.max(30, Math.min(56, Math.floor(420 / k)));
+    const left = o.left || 220, top = 8;
+    const W = left + k * cell + 20, H = top + k * cell + 120;
+    let b = "";
+    for (let i = 0; i < k; i++) {
+      b += text(left - 8, top + i * cell + cell / 2 + 4, rotulos[i], "label", "end");
+      b += `<text class="tick" transform="translate(${(left + i * cell + cell / 2).toFixed(1)} ${top + k * cell + 8}) rotate(40)" text-anchor="start">${esc(rotulos[i])}</text>`;
+      for (let j = 0; j < k; j++) {
+        const v = valores[i][j];
+        const x = left + j * cell, y = top + i * cell;
+        if (!fin(v)) {
+          b += `<rect class="cell-na" x="${x}" y="${y}" width="${cell - 1}" height="${cell - 1}"><title>${esc(rotulos[i])} x ${esc(rotulos[j])}: indefinida</title></rect>`;
+          continue;
+        }
+        const op = Math.max(0.06, Math.min(1, Math.abs(v))).toFixed(2);
+        b += `<rect class="${v >= 0 ? "cell-pos" : "cell-neg"}" fill-opacity="${op}" x="${x}" y="${y}" width="${cell - 1}" height="${cell - 1}"><title>${esc(rotulos[i])} x ${esc(rotulos[j])}: ${fmt(v, 3)}</title></rect>`;
+        b += text(x + cell / 2, y + cell / 2 + 4, fmt(v, 2), Math.abs(v) > 0.6 ? "cell-text strong" : "cell-text", "middle");
+      }
+    }
+    return wrap(W, H, o.titulo || "Matriz de correlação", b);
+  }
+
+  /* Sequential heat colour, pale yellow (0) to dark red (1): the same scale as the SVG
+     written by `utsim analisar --mapa-calor`. */
+  const HEAT = [[255, 245, 177], [254, 204, 92], [253, 141, 60], [227, 26, 28], [128, 0, 38]];
+  function corCalor(v) {
+    v = Math.max(0, Math.min(1, v)) * (HEAT.length - 1);
+    const i = Math.min(HEAT.length - 2, Math.floor(v)), f = v - i;
+    const c = [0, 1, 2].map((k) => Math.round(HEAT[i][k] + (HEAT[i + 1][k] - HEAT[i][k]) * f));
+    return "#" + c.map((x) => x.toString(16).padStart(2, "0")).join("");
+  }
+
+  /* Heat map over the plan. d: /api/mapa_calor; camada: {nome, celulas:[[col,row,tempo,passagens]]};
+     medida: "tempo" | "passagens". */
+  function mapaCalor(d, camada, medida, o = {}) {
+    if (!d || !camada) return semDados(o.titulo);
+    const M = 30, W = 760;
+    const wm = d.colunas * d.celula, hm = d.linhas * d.celula;
+    const px = (W - 2 * M) / Math.max(wm, 1e-9);
+    const H = hm * px + 2 * M + 34;
+    const sx = (x) => M + (x - d.x0) * px, sy = (y) => M + hm * px - (y - d.y0) * px;
+    const idx = medida === "passagens" ? 3 : 2;
+    const max = Math.max(0, ...camada.celulas.map((c) => c[idx]));
+    let b = `<rect class="plan-bg" x="${M}" y="${M}" width="${(wm * px).toFixed(1)}" height="${(hm * px).toFixed(1)}"/>`;
+    const side = d.celula * px;
+    for (const [col, row, t, n] of camada.celulas) {
+      const v = medida === "passagens" ? n : t;
+      if (!(v > 0) || !(max > 0)) continue;
+      const x = d.x0 + col * d.celula, y = d.y0 + (row + 1) * d.celula;
+      b += `<rect x="${sx(x).toFixed(2)}" y="${sy(y).toFixed(2)}" width="${side.toFixed(2)}" height="${side.toFixed(2)}" fill="${corCalor(v / max)}"><title>(${fmt(x + d.celula / 2)}; ${fmt(y - d.celula / 2)}) m: ${fmt(t)} de ocupação, ${n} passagens</title></rect>`;
+    }
+    for (const [x1, y1, x2, y2] of d.ligacoes) {
+      b += `<line class="plan-link" x1="${sx(x1).toFixed(1)}" y1="${sy(y1).toFixed(1)}" x2="${sx(x2).toFixed(1)}" y2="${sy(y2).toFixed(1)}"/>`;
+    }
+    for (const ob of d.objetos) {
+      const x = sx(ob.x), y = sy(ob.y), fim = x > 0.75 * W;
+      b += `<rect class="plan-obj" x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="8" height="8"><title>${esc(ob.nome)} (${esc(ob.tipo)})</title></rect>`;
+      b += text(fim ? x - 6 : x + 6, y - 6, ob.nome, "tick", fim ? "end" : "start");
+    }
+    const ly = hm * px + 2 * M + 6;
+    for (let i = 0; i < 5; i++) b += `<rect x="${M + 26 * i}" y="${ly.toFixed(1)}" width="26" height="12" fill="${corCalor((i + 0.5) / 5)}"/>`;
+    b += text(M + 140, ly + 10, (medida === "passagens" ? "Passagens" : "Tempo de ocupação") + ` por célula de ${fmt(d.celula)} m: de 0 a ${fmt(max)}`, "tick");
+    return wrap(W, H, o.titulo || "Mapa de calor", b);
+  }
+
+  /* Tornado: rank correlation of each activity with the total time, largest first.
+     itens: [{rotulo, valor, extra}] with valor in [-1, 1]. */
+  function tornado(itens, o = {}) {
+    if (!itens.length) return semDados(o.titulo);
+    const longest = Math.max(...itens.map((i) => String(i.rotulo).length));
+    const W = 760, left = o.left || Math.min(340, 24 + 6.6 * longest), right = 70, rowH = 24, top = 8;
+    const H = top + itens.length * rowH + 40;
+    const sx = linear(-1, 1, left, W - right);
+    let b = xAxis(sx, [-1, -0.5, 0, 0.5, 1], top, top + itens.length * rowH, o.rotuloX || "Correlação de postos com o tempo total", "");
+    itens.forEach((it, k) => {
+      const y = top + k * rowH;
+      const a = sx(Math.min(0, it.valor)), z = sx(Math.max(0, it.valor));
+      b += text(left - 8, y + rowH / 2 + 4, it.rotulo, "label", "end");
+      b += `<rect class="${it.valor >= 0 ? "bar" : "bar hot"}" x="${a.toFixed(1)}" y="${y + 4}" width="${Math.max(1, z - a).toFixed(1)}" height="${rowH - 8}"><title>${esc(it.rotulo)}: ${fmt(it.valor, 3)}${it.extra ? "; " + esc(it.extra) : ""}</title></rect>`;
+      b += text(W - right + 6, y + rowH / 2 + 4, fmt(it.valor, 2), "value");
+    });
+    return wrap(W, H, o.titulo || "Tornado", b);
+  }
+
   /* Style of a chart downloaded alone (the page's CSS is not inside the file). */
   const SVG_CSS =
     "text{font:11px system-ui,sans-serif;fill:#1c1f24}.tick{fill:#5d6672}.axis,.whisker,.median,.ci{stroke:#1c1f24;fill:none}" +
@@ -274,6 +398,6 @@ const UT = (() => {
     ".band{fill:#2563eb;opacity:.28}.band2{fill:#2563eb;opacity:.12}.box{fill:#bcd0f7;stroke:#1c1f24}.dot{fill:#1c1f24;opacity:.6}" +
     ".mean{fill:#c2410c}.goal{stroke:#c2410c;stroke-dasharray:4 3;fill:none}.spark{fill:#2563eb}";
 
-  return { esc, fmt, fin, barrasIC, linhaBanda, histograma, gantt, caixa, empilhada, pareto, minigrafico, SVG_CSS, ticks };
+  return { esc, fmt, fin, barrasIC, linhaBanda, histograma, gantt, caixa, empilhada, pareto, minigrafico, intervalos, matriz, mapaCalor, corCalor, tornado, SVG_CSS, ticks };
 })();
 if (typeof module !== "undefined") module.exports = UT;

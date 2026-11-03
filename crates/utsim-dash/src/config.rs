@@ -9,6 +9,10 @@
 //!     cards: ["vazao", "lead_time_p90", "wip", "utilizacao_gargalo"],
 //!     targets: {"vazao": AtLeast(120.0), "lead_time_p90": AtMost(900.0)},
 //!     thresholds: (green: 0.9, yellow: 0.5),
+//!     // Optional analyses (see `docs/manual_painel.md`):
+//!     scenarios: Some("experimento.ron"),
+//!     groups: {"montagem": ["m1", "m2"]},
+//!     pert: Some((from: Some("corte"), to: Some("embalagem"), deadline: Some(480.0))),
 //! )
 //! ```
 
@@ -114,6 +118,32 @@ pub struct OeeSpec {
     pub scrap_sinks: Vec<String>,
 }
 
+/// The part of the model whose PERT/CPM Monte Carlo the dashboard shows (tornado).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct PertSpec {
+    /// Selected objects (or use `from` and `to`).
+    pub objects: Vec<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    /// Deadline for `P(T ≤ deadline)`, in model time units.
+    pub deadline: Option<f64>,
+    /// Monte Carlo draws.
+    pub samples: usize,
+}
+
+impl Default for PertSpec {
+    fn default() -> Self {
+        PertSpec {
+            objects: Vec::new(),
+            from: None,
+            to: None,
+            deadline: None,
+            samples: 10_000,
+        }
+    }
+}
+
 /// The dashboard configuration.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -132,6 +162,18 @@ pub struct Dashboard {
     /// time units) becomes the KPI `nivel_servico`.
     pub lead_time_limit: Option<f64>,
     pub oee: Vec<OeeSpec>,
+    /// Experiment file (`utsim experiment` format) whose scenarios the Scenarios view
+    /// compares, relative to the dashboard file (or to the model without one).
+    pub scenarios: Option<String>,
+    /// Groups of objects with their own work-in-process series, by name.
+    pub groups: BTreeMap<String, Vec<String>>,
+    /// Side of the cells of the heat map, in metres (default 0.5).
+    pub heatmap_cell: Option<f64>,
+    /// Window of the throughput series, in model time units (default: a twentieth of
+    /// the statistics window).
+    pub throughput_window: Option<f64>,
+    /// PERT/CPM Monte Carlo of a part of the model (sensitivity tornado).
+    pub pert: Option<PertSpec>,
 }
 
 impl Default for Dashboard {
@@ -145,6 +187,11 @@ impl Default for Dashboard {
             targets: BTreeMap::new(),
             lead_time_limit: None,
             oee: Vec::new(),
+            scenarios: None,
+            groups: BTreeMap::new(),
+            heatmap_cell: None,
+            throughput_window: None,
+            pert: None,
         }
     }
 }
@@ -212,6 +259,26 @@ impl Dashboard {
         if self.lead_time_limit.is_some_and(|l| l.is_nan() || l <= 0.0) {
             return Err("lead_time_limit deve ser positivo".to_string());
         }
+        if self.heatmap_cell.is_some_and(|c| c.is_nan() || c <= 0.0) {
+            return Err("heatmap_cell deve ser positivo (em metros)".to_string());
+        }
+        if self
+            .throughput_window
+            .is_some_and(|w| w.is_nan() || w <= 0.0)
+        {
+            return Err("throughput_window deve ser positivo".to_string());
+        }
+        if let Some((g, _)) = self.groups.iter().find(|(_, v)| v.is_empty()) {
+            return Err(format!("groups: o grupo {g} está vazio"));
+        }
+        if let Some(p) = &self.pert {
+            if p.objects.is_empty() && (p.from.is_none() || p.to.is_none()) {
+                return Err("pert: indique objects ou from e to".to_string());
+            }
+            if p.samples == 0 {
+                return Err("pert: samples deve ser positivo".to_string());
+            }
+        }
         Ok(())
     }
 
@@ -261,11 +328,32 @@ mod tests {
     }
 
     #[test]
+    fn the_optional_analyses_parse() {
+        let cfg = Dashboard::parse(
+            r#"Dashboard(
+                scenarios: Some("experimento.ron"),
+                groups: {"montagem": ["m1", "m2"]},
+                heatmap_cell: Some(1.0),
+                throughput_window: Some(60.0),
+                pert: Some((from: Some("corte"), to: Some("embalagem"), deadline: Some(480.0))),
+            )"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.scenarios.as_deref(), Some("experimento.ron"));
+        assert_eq!(cfg.groups["montagem"], ["m1", "m2"]);
+        let p = cfg.pert.unwrap();
+        assert_eq!((p.samples, p.deadline), (10_000, Some(480.0)));
+    }
+
+    #[test]
     fn typos_and_bad_values_are_errors() {
         assert!(Dashboard::parse("Dashboard(titulo: None)").is_err());
         assert!(Dashboard::parse("Dashboard(thresholds: (green: 0.4, yellow: 0.8))").is_err());
         assert!(Dashboard::parse("Dashboard(level: 1.5)").is_err());
         assert!(Dashboard::parse("Dashboard(oee: [(object: \"a\", ideal_cycle: 0.0)])").is_err());
+        assert!(Dashboard::parse("Dashboard(heatmap_cell: Some(0.0))").is_err());
+        assert!(Dashboard::parse("Dashboard(groups: {\"g\": []})").is_err());
+        assert!(Dashboard::parse("Dashboard(pert: Some((from: Some(\"a\"))))").is_err());
     }
 
     #[test]

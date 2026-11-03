@@ -10,12 +10,16 @@
 //! | `/api/kpis` | every [`Kpi`](crate::kpi::Kpi) |
 //! | `/api/objetos` | one row per object (table of the engineer view) |
 //! | `/api/objeto/{nome}` | the detail of one object: KPIs, states, histograms, series, Gantt |
-//! | `/api/series` | work in progress over time, mean with confidence band and P5-P95 |
+//! | `/api/series` | work in progress (system and groups) and throughput per window over time, mean with confidence band and P5-P95 |
 //! | `/api/distribuicoes` | pooled histograms of the time in the system |
 //! | `/api/pareto` | time lost per object and cause |
 //! | `/api/gantt` | state timeline of the first replication |
 //! | `/api/estados` | colour and Portuguese label of each state |
 //! | `/api/config` | the dashboard configuration in use |
+//! | `/api/correlacao` | Pearson and Spearman correlations between metrics across replications |
+//!
+//! The routes of [`crate::analyses`] (exact Gantt, heat map, scenarios, PERT) are added by
+//! the study when the replications end.
 
 use std::collections::BTreeMap;
 
@@ -26,11 +30,10 @@ use utsim_core::{RunReport, State};
 use utsim_model::Model;
 use utsim_model::analysis::{self, ObjectStats};
 use utsim_scene::style::{state_color, state_label};
-use utsim_stats::summary;
 
 use crate::config::Dashboard;
 use crate::kpi::{self, Kpi, KpiSet, Spec};
-use crate::num::{pt_mean_hw, quantile};
+use crate::num::pt_mean_hw;
 
 /// Progress of the study.
 #[derive(Clone, Copy, Debug, Default, Serialize)]
@@ -39,6 +42,8 @@ pub struct Progress {
     pub total: u32,
     pub concluido: bool,
     pub cancelado: bool,
+    /// What runs after the replications (empty while they run and at the end).
+    pub etapa: &'static str,
 }
 
 /// Every route of the API, ready to serve or to embed.
@@ -120,28 +125,10 @@ fn histogram_json(h: &Histogram) -> Value {
 }
 
 /// Mean, confidence band and P5-P95 of curves sampled at the same instants.
-/// Returns `[t, mean, lo, hi, p5, p95]` rows over the shortest curve.
+/// Returns `[t, mean, lo, hi, p5, p95]` rows over the shortest curve
+/// ([`analysis::band`]).
 fn band(curves: &[Vec<[f64; 2]>], level: f64) -> Vec<[f64; 6]> {
-    let len = curves.iter().map(Vec::len).min().unwrap_or(0);
-    (0..len)
-        .map(|k| {
-            let xs: Vec<f64> = curves.iter().map(|c| c[k][1]).collect();
-            let s = summary(&xs, level);
-            let (lo, hi) = if s.half_width.is_finite() {
-                (s.mean - s.half_width, s.mean + s.half_width)
-            } else {
-                (s.mean, s.mean)
-            };
-            [
-                curves[0][k][0],
-                s.mean,
-                lo,
-                hi,
-                quantile(&xs, 0.05),
-                quantile(&xs, 0.95),
-            ]
-        })
-        .collect()
+    analysis::band(curves, level)
 }
 
 /// State timeline of one block in one replication: `[start, end, state]` segments built
@@ -202,6 +189,44 @@ impl Package {
         // Series of the whole system: WIP summed over the blocks that hold work.
         let wip_curves = wip_curves(reports);
         let wip_band = band(&wip_curves, cfg.level);
+        // Throughput per window (the study keeps the arrival instants at the sinks).
+        let window = cfg
+            .throughput_window
+            .or_else(|| reports.first().map(analysis::default_window))
+            .unwrap_or(1.0);
+        let per = if matches!(cfg.time_unit, crate::config::TimeUnit::Unit) {
+            1.0
+        } else {
+            cfg.time_unit.per_hour()
+        };
+        let throughput: Vec<[f64; 6]> = band(
+            &analysis::throughput_curves(reports, &[], window),
+            cfg.level,
+        )
+        .into_iter()
+        .map(|p| {
+            [
+                p[0],
+                p[1] * per,
+                p[2] * per,
+                p[3] * per,
+                p[4] * per,
+                p[5] * per,
+            ]
+        })
+        .collect();
+        let groups: Vec<Value> = cfg
+            .groups
+            .iter()
+            .map(|(name, members)| {
+                json!({
+                    "nome": format!("WIP de {name}"),
+                    "objetos": members,
+                    "unidade": "itens",
+                    "pontos": analysis::wip_band(reports, Some(members), cfg.level),
+                })
+            })
+            .collect();
 
         let cards = {
             let mut ids: Vec<String> = cfg
@@ -253,8 +278,19 @@ impl Package {
             "/api/series".to_string(),
             json!({
                 "wip": {"nome": "Estoque em processo (WIP)", "unidade": "itens", "pontos": wip_band},
+                "vazao": {
+                    "nome": "Vazão por janela (chegadas às saídas)",
+                    "unidade": cfg.time_unit.throughput_label(),
+                    "janela": window,
+                    "pontos": throughput,
+                },
+                "grupos": groups,
                 "nivel": cfg.level,
             }),
+        );
+        routes.insert(
+            "/api/correlacao".to_string(),
+            crate::analyses::correlation_json(reports),
         );
 
         // Objects.
