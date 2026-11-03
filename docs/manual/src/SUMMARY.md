@@ -15,6 +15,7 @@
 - [Recursos móveis](recursos-moveis.md)
   - [Movimentação e obstáculos](movimentacao.md)
   - [Corredores e faixas de segurança](corredores.md)
+  - [Pessoas: fadiga, aprendizado e habilidades](pessoas.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)
 - [Quebras e turnos](quebras-e-turnos.md)
   - [Manutenção de máquinas e OEE](manutencao.md)
