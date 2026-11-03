@@ -18,10 +18,10 @@ pub mod properties;
 pub mod results;
 pub mod roteiro;
 pub mod source;
-pub mod terceiros;
 pub mod view;
-pub mod visual;
 
 // Pure scene modules, moved to the engine-independent `utsim-scene` crate and
 // re-exported so the viewer keeps its paths.
 pub use utsim_scene::{fluids, geometry, handling, layout, style, timeline};
+// Appearance rules and the third-party catalogue, shared with the Godot bridge.
+pub use utsim_look::{catalogue as terceiros, visual};

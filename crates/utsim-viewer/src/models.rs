@@ -114,7 +114,9 @@ impl Library {
     fn key(source: &Source) -> String {
         match source {
             Source::Library(spec) => safe(&spec.key()),
-            Source::File(path) => format!("arquivo_{}", safe(&path.to_string_lossy())),
+            Source::File(path) | Source::Catalogue { file: path, .. } => {
+                format!("arquivo_{}", safe(&path.to_string_lossy()))
+            }
         }
     }
 
@@ -130,7 +132,7 @@ impl Library {
                 registry.insert_asset(PathBuf::from(&path), Path::new(&path), spec.glb());
                 path
             }
-            Source::File(file) => {
+            Source::File(file) | Source::Catalogue { file, .. } => {
                 // Each folder gets its own embedded folder, so the textures a `.glb`
                 // names by relative URI (`Textures/colormap.png`) resolve next to it.
                 let bytes = read_file(file)?;

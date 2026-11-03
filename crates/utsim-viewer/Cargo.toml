@@ -21,6 +21,7 @@ utsim-flow.workspace = true
 utsim-fluid.workspace = true
 utsim-scene.workspace = true
 utsim-assets.workspace = true
+utsim-look.workspace = true
 utsim-script.workspace = true
 utsim-opt.workspace = true
 clap.workspace = true

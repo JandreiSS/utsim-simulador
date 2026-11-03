@@ -23,7 +23,7 @@ Princípios:
 | Fase | Conteúdo | Estimativa |
 |---|---|---|
 | G1 | Ponte e reprodução (**feita**) | 6–8 h |
-| G2 | Edição do fluxo | 10–14 h |
+| G2 | Edição do fluxo (**feita**) | 10–14 h |
 | G3 | Rede, fluidos e resultados | 8–12 h |
 | G4 | Realidade virtual e aumentada (OpenXR) | 10–16 h |
 | G5 | Empacotamento e exportação (parcialmente feita) | 4–6 h |
@@ -58,9 +58,63 @@ Total previsto: 38 a 56 h.
 - **Capturas roteirizadas** (`godot/roteiros/capturas.json`) dos três exemplos, conferidas
   contra o Bevy.
 
-## G2: edição do fluxo
+## G2: edição do fluxo (feita)
 
 Objetivo: montar e alterar um modelo no Godot, como no editor Bevy, com desfazer e salvar.
+
+O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
+
+- **Antes:** a crate `utsim-look` (sem motor) tem as regras de aparência e o catálogo de
+  terceiros, com os testes; o `utsim-viewer` e a ponte usam as mesmas. O texto RON do
+  `Command::Set` foi para `utsim-edit::ron_text`.
+- **Ponte:** `UtsimDocument` com abrir, novo, salvar e salvar como, desfazer e refazer, os
+  problemas e avisos a cada mudança, o esquema das propriedades por tipo (distribuições por
+  família e parâmetros, listas e mapas em RON, equipes como conjunto, turnos por tabela ou
+  calendário), nome e descrição do modelo (`Command::SetInfo`), área de transferência,
+  alinhar, distribuir, a cena do documento, o fantasma da Biblioteca e a miniatura do ativo.
+- **Interação** (`editor.gd`, `biblioteca.gd`, `painel_propriedades.gd`, `principal.gd`):
+  Biblioteca com ícones (clicar e clicar no chão, ou arrastar até o chão); mover com encaixe na
+  grade, por projeção no piso, sem física; seleção por clique, Shift e caixa; ligar por arrasto
+  da porta de saída até o destino, ou com a ferramenta Ligar; apagar; painel gerado do esquema
+  e validado no Rust; atalhos Ctrl+Z, Ctrl+Y, Ctrl+S, Delete, Esc e os outros do Bevy; modos
+  Editar e Simular.
+- **Aparência:** o `visual.asset` escolhido da biblioteca do UTSim e do catálogo, com os
+  créditos na dica e uma miniatura do objeto com o ativo (o que está sob o mouse na lista).
+- **Testes:**
+  - Rust (`cargo test -p utsim-godot`): o esquema de cada campo de cada exemplo lido e escrito
+    de volta sem mudar o modelo, os turnos, a montagem do tutorial 1 pelas mesmas chamadas da
+    interface comparada com `examples/tutorial_01_caixa.ron`, a miniatura e as diferenças
+    entre modelos; `utsim-look` e `utsim-edit::ron_text` com os próprios testes;
+  - roteiros da interface sem janela, no `scripts/godot_teste.sh`:
+    `godot/roteiros/g2_tutorial_01.json` monta o tutorial 1 só pela interface e compara o
+    `.ron` salvo com o exemplo (`igual_a`); `g2_montar_linha.json` monta uma linha, edita
+    propriedades, escolhe um ativo, simula, desfaz, salva e reabre.
+
+**Conferência visual pendente** (os roteiros rodaram só sem janela; com janela eles também
+gravam as capturas de cada passo). Com o PC livre, rode:
+
+```bash
+bash scripts/godot.sh
+"$HOME/Documents/Godot_v4.7.2-stable_win64.exe/Godot_v4.7.2-stable_win64_console.exe" --path godot -- \
+    --utsim-roteiro=roteiros/g2_montar_linha.json --utsim-capturas="$(pwd -W)/godot/capturas/g2"
+"$HOME/Documents/Godot_v4.7.2-stable_win64.exe/Godot_v4.7.2-stable_win64_console.exe" --path godot -- \
+    --utsim-roteiro=roteiros/g2_tutorial_01.json --utsim-capturas="$(pwd -W)/godot/capturas/g2"
+```
+
+e confira nas capturas (`godot/capturas/g2/*.png`, fora do git):
+
+- as portas (losangos verde e azul) no bloco selecionado e a seta de ligação seguindo o mouse
+  (`g2_linha_04_ligando`);
+- o fantasma do objeto ao colocar (`g2_linha_02_fantasma`);
+- o painel de propriedades sem cortar à direita (as listas de escolha não alargam mais o
+  painel) e a miniatura do ativo (`g2_linha_05b_ativo`);
+- o modelo do tutorial 1 montado (`g2_tutorial_01`).
+
+Abrir o projeto (`bash scripts/godot.sh --abrir`, F5) e montar um modelo à mão também vale a
+pena: a dica de um botão da Biblioteca, o arrasto até o chão e o arrasto entre as portas são
+coisas que só a mão no mouse confirma.
+
+O plano original da G2:
 
 - **Ponte:** classe `UtsimDocument` sobre o `utsim-edit::Document`:
   - abrir, novo e salvar;
@@ -209,11 +263,17 @@ Pendente:
 - **Assinatura** do instalador e do `.apk`.
 - Capturas roteirizadas como artefato do CI (precisam de GPU).
 
-## Lacunas conhecidas depois da G1
+## Lacunas conhecidas depois da G2
 
-- Regras de aparência duplicadas entre o Bevy e a ponte (resolver no início da G2).
+- A aparência do Editar só foi conferida sem janela (ver "Conferência visual pendente" na G2).
 - `operador_simples` sem braços e pernas animados no Godot (só o boneco é animado).
-- Nós de fluido como cilindros simples; rede só desenhada, sem edição.
+- Nós de fluido como cilindros simples; rede de caminhos e fluidos só desenhados, sem edição
+  (G3).
+- O Editar não cria nem edita calendários, fluxos de tokens ou chegadas por período: um objeto
+  escolhe um calendário que já existe, e as chegadas por período (`schedule`) são editadas
+  como texto RON, sem a tabela de períodos do Bevy.
 - Só a câmera de órbita (o Bevy tem seguir, primeira pessoa e do recurso).
-- `run` bloqueia a interface durante as replicações.
+- `run` bloqueia a interface durante as replicações (thread com progresso na G3).
 - A interface não lê um replay `.json` gravado; só modelos `.ron`.
+- O roteiro de interface escolhe um item de lista (`escolher`) chamando a lista direto: sem
+  janela, a lista aberta é uma janela à parte que os eventos simulados não alcançam.
