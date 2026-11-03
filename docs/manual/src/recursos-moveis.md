@@ -202,6 +202,20 @@ Na cena 3D (`utsim cena` e a cena ao vivo), a pose de um recurso móvel que est�
 
 A volta para casa (`home: true`) já era interrompida por qualquer pedido novo, com ou sem `preempt`. Com `preempt: Empty` o despachante ganha a métrica `preemptions.count` (membros que devolveram o serviço). Sem o campo (`Never`) tudo funciona como antes. A preempção de um trabalho em andamento na máquina, com retomada depois, não existe ainda. Um transportador só pode estar na equipe de um despachante.
 
+### Ligações de equipe e de pedido
+
+Além das conexões de itens, um modelo com equipes tem ligações "de referência", que saem dos campos que já existem, sem formato novo:
+
+| Ligação | De → para | Campo |
+|---|---|---|
+| equipe | despachante → membro | `team` |
+| pedido de transporte | objeto → transportador ou despachante | `transport` |
+| pedido de operador | processo → equipe | `operators.team` |
+| reparo | objeto → equipe de manutenção | `downtime.repair_crew` |
+| casa e pausa | membro → casa ou local de pausa | `home_at`, `home_object`, `break_at`, `break_object` |
+
+A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`links`, com o tipo, os dois blocos e o ponto final), para o editor desenhar as linhas de equipe e de pedido com cores e traços próprios. A biblioteca de edição (`utsim-edit`, módulo `teams`) tem as operações que o editor usa ao arrastar uma ligação: pôr ou tirar um membro da equipe (um transportador sai da equipe antiga no mesmo passo, porque só pode estar em uma), definir ou limpar o `transport` de um objeto e os `operators` de um processo. Cada operação é um passo de desfazer. O desenho e o arrasto no editor 3D vêm depois, na interface em Rust.
+
 ## Rede de caminhos
 
 No modo `Legacy` (o dos modelos do formato 1), sem rede os veículos andam em **linha reta** entre os pontos e, com `network`, seguem os corredores como descrito abaixo. No modo `Network`, a rede é a mesma, mas a ligação até ela e o ponto de parada seguem o caminho livre (veja [Movimentação e obstáculos](movimentacao.md)). A rede pode ser desenhada ou gerada com `utsim rede gerar`:
