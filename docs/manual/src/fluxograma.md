@@ -93,6 +93,55 @@ Cole o texto num bloco ` ```mermaid ` do Markdown (GitHub, GitLab, Obsidian) ou 
 
 As etapas vão para camadas: a camada de uma etapa é o maior caminho até ela, sem contar os retrabalhos. Dentro da camada, a ordem reduz os cruzamentos (médias dos vizinhos, algumas varreduras) e as caixas são alinhadas com as vizinhas. Uma seta que pulasse camadas passa por pontos virtuais em cada camada, para contornar as caixas. O resultado depende só do modelo: o mesmo arquivo dá sempre o mesmo desenho.
 
+## Os dez tipos de diagrama (`--tipo`)
+
+`utsim fluxograma modelo.ron --tipo <tipo>` escolhe o tipo; `--tipo todos --html indice.html` gera todos, com uma página por tipo ao lado do índice (`indice-carta.html`, `indice-vsm.svg`, `indice-carta.csv`...). Os cinco primeiros saem só do modelo; os cinco últimos precisam de uma rodada (use `--replica n` para escolher a replicação; a primeira é a 0). Toda página termina com **Origem dos dados**: o modelo, ou a simulação com a semente e a replicação.
+
+| `--tipo` | Diagrama | Origem | Saídas |
+|---|---|---|---|
+| `carta` | carta de processo (fluxograma vertical) | modelo | HTML, CSV |
+| `blocos` | fluxograma de blocos por camadas (o desenho de cima) | modelo | SVG, HTML, Mermaid |
+| `operacoes` | gráfico de operações do processo | modelo | SVG, HTML, Mermaid |
+| `raias` | fluxograma multifuncional | modelo | SVG, HTML, Mermaid |
+| `sipoc` | diagrama SIPOC | modelo | SVG, HTML, CSV |
+| `mapofluxograma` | mapofluxograma | simulação | SVG, HTML, CSV |
+| `espaguete` | diagrama de espaguete | simulação | SVG, HTML, CSV |
+| `de-para` | matriz de-para e diagrama de cordas | simulação | SVG, HTML, CSV |
+| `homem-maquina` | gráfico homem-máquina | simulação | SVG, HTML, CSV |
+| `vsm` | mapa do fluxo de valor, estado atual | simulação | SVG, HTML, CSV |
+
+Sem `--tipo`, o comando mantém o comportamento descrito acima (blocos mais carta, numa página só).
+
+### Carta de processo (`carta`)
+**O que é:** a sequência de etapas do caminho principal, uma por linha, com o símbolo, o tempo médio, a distância, os recursos, as observações e os totais por símbolo. **Quando usar:** para documentar o método de trabalho e contar quantas operações, transportes, esperas, inspeções e armazenagens o item sofre. **Como gerar:** `utsim fluxograma m.ron --tipo carta --html carta.html --csv carta.csv`.
+
+### Fluxograma de blocos (`blocos`)
+**O que é:** o diagrama de caixas e setas por camadas descrito no início deste capítulo; `--horizontal` desenha da esquerda para a direita. **Quando usar:** para ver ramificações, junções, retrabalho e recursos de uma vez. **Como gerar:** `--tipo blocos --svg f.svg --mermaid f.mmd`.
+
+### Gráfico de operações do processo (`operacoes`)
+**O que é:** só as operações (`O-1`, `O-2`...) e as inspeções (`I-1`...), numeradas na ordem do processo, com as chegadas (material) entrando nas montagens e as saídas das desmontagens; esperas, transportes e armazenagens ficam fora. **Quando usar:** para enxergar a estrutura de montagem do produto e fazer o estudo de operações. **Como gerar:** `--tipo operacoes --svg o.svg --mermaid o.mmd`.
+
+### Fluxograma multifuncional (`raias`)
+**O que é:** as etapas dentro da raia de quem as executa, com as passagens entre raias em laranja e uma tabela que as conta. A raia sai da equipe de operadores da etapa (`Equipe x`), do tipo do objeto (`Estações`, `Esteiras`, `Filas e armazenagem`, `Fornecedor e cliente`) e, para o transporte por frota ou transferência, de uma raia própria (`Frota x`). **Quando usar:** para achar entregas entre áreas e responsáveis. **Como gerar:** `--tipo raias --html r.html`; `--raia objeto=nome` põe um objeto numa área à escolha (o formato do modelo não tem campo de área).
+
+### Diagrama SIPOC (`sipoc`)
+**O que é:** cinco colunas: fornecedores (as chegadas), entradas (o que chega e com que frequência), processo (as etapas principais do caminho), saídas e clientes (as saídas do modelo). **Quando usar:** na abertura de um projeto de melhoria, para delimitar o processo. **Como gerar:** `--tipo sipoc --html s.html --csv s.csv`.
+
+### Mapofluxograma (`mapofluxograma`)
+**O que é:** a planta, com os objetos nas suas posições, o símbolo da carta de processo em cada etapa e o percurso mais usado pelos itens, em setas numeradas na ordem. **Quando usar:** para ligar o fluxo do processo ao layout físico. **Como gerar:** `--tipo mapofluxograma --svg m.svg`. Um modelo sem posições (tudo em 0, 0, 0) usa a disposição do fluxograma de blocos e não mostra distâncias. Em código, `Options::plant_background` aceita um fragmento SVG que é desenhado por baixo (gancho para a planta CAD).
+
+### Diagrama de espaguete (`espaguete`)
+**O que é:** todos os deslocamentos da rodada sobre a planta: os itens entre os objetos e os percursos reais das empilhadeiras, AGVs e pessoas (uma cor por recurso, espessura pela frequência), com a distância total e a média por viagem de cada recurso e dos itens. **Comparação:** `--comparar depois.ron` desenha os dois modelos lado a lado (o primeiro é o "antes") e mostra as distâncias e a variação. **Como gerar:** `--tipo espaguete --html e.html --csv e.csv`. A distância de um item é a do trajeto das ligações com tempo (`transfer`) ou, sem ele, a reta entre os dois objetos.
+
+### Matriz de-para e diagrama de cordas (`de-para`)
+**O que é:** para cada par de objetos, o número de viagens dos itens e a distância total (distância x viagens), em tabelas com sombreado e num diagrama de cordas (a espessura é o número de viagens). **Quando usar:** para achar os fluxos intensos e decidir quais objetos ficam perto. **Como gerar:** `--tipo de-para --html d.html --csv d.csv`.
+
+### Gráfico homem-máquina (`homem-maquina`)
+**O que é:** uma coluna de tempo para cada processo, montagem, desmontagem e recurso móvel, colorida pelo que ele faz (trabalhando, preparando, andando, esperando, ocioso, parado), com a ocupação (trabalhando mais preparando) num intervalo. **Como gerar:** `--tipo homem-maquina --de 4000 --ate 5000 --html h.html`; sem o intervalo, usa um décimo da rodada depois do aquecimento.
+
+### Mapa do fluxo de valor (`vsm`)
+**O que é:** os processos do caminho principal com tempo de ciclo, preparação, disponibilidade (MTBF/(MTBF+MTTR)) e operadores; os estoques entre eles (fila média da rodada) e a linha do tempo: tempo de agregação de valor (só as operações; inspeções, esperas e transportes não agregam) contra o lead time medido (`time_in_system` da saída), com o índice de agregação de valor. **Como gerar:** `--tipo vsm --html v.html --csv v.csv`. O desenho cobre o fluxo de material; o fluxo de informação não existe no modelo.
+
 ## Limitações
 
 - O desenho é do **modelo**, não da rodada: filas, tempos de espera e escolhas de caminho aleatórias só aparecem com `--com-resultados`.
