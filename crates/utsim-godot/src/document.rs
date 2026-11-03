@@ -1,0 +1,855 @@
+//! The editing core behind `UtsimDocument`, with no Godot types: a
+//! [`utsim_edit::Document`] plus what the editor keeps between calls (the clipboard and
+//! its paste count, the starting positions of a drag) and the views the Godot side
+//! draws (objects, connections with their port numbers, properties as a schema).
+//!
+//! Every change is a [`Command`] applied by the document, so it is validated and undone
+//! like in the Bevy editor; operations on several objects come from
+//! [`utsim_edit::arrange`] as one `Batch`, so they are one undo step.
+//!
+//! Positions are model coordinates here (`x`, `y` on the floor plan, `z` up); `lib.rs`
+//! converts from and to Godot coordinates with [`crate::coords`].
+
+use std::path::Path;
+
+use utsim_core::RunReport;
+use utsim_edit::arrange::{self, Align, Axis, Clipboard};
+use utsim_edit::{Command, Document, Issue};
+use utsim_model::replay::{Replay, ReplayBlock, kind_name};
+use utsim_model::{Model, is_mobile};
+
+use crate::schema::{self, Field, Value};
+
+/// Undo key of a drag (consecutive moves merge into one step).
+const DRAG_KEY: &str = "arrastar";
+
+/// Offset of the `n`-th paste (n >= 1) of the same clipboard: two metres right and two
+/// down per paste, so the copies do not land on top of each other (the Bevy editor's).
+pub fn paste_offset(n: u32) -> [f64; 3] {
+    let k = 2.0 * n.max(1) as f64;
+    [k, -k, 0.0]
+}
+
+/// Mobile resources are not wired by ports: the message shown when the user tries to
+/// connect one (`None` for ordinary blocks).
+pub fn connect_blocked(kind: &str) -> Option<&'static str> {
+    match kind {
+        "Transporter" | "Dispatcher" => Some(
+            "Transportadores e despachantes não usam ligações. Use o campo \"Transporte de \
+             saída\" (nos objetos que enviam itens) ou \"Precisa de operadores\" (nos processos).",
+        ),
+        _ => None,
+    }
+}
+
+/// Snaps `v` to a grid of `step` (no snapping when `step` is not positive). Never
+/// returns `-0.0`.
+pub fn snap_to(v: f64, step: f64) -> f64 {
+    if step.is_finite() && step > 0.0 {
+        (v / step).round() * step + 0.0
+    } else {
+        v + 0.0
+    }
+}
+
+/// One object as the editor lists and draws it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ObjectRow {
+    pub name: String,
+    pub kind: &'static str,
+    pub kind_label: &'static str,
+    pub position: [f64; 3],
+    pub mobile: bool,
+    /// Problems attached to this object.
+    pub problems: usize,
+    pub warnings: usize,
+}
+
+/// One connection: `port` is its number among the outputs of `from` (1, 2...), the
+/// order the output rule uses.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConnectionRow {
+    pub from: String,
+    pub to: String,
+    pub port: usize,
+    /// The source hands its items to a transporter: the link is only logical flow.
+    pub logical: bool,
+}
+
+/// Everything the properties panel shows for one object.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Properties {
+    pub name: String,
+    pub kind: &'static str,
+    pub kind_label: &'static str,
+    pub fields: Vec<Field>,
+    pub problems: Vec<String>,
+    pub warnings: Vec<String>,
+    /// Destinations of the outgoing connections, in port order.
+    pub outputs: Vec<String>,
+    /// Sources of the incoming connections.
+    pub inputs: Vec<String>,
+}
+
+/// The editor state of one open model.
+pub struct Editor {
+    pub doc: Document,
+    clipboard: Clipboard,
+    /// Pastes of the current clipboard so far (each one lands further away).
+    pastes: u32,
+    /// Positions at the start of the current drag.
+    drag: Vec<(String, [f64; 3])>,
+}
+
+impl Default for Editor {
+    fn default() -> Self {
+        Editor::new("novo_modelo")
+    }
+}
+
+impl Editor {
+    pub fn new(name: &str) -> Editor {
+        Editor::with(Document::new(name))
+    }
+
+    pub fn open(path: &Path) -> Result<Editor, String> {
+        Document::open(path)
+            .map(Editor::with)
+            .map_err(|e| e.to_string())
+    }
+
+    fn with(doc: Document) -> Editor {
+        Editor {
+            doc,
+            clipboard: Clipboard::default(),
+            pastes: 0,
+            drag: Vec::new(),
+        }
+    }
+
+    pub fn model(&self) -> &Model {
+        self.doc.model()
+    }
+
+    pub fn apply(&mut self, command: Command) -> Result<(), String> {
+        self.doc.apply(command)
+    }
+
+    fn apply_some(&mut self, command: Option<Command>, none: &str) -> Result<(), String> {
+        match command {
+            Some(c) => self.apply(c),
+            None => Err(none.to_string()),
+        }
+    }
+
+    /// Adds an object of palette entry `id` at `position` (model coordinates) with a free
+    /// name; returns the name.
+    pub fn add(&mut self, id: &str, position: [f64; 3]) -> Result<String, String> {
+        let entry =
+            utsim_edit::palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        let name = self.doc.unique_name(entry.name_base);
+        let object = utsim_edit::from_palette(id, &name, position)
+            .ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        self.apply(Command::Add(Box::new(object)))?;
+        Ok(name)
+    }
+
+    pub fn remove(&mut self, names: &[String]) -> Result<(), String> {
+        self.apply_some(arrange::delete_command(names), "nada selecionado")
+    }
+
+    pub fn connect(&mut self, from: &str, to: &str) -> Result<(), String> {
+        for end in [from, to] {
+            if let Some(o) = self.model().objects.iter().find(|o| o.name == end) {
+                if let Some(msg) = connect_blocked(kind_name(&o.kind)) {
+                    return Err(msg.to_string());
+                }
+            }
+        }
+        self.apply(Command::Connect {
+            from: from.into(),
+            to: to.into(),
+        })
+    }
+
+    pub fn disconnect(&mut self, from: &str, to: &str) -> Result<(), String> {
+        self.apply(Command::Disconnect {
+            from: from.into(),
+            to: to.into(),
+        })
+    }
+
+    /// Destinations of `name`'s outgoing connections, in port order.
+    pub fn outputs(&self, name: &str) -> Vec<String> {
+        self.model()
+            .connections
+            .iter()
+            .filter(|(a, _)| a == name)
+            .map(|(_, b)| b.clone())
+            .collect()
+    }
+
+    pub fn inputs(&self, name: &str) -> Vec<String> {
+        self.model()
+            .connections
+            .iter()
+            .filter(|(_, b)| b == name)
+            .map(|(a, _)| a.clone())
+            .collect()
+    }
+
+    /// Moves output `index` (0-based) of `from` by `delta` places in the port order, as
+    /// one undo step: the outputs from the first changed port on are disconnected and
+    /// connected again in the new order (`Connect` appends, so the earlier ports keep
+    /// their place).
+    pub fn move_connection(&mut self, from: &str, index: usize, delta: i64) -> Result<(), String> {
+        let outs = self.outputs(from);
+        let target = index as i64 + delta;
+        if index >= outs.len() || target < 0 || target >= outs.len() as i64 {
+            return Err("não há para onde mover esta ligação".into());
+        }
+        let target = target as usize;
+        let mut order = outs.clone();
+        let moved = order.remove(index);
+        order.insert(target, moved);
+        let first = index.min(target);
+        let mut batch: Vec<Command> = outs[first..]
+            .iter()
+            .map(|to| Command::Disconnect {
+                from: from.into(),
+                to: to.clone(),
+            })
+            .collect();
+        batch.extend(order[first..].iter().map(|to| Command::Connect {
+            from: from.into(),
+            to: to.clone(),
+        }));
+        self.apply(Command::Batch(batch))
+    }
+
+    /// Starts dragging `names` (their positions now are the reference of [`Self::drag`]).
+    pub fn begin_drag(&mut self, names: &[String]) {
+        self.doc.end_gesture();
+        self.drag = arrange::positions(self.model(), names);
+    }
+
+    /// Moves the dragged objects by `delta` (plan `x`, `y`) from where the drag started;
+    /// every call of one drag is one undo step. With a grid `step` (> 0) the delta is
+    /// adjusted so the first dragged object lands on the grid (the others keep their
+    /// offsets to it).
+    pub fn drag(&mut self, delta: [f64; 2], step: f64) -> Result<(), String> {
+        let Some((_, first)) = self.drag.first() else {
+            return Err("nenhum arrasto começou".into());
+        };
+        let delta = [
+            snap_to(first[0] + delta[0], step) - first[0],
+            snap_to(first[1] + delta[1], step) - first[1],
+        ];
+        let unchanged = self.drag.iter().all(|(name, start)| {
+            self.model()
+                .objects
+                .iter()
+                .find(|o| &o.name == name)
+                .is_some_and(|o| {
+                    o.position[0] == start[0] + delta[0] && o.position[1] == start[1] + delta[1]
+                })
+        });
+        if unchanged {
+            return Ok(());
+        }
+        let command = arrange::moved_from(&self.drag, delta);
+        self.doc.apply_coalescing(command, Some(DRAG_KEY))
+    }
+
+    pub fn end_drag(&mut self) {
+        self.drag.clear();
+        self.doc.end_gesture();
+    }
+
+    /// Moves `names` by `delta` in one step (the arrow keys).
+    pub fn nudge(&mut self, names: &[String], delta: [f64; 2]) -> Result<(), String> {
+        self.apply_some(
+            arrange::move_command(self.model(), names, delta),
+            "nada selecionado",
+        )
+    }
+
+    pub fn copy(&mut self, names: &[String]) -> usize {
+        self.clipboard = Clipboard::copy(self.model(), names);
+        self.pastes = 0;
+        self.clipboard.objects.len()
+    }
+
+    pub fn cut(&mut self, names: &[String]) -> Result<usize, String> {
+        let n = self.copy(names);
+        if n == 0 {
+            return Err("nada selecionado".into());
+        }
+        self.remove(names)?;
+        Ok(n)
+    }
+
+    pub fn has_clipboard(&self) -> bool {
+        !self.clipboard.is_empty()
+    }
+
+    /// Pastes the clipboard; returns the new names. After a cut the first paste goes back
+    /// where the objects were; each later paste lands further away.
+    pub fn paste(&mut self) -> Result<Vec<String>, String> {
+        let gone = self
+            .clipboard
+            .objects
+            .iter()
+            .all(|o| !self.model().objects.iter().any(|m| m.name == o.name));
+        let offset = if gone && self.pastes == 0 {
+            [0.0; 3]
+        } else {
+            paste_offset(self.pastes + 1)
+        };
+        let (command, names) = self
+            .clipboard
+            .paste(self.model(), offset)
+            .ok_or("a área de transferência está vazia (Ctrl+C copia)")?;
+        self.apply(command)?;
+        self.pastes += 1;
+        Ok(names)
+    }
+
+    /// Copies `names` and pastes them next to the originals, keeping the clipboard.
+    pub fn duplicate(&mut self, names: &[String]) -> Result<Vec<String>, String> {
+        let clip = Clipboard::copy(self.model(), names);
+        let (command, new) = clip
+            .paste(self.model(), paste_offset(1))
+            .ok_or("nada selecionado")?;
+        self.apply(command)?;
+        Ok(new)
+    }
+
+    /// `how`: `esquerda`, `centro_x`, `direita`, `topo`, `centro_y` or `base`.
+    pub fn align(&mut self, names: &[String], how: &str) -> Result<(), String> {
+        let how = match how {
+            "esquerda" => Align::Left,
+            "centro_x" => Align::CenterX,
+            "direita" => Align::Right,
+            "topo" => Align::Top,
+            "centro_y" => Align::CenterY,
+            "base" => Align::Bottom,
+            _ => return Err(format!("alinhamento desconhecido: {how}")),
+        };
+        self.apply_some(
+            arrange::align_command(self.model(), names, how),
+            "selecione dois objetos ou mais para alinhar",
+        )
+    }
+
+    /// `axis`: `x` or `y`.
+    pub fn distribute(&mut self, names: &[String], axis: &str) -> Result<(), String> {
+        let axis = match axis {
+            "x" => Axis::X,
+            "y" => Axis::Y,
+            _ => return Err(format!("eixo desconhecido: {axis}")),
+        };
+        self.apply_some(
+            arrange::distribute_command(self.model(), names, axis),
+            "selecione três objetos ou mais para distribuir",
+        )
+    }
+
+    /// Sets property `path` of `object` (`"run"` for the run settings), and the same on
+    /// `others` when they are of the same kind (one undo step). Look edits of one gesture
+    /// (dragging in the colour picker) merge until [`Document::end_gesture`].
+    pub fn set_property(
+        &mut self,
+        object: &str,
+        path: &str,
+        value: &Value,
+        others: &[String],
+    ) -> Result<(), String> {
+        let command = schema::edit(self.model(), object, path, value)?;
+        let mut all = vec![object.to_string()];
+        all.extend(others.iter().cloned());
+        let command = if others.is_empty() || path == "name" || path.starts_with("position.") {
+            command
+        } else if arrange::same_kind(self.model(), &all) {
+            arrange::fan_out(std::slice::from_ref(&command), object, others).unwrap_or(command)
+        } else {
+            command
+        };
+        let key = path
+            .starts_with("visual.")
+            .then(|| format!("aparencia:{}", all.join(",")));
+        self.doc.apply_coalescing(command, key.as_deref())
+    }
+
+    pub fn objects(&self) -> Vec<ObjectRow> {
+        let issues = self.doc.issues();
+        let warnings = self.doc.warnings();
+        let count = |list: &[Issue], n: &str| {
+            list.iter()
+                .filter(|i| i.object.as_deref() == Some(n))
+                .count()
+        };
+        self.model()
+            .objects
+            .iter()
+            .map(|o| ObjectRow {
+                name: o.name.clone(),
+                kind: kind_name(&o.kind),
+                kind_label: schema::kind_label(&o.kind),
+                position: o.position,
+                mobile: is_mobile(&o.kind),
+                problems: count(&issues, &o.name),
+                warnings: count(&warnings, &o.name),
+            })
+            .collect()
+    }
+
+    pub fn connections(&self) -> Vec<ConnectionRow> {
+        let model = self.model();
+        let mut ports: Vec<(&str, usize)> = Vec::new();
+        model
+            .connections
+            .iter()
+            .map(|(a, b)| {
+                let port = match ports.iter_mut().find(|(n, _)| *n == a.as_str()) {
+                    Some((_, k)) => {
+                        *k += 1;
+                        *k
+                    }
+                    None => {
+                        ports.push((a.as_str(), 1));
+                        1
+                    }
+                };
+                ConnectionRow {
+                    from: a.clone(),
+                    to: b.clone(),
+                    port,
+                    logical: model
+                        .objects
+                        .iter()
+                        .any(|o| &o.name == a && o.transport.is_some()),
+                }
+            })
+            .collect()
+    }
+
+    /// The properties of `object`, or of the run settings for `"run"` (or an unknown
+    /// name), with the issues that concern it.
+    pub fn properties(&self, object: &str) -> Properties {
+        let issues = self.doc.issues();
+        let warnings = self.doc.warnings();
+        let model = self.model();
+        let Some(obj) = model.objects.iter().find(|o| o.name == object) else {
+            let general = |list: &[Issue]| -> Vec<String> {
+                list.iter()
+                    .filter(|i| i.object.is_none())
+                    .map(|i| i.message.clone())
+                    .collect()
+            };
+            return Properties {
+                name: "run".into(),
+                kind: "run",
+                kind_label: "Modelo",
+                fields: schema::run_fields(&model.run),
+                problems: general(&issues),
+                warnings: general(&warnings),
+                outputs: Vec::new(),
+                inputs: Vec::new(),
+            };
+        };
+        let mine = |list: &[Issue]| -> Vec<String> {
+            list.iter()
+                .filter(|i| i.object.as_deref() == Some(object))
+                .map(|i| i.message.clone())
+                .collect()
+        };
+        Properties {
+            name: obj.name.clone(),
+            kind: kind_name(&obj.kind),
+            kind_label: schema::kind_label(&obj.kind),
+            fields: schema::object_fields(model, obj),
+            problems: mine(&issues),
+            warnings: mine(&warnings),
+            outputs: self.outputs(object),
+            inputs: self.inputs(object),
+        }
+    }
+}
+
+/// The static part of a replay for the model as it is being edited (no run, no
+/// validation): one block per object, flow and fluid node, like
+/// `Model::empty_replay`, and only the connections whose ends exist. The edit view draws
+/// it with the same scene code as the playback.
+pub fn edit_replay(model: &Model) -> Replay {
+    let index = |name: &str| model.objects.iter().position(|o| o.name == name);
+    Replay {
+        model: model.name.clone(),
+        replication: 0,
+        stop_time: 0.0,
+        blocks: model
+            .objects
+            .iter()
+            .map(|o| ReplayBlock {
+                name: o.name.clone(),
+                kind: kind_name(&o.kind).to_string(),
+                position: o.position,
+            })
+            .chain(model.flows.iter().map(|f| ReplayBlock {
+                name: f.name.clone(),
+                kind: "Flow".to_string(),
+                position: [0.0; 3],
+            }))
+            .chain(model.fluids.iter().map(|f| ReplayBlock {
+                name: f.name.clone(),
+                kind: "Fluid".to_string(),
+                position: [0.0; 3],
+            }))
+            .collect(),
+        connections: model
+            .connections
+            .iter()
+            .filter_map(|(a, b)| Some((index(a)?, index(b)?)))
+            .collect(),
+        records: Vec::new(),
+        report: RunReport {
+            replication: 0,
+            seed: model.run.seed,
+            stats_from: 0.0,
+            end_time: 0.0,
+            events: 0,
+            blocks: Vec::new(),
+        },
+        fluids: model.fluids.clone(),
+    }
+}
+
+/// A model with only palette entry `id` at the origin (the ghost shown while placing).
+pub fn palette_model(id: &str) -> Option<Model> {
+    let mut doc = Document::new("fantasma");
+    let base = utsim_edit::palette_entry(id)?.name_base;
+    let object = utsim_edit::from_palette(id, base, [0.0; 3])?;
+    doc.apply(Command::Add(Box::new(object))).ok()?;
+    Some(doc.model().clone())
+}
+
+/// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
+/// them (shortcut, what it does).
+pub const SHORTCUTS: [(&str, &str); 30] = [
+    ("Clique", "seleciona o bloco ou a ligação"),
+    (
+        "Clique de novo no mesmo ponto",
+        "passa para o próximo bloco sobreposto",
+    ),
+    ("Shift + clique", "põe ou tira o bloco da seleção"),
+    (
+        "Shift + arrastar no chão",
+        "seleção por caixa (soma à seleção)",
+    ),
+    ("Arrastar no chão", "seleção por caixa (troca a seleção)"),
+    ("Arrastar um bloco", "move o bloco ou a seleção inteira"),
+    ("Botão direito + arrastar", "gira a vista"),
+    ("Shift + botão direito + arrastar", "desloca a vista"),
+    ("Roda do mouse", "aproxima e afasta"),
+    (
+        "Biblioteca: clique e clique no chão",
+        "coloca um objeto (Shift mantém a ferramenta)",
+    ),
+    (
+        "Biblioteca: arrastar até o chão",
+        "coloca um objeto onde soltar",
+    ),
+    ("Setas", "move a seleção um passo da grade"),
+    ("Del", "exclui a seleção (ou a ligação selecionada)"),
+    (
+        "L",
+        "ferramenta Ligar: clique na origem e depois no destino",
+    ),
+    (
+        "Esc",
+        "cancela a ferramenta, a ligação começada ou a seleção",
+    ),
+    ("F", "enquadra o modelo"),
+    ("G", "liga ou desliga o encaixe na grade"),
+    ("Tab", "alterna entre Editar e Simular"),
+    ("F1", "mostra ou esconde esta janela"),
+    ("Ctrl + A", "seleciona todos os objetos"),
+    ("Ctrl + C", "copia a seleção"),
+    ("Ctrl + X", "recorta a seleção"),
+    (
+        "Ctrl + V",
+        "cola (nomes únicos, ligações internas preservadas)",
+    ),
+    ("Ctrl + D", "duplica a seleção"),
+    ("Ctrl + Z", "desfaz"),
+    ("Ctrl + Y ou Ctrl + Shift + Z", "refaz"),
+    ("Ctrl + S", "salva"),
+    ("Ctrl + Shift + S", "salva como"),
+    ("Ctrl + O", "abre um modelo"),
+    ("Ctrl + N", "novo modelo"),
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line() -> Editor {
+        let mut e = Editor::new("teste");
+        for (i, id) in ["Source", "Queue", "Processor", "Sink"].iter().enumerate() {
+            e.add(id, [3.0 * i as f64, 0.0, 0.0]).unwrap();
+        }
+        for (a, b) in [
+            ("chegada", "fila"),
+            ("fila", "processo"),
+            ("processo", "saida"),
+        ] {
+            e.connect(a, b).unwrap();
+        }
+        e
+    }
+
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn position(e: &Editor, n: &str) -> [f64; 3] {
+        e.model()
+            .objects
+            .iter()
+            .find(|o| o.name == n)
+            .unwrap()
+            .position
+    }
+
+    #[test]
+    fn a_line_built_from_the_palette_runs_and_undoes_step_by_step() {
+        let mut e = line();
+        assert!(e.doc.issues().is_empty(), "{:?}", e.doc.issues());
+        assert_eq!(e.objects().len(), 4);
+        assert_eq!(e.objects()[2].kind_label, "Processo");
+        e.set_property(
+            "processo",
+            "process",
+            &Value::Text("Const(2.0)".into()),
+            &[],
+        )
+        .unwrap();
+        assert!(e.model().run_replications().is_ok());
+        for _ in 0..8 {
+            assert!(e.doc.undo());
+        }
+        assert!(e.model().objects.is_empty());
+        assert!(!e.doc.undo());
+        while e.doc.redo() {}
+        assert_eq!(e.model().connections.len(), 3);
+    }
+
+    #[test]
+    fn mobile_resources_cannot_be_connected() {
+        let mut e = line();
+        let agv = e.add("Agv", [0.0, 5.0, 0.0]).unwrap();
+        assert_eq!(agv, "agv");
+        let err = e.connect("fila", &agv).unwrap_err();
+        assert!(err.contains("Transporte de saída"), "{err}");
+        assert!(e.connect("fila", "fila").is_err());
+        assert!(e.connect("fila", "processo").is_err(), "already connected");
+    }
+
+    #[test]
+    fn connections_have_port_numbers_and_can_be_reordered() {
+        let mut e = line();
+        e.add("Sink", [6.0, 3.0, 0.0]).unwrap();
+        e.add("Sink", [6.0, 6.0, 0.0]).unwrap();
+        e.connect("processo", "saida_2").unwrap();
+        e.connect("processo", "saida_3").unwrap();
+        let ports: Vec<(String, usize)> = e
+            .connections()
+            .into_iter()
+            .filter(|c| c.from == "processo")
+            .map(|c| (c.to, c.port))
+            .collect();
+        assert_eq!(
+            ports,
+            vec![
+                ("saida".into(), 1),
+                ("saida_2".into(), 2),
+                ("saida_3".into(), 3)
+            ]
+        );
+        e.move_connection("processo", 2, -2).unwrap();
+        assert_eq!(
+            e.outputs("processo"),
+            names(&["saida_3", "saida", "saida_2"])
+        );
+        e.move_connection("processo", 0, 1).unwrap();
+        assert_eq!(
+            e.outputs("processo"),
+            names(&["saida", "saida_3", "saida_2"])
+        );
+        assert!(e.move_connection("processo", 2, 1).is_err());
+        // One undo step per reorder.
+        e.doc.undo();
+        assert_eq!(
+            e.outputs("processo"),
+            names(&["saida_3", "saida", "saida_2"])
+        );
+        assert_eq!(e.outputs("chegada"), names(&["fila"]));
+        e.disconnect("processo", "saida").unwrap();
+        assert_eq!(e.outputs("processo"), names(&["saida_3", "saida_2"]));
+    }
+
+    #[test]
+    fn a_drag_is_one_undo_step_and_nudge_moves_by_the_step() {
+        let mut e = line();
+        let sel = names(&["fila", "processo"]);
+        e.begin_drag(&sel);
+        for k in 1..=5 {
+            e.drag([k as f64, 0.5 * k as f64], 0.0).unwrap();
+        }
+        e.end_drag();
+        assert_eq!(position(&e, "fila"), [8.0, 2.5, 0.0]);
+        assert_eq!(position(&e, "processo"), [11.0, 2.5, 0.0]);
+        e.doc.undo();
+        assert_eq!(position(&e, "fila"), [3.0, 0.0, 0.0]);
+        e.nudge(&sel, [0.0, -1.0]).unwrap();
+        assert_eq!(position(&e, "processo"), [6.0, -1.0, 0.0]);
+        assert!(e.drag([1.0, 1.0], 0.0).is_err(), "no drag going on");
+        e.begin_drag(&sel);
+        e.drag([0.3, 0.8], 1.0).unwrap();
+        e.end_drag();
+        assert_eq!(position(&e, "fila"), [3.0, 0.0, 0.0], "snapped to the grid");
+    }
+
+    #[test]
+    fn copy_paste_cut_and_duplicate() {
+        let mut e = line();
+        assert_eq!(e.copy(&names(&["fila", "processo"])), 2);
+        let pasted = e.paste().unwrap();
+        assert_eq!(pasted, names(&["fila_2", "processo_2"]));
+        assert_eq!(position(&e, "fila_2"), [5.0, -2.0, 0.0]);
+        assert!(e.outputs("fila_2").contains(&"processo_2".to_string()));
+        let again = e.paste().unwrap();
+        assert_eq!(position(&e, again[0].as_str()), [7.0, -4.0, 0.0]);
+        let dup = e.duplicate(&names(&["saida"])).unwrap();
+        assert_eq!(dup, names(&["saida_2"]));
+        assert_eq!(e.cut(&names(&["chegada"])).unwrap(), 1);
+        assert!(!e.model().objects.iter().any(|o| o.name == "chegada"));
+        assert_eq!(e.paste().unwrap(), names(&["chegada"]));
+        assert_eq!(
+            position(&e, "chegada"),
+            [0.0, 0.0, 0.0],
+            "a cut pastes back in place"
+        );
+        assert!(e.has_clipboard());
+    }
+
+    #[test]
+    fn align_and_distribute() {
+        let mut e = line();
+        e.nudge(&names(&["fila"]), [0.0, 2.0]).unwrap();
+        e.align(&names(&["chegada", "fila", "processo"]), "topo")
+            .unwrap();
+        assert_eq!(position(&e, "processo")[1], 2.0);
+        e.nudge(&names(&["fila"]), [1.0, 0.0]).unwrap();
+        e.distribute(&names(&["chegada", "fila", "processo"]), "x")
+            .unwrap();
+        assert_eq!(position(&e, "fila")[0], 3.0);
+        assert!(e.align(&names(&["fila"]), "esquerda").is_err());
+        assert!(e.align(&names(&["fila", "saida"]), "nada").is_err());
+    }
+
+    #[test]
+    fn properties_carry_issues_and_fan_out_to_the_same_kind() {
+        let mut e = Editor::new("t");
+        e.add("Processor", [0.0; 3]).unwrap();
+        e.add("Processor", [2.0, 0.0, 0.0]).unwrap();
+        let p = e.properties("processo");
+        assert_eq!(p.kind_label, "Processo");
+        assert!(
+            !p.problems.is_empty(),
+            "a processor with no input is a problem"
+        );
+        e.set_property(
+            "processo",
+            "capacity",
+            &Value::Int(3),
+            &names(&["processo_2"]),
+        )
+        .unwrap();
+        let caps: Vec<String> = e
+            .model()
+            .objects
+            .iter()
+            .map(|o| schema::read_field(o, "capacity").unwrap())
+            .collect();
+        assert_eq!(caps, vec!["3", "3"]);
+        e.doc.undo();
+        assert_eq!(
+            schema::read_field(&e.model().objects[1], "capacity").unwrap(),
+            "1"
+        );
+        // Look edits of one gesture are one step.
+        e.set_property(
+            "processo",
+            "visual.color",
+            &Value::Text("#102030".into()),
+            &[],
+        )
+        .unwrap();
+        e.set_property(
+            "processo",
+            "visual.color",
+            &Value::Text("#405060".into()),
+            &[],
+        )
+        .unwrap();
+        e.doc.end_gesture();
+        e.doc.undo();
+        assert!(e.model().objects[0].visual.is_none());
+        let run = e.properties("run");
+        assert_eq!(run.kind, "run");
+        assert!(run.fields.iter().any(|f| f.path == "stop_time"));
+    }
+
+    #[test]
+    fn the_edit_replay_draws_invalid_models_and_the_palette_ghosts_exist() {
+        let mut e = line();
+        e.apply(Command::Connect {
+            from: "saida".into(),
+            to: "chegada".into(),
+        })
+        .unwrap();
+        e.add("Dispatcher", [0.0, 9.0, 0.0]).unwrap();
+        assert!(!e.doc.issues().is_empty());
+        let r = edit_replay(e.model());
+        assert_eq!(r.blocks.len(), 5);
+        assert_eq!(r.connections.len(), 4);
+        for entry in utsim_edit::PALETTE {
+            let m = palette_model(entry.id).unwrap();
+            assert_eq!(m.objects.len(), 1, "{}", entry.id);
+        }
+        assert!(palette_model("Nada").is_none());
+    }
+
+    #[test]
+    fn saving_and_opening_keeps_the_model() {
+        let mut e = line();
+        let dir = std::env::temp_dir().join(format!("utsim-godot-doc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("linha.ron");
+        e.doc.save_as(&path).unwrap();
+        assert!(!e.doc.is_dirty());
+        let back = Editor::open(&path).unwrap();
+        assert_eq!(back.model(), e.model());
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(Editor::open(&dir.join("nada.ron")).is_err());
+    }
+
+    #[test]
+    fn snapping() {
+        assert_eq!(snap_to(1.26, 0.5), 1.5);
+        assert_eq!(snap_to(-0.1, 1.0), 0.0);
+        assert!(snap_to(-0.1, 1.0).is_sign_positive());
+        assert_eq!(snap_to(1.26, 0.0), 1.26);
+    }
+}

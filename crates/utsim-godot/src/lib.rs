@@ -1,6 +1,10 @@
 //! GDExtension bridge between UTSim and the Godot interface (`godot/`).
 //!
-//! Two classes, both `RefCounted`, so GDScript owns them like any resource:
+//! Three classes, all `RefCounted`, so GDScript owns them like any resource:
+//! - `UtsimDocument` (`document_class.rs`): the model being edited, over
+//!   `utsim_edit::Document` ([`document::Editor`]): commands with undo and redo, the
+//!   problems and warnings, the object list and the properties of one object as a schema
+//!   ([`schema`]) the panel draws generically;
 //! - [`UtsimModel`]: loads and validates a `.ron`, lists errors and warnings, runs the
 //!   replications and summarises them, and records the replay of one replication;
 //! - [`UtsimPlayback`]: the scene of that replay ([`playback::Playback`]): the static
@@ -10,16 +14,20 @@
 //!
 //! Every position is converted to Godot coordinates here ([`coords`]): `(x, y, z)` of
 //! the model becomes `(x, z, -y)` and a yaw is the rotation about `+Y`. The pure modules
-//! ([`coords`], [`looks`], [`catalogue`], [`playback`]) have no Godot types and are unit
-//! tested without the engine.
+//! ([`coords`], [`looks`], [`catalogue`], [`playback`], [`document`], [`schema`],
+//! [`ron_text`]) have no Godot types and are unit tested without the engine.
 
 // `#[derive(GodotClass)]` with `init` writes `base: base` in the generated constructor.
 #![allow(clippy::redundant_field_names)]
 
 pub mod catalogue;
 pub mod coords;
+pub mod document;
+mod document_class;
 pub mod looks;
 pub mod playback;
+pub mod ron_text;
+pub mod schema;
 
 use std::path::PathBuf;
 
@@ -42,11 +50,11 @@ fn rgb(c: [f32; 3]) -> Color {
     Color::from_rgb(c[0], c[1], c[2])
 }
 
-fn put(d: &mut VarDictionary, key: &str, value: impl ToGodot) {
+pub(crate) fn put(d: &mut VarDictionary, key: &str, value: impl ToGodot) {
     d.set(&key.to_variant(), &value.to_variant());
 }
 
-fn strings<S: AsRef<str>>(list: &[S]) -> PackedStringArray {
+pub(crate) fn strings<S: AsRef<str>>(list: &[S]) -> PackedStringArray {
     let mut out = PackedStringArray::new();
     for s in list {
         out.push(&GString::from(s.as_ref()));
@@ -66,10 +74,10 @@ fn messages(e: &ModelError) -> Vec<String> {
 #[derive(GodotClass)]
 #[class(base = RefCounted, init)]
 pub struct UtsimModel {
-    model: Option<Model>,
-    path: Option<PathBuf>,
-    last_error: String,
-    base: Base<RefCounted>,
+    pub(crate) model: Option<Model>,
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) last_error: String,
+    pub(crate) base: Base<RefCounted>,
 }
 
 #[godot_api]
@@ -187,8 +195,8 @@ impl UtsimModel {
 #[derive(GodotClass)]
 #[class(base = RefCounted, init)]
 pub struct UtsimPlayback {
-    core: Option<Playback>,
-    base: Base<RefCounted>,
+    pub(crate) core: Option<Playback>,
+    pub(crate) base: Base<RefCounted>,
 }
 
 #[godot_api]

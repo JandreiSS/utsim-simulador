@@ -16,6 +16,7 @@ utsim-core.workspace = true
 utsim-model.workspace = true
 utsim-scene.workspace = true
 utsim-assets.workspace = true
+utsim-edit.workspace = true
 serde.workspace = true
 ron.workspace = true
 # Only the core classes are generated (no `__codegen-full`): the bridge returns plain data
