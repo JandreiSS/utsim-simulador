@@ -156,7 +156,7 @@ Section "UTSim 3D (prévia)" SecTresD
   SetShellVarContext current
   SetOutPath "$INSTDIR\3d"
   CreateDirectory "$SMPROGRAMS\UTSim"
-  CreateShortcut "$SMPROGRAMS\UTSim\UTSim 3D (prévia).lnk" "$INSTDIR\3d\utsim-3d.exe" "" "$INSTDIR\3d\utsim-3d.exe" 0
+  CreateShortcut "$SMPROGRAMS\UTSim\UTSim 3D (prévia).lnk" "$INSTDIR\3d\utsim-3d.exe" "" "$INSTDIR\assets\icone\utsim.ico" 0
   CreateShortcut "$SMPROGRAMS\UTSim\Avisos de terceiros do UTSim 3D.lnk" "$INSTDIR\3d\AVISOS-TERCEIROS.txt"
 SectionEnd
 !endif

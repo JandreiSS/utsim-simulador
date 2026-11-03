@@ -26,7 +26,7 @@ Princípios:
 | G2 | Edição do fluxo | 10–14 h |
 | G3 | Rede, fluidos e resultados | 8–12 h |
 | G4 | Realidade virtual e aumentada (OpenXR) | 10–16 h |
-| G5 | Empacotamento e exportação | 4–6 h |
+| G5 | Empacotamento e exportação (parcialmente feita) | 4–6 h |
 
 Total previsto: 38 a 56 h.
 
@@ -139,28 +139,71 @@ Objetivo: montar e alterar um modelo no Godot, como no editor Bevy, com desfazer
   - o build Android da ponte (NDK, `rayon` em ARM) ainda não foi experimentado;
   - o boneco animado tem 7,6 MB por arquivo: avaliar uma versão reduzida para o Quest.
 
-## G5: empacotamento e exportação
+## G5: empacotamento e exportação (parcialmente feita)
 
-- **Modelos de exportação do Godot 4.7.2:**
-  - Windows, Linux e Android;
-  - instalados pelo editor ou pelo script, com o hash conferido.
-- **Presets de exportação** (`export_presets.cfg`):
-  - a biblioteca da ponte em release ao lado do executável;
-  - os `.glb` importados dentro do `.pck`;
-  - o catálogo de terceiros com os créditos (`assets/terceiros/CREDITOS.md`).
-- **Instaladores:**
-  - integrar ao instalador do Windows (NSIS) e ao `.deb` e `.tar.gz` da fase 12, com o
-    `utsim` e o `utsim-view`;
-  - `.apk` do Quest.
-- **CI:**
-  - job que baixa o Godot do console, roda `scripts/godot_teste.sh` sem janela e exporta os
-    pacotes;
-  - capturas roteirizadas guardadas como artefato.
-- **Riscos:**
-  - tamanho do pacote (os arquivos UAL);
-  - assinatura do `.apk`;
-  - o executável do console do Godot em runners Linux sem GPU, que roda com o driver
-    `headless` (já é o caso do teste).
+Feito:
+
+- **Modelos de exportação do Godot 4.7.2** (Windows, Linux e os demais):
+  - `scripts/godot_exportar.sh --instalar-modelos` baixa o `.tpz` (cerca de 1,2 GB), confere o
+    SHA512 publicado no mesmo release (`SHA512-SUMS.txt`) e instala em
+    `%APPDATA%\Godot\export_templates\4.7.2.stable\` (Linux: `~/.local/share/godot/...`);
+  - também dá para instalar pelo editor (Editor > Gerenciar modelos de exportação).
+- **Presets** (`godot/export_presets.cfg`): "Windows Desktop" e "Linux".
+  - Executável `utsim-3d` (`.exe` no Windows, `.x86_64` no Linux) e `utsim-3d.pck` separado;
+  - os `.glb` importados e o catálogo entram no `.pck`; `testes/` e `capturas/` ficam de fora;
+  - a biblioteca da ponte em release (`utsim_godot.dll` / `libutsim_godot.so`) é copiada pelo
+    Godot ao lado do executável;
+  - o ícone do UTSim (`assets/icone/utsim.ico`) e os metadados estão no preset.
+- **`scripts/godot_exportar.sh`**:
+  - compila a ponte em release (`scripts/godot.sh --release`), importa sem janela e exporta com
+    `--headless --export-release`;
+  - deixa a saída em `target/godot-export/<plataforma>/`;
+  - gera `AVISOS-TERCEIROS.txt` (`scripts/godot_avisos.gd`: licença, licenças e copyright dos
+    componentes do motor, lidos do próprio executável). Não é a licença do UTSim, que
+    segue indefinida.
+- **Pacotes** (`scripts/preparar-pacote.sh` aceita a pasta da exportação como 3º argumento):
+  - a pasta `3d/` entra no instalador do Windows (NSIS) como o componente opcional "UTSim 3D
+    (prévia)", com os atalhos "UTSim 3D (prévia)" e "Avisos de terceiros do UTSim 3D" no
+    Menu Iniciar, sem mexer no `utsim-view`;
+  - no `.zip` do Windows, no `.tar.gz` (com `instalar.sh`) e no `.deb` do Linux (comando
+    `utsim-3d` e atalho no menu);
+  - sem a exportação, tudo sai como antes (sem a pasta `3d/`).
+- **CI**:
+  - `scripts/godot_instalar_ci.sh` baixa o Godot do console e confere o SHA512;
+  - job `godot-exportar` no `ci.yml`, só ao disparar à mão: teste sem janela, exportação,
+    execução do programa exportado com `--headless --quit` e artefato;
+  - `release.yml` aceita `incluir_3d` (ou a variável do repositório `UTSIM_INCLUIR_3D=true`)
+    para levar o UTSim 3D aos pacotes.
+
+Medidas no Windows (exportação real, ponte em release):
+
+| Arquivo | Tamanho |
+|---|---|
+| `utsim-3d.exe` (modelo de exportação completo) | 109 MB |
+| `utsim-3d.pck` (cena, scripts e todos os `.glb`, incluindo os UAL) | 2,3 MB |
+| `utsim_godot.dll` | 6,4 MB |
+| `AVISOS-TERCEIROS.txt` | 94 KB |
+
+O programa exportado abre e carrega a ponte (`utsim-3d.exe --headless --quit`). O executável do
+Linux tem 73 MB.
+
+Pendente:
+
+- **Ícone embutido no `.exe`:** o Godot só troca o ícone do executável com o `rcedit`
+  (Configurações do editor > Exportar > Windows). Sem ele, o `utsim-3d.exe` mostra o ícone do
+  Godot; o atalho do Menu Iniciar já usa o `utsim.ico`.
+- **Instalador não compilado aqui:** o NSIS não estava instalado na máquina do desenvolvimento;
+  o trecho novo do `utsim.nsi` está escrito e a montagem da pasta `3d/` foi testada, mas a
+  compilação do `makensis` fica para o CI ou para quem tiver o NSIS.
+- **Exportação para o Linux:** o preset foi conferido até a falta da `.so` (a ponte é compilada
+  para o sistema atual); a exportação completa roda no job do CI.
+- **`.apk` do Quest:** sem preset; precisa do NDK, do JDK, de uma ponte para `aarch64` e da
+  fase G4. O preset será acrescentado junto com ela.
+- **Tamanho:** o executável do modelo de exportação pesa 109 MB no Windows (o instalador comprime com LZMA;
+  o tamanho final não foi medido sem o NSIS). Reduzir exige compilar um modelo
+  personalizado do Godot sem os módulos que a interface não usa.
+- **Assinatura** do instalador e do `.apk`.
+- Capturas roteirizadas como artefato do CI (precisam de GPU).
 
 ## Lacunas conhecidas depois da G1
 
