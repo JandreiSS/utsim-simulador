@@ -842,7 +842,13 @@ fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
 }
 
 /// A row of tabs named `<abas>_<título>` (the row itself is `abas`); `at` is the one shown.
-pub(crate) fn tab_row(ui: &mut Ui, reg: &mut Registry, abas: &str, titles: &[&str], at: &mut usize) {
+pub(crate) fn tab_row(
+    ui: &mut Ui,
+    reg: &mut Registry,
+    abas: &str,
+    titles: &[&str],
+    at: &mut usize,
+) {
     let row = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         for (k, title) in titles.iter().enumerate() {
@@ -977,7 +983,14 @@ pub(crate) fn field_response(
 }
 
 /// A text area bound to `buf` (scenarios, variables), in the monospace font.
-pub(crate) fn area(ui: &mut Ui, reg: &mut Registry, name: &str, buf: &mut String, rows: usize, hint: &str) {
+pub(crate) fn area(
+    ui: &mut Ui,
+    reg: &mut Registry,
+    name: &str,
+    buf: &mut String,
+    rows: usize,
+    hint: &str,
+) {
     let r = ui.add(
         TextEdit::multiline(buf)
             .id(Id::new(("utsim_res", name)))
