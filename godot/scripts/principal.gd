@@ -167,6 +167,7 @@ func _build_world() -> void:
 	add_child(sun)
 	camera = CameraOrbita.new()
 	camera.over_ui = over_ui
+	camera.free_span = free_span
 	add_child(camera)
 	camera.current = true
 	var ground := MeshInstance3D.new()
@@ -541,6 +542,9 @@ func _build_ui() -> void:
 	_fps.offset_top = TOP_HEIGHT + 6
 	_fps.theme_type_variation = &"Ajuda"
 	_fps.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fps.name = "Desempenho"
+	# Measurement for development, not for the user: hidden until F3.
+	_fps.visible = false
 	_ui.add_child(_fps)
 
 	_open_dialog = FileDialog.new()
@@ -628,7 +632,9 @@ func _fill_shortcuts() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 18)
-	for pair in doc.shortcuts():
+	var pairs: Array = Array(doc.shortcuts())
+	pairs.append(["F3", "Mostra ou oculta as medidas de desempenho sobre a vista 3D"])
+	for pair in pairs:
 		var k := Label.new()
 		k.text = pair[0]
 		k.add_theme_color_override("font_color", Color(0.62, 0.76, 0.98))
@@ -640,11 +646,26 @@ func _fill_shortcuts() -> void:
 	_shortcuts.add_child(scroll)
 
 
+## The performance line over the 3D view (frames per second, bridge and scene times):
+## hidden by default, F3 shows and hides it.
+func toggle_performance() -> void:
+	_fps.visible = not _fps.visible
+	set_status("Medidas de desempenho %s (F3)." % ("visíveis" if _fps.visible else "ocultas"))
+
+
 func toggle_shortcuts() -> void:
 	if _shortcuts.visible:
 		_shortcuts.hide()
 	else:
 		_shortcuts.popup_centered()
+
+
+## Left and right x of the 3D view not covered by the side panels (`CameraOrbita.free_span`).
+func free_span() -> Vector2:
+	var w := get_viewport().get_visible_rect().size.x
+	var lo := float(LEFT_WIDTH) if _left != null and _left.visible else 0.0
+	var hi := w - float(RIGHT_WIDTH) if _right != null and _right.visible else w
+	return Vector2(lo, hi)
 
 
 ## Whether screen point `p` is over a panel (the 3D view does not take it).
@@ -1389,8 +1410,9 @@ func _process(dt: float) -> void:
 		_drive_camera()
 		if _frames % 10 == 0:
 			cena.limit_labels(camera)
-	_fps.text = "%d qps | ponte %.2f ms | cena %.2f ms" % [
-		Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0]
+	if _fps.visible:
+		_fps.text = "%d qps | ponte %.2f ms | cena %.2f ms" % [
+			Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0]
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1434,6 +1456,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		match k.keycode:
 			KEY_F1:
 				toggle_shortcuts()
+			KEY_F3:
+				toggle_performance()
 			KEY_TAB:
 				set_mode("editar" if mode == "simular" else "simular")
 			KEY_F:

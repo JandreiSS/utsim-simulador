@@ -16,6 +16,10 @@ var _dragging := false
 ## `func(screen_point) -> bool`: whether a panel covers that point (the main scene's
 ## `over_ui`), for events the GUI let go of.
 var over_ui := Callable()
+## `func() -> Vector2`: left and right x (pixels) of the part of the screen not covered by
+## the side panels. `frame_box` centres the box there and fits its width in it, so the
+## objects and their labels are not cut by a panel.
+var free_span := Callable()
 
 
 func _ready() -> void:
@@ -40,7 +44,20 @@ func frame_box(lo: Vector3, hi: Vector3) -> void:
 	yaw = 0.0
 	pitch = 0.75
 	# The view fits the box: half its diagonal over tan(fov / 2), plus a margin.
-	dist = clampf(radius / tan(deg_to_rad(fov) * 0.5) * 0.85, 1.5, 5000.0)
+	var half_tan := tan(deg_to_rad(fov) * 0.5)
+	dist = clampf(radius / half_tan * 0.85, 1.5, 5000.0)
+	var screen := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2.ZERO
+	if free_span.is_valid() and screen.x > 0.0 and screen.y > 0.0:
+		var span: Vector2 = free_span.call()
+		var width := span.y - span.x
+		if width > 100.0:
+			# The box's half width, with a margin for the labels, fits in the free part.
+			var half_x := (b.x - a.x) * 0.5 + 1.5
+			dist = clampf(maxf(dist, half_x / (half_tan * width / screen.y)), 1.5, 5000.0)
+			# Move the target so the box's centre falls in the middle of the free part
+			# (yaw is 0 here: the screen's right is +X).
+			var shift_px := screen.x * 0.5 - (span.x + span.y) * 0.5
+			target.x += shift_px * 2.0 * dist * half_tan / screen.y
 	update()
 
 

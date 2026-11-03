@@ -458,6 +458,27 @@ visual). Não é a fase G4 deste plano: o roteiro se chama `g4_motorista.json` p
   escondidas) e as coxas ficam sobre o assento; o modelo do catálogo tem o volante longe do banco.
   Persistir "Mostrar motorista" no arquivo pede um campo `driver` no `VisualDef` (núcleo).
 
+### Vista 3D mais limpa (feito)
+
+O dono achou a tela "muito esquisita". Os painéis em volta da vista 3D vão para uma frente à
+parte (Rust/egui dentro do Godot); aqui ficou só o que mora na vista 3D:
+
+- **Rótulos legíveis** (`cena.gd`, `_style_label`): o nome de cada objeto (e de cada nó de
+  fluido) ganhou uma placa escura translúcida atrás do texto (`Placa`, um quadrilátero com o
+  mesmo *billboard* e o mesmo tamanho fixo na tela do rótulo, redimensionado quando o texto muda
+  em `set_label_text`) e um contorno mais fino. O nome fica legível sobre a grade, sobre o modelo e
+  sobre outro rótulo.
+- **Enquadramento na parte livre da tela** (`CameraOrbita.free_span`, `principal.free_span`): o
+  `frame_box` (abrir, Novo, tecla F) centraliza o modelo entre os painéis laterais visíveis e
+  afasta a câmera se a largura não couber ali, para que objetos e rótulos não fiquem cortados
+  pela borda de um painel (antes, "saida (recebidos: 0" sumia sob as propriedades).
+- **Medidas de desempenho ocultas**: a linha "qps | ponte | cena" sobre a vista 3D
+  (`Desempenho`) só aparece com **F3** (aparece também na janela de atalhos, F1).
+
+Conferido com janela a 1600×900 e 1280×720 (`g2_tutorial_01`, `g2_montar_linha`, `g3_cena`,
+`g3_resultados`). A 1280×720 o roteiro `g2_tutorial_01` já falhava antes (a câmera que ele fixa põe
+o ponto de colocação sob o painel direito); os roteiros rodam a 1600×900.
+
 ## Lacunas conhecidas depois da G3
 
 - O ajuste de dados reais não cobre ainda os campos fora dos objetos (fluxos de tokens, fluidos,

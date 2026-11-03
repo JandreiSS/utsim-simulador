@@ -171,11 +171,8 @@ func build(pb: Object, keep_templates := false) -> void:
 		label.no_depth_test = true
 		label.pixel_size = 0.0006
 		label.font_size = 26
-		label.outline_size = 8
-		label.outline_modulate = Color(0.08, 0.09, 0.11, 0.9)
 		label.modulate = Color(0.95, 0.96, 0.98)
-		label.render_priority = 10
-		label.outline_render_priority = 9
+		_style_label(label)
 		# Above the model: a person's head, a machine's roof (not its light mast).
 		var top := maxf(_height(root), (b["size"] as Vector3).y)
 		if b.get("skeletal", false):
@@ -534,7 +531,7 @@ func apply(t: float, dt: float, snap := false) -> void:
 				(rig["simple"] as MeshInstance3D).material_override = _plain(color[i])
 		if _last_label[i] != label[i]:
 			_last_label[i] = label[i]
-			(rig["label"] as Label3D).text = label[i]
+			set_label_text(rig["label"], label[i])
 	_apply_items(f)
 	if not fluid_nodes.is_empty():
 		_apply_fluids(playback.fluid_frame(t))
@@ -684,6 +681,48 @@ func set_ghost(opacity: float) -> void:
 			g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Look of the name labels over the objects: a thin outline and, behind the text, a dark
+## translucent plate (`Placa`, a child quad drawn with the same billboard and fixed size as
+## the label), so a name stays readable over the floor grid, a model or another label.
+static func _style_label(label: Label3D) -> void:
+	label.outline_size = 4
+	label.outline_modulate = Color(0.04, 0.05, 0.07, 0.9)
+	label.render_priority = 10
+	label.outline_render_priority = 9
+	var plate := MeshInstance3D.new()
+	plate.name = "Placa"
+	plate.mesh = QuadMesh.new()
+	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.fixed_size = true
+	m.no_depth_test = true
+	m.albedo_color = Color(0.07, 0.08, 0.11, 0.78)
+	m.render_priority = 8
+	plate.material_override = m
+	label.add_child(plate)
+	_fit_plate(label)
+
+
+## Text of a label, with its plate resized to the new text.
+static func set_label_text(label: Label3D, text: String) -> void:
+	label.text = text
+	_fit_plate(label)
+
+
+static func _fit_plate(label: Label3D) -> void:
+	var plate := label.get_node_or_null("Placa") as MeshInstance3D
+	if plate == null:
+		return
+	plate.visible = label.text != ""
+	var font: Font = label.font if label.font != null else ThemeDB.fallback_font
+	var px := font.get_multiline_string_size(label.text, HORIZONTAL_ALIGNMENT_CENTER, -1, label.font_size)
+	# Padding of about 10 px on the sides and 4 px above and below, at the label's scale.
+	(plate.mesh as QuadMesh).size = Vector2(px.x + 20.0, px.y + 8.0) * label.pixel_size
+
+
 func set_labels_visible(on: bool) -> void:
 	labels_visible = on
 	for rig in rigs:
@@ -775,11 +814,8 @@ func _build_fluids() -> void:
 		label.no_depth_test = true
 		label.pixel_size = 0.0006
 		label.font_size = 24
-		label.outline_size = 8
-		label.outline_modulate = Color(0.08, 0.09, 0.11, 0.9)
 		label.modulate = Color(0.75, 0.88, 1.0)
-		label.render_priority = 10
-		label.outline_render_priority = 9
+		_style_label(label)
 		label.position = Vector3(0, h + 0.35, 0)
 		root.add_child(label)
 		e["label"] = label
@@ -839,7 +875,8 @@ func _apply_fluids(ff: Dictionary) -> void:
 			(liquid.material_override as StandardMaterial3D).albedo_color = color[i]
 		elif e.has("marker"):
 			(( e["marker"] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color = color[i]
-		(e["label"] as Label3D).text = text[i]
+		if (e["label"] as Label3D).text != text[i]:
+			set_label_text(e["label"], text[i])
 	for k in mini(fluid_pipes.size(), active.size()):
 		var c := Color(0.25, 0.85, 0.95) if active[k] != 0 else Color(0.30, 0.42, 0.52)
 		((fluid_pipes[k] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color = c
