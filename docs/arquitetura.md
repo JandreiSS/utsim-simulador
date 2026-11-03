@@ -930,6 +930,28 @@ substitui para a malha continuar visível. Lacunas: no navegador os arquivos de 
 carregados (fica a forma padrão); a cor (`visual.color`) só pinta o material `pintura` da
 biblioteca embutida.
 
+### Planta CAD (`utsim-cad`)
+
+Crate pura, sem interface e sem dependências além de `serde` e `thiserror`. Leitor mínimo
+de DXF 2D em texto (a crate `dxf` não foi usada: o leitor próprio cobre `LINE`, `LWPOLYLINE`,
+`POLYLINE`, `CIRCLE`, `ARC`, `TEXT`, `MTEXT` e `INSERT` aninhado, e evita uma dependência).
+A planta achatada (`Plan`) tem camadas em ordem de nome, com polilinhas e rótulos em metros
+(conforme `$INSUNITS`; ausente: milímetros, marcado em `units_assumed`). Calibração por dois
+pontos (`Calibration`, escala e, com dois pares, rotação e translação), simplificação
+Douglas-Peucker, arrays planos para a interface (`FlatLines`) e SVG determinístico (`to_svg`).
+Camadas têm papel (`Role`: fundo, parede, coluna, porta, ignorar) sugerido pelo nome e
+sobrescrito pela pessoa (`RoleMap`); `build_obstacles` devolve polígonos anti-horários
+(paredes abertas ganham espessura, padrão 0,15 m) e as aberturas das portas, a entrada da
+futura `utsim-nav`. A planta não é lida pela simulação.
+
+**Proposta `floor_plan` do modelo (ainda não ligada ao `utsim-model`).** `FloorPlanDef`
+(em `utsim-cad`, serializável em RON) traz arquivo relativo ao `.ron`, hash `fnv1a64`,
+transformação, calibração, camadas com papel e visibilidade e espessura de parede. Ligá-lo
+seria um campo opcional `floor_plan: Option<FloorPlanDef>` com `#[serde(default)]` no
+`Model`, aditivo, sem passo de `MIGRATIONS` (modelos antigos seguem válidos). Fica como
+proposta porque `utsim-model` está em mudança por outro trabalho; os obstáculos gerados
+irão para um campo `obstacles` junto com o recurso de desvio.
+
 ### Pessoas animadas por esqueleto (A3D-3)
 
 No visual realista, as pessoas (`MobileRole::Person`, inclusive os operadores) usam o boneco
