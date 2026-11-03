@@ -24,6 +24,9 @@ pub struct WidgetInfo {
     pub checked: Option<bool>,
     /// The choices of a list, in order (for `escolher`).
     pub choices: Vec<String>,
+    /// How many things a chart draws (bars, rows, curves or bins), for the `grafico`
+    /// checks; `None` for the other widgets.
+    pub count: Option<usize>,
 }
 
 /// The named widgets of the last frame drawn, and the pending scripted requests.
@@ -54,6 +57,7 @@ impl Registry {
                 enabled: response.enabled(),
                 checked: None,
                 choices: Vec::new(),
+                count: None,
             },
         );
     }
@@ -158,6 +162,7 @@ mod tests {
             enabled: true,
             checked: None,
             choices: vec!["0.5 m".into(), "1 m".into()],
+            count: None,
         }
     }
 

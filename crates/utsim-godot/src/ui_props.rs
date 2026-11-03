@@ -126,6 +126,7 @@ pub(crate) fn named(ui: &Ui, reg: &mut Registry, name: &str, r: &Response, text:
         enabled: r.enabled(),
         checked: None,
         choices: Vec::new(),
+        count: None,
     };
     if !info.rect.is_positive() {
         info.rect = Rect::NOTHING;

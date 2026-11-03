@@ -50,6 +50,7 @@ pub mod ui_bottom;
 mod ui_class;
 pub mod ui_left;
 pub mod ui_props;
+pub mod ui_results;
 
 pub use utsim_edit::ron_text;
 pub use utsim_look::{catalogue, visual as looks};

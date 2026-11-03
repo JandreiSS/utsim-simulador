@@ -20,6 +20,7 @@ use crate::ui_bar::{self, BarMemory, BarState};
 use crate::ui_bottom::{self, PlayView, StatusView};
 use crate::ui_left::{self, EditView, LeftMemory, SimView};
 use crate::ui_props::{self, PropAction, PropsState, PropsView};
+use crate::ui_results::{self, ResultsMemory, ResultsView};
 
 /// What one frame produced.
 pub struct Frame {
@@ -46,6 +47,10 @@ pub struct Host {
     pub left_mem: LeftMemory,
     status: StatusView,
     play: PlayView,
+    /// The run the "Resultados" window shows, whether it is open, and what it keeps.
+    pub results: Option<ResultsView>,
+    pub results_open: bool,
+    pub results_mem: ResultsMemory,
     /// The egui panels of the last frame, in points.
     panels: Vec<Rect>,
     /// The last pointer event was over egui.
@@ -87,6 +92,9 @@ impl Host {
             left_mem: LeftMemory::default(),
             status: StatusView::default(),
             play: PlayView::default(),
+            results: None,
+            results_open: false,
+            results_mem: ResultsMemory::default(),
             panels: Vec::new(),
             was_over: false,
             central: Rect::NOTHING,
@@ -204,6 +212,29 @@ impl Host {
         &self.play
     }
 
+    /// A new run for the "Resultados" window (`export_dir`: the folder proposed for the
+    /// CSV files when none was typed).
+    pub fn set_results(&mut self, v: ResultsView, export_dir: &str) {
+        self.results_mem.on_new_results(&v, export_dir);
+        self.results = Some(v);
+        self.dirty = true;
+    }
+
+    /// Opens or closes the "Resultados" window (it opens only with a run to show).
+    pub fn set_results_open(&mut self, on: bool) {
+        let on = on && self.results.is_some();
+        if on != self.results_open {
+            self.results_open = on;
+            self.dirty = true;
+        }
+    }
+
+    /// The rectangle of the "Resultados" window, in points: the free central area of the
+    /// last frame, inside a margin.
+    pub fn results_rect(&self) -> Rect {
+        self.central.shrink(ui_results::MARGIN)
+    }
+
     /// Asks for a frame (something outside egui changed what it shows).
     pub fn invalidate(&mut self) {
         self.dirty = true;
@@ -248,6 +279,10 @@ impl Host {
         let (props, pst) = (&self.props, &mut self.props_state);
         let (left, edit, sim, lmem) = (self.left, &self.edit, &self.sim, &mut self.left_mem);
         let (status, play) = (&self.status, &self.play);
+        let (results, rmem) = (
+            self.results.as_ref().filter(|_| self.results_open),
+            &mut self.results_mem,
+        );
         let output = self.ctx.run_ui(raw, |ui| {
             // A pass may run twice (egui discards the first when the layout changed):
             // only the last one counts.
@@ -296,7 +331,20 @@ impl Host {
                 panels.push(rect);
                 central.max.y = rect.min.y;
             }
+            // The "Resultados" window covers the free area (the view stays framed as if it
+            // were not there: it is closed to look at the scene).
+            if let Some(v) = results {
+                let rect = central.shrink(ui_results::MARGIN);
+                if rect.width() > 200.0 && rect.height() > 150.0 {
+                    ui_results::show(ui, rect, v, rmem, reg, &mut actions);
+                    panels.push(rect);
+                }
+            }
         });
+        if actions.iter().any(|a| a == "resultados:fechar") {
+            self.results_open = false;
+            self.dirty = true;
+        }
         self.central = central;
         self.panels = panels;
         self.frames += 1;
