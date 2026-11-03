@@ -4,6 +4,7 @@ mod experiment;
 mod fit;
 mod gerar;
 mod optimize;
+mod planta;
 mod replay;
 
 use std::path::PathBuf;
@@ -107,6 +108,25 @@ enum Cmd {
         /// Arquivo de saída (padrão: a saída padrão)
         #[arg(long)]
         saida: Option<PathBuf>,
+    },
+    /// Lê uma planta DXF 2D: camadas, calibração por dois pontos e SVG
+    Planta {
+        arquivo: PathBuf,
+        /// Lista as camadas com contagem e papel sugerido
+        #[arg(long)]
+        camadas: bool,
+        /// Grava a planta em SVG
+        #[arg(long)]
+        svg: Option<PathBuf>,
+        /// Calibra: x1,y1,x2,y2,distancia (pontos nas unidades do desenho, distância em m)
+        #[arg(long, value_name = "X1,Y1,X2,Y2,DIST", allow_hyphen_values = true)]
+        calibrar: Option<String>,
+        /// Move a origem para este ponto (x,y, em metros após a calibração)
+        #[arg(long, value_name = "X,Y", allow_hyphen_values = true)]
+        origem: Option<String>,
+        /// Força a unidade do desenho: mm, cm, dm, m, km, pol ou pe
+        #[arg(long)]
+        unidades: Option<String>,
     },
     /// Compara cenários de um arquivo de experimento
     Experiment {
@@ -264,6 +284,21 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         Cmd::Experiment { file, json } => experiment::run(&file, json.as_deref())?,
+        Cmd::Planta {
+            arquivo,
+            camadas,
+            svg,
+            calibrar,
+            origem,
+            unidades,
+        } => planta::run(
+            &arquivo,
+            camadas,
+            svg.as_deref(),
+            calibrar.as_deref(),
+            origem.as_deref(),
+            unidades.as_deref(),
+        )?,
         Cmd::GerarModelo {
             objetos,
             tipo,
