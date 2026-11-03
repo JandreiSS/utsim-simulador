@@ -8,7 +8,7 @@
 //! Choices that open a list (a combo box) can also be made by name ([`Registry::request`]),
 //! as the `escolher` step does with Godot's `OptionButton`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use egui::{Rect, Response};
 
@@ -30,13 +30,18 @@ pub struct WidgetInfo {
 #[derive(Default, Debug)]
 pub struct Registry {
     widgets: BTreeMap<String, WidgetInfo>,
+    /// Every name drawn in the last frame, also the ones scrolled out of sight.
+    known: BTreeSet<String>,
     requests: HashMap<String, String>,
+    /// Names to scroll into view the next time they are drawn.
+    reveals: BTreeSet<String>,
 }
 
 impl Registry {
     /// Forgets the widgets of the previous frame (call before drawing a new one).
     pub fn begin_frame(&mut self) {
         self.widgets.clear();
+        self.known.clear();
     }
 
     /// Records the widget `name` drawn with `response`.
@@ -70,6 +75,7 @@ impl Registry {
     }
 
     pub fn put_info(&mut self, name: &str, info: WidgetInfo) {
+        self.known.insert(name.to_owned());
         // Only what is on screen counts: a widget clipped away has a zero rectangle.
         if info.rect.is_positive() {
             self.widgets.insert(name.to_owned(), info);
@@ -116,7 +122,27 @@ impl Registry {
     }
 
     pub fn has_requests(&self) -> bool {
-        !self.requests.is_empty()
+        !self.requests.is_empty() || !self.reveals.is_empty()
+    }
+
+    /// Whether `name` was drawn in the last frame, on screen or scrolled away.
+    pub fn knows(&self, name: &str) -> bool {
+        self.known.contains(name)
+    }
+
+    /// Asks the widget `name` to scroll into view (a scripted step that will click it).
+    /// False when it was not drawn.
+    pub fn reveal(&mut self, name: &str) -> bool {
+        let known = self.knows(name);
+        if known {
+            self.reveals.insert(name.to_owned());
+        }
+        known
+    }
+
+    /// Whether `name` asked to be scrolled into view (taken).
+    pub fn take_reveal(&mut self, name: &str) -> bool {
+        self.reveals.remove(name)
     }
 }
 
@@ -154,12 +180,18 @@ mod tests {
     }
 
     #[test]
-    fn hidden_widgets_are_not_listed() {
+    fn hidden_widgets_are_not_listed_but_can_be_revealed() {
         let mut r = Registry::default();
         let mut w = info(0.0, "x");
         w.rect = Rect::NOTHING;
         r.put_info("Oculto", w);
         assert!(r.get("Oculto").is_none());
+        assert!(r.knows("Oculto"));
+        assert!(!r.reveal("Outro"));
+        assert!(r.reveal("Oculto"));
+        assert!(r.has_requests());
+        assert!(r.take_reveal("Oculto"));
+        assert!(!r.take_reveal("Oculto"));
     }
 
     #[test]

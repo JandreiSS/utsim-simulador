@@ -54,6 +54,16 @@ var _ui: CanvasLayer
 ## The interface around the 3D view drawn in Rust with egui (`UtsimUi`, the bridge): the
 ## top bar for now; the other panels move to it in the next steps (plano_interface_rust.md).
 var ui: Object
+## The properties panel: the egui one (Rust) unless a subpanel still in Godot is needed
+## (Rede, Corredor, a link, the real-data form), then the Godot one (`_props`).
+var _props_godot := true
+## Whether the right panel may show at all (Editar, no window covering it).
+var _right_allowed := true
+## The asset the egui panel's miniature shows (`miniatura` of the scripted checks).
+var mini_asset := "-"
+var _mini_view: SubViewport
+var _mini_scene: CenaUtsim
+var _mini_camera: Camera3D
 var _left: PanelContainer
 var _right: PanelContainer
 var _bottom: PanelContainer
@@ -121,6 +131,10 @@ func _ready() -> void:
 			return
 	doc = ClassDB.instantiate(&"UtsimDocument")
 	doc.new_model("novo_modelo")
+	if ui != null:
+		ui.set_document(doc)
+		ui.set_reserved_bottom(BOTTOM_HEIGHT)
+		_build_miniature()
 	editor = EditorUtsim.new()
 	editor.name = "Editor"
 	add_child(editor)
@@ -586,7 +600,19 @@ func _sync_panels() -> void:
 	for panel in [_results_panel, _pert_panel]:
 		panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
 	if mode == "editar":
-		_right.visible = not covering
+		_set_right(not covering)
+
+
+## Shows or hides the right panel (the egui one or the Godot one, see `_props_godot`).
+func _set_right(on: bool) -> void:
+	_right_allowed = on
+	_apply_right()
+
+
+func _apply_right() -> void:
+	_right.visible = _right_allowed and (_props_godot or ui == null)
+	if ui != null:
+		ui.set_properties_visible(_right_allowed and not _props_godot)
 
 
 func is_editing() -> bool:
@@ -663,6 +689,9 @@ func _sync_bar() -> void:
 func bar_action(what: String) -> void:
 	if doc == null:
 		return
+	if what.contains("\t"):
+		_panel_action(what.split("\t"))
+		return
 	var arg := what.get_slice(":", 1) if what.contains(":") else ""
 	match what.get_slice(":", 0):
 		"modo":
@@ -695,6 +724,39 @@ func bar_action(what: String) -> void:
 		"atalhos":
 			toggle_shortcuts()
 	_sync_bar()
+
+
+## What the egui properties panel did (the edits are already applied by the bridge).
+func _panel_action(a: PackedStringArray) -> void:
+	match a[0]:
+		"prop_ok":
+			var path := a[2]
+			if path == "name" and not editor.selected.is_empty():
+				editor.selected[0] = a[3].strip_edges()
+			after_edit.call_deferred()
+			set_status("%s: %s alterado." % [a[1], path])
+		"prop_erro":
+			set_status("Não alterou %s: %s" % [a[1], a[2] if a.size() > 2 else ""])
+			_show_properties.call_deferred()
+		"prop_fim":
+			after_edit.call_deferred()
+		"problema":
+			editor.corredores.highlight_issue(a[1])
+		"saida_ordem":
+			if not editor.selected.is_empty() and doc.move_connection(editor.selected[0], int(a[1]), int(a[2])):
+				after_edit.call_deferred()
+		"saida_remover":
+			if not editor.selected.is_empty() and doc.disconnect_objects(editor.selected[0], a[1]):
+				after_edit.call_deferred()
+		"motorista":
+			cena.set_driver_visible(a[1], a[2] == "true")
+			_show_properties()
+		"dados_reais":
+			if not editor.selected.is_empty():
+				_props._data_mode["%s|%s" % [editor.selected[0], a[1]]] = true
+			_show_properties()
+		"miniatura":
+			show_miniature(a[1])
 
 
 # ---------------------------------------------------------------------------
@@ -875,6 +937,25 @@ func _show_properties() -> void:
 	if doc == null or mode != "editar":
 		return
 	var scroll := _props_scroll.scroll_vertical
+	var godot := ui == null or not editor.selected_link.is_empty() or editor.tool == "rede" or editor.tool == "corredor"
+	var sel: Array = editor.selected
+	var name: String = sel[0] if not sel.is_empty() else "run"
+	if not godot and _needs_data_form(name):
+		godot = true
+	if _props_godot != godot:
+		_props_godot = godot
+		_apply_right()
+	if not godot:
+		# The egui panel (Rust) reads the schema from the document itself.
+		_props.clear()
+		var others := PackedStringArray()
+		for k in range(1, sel.size()):
+			others.append(sel[k])
+		var extra_line := ""
+		if sel.size() > 1:
+			extra_line = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
+		ui.show_properties(name, others, extra_line, _driver_state(name))
+		return
 	if not editor.selected_link.is_empty():
 		_show_link(editor.selected_link)
 		return
@@ -886,14 +967,88 @@ func _show_properties() -> void:
 		_show_aisles()
 		_props_scroll.scroll_vertical = scroll
 		return
-	var sel: Array = editor.selected
-	var name: String = sel[0] if not sel.is_empty() else "run"
 	var props: Dictionary = doc.properties(name)
 	var extra := ""
 	if sel.size() > 1:
 		extra = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
 	_props.show_properties(props, extra)
 	_props_scroll.scroll_vertical = scroll
+
+
+## Whether the object's panel needs the real-data form (still in Godot): a field fed by
+## data, or one switched to "Dados reais" and not applied yet.
+func _needs_data_form(name: String) -> bool:
+	for k in _props._data_mode:
+		if String(k).begins_with(name + "|"):
+			return true
+	var data: Dictionary = doc.properties(name).get("data", {})
+	for v in data.values():
+		if String((v as Dictionary).get("source", "")) == "dados":
+			return true
+	return false
+
+
+## The seated driver of a forklift: -1 none, 0 hidden, 1 shown.
+func _driver_state(object: String) -> int:
+	if cena == null or not cena.has_driver(object):
+		return -1
+	return 1 if cena.driver_visible(object) else 0
+
+
+## The miniature of the asset picker of the egui panel: the object alone in a small 3D
+## world of its own, drawn by the same scene code; egui shows the texture.
+func _build_miniature() -> void:
+	_mini_view = SubViewport.new()
+	_mini_view.name = "Miniatura"
+	_mini_view.size = Vector2i(396, 150)
+	_mini_view.own_world_3d = true
+	_mini_view.msaa_3d = Viewport.MSAA_2X
+	_mini_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(_mini_view)
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color(0.16, 0.17, 0.21)
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color(0.80, 0.84, 0.92)
+	e.ambient_light_energy = 0.8
+	e.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.environment = e
+	_mini_view.add_child(env)
+	var light := DirectionalLight3D.new()
+	light.light_energy = 1.4
+	light.transform = Transform3D(Basis.IDENTITY, Vector3(4, 8, 5)).looking_at(Vector3.ZERO, Vector3.UP)
+	_mini_view.add_child(light)
+	_mini_camera = Camera3D.new()
+	_mini_camera.current = true
+	_mini_view.add_child(_mini_camera)
+	_mini_scene = CenaUtsim.new()
+	_mini_scene.show_floor = false
+	_mini_scene.show_connections = false
+	_mini_view.add_child(_mini_scene)
+	ui.set_miniature(_mini_view)
+
+
+## Draws the selected object with `asset` in the miniature.
+func show_miniature(asset: String) -> void:
+	mini_asset = asset
+	if _mini_scene == null or editor == null or editor.selected.is_empty():
+		if _mini_scene != null:
+			_mini_scene.clear()
+		return
+	var pb: Object = doc.look_scene(editor.selected[0], asset, CenaUtsim.skeletal_available())
+	if pb == null:
+		_mini_scene.clear()
+		return
+	_mini_scene.build(pb)
+	_mini_scene.apply(0.0, 0.0, true)
+	_mini_scene.set_labels_visible(false)
+	var lo: Vector3 = _mini_scene.info.get("bounds_min", Vector3(-1, 0, -1))
+	var hi: Vector3 = _mini_scene.info.get("bounds_max", Vector3(1, 1, 1))
+	var size := maxf((hi - lo).length(), 1.0)
+	var center := (lo + hi) * 0.5
+	var eye := center + Vector3(0.9, 0.7, 1.1).normalized() * size * 1.1
+	_mini_camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(center, Vector3.UP)
 
 
 func _show_link(link: Array) -> void:
@@ -1116,7 +1271,7 @@ func set_mode(which: String) -> bool:
 	playing_replay = false
 	_edit_left.visible = true
 	_sim_left.visible = false
-	_right.visible = true
+	_set_right(true)
 	_bar.visible = false
 	_sync_panels()
 	_sync_bar()
@@ -1143,7 +1298,7 @@ func simulate(reps: int) -> bool:
 	mode = "simular"
 	_edit_left.visible = false
 	_sim_left.visible = true
-	_right.visible = false
+	_set_right(false)
 	_bar.visible = true
 	_sync_panels()
 	_sync_bar()
@@ -1636,7 +1791,7 @@ func open_replay(path: String) -> bool:
 	mode = "simular"
 	_edit_left.visible = false
 	_sim_left.visible = true
-	_right.visible = false
+	_set_right(false)
 	_bar.visible = true
 	_sync_panels()
 	_sync_bar()

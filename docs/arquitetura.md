@@ -1569,6 +1569,18 @@ foram feitos a fundação e a barra superior:
   cabem vão para o menu "Mais", na ordem Atalhos, Organizar, Arquivo, Grade, Análise,
   Desfazer/Refazer (`fit`). O `principal.gd` manda o estado em `_sync_bar()` e executa as
   ações em `bar_action()`, com as mesmas funções dos botões antigos.
+- **Painel de propriedades** (`ui_props.rs`): desenha o esquema de `Editor::properties`
+  direto (o nó recebe o documento com `set_document` e o objeto com `show_properties`; a
+  vista é refeita só quando a revisão ou o objeto mudam) e cada mudança vira
+  `Editor::set_property`, com a validação do `schema.rs` e um passo de desfazer; o
+  `principal.gd` recebe `prop_ok`/`prop_erro` pelo sinal `action`. Campos de texto
+  selecionam tudo ao ganhar o foco e gravam com Enter ou ao perder o foco. A miniatura do
+  ativo é a textura de um `SubViewport` do `principal.gd` (`set_miniature`). Rede, Corredor,
+  ligação e dados reais ainda usam o painel Godot, escolhido em `_show_properties`. Para os
+  roteiros, `reveal(nome)` rola o painel até o widget e `knows_widget(nome)` diz se ele foi
+  desenhado fora da vista.
+- **Comandos de desenho conferidos sem o motor** (`egui_host::tests`): índices, coordenadas
+  de textura, cores, recortes e texturas da barra e do painel a 1600×900 e 1280×720.
 - **Tema** (`crates/utsim-ui-tema`, só egui): cores do tema Godot por papel, tamanhos,
   estilo dos widgets, fontes de interface do sistema com as do egui como reserva, botão
   primário e controle segmentado. O launcher e o app UTSim Seis Sigma vão adotá-lo.

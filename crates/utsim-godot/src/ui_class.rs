@@ -21,13 +21,17 @@ use godot::classes::notify::CanvasItemNotification;
 use godot::classes::rendering_server::CanvasItemTextureFilter;
 use godot::classes::{
     ClassDb, Engine, INode2D, Input as GdInput, InputEvent, Node2D, Object, Os, RenderingServer,
+    Viewport,
 };
 use godot::prelude::*;
 
+use crate::document_class::UtsimDocument;
 use crate::egui_host::Host;
 use crate::egui_input::{Input, Mods};
 use crate::egui_mesh::{self, Change, Textures};
+use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
+use crate::ui_props::{self, PropAction, PropsView};
 use crate::{put, strings};
 
 /// Godot's `Image.FORMAT_RGBA8`.
@@ -47,6 +51,19 @@ pub struct UtsimUi {
     #[var]
     ui_scale: f32,
     cursor: Option<egui::CursorIcon>,
+    /// The document the properties panel edits.
+    doc: Option<Gd<UtsimDocument>>,
+    /// The object shown in the properties panel (`run` for the model), the others
+    /// selected with it, the line under the title and the driver state.
+    object: String,
+    others: Vec<String>,
+    extra: String,
+    driver: i32,
+    props_on: bool,
+    /// The revision and object the cached view was built for.
+    props_key: Option<(u64, String)>,
+    /// The texture of the miniature's `SubViewport` (owned by Godot, never freed here).
+    miniature: Option<Rid>,
     base: Base<Node2D>,
 }
 
@@ -61,6 +78,14 @@ impl INode2D for UtsimUi {
             items: Vec::new(),
             ui_scale: 1.0,
             cursor: None,
+            doc: None,
+            object: String::new(),
+            others: Vec::new(),
+            extra: String::new(),
+            driver: -1,
+            props_on: false,
+            props_key: None,
+            miniature: None,
             base,
         }
     }
@@ -80,8 +105,14 @@ impl INode2D for UtsimUi {
         let Some(input) = read_input(&event) else {
             return;
         };
+        let press = matches!(input, Input::Button { pressed: true, .. }) && !input.is_wheel();
         let consumed = self.host.push(&input, clipboard_get);
         if consumed && let Some(mut vp) = self.base().get_viewport() {
+            // A click on egui takes the keyboard from a Godot field (the object search, a
+            // field of a Godot panel): what is typed next goes to egui or to the shortcuts.
+            if press {
+                vp.gui_release_focus();
+            }
             vp.set_input_as_handled();
         }
     }
@@ -189,6 +220,12 @@ impl UtsimUi {
         self.host.reg.get(&name.to_string()).is_some()
     }
 
+    /// Whether the named widget was drawn, also when it is scrolled out of sight.
+    #[func]
+    fn knows_widget(&self, name: GString) -> bool {
+        self.host.reg.knows(&name.to_string())
+    }
+
     /// `{text, enabled, checked, choices}` of the named widget, or `{}`.
     #[func]
     fn widget_info(&self, name: GString) -> VarDictionary {
@@ -220,7 +257,74 @@ impl UtsimUi {
     /// Asks for a new frame (something the interface shows changed).
     #[func]
     fn repaint(&mut self) {
+        self.props_key = None;
         self.host.invalidate();
+    }
+
+    /// The document the properties panel reads and edits.
+    #[func]
+    fn set_document(&mut self, doc: Gd<UtsimDocument>) {
+        self.doc = Some(doc);
+        self.props_key = None;
+        self.host.invalidate();
+    }
+
+    /// Shows the properties of `object` (`"run"`: the model), with `others` selected with
+    /// it (the edits apply to them too), `extra` under the title and the forklift driver
+    /// state (`-1` none, `0` hidden, `1` shown).
+    #[func]
+    fn show_properties(
+        &mut self,
+        object: GString,
+        others: PackedStringArray,
+        extra: GString,
+        driver: i64,
+    ) {
+        self.object = object.to_string();
+        self.others = others.as_slice().iter().map(|s| s.to_string()).collect();
+        self.extra = extra.to_string();
+        self.driver = driver as i32;
+        self.props_on = true;
+        self.props_key = None;
+        self.host.invalidate();
+    }
+
+    /// Shows or hides the properties panel (hidden: the Godot panel or nothing).
+    #[func]
+    fn set_properties_visible(&mut self, on: bool) {
+        if self.props_on != on {
+            self.props_on = on;
+            self.props_key = None;
+            self.host.invalidate();
+        }
+    }
+
+    #[func]
+    fn properties_visible(&self) -> bool {
+        self.props_on
+    }
+
+    /// Pixels at the bottom that stay Godot's (the status bar): the panels stop above.
+    #[func]
+    fn set_reserved_bottom(&mut self, pixels: f32) {
+        self.host.bottom_reserved = pixels.max(0.0);
+        self.host.invalidate();
+    }
+
+    /// The `SubViewport` the asset miniature is drawn in: its texture is shown in the panel.
+    #[func]
+    fn set_miniature(&mut self, viewport: Gd<Viewport>) {
+        let rid = viewport.get_viewport_rid();
+        self.miniature = Some(RenderingServer::singleton().viewport_get_texture(rid));
+        self.props_key = None;
+        self.host.invalidate();
+    }
+
+    /// Scrolls the named widget into view (a scripted step will act on it). False when it
+    /// was not drawn.
+    #[func]
+    fn reveal(&mut self, name: GString) -> bool {
+        self.host.reg.reveal(&name.to_string())
     }
 
     /// Frames run so far (frames run only when something changed).
@@ -259,6 +363,7 @@ impl UtsimUi {
         if !self.host.needs_frame(now, size, ppp) {
             return;
         }
+        self.refresh_props_view();
         let frame = self.host.frame(now, size, ppp);
         let mut output = frame.output;
         let mut textures = std::mem::take(&mut output.textures_delta);
@@ -286,11 +391,108 @@ impl UtsimUi {
         // Applied above (egui checks that every delta was handled).
         textures.clear();
         for a in frame.actions {
-            let args = [
-                StringName::from("action").to_variant(),
-                GString::from(a.as_str()).to_variant(),
-            ];
-            self.base_mut().call_deferred("emit_signal", &args);
+            self.emit(&a);
+        }
+        for a in frame.props {
+            self.prop_action(a);
+        }
+    }
+
+    /// Emits `action(what)` after this frame (outside this object's borrow).
+    fn emit(&mut self, what: &str) {
+        let args = [
+            StringName::from("action").to_variant(),
+            GString::from(what).to_variant(),
+        ];
+        self.base_mut().call_deferred("emit_signal", &args);
+    }
+
+    /// The properties view from the document, rebuilt only when the document or the
+    /// object shown changed.
+    fn refresh_props_view(&mut self) {
+        let Some(doc) = self.doc.clone().filter(|_| self.props_on) else {
+            self.host.props = None;
+            self.props_key = None;
+            return;
+        };
+        let d = doc.bind();
+        let key = (d.editor.doc.revision(), self.object.clone());
+        if self.props_key.as_ref() == Some(&key) && self.host.props.is_some() {
+            return;
+        }
+        let props = d.editor.properties(&self.object);
+        let prefix = format!("{}.", props.name);
+        let data_paths = d
+            .data_list()
+            .iter()
+            .filter_map(|f| {
+                f["field"]
+                    .as_str()
+                    .and_then(|k| k.strip_prefix(&prefix))
+                    .map(str::to_owned)
+            })
+            .collect();
+        self.host.props = Some(PropsView {
+            props,
+            families: schema::FAMILIES.iter().map(|s| s.to_string()).collect(),
+            data_paths,
+            extra: self.extra.clone(),
+            driver: self.driver,
+            miniature: self.miniature.is_some(),
+        });
+        self.props_key = Some(key);
+    }
+
+    /// Applies an edit of the properties panel through the document (validation, undo)
+    /// and tells the main scene; the rest goes to the main scene as actions.
+    fn prop_action(&mut self, a: PropAction) {
+        match a {
+            PropAction::Set {
+                path,
+                value,
+                end_gesture,
+            } => {
+                let Some(mut doc) = self.doc.clone() else {
+                    return;
+                };
+                let object = self.object.clone();
+                let r = {
+                    let mut d = doc.bind_mut();
+                    let r = d.editor.set_property(&object, &path, &value, &self.others);
+                    if r.is_ok() && end_gesture {
+                        d.editor.doc.end_gesture();
+                    }
+                    r
+                };
+                self.props_key = None;
+                self.host.invalidate();
+                match r {
+                    Ok(()) => {
+                        let shown = value_string(&value);
+                        if path == "name" {
+                            self.object = shown.trim().to_owned();
+                        }
+                        self.emit(&format!("prop_ok\t{object}\t{path}\t{shown}"));
+                    }
+                    Err(e) => self.emit(&format!("prop_erro\t{path}\t{e}")),
+                }
+            }
+            PropAction::EndGesture => {
+                if let Some(mut doc) = self.doc.clone() {
+                    doc.bind_mut().editor.doc.end_gesture();
+                }
+                self.emit("prop_fim");
+            }
+            PropAction::Issue(m) => self.emit(&format!("problema\t{m}")),
+            PropAction::Arrange(w) => self.emit(&format!("organizar:{w}")),
+            PropAction::Reorder(k, d) => self.emit(&format!("saida_ordem\t{k}\t{d}")),
+            PropAction::Disconnect(to) => self.emit(&format!("saida_remover\t{to}")),
+            PropAction::Driver(on) => {
+                let o = self.object.clone();
+                self.emit(&format!("motorista\t{o}\t{on}"));
+            }
+            PropAction::DataMode(p) => self.emit(&format!("dados_reais\t{p}")),
+            PropAction::Miniature(asset) => self.emit(&format!("miniatura\t{asset}")),
         }
     }
 
@@ -390,7 +592,13 @@ impl UtsimUi {
             let uvs: PackedVector2Array = m.uvs.iter().map(|p| Vector2::new(p[0], p[1])).collect();
             let texture = m
                 .texture
-                .and_then(|t| self.gpu.get(&t).copied())
+                .and_then(|t| {
+                    if t == ui_props::MINIATURE {
+                        self.miniature
+                    } else {
+                        self.gpu.get(&t).copied()
+                    }
+                })
                 .unwrap_or(Rid::Invalid);
             rs.canvas_item_add_triangle_array_ex(item, &indices, &points, &colors)
                 .uvs(&uvs)
@@ -449,6 +657,18 @@ fn read_input(ev: &Gd<InputEvent>) -> Option<Input> {
             mods: mods(),
         }),
         _ => None,
+    }
+}
+
+/// A value as the main scene's status line shows it.
+fn value_string(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(x) => ui_props::num_text(*x),
+        Value::Text(t) => t.clone(),
+        Value::List(l) => l.join(", "),
     }
 }
 

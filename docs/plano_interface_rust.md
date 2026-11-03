@@ -117,7 +117,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 |---|---|---|---|
 | 1 | Fundação: nó `UtsimUi`, entrada, desenho, área livre, registro de nomes, tema comum, testes | 6–8 h | **feito** |
 | 2a | Barra superior em egui, com grupos e menu "Mais" | 2–3 h | **feito** |
-| 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | a fazer |
+| 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | **feito** |
 | 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | a fazer |
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | a fazer |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
@@ -125,7 +125,37 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
 
-### Detalhes do passo 2b (propriedades)
+### Passo 2b (propriedades), como foi feito
+
+- `ui_props.rs` (puro, testado com um `Editor` de verdade) desenha o esquema de
+  `Editor::properties` direto, sem dicionário no meio. O nó recebe o documento uma vez
+  (`set_document(doc)`) e o objeto a mostrar (`show_properties(objeto, outros, linha, motorista)`);
+  a vista só é refeita quando a revisão do documento ou o objeto mudam.
+- Cada mudança sai como `PropAction::Set` com o mesmo caminho e o mesmo valor que o painel
+  Godot mandava e a ponte a aplica com `Editor::set_property` (a validação do `schema.rs`, um
+  passo de desfazer; a cor fecha o passo quando o botão do mouse sobe). O `principal.gd`
+  recebe `prop_ok`, `prop_erro` e o resto pelo sinal `action` (`_panel_action`): atualiza a
+  cena, a seleção (ao renomear) e a linha de status.
+- Rótulo à esquerda (150 pt, quebra em várias linhas, dica com a ajuda) e controle à
+  direita, em colunas alinhadas; seções recolhíveis por título (ficam fechadas para todos
+  os objetos); problemas em vermelho e avisos em amarelo, clicáveis; distribuição com
+  família, parâmetros, média e "editar como texto"; "Aplicar" primário na descrição e nos
+  scripts; saídas em ordem de porta com ▲ ▼ ✕; botões de alinhar e distribuir com vários
+  selecionados; "Mostrar motorista" na aparência da empilhadeira.
+- Campos de texto: selecionam tudo ao ganhar o foco, gravam com Enter ou ao perder o foco,
+  Esc descarta; enquanto há um campo com o foco as teclas são do egui (Del, Ctrl+Z e as
+  letras não chegam aos atalhos).
+- Miniatura: um `SubViewport` do `principal.gd` (`_build_miniature`, `show_miniature`) com a
+  mesma cena; o egui mostra a textura dele (`TextureId::User(1)`) e pede, pela ação
+  `miniatura`, o ativo escolhido ou o que está sob o mouse na lista aberta.
+- O painel Godot (`painel_propriedades.gd`) continua para o que ainda não migrou: ferramentas
+  Rede e Corredor, ligação selecionada e o formulário de dados reais (campo alimentado por
+  dados, ou "Fonte: Dados reais" escolhida no painel egui). O `principal.gd` escolhe em
+  `_show_properties` e mostra um ou outro.
+- Roteiros: `reveal(nome)` rola o painel até um widget fora da vista antes do clique;
+  um nó Godot oculto com o mesmo nome (o painel Godot) cede ao widget do egui.
+
+### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
   `UtsimDocument` (o nó recebe o documento uma vez, `set_document(doc)`) e aplica cada mudança
@@ -148,9 +178,16 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - Crate `utsim-ui-tema` (tema, fontes, botão primário, controle segmentado) com testes de
   contraste e de layout.
 - Na ponte: `egui_input.rs`, `egui_mesh.rs`, `egui_widgets.rs`, `egui_host.rs` (puros, com
-  testes) e `ui_class.rs` (o nó `UtsimUi`); `ui_bar.rs` (a barra superior).
+  testes) e `ui_class.rs` (o nó `UtsimUi`); `ui_bar.rs` (a barra superior) e `ui_props.rs`
+  (o painel de propriedades).
+- Testes dos comandos de desenho sem o motor (`egui_host::tests::the_canvas_commands_*`): a
+  barra e o painel a 1600×900 e 1280×720 geram malhas com índices válidos, coordenadas de
+  textura em 0..1, cores em alfa direto em 0..1, recortes dentro da janela e só texturas já
+  criadas. É o que dá para conferir sem renderizador; a imagem em si só a janela mostra.
+- Um clique no egui tira o foco de um campo Godot (`gui_release_focus`).
 - `principal.gd` sem a barra superior em GDScript: `_sync_bar()` e `bar_action()`; o
   `roteiro.gd` acha widgets do egui pelo nome.
 - A conferência visual com janela (capturas a 1600×900 e 1280×720) ficou pendente: a tela
   estava em uso pelo dono; os testes de layout da barra (`ui_bar::tests`) conferem que nada
-  se sobrepõe nem sai da barra nas duas larguras e que o menu "Mais" só aparece a 1280.
+  se sobrepõe nem sai da barra nas duas larguras e que o menu "Mais" só aparece a 1280, e
+  os do painel (`ui_props::tests`) os nomes, as colunas, a digitação e as seções.

@@ -17,12 +17,15 @@ use egui::{Context, Event, FullOutput, Order, Pos2, RawInput, Rect, Vec2, Viewpo
 use crate::egui_input::{self, Input};
 use crate::egui_widgets::Registry;
 use crate::ui_bar::{self, BarMemory, BarState};
+use crate::ui_props::{self, PropAction, PropsState, PropsView};
 
 /// What one frame produced.
 pub struct Frame {
     pub output: FullOutput,
     /// The actions clicked, in order (`"novo"`, `"modo:simular"`...).
     pub actions: Vec<String>,
+    /// What was done in the properties panel.
+    pub props: Vec<PropAction>,
 }
 
 pub struct Host {
@@ -31,6 +34,15 @@ pub struct Host {
     pub reg: Registry,
     pub bar: BarState,
     bar_mem: BarMemory,
+    /// The properties panel (shown when set).
+    pub props: Option<PropsView>,
+    pub props_state: PropsState,
+    /// Pixels at the bottom left to Godot (the status bar).
+    pub bottom_reserved: f32,
+    /// The egui panels of the last frame, in points.
+    panels: Vec<Rect>,
+    /// The last pointer event was over egui.
+    was_over: bool,
     /// What is left for the 3D view, in points (the screen minus the egui panels).
     central: Rect,
     ppp: f32,
@@ -60,6 +72,11 @@ impl Host {
             reg: Registry::default(),
             bar: BarState::default(),
             bar_mem: BarMemory::default(),
+            props: None,
+            props_state: PropsState::default(),
+            bottom_reserved: 0.0,
+            panels: Vec::new(),
+            was_over: false,
             central: Rect::NOTHING,
             ppp: 1.0,
             size: [0.0, 0.0],
@@ -89,6 +106,12 @@ impl Host {
             Input::Key { .. } => typing,
             Input::PointerGone | Input::Focus(_) => false,
         };
+        // The pointer moving over the 3D view, away from egui, changes nothing egui shows:
+        // the event waits for the next frame instead of asking for one.
+        let quiet = matches!(input, Input::Motion { .. }) && !over && !self.was_over && !consumed;
+        if input.pos().is_some() {
+            self.was_over = over;
+        }
         for e in egui_input::to_egui(input, self.ppp, self.mac, clipboard) {
             // Tab is the mode switch of the main scene: egui only gets it inside a text
             // field (it would move the keyboard focus between buttons).
@@ -105,7 +128,9 @@ impl Host {
             }
             self.events.push(e);
         }
-        self.dirty = true;
+        if !quiet {
+            self.dirty = true;
+        }
         consumed
     }
 
@@ -154,17 +179,39 @@ impl Host {
             .or_default()
             .native_pixels_per_point = Some(ppp);
         let mut actions = Vec::new();
+        let mut props_out = Vec::new();
         let mut central = self.central;
+        let mut panels = Vec::new();
+        let bottom = self.bottom_reserved / ppp;
         let (reg, bar, mem) = (&mut self.reg, &self.bar, &mut self.bar_mem);
+        let (props, pst) = (&self.props, &mut self.props_state);
         let output = self.ctx.run_ui(raw, |ui| {
             // A pass may run twice (egui discards the first when the layout changed):
             // only the last one counts.
             reg.begin_frame();
             actions.clear();
+            props_out.clear();
+            panels.clear();
+            let screen = ui.max_rect();
             ui_bar::show(ui, bar, mem, reg, &mut actions);
-            central = ui.available_rect_before_wrap();
+            let below = ui.available_rect_before_wrap();
+            panels.push(Rect::from_min_max(
+                screen.min,
+                Pos2::new(screen.max.x, below.min.y),
+            ));
+            central = below;
+            if let Some(v) = props {
+                let rect = Rect::from_min_max(
+                    Pos2::new(below.max.x - ui_props::WIDTH, below.min.y),
+                    Pos2::new(below.max.x, (below.max.y - bottom).max(below.min.y + 40.0)),
+                );
+                ui_props::show(ui, rect, v, pst, reg, &mut props_out);
+                panels.push(rect);
+                central.max.x = rect.min.x;
+            }
         });
         self.central = central;
+        self.panels = panels;
         self.frames += 1;
         // A button keeps no keyboard focus: the keys stay the main scene's shortcuts.
         if let Some(id) = self.ctx.memory(|m| m.focused())
@@ -178,7 +225,11 @@ impl Host {
             .map(|v| v.repaint_delay.as_secs_f64())
             .unwrap_or(f64::INFINITY);
         self.next_repaint = (delay < 1.0e6).then_some(now + delay);
-        Frame { output, actions }
+        Frame {
+            output,
+            actions,
+            props: props_out,
+        }
     }
 
     /// Whether the screen point `px` (pixels) is over an egui panel or pop-up.
@@ -187,11 +238,7 @@ impl Host {
             return false;
         }
         let p = Pos2::new(px[0] / self.ppp, px[1] / self.ppp);
-        let screen = Rect::from_min_size(
-            Pos2::ZERO,
-            Vec2::new(self.size[0] / self.ppp, self.size[1] / self.ppp),
-        );
-        if screen.contains(p) && !self.central.contains(p) {
+        if self.panels.iter().any(|r| r.contains(p)) {
             return true;
         }
         self.ctx
@@ -362,5 +409,126 @@ mod tests {
         s.can_undo = true;
         h.set_bar(s);
         assert!(h.needs_frame(100.0, SIZE, 1.0));
+    }
+
+    /// What the bridge would send to Godot for the frames of `h`, checked the way
+    /// `UtsimUi` uses it: every texture set before a mesh uses it, uvs inside the texture,
+    /// clips inside the viewport, indices inside the mesh, straight-alpha colours in 0..1.
+    /// (Headless Godot has no renderer, so the canvas commands are checked here.)
+    fn check_canvas(h: &mut Host, size: [f32; 2], frames: usize) -> (usize, usize) {
+        use crate::egui_mesh::{self, Change, Textures};
+        let mut textures = Textures::default();
+        let (mut meshes, mut vertices) = (0, 0);
+        for k in 0..frames {
+            let f = h.frame(10.0 + k as f64, size, 1.0);
+            let mut out = f.output;
+            let mut delta = std::mem::take(&mut out.textures_delta);
+            for (id, ds) in &delta.set {
+                for d in ds {
+                    assert_ne!(
+                        textures.apply(*id, d),
+                        Change::Ignored,
+                        "remendo sem textura {id:?}"
+                    );
+                }
+            }
+            for img in textures.images.values() {
+                assert_eq!(img.rgba.len(), img.size[0] * img.size[1] * 4);
+            }
+            let prims = h.ctx.tessellate(out.shapes, out.pixels_per_point);
+            for prim in &prims {
+                let Some(m) = egui_mesh::convert(prim, out.pixels_per_point, size) else {
+                    continue;
+                };
+                meshes += 1;
+                vertices += m.points.len();
+                let t = m.texture.expect("textura");
+                assert!(
+                    textures.images.contains_key(&t) || t == crate::ui_props::MINIATURE,
+                    "textura {t:?} usada antes de ser criada"
+                );
+                assert_eq!(m.points.len(), m.colors.len());
+                assert_eq!(m.points.len(), m.uvs.len());
+                assert_eq!(m.indices.len() % 3, 0);
+                assert!(
+                    m.indices
+                        .iter()
+                        .all(|&i| i >= 0 && (i as usize) < m.points.len())
+                );
+                for uv in &m.uvs {
+                    let ok = |v: f32| (-1e-4..=1.0001).contains(&v);
+                    assert!(ok(uv[0]) && ok(uv[1]), "uv {uv:?}");
+                }
+                for c in &m.colors {
+                    assert!(c.iter().all(|x| (0.0..=1.0).contains(x)), "cor {c:?}");
+                }
+                let [x, y, w, hh] = m.clip;
+                assert!(
+                    x >= 0.0 && y >= 0.0 && w > 0.0 && hh > 0.0,
+                    "recorte {:?}",
+                    m.clip
+                );
+                assert!(
+                    x + w <= size[0] + 0.5 && y + hh <= size[1] + 0.5,
+                    "recorte fora {:?}",
+                    m.clip
+                );
+            }
+            for id in &delta.free {
+                textures.free(*id);
+            }
+            delta.clear();
+        }
+        (meshes, vertices)
+    }
+
+    #[test]
+    fn the_canvas_commands_of_the_bar_are_consistent() {
+        for size in [[1600.0, 900.0], [1280.0, 720.0]] {
+            let mut h = Host::new();
+            h.set_bar(BarState {
+                title: "tutorial_01: um caixa".into(),
+                ..BarState::default()
+            });
+            let (meshes, vertices) = check_canvas(&mut h, size, 3);
+            assert!(
+                meshes > 0 && vertices > 100,
+                "{size:?}: {meshes} malhas, {vertices} vértices"
+            );
+            let c = h.central_pixels();
+            assert!(c[1] > 40.0 && c[1] < 50.0, "{c:?}");
+        }
+    }
+
+    #[test]
+    fn the_canvas_commands_with_the_properties_panel_are_consistent() {
+        let mut e = crate::document::Editor::new("teste");
+        let name = e.add("Processor", [0.0, 0.0, 0.0]).unwrap();
+        for size in [[1600.0, 900.0], [1280.0, 720.0]] {
+            let mut h = Host::new();
+            h.bottom_reserved = 40.0;
+            h.props = Some(crate::ui_props::PropsView {
+                props: e.properties(&name),
+                families: crate::schema::FAMILIES
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                data_paths: Vec::new(),
+                extra: String::new(),
+                driver: -1,
+                miniature: true,
+            });
+            let (meshes, _) = check_canvas(&mut h, size, 3);
+            assert!(meshes > 0);
+            let c = h.central_pixels();
+            assert!(
+                (c[0] + c[2] - (size[0] - crate::ui_props::WIDTH)).abs() < 1.0,
+                "{c:?}"
+            );
+            // The panel is egui's; the status bar under it stays Godot's.
+            assert!(h.is_over([size[0] - 100.0, 300.0]));
+            assert!(!h.is_over([size[0] - 100.0, size[1] - 10.0]));
+            assert!(!h.is_over([size[0] / 3.0, 400.0]));
+        }
     }
 }

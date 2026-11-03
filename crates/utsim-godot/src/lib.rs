@@ -47,6 +47,7 @@ pub mod results;
 pub mod schema;
 pub mod ui_bar;
 mod ui_class;
+pub mod ui_props;
 
 pub use utsim_edit::ron_text;
 pub use utsim_look::{catalogue, visual as looks};
