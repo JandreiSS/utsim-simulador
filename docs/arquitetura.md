@@ -15,6 +15,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
 | Painel web | `utsim-dash` | só lê relatórios de replicações; servidor HTTP em `std::net` só em `127.0.0.1`, API JSON somente leitura, página e gráficos SVG embutidos (`include_str!`), todo cálculo em Rust; `.xlsx` atrás da feature `xlsx` |
+| Gêmeo digital | `utsim-twin` | só lê a planta (conectores OPC UA cliente, MQTT e Sparkplug B, nenhum escreve); nunca altera a simulação no modo sombra; o núcleo (`Twin`) não tem rede nem relógio, e a reprodução de uma gravação dá o mesmo relatório (seção 4t) |
 | Navegação | `utsim-nav` | obstáculos, menor caminho livre (grade e A*), pontos de acesso e geração de rede; função pura dos dados (seção 4p, "Obstáculos, caminho livre e modos de movimentação") |
 | Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
@@ -1530,6 +1531,62 @@ A inspeção sai do nome (trechos configuráveis em `Options::inspection_keyword
 **Tipos de diagrama.** `TipoDiagrama` lista dez tipos, um módulo cada, e `gerar(tipo, modelo, opções)` devolve `Saida { svg, html, csv, mermaid }`. Do modelo: `carta`, `html` (blocos), `operacoes` (grafo reduzido: operações e inspeções, esperas/transportes/armazenagens contraídos nas setas, numeração O-n e I-n pela ordem das camadas), `raias` (raia pela equipe de operadores, tipo do objeto, `Options::areas` ou frota; um passo virtual de transporte por seta de frota; `cruza` quando a raia muda), `sipoc` (fontes, caminho principal, saídas). Da simulação (`rastro::capturar` roda `Model::replay` e guarda viagens dos itens, pernas dos recursos móveis, mudanças de estado e as rotas fonte-saída, da mais usada à menos): `mapa::mapofluxograma` (rota mais usada, com gancho `plant_background`), `mapa::espaguete` e `comparar` (segmentos idênticos somam e engrossam o traço), `depara` (pares, matriz e cordas), `homem_maquina` (estados agrupados em seis categorias, janela escolhida) e `vsm` (ciclo, preparação, disponibilidade, estoque pela fila média e lead time de `time_in_system`). Os tipos da simulação são determinísticos como a rodada: mesma semente e replicação, mesma página.
 
 **Interface.** A CLI chama `utsim fluxograma` (`crates/utsim-cli/src/fluxograma.rs`). O botão "Fluxograma" do Godot está no `docs/backlog_v02.md`.
+
+## 4t. Gêmeo digital em modo sombra (`utsim-twin`)
+
+Primeira entrega do gêmeo (`docs/plano_gemeo_digital_e_painel.md`, seção 1: T1, T2 sem
+arquivo/SQL/Modbus, T3 em sombra, T8 parcial, T9 parcial, T10). Manual: "Gêmeo digital
+(modo sombra)".
+
+```
+ conectores (um fio cada; só leitura)      OPC UA cliente · MQTT · Sparkplug B (prost)
+        |  canal limitado (descarta e conta)   RawObservation { fonte, tag, valor, qualidade, seq, chegada, carimbo }
+        v
+ live::run   espera 100 ms, ordena por (carimbo da fonte ou chegada, fonte, seq),
+        |    dá o tempo do gêmeo (relógio local ou tag de relógio, nunca volta)
+        v
+ Twin::stamp  regra do mapeamento + anonimização de pessoas  ->  Observation
+ Twin::ingest gravação (JSONL) -> Mapper (escala, unidade, contadores, estados, filtros)
+        |      -> Accumulator (estado observado, janelas) -> DriftMonitor (por janela fechada)
+        v
+ TwinReport (JSON)  ->  painel: rotas /gemeo e /api/gemeo* no servidor do utsim-dash
+```
+
+- **Arquivos.** `config` (`.gemeo.ron`, validação contra o modelo), `obs`, `map`
+  (`Mapper`), `shadow` (`Accumulator`, `initial_state`), `simdist` (distribuição simulada),
+  `drift` (posto, Benjamini-Hochberg, EWMA/CUSUM do `utsim-quality`, limites corrigidos
+  pelo número de KPIs), `record` (gravação, anonimização, retenção, leitura), `twin`
+  (`Twin`, `replay`), `connect` (`Connector`, `Sink`, `ChannelConnector`, `opcua`, `mqtt`),
+  `sparkplug` (tipos `prost` escritos à mão a partir do `proto/sparkplug_b.proto` oficial,
+  EPL-2.0, sem `protoc`; um teste confere os números de campo com o arquivo), `live`,
+  `panel`.
+- **Mesmo estimador no real e no simulado.** As replicações do modelo são lidas como um
+  sensor leria (`samples_per_window` amostras por janela via `block_status` e
+  `report().block`), viram os mesmos `Event` e passam pelo mesmo `Accumulator`. Cada janela
+  de cada replicação depois do aquecimento é uma amostra da distribuição do KPI.
+- **Determinismo.** O `Accumulator` integra as funções-degrau de cada objeto só nos eventos
+  do próprio objeto e nos fins de janela, nunca nos instantes em que o relógio avança; por
+  isso a sessão ao vivo (que avança a cada tique) e a reprodução (que só avança nas leituras)
+  dão o mesmo resultado bit a bit. A gravação guarda `t` já atribuído e o índice da regra; o
+  `serde_json` do gêmeo usa `float_roundtrip`, para ler de volta exatamente os números
+  gravados. O fim da sessão é uma linha `{"tipo":"fim","t":…}`.
+- **Anonimização antes de processar.** A leitura de uma pessoa é anonimizada (apelido por
+  hash com chave sorteada por gravação, nunca escrita) antes de gravar *e* antes de entrar
+  no gêmeo, e a regra é achada antes; assim a reprodução, que só vê o apelido, segue
+  idêntica.
+- **Painel com mudança mínima no `utsim-dash`.** O servidor ganhou a trait
+  `server::Extra` (`get(caminho) -> Option<(tipo, corpo)>`) e `Server::start_with`; o
+  `TwinPanel` responde `/gemeo`, `/gemeo.js`, `/gemeo.css`, `/api/gemeo`,
+  `/api/gemeo/estado` e `/api/gemeo/estado.ron`. O resto do servidor (só `127.0.0.1`,
+  `Host` local, somente `GET`) vale para essas rotas.
+- **Estado observado** sai como `utsim_model::InitialState` (contagens, quebras em curso,
+  posições), conferido objeto a objeto com `Model::check_state`, para a futura previsão.
+- **Testes** (`crates/utsim-twin/tests`): fábrica sintética do `utsim-emu` no mesmo
+  processo (sem alarme com o modelo certo, desvio com o ciclo maior, ao vivo pelo
+  `ChannelConnector` com gravação e reprodução idêntica, anonimização, retenção, validação)
+  e por OPC UA em `127.0.0.1` (servidor da emulação, cliente do gêmeo, desvio e reprodução
+  idêntica); MQTT e Sparkplug B com um broker mínimo embutido no teste; Sparkplug com
+  mensagens codificadas byte a byte; rotas do painel.
 
 ## 5. Estatísticas
 

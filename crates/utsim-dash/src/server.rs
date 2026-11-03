@@ -24,6 +24,13 @@ const MAX_HEAD: usize = 16 * 1024;
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Extra read-only routes served next to the dashboard's own (the digital twin's page
+/// and API, `utsim gemeo --painel`). Asked first for every `GET`.
+pub trait Extra: Send + Sync {
+    /// Content type and body for `path`, or `None` to fall through.
+    fn get(&self, path: &str) -> Option<(&'static str, Vec<u8>)>;
+}
+
 /// A running dashboard server.
 pub struct Server {
     addr: SocketAddr,
@@ -34,6 +41,15 @@ pub struct Server {
 impl Server {
     /// Starts listening on `127.0.0.1:port` (`0` picks a free port) and serves `study`.
     pub fn start(study: Study, port: u16) -> io::Result<Server> {
+        Server::start_with(study, port, None)
+    }
+
+    /// Like [`Server::start`], also serving the routes of `extra`.
+    pub fn start_with(
+        study: Study,
+        port: u16,
+        extra: Option<Arc<dyn Extra>>,
+    ) -> io::Result<Server> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))?;
         let addr = listener.local_addr()?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -50,8 +66,9 @@ impl Server {
                     continue;
                 }
                 let (study, active) = (study.clone(), Arc::clone(&active));
+                let extra = extra.clone();
                 thread::spawn(move || {
-                    let _ = serve(stream, &study, addr.port());
+                    let _ = serve(stream, &study, addr.port(), extra.as_deref());
                     active.fetch_sub(1, Ordering::AcqRel);
                 });
             }
@@ -217,7 +234,12 @@ impl Response {
     }
 }
 
-fn serve(mut stream: TcpStream, study: &Study, port: u16) -> io::Result<()> {
+fn serve(
+    mut stream: TcpStream,
+    study: &Study,
+    port: u16,
+    extra: Option<&dyn Extra>,
+) -> io::Result<()> {
     stream.set_read_timeout(Some(READ_TIMEOUT))?;
     stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
     let Some(req) = read_request(&mut stream)? else {
@@ -229,7 +251,14 @@ fn serve(mut stream: TcpStream, study: &Study, port: u16) -> io::Result<()> {
             "o painel só atende o endereço local (127.0.0.1)",
         )
     } else {
-        route(&req, study)
+        let decoded = percent_decode(&req.path);
+        match extra
+            .filter(|_| req.method == "GET" || req.method == "HEAD")
+            .and_then(|x| x.get(&decoded))
+        {
+            Some((content_type, body)) => Response::new("200 OK", content_type, body),
+            None => route(&req, study),
+        }
     };
     let mut head = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\

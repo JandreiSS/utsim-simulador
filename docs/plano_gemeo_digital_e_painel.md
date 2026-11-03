@@ -62,6 +62,30 @@ Documentos relacionados, que este plano não repete:
 
 ### 1.1 Objetivo e níveis
 
+*Primeira entrega feita (modo sombra, crate `utsim-twin`, `utsim gemeo`; manual "Gêmeo
+digital (modo sombra)"; arquitetura, seção 4t).* Notas da implementação:
+- [x] Conectores só leitura: cliente OPC UA com assinatura (monitored items), MQTT com carga
+  simples ou JSON (`rumqttc` fixado) e Sparkplug B com `prost` a partir do `.proto` oficial
+  (decisão D5). Ficaram numa só crate, atrás das features `opcua` e `mqtt`, e não em
+  `utsim-connect`.
+- [x] `.gemeo.ron` com conexões, relógio (`Wall` ou `Tag`), mapeamento para entradas,
+  saídas, estado (três classes: rodando, parado, quebrado), conteúdo e posição; escala,
+  deslocamento, unidade, volta do contador, códigos de estado, banda morta, faixa, atraso
+  de estado (`debounce`) e ponteiro JSON; validação contra o modelo.
+- [x] Modo sombra: estado observado (também como `InitialState`), KPIs em janelas,
+  distribuição simulada do modelo (as replicações passam pelo mesmo estimador), p-valor por
+  posto com Benjamini-Hochberg, EWMA e CUSUM do `utsim-quality` com limites corrigidos
+  pelo número de KPIs, alertas com histerese; página `/gemeo` no servidor do `utsim-dash`.
+- [x] Gravação em linhas JSON por dia (não `.utrec` compactado), anonimização de pessoas
+  ligada e retenção de 30 dias (decisão D12); reprodução sem rede com relatório idêntico
+  (teste obrigatório, ao vivo pelo canal e por OPC UA).
+- [ ] Não feito nesta entrega: conector de arquivo/histórico, SQL e Modbus, HistoryRead,
+  TLS no MQTT, login por usuário no OPC UA, assistente de mapeamento, alvos `Param`,
+  `Label` e `Measure` (medida livre), transformação `Threshold`, testes KS/AD/Mann-Whitney
+  de distribuições de tempos, menor desvio detectável, `TwinFrontend` no `utsim-emu`
+  (o laço do gêmeo é próprio: no modo sombra o modelo não roda junto), modos sincronizado
+  e previsão.
+
 Ligar um modelo `.ron` a dados reais (sensores, CLPs, MES, historiadores) para:
 
 1. **ver** a planta real no 3D e no painel, com os KPIs calculados dos dados reais;
@@ -503,16 +527,16 @@ utsim run modelo.ron --estado-inicial estado_6h.ron --replicacoes 40       # est
 
 | Parte | Horas | Modelo |
 |---|---|---|
-| T1 `utsim-twin`: observação, mapeamento, transformações, validação, `RealState`, gravação `.utrec` | 9–12 | Opus |
-| T2 conectores: arquivo/histórico (3–4), MQTT (4–5), Sparkplug B (4–6), cliente OPC UA com assinatura e histórico (5–7), SQL (2–3), Modbus TCP (2–3) | 20–28 | Sonnet (Sparkplug e OPC UA com revisão Opus) |
-| T3 modo sombra e gêmeo livre no laço (`TwinFrontend`) | 5–7 | Sonnet |
+| T1 `utsim-twin`: observação, mapeamento, transformações, validação, `RealState`, gravação `.utrec` — **feito** (gravação em JSONL) | 9–12 | Opus |
+| T2 conectores: arquivo/histórico (3–4), MQTT (4–5), Sparkplug B (4–6), cliente OPC UA com assinatura e histórico (5–7), SQL (2–3), Modbus TCP (2–3) — **feito** MQTT, Sparkplug B e cliente OPC UA com assinatura (sem histórico) | 20–28 | Sonnet (Sparkplug e OPC UA com revisão Opus) |
+| T3 modo sombra e gêmeo livre no laço (`TwinFrontend`) — **feito** o modo sombra, com laço próprio | 5–7 | Sonnet |
 | T4 modo sincronizado: fonte guiada, paradas reais, `Set` de parâmetros, reconciliação de WIP | 10–14 | Opus |
 | T5 estado inicial no kernel (níveis 1 e 2, blocos principais, rastro `Init`) — **feito**, menos o rastro `Init` | 18–26 | Opus |
 | T6 previsão à frente com replicações, "e se" pareado, `run.start_at` | 8–11 | Opus |
 | T7 calibração: conjuntos derivados, ajuste, sugestão, atualização conjugada | 8–11 | Opus |
-| T8 desvio: posto entre replicações, CUSUM/EWMA, KS/AD/Mann–Whitney, BH, menor desvio detectável | 8–11 | Opus |
-| T9 segurança: escrita explícita, credenciais, TLS, anonimização | 3–4 | Sonnet |
-| T10 CLI `utsim gemeo` | 2–3 | Sonnet |
+| T8 desvio: posto entre replicações, CUSUM/EWMA, KS/AD/Mann–Whitney, BH, menor desvio detectável — **parcial**: posto, CUSUM/EWMA e BH feitos | 8–11 | Opus |
+| T9 segurança: escrita explícita, credenciais, TLS, anonimização — **parcial**: só leitura, credenciais por variável de ambiente e anonimização feitas; TLS no MQTT não | 3–4 | Sonnet |
+| T10 CLI `utsim gemeo` — **feito** (`utsim gemeo` e `utsim gemeo reproduzir`) | 2–3 | Sonnet |
 | T11 Godot: janela Gêmeo, cores real × simulado, marcadores | 8–11 | Sonnet |
 | **Total** | **99–138** | |
 
@@ -1108,8 +1132,8 @@ estatística P1–P3) e `utsim-emu/src/runner.rs` (T3/T4).
 
 | Tarefa | Modelo | Depende de |
 |---|---|---|
-| T2 conectores MQTT, Sparkplug B, cliente OPC UA | Sonnet (revisão Opus) | T1 |
-| T3 modo sombra + T10 CLI + reprodução de histórico | Sonnet | T1, T2 (arquivo) |
+| T2 conectores MQTT, Sparkplug B, cliente OPC UA — **feito** (sem histórico) | Sonnet (revisão Opus) | T1 |
+| T3 modo sombra + T10 CLI + reprodução de histórico — **feito** (reprodução de gravações; histórico de arquivo não) | Sonnet | T1, T2 (arquivo) |
 | D4, D5, D8, D9 visões, exportação e configuração do painel | Sonnet | D2, D3 |
 | T5 estado inicial no kernel (**feito**, sem mudar o formato do modelo: arquivo à parte) | Opus | formato 2 (ordem do `plano_analises_e_dinamica.md`, item 2), para conferir os golden uma vez; não roda junto com "capacidade por hora do dia" nem com conflitos determinísticos (mesmos arquivos do kernel) |
 | E4, E5 CEP e mudança (E4 **feito** em `utsim-quality`) | Opus | E7 |

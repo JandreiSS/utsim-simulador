@@ -35,6 +35,7 @@
 
 - [Simular a partir de um estado](estado-inicial.md)
 - [Emulação OPC UA](emulacao-opcua.md)
+- [Gêmeo digital (modo sombra)](gemeo-digital.md)
 - [Aprendizado por reforço](aprendizado-por-reforco.md)
 - [3D realista e aparência](visual-3d.md)
 - [Página no navegador](navegador.md)

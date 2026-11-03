@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gêmeo (sombra) · UTSim</title>
+<link rel="stylesheet" href="/gemeo.css">
+</head>
+<body>
+<header>
+  <h1>Gêmeo digital <span class="modo">modo sombra (só observa)</span></h1>
+  <nav><a href="/">Painel do modelo</a> · <a href="/api/gemeo/estado.ron">Estado observado (.ron)</a></nav>
+  <p id="resumo">Carregando…</p>
+</header>
+<main>
+  <section><h2>Alertas de desvio</h2><div id="alertas"></div></section>
+  <section><h2>KPIs: real × modelo</h2><div id="kpis"></div></section>
+  <section><h2>Estado observado</h2><div id="objetos"></div></section>
+  <section><h2>Conexões</h2><div id="conexoes"></div></section>
+  <section><h2>Tags mapeados</h2><div id="regras"></div></section>
+</main>
+<script src="/gemeo.js"></script>
+</body>
+</html>

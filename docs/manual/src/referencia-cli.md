@@ -14,6 +14,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim experiment` | compara cenários | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim otimizar` | procura os melhores parâmetros | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
+| `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
@@ -40,6 +41,8 @@ utsim dados examples/dados_reais.ron --relatorio relatorios_dados
 utsim experiment examples/experimento_mm1.ron
 utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
 utsim emular examples/linha_com_bloqueio.ron --velocidade 10
+utsim gemeo examples/gemeo/linha.ron --gravar gravacoes --painel 8080
+utsim gemeo reproduzir gravacoes/ --json relatorio.json
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
@@ -62,6 +65,7 @@ utsim corredores modelo.ron --svg planta.svg
 - `rede gerar`: sobrescreve o modelo (ou grava em `--saida`), mantendo os comentários do topo; `--folga` troca a folga (padrão: a maior entre os recursos); `--usar` grava `movement: Network` em `run`; uma rede desenhada à mão só é trocada com `--substituir`.
 - `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
   para ele e `--sorteios` só para `montecarlo`.
+- `gemeo`: o arquivo do gêmeo é `<modelo>.gemeo.ron` (ou `--config`); `--ate` é o tempo do gêmeo em que a sessão termina (sem ele, até Ctrl+C); `--estado` grava o estado observado como estado inicial; `reproduzir` aceita a pasta de uma sessão ou a pasta de gravações (usa a mais recente).
 - `qualidade`: tem quatro subcomandos (`carta`, `capacidade`, `msa`, `arl`), cada um com o seu `--help`. Na `carta`, `--excluir` e `--revisar` são da fase I e `--limites` da fase II; `--regras` aceita `1`, `we`, `nelson` ou uma lista como `1,2,5`. Na `capacidade`, `--deslocamento` é o deslocamento somado ao Z no nível sigma (1,5 por convenção).
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
@@ -289,6 +293,49 @@ Options:
       --gravar <GRAVAR>          Grava os comandos recebidos (tempo, variável, valor) neste arquivo RON
       --reproduzir <REPRODUZIR>  Reaplica os comandos de um arquivo RON, sem OPC UA e sem esperar o relógio
   -h, --help                     Print help
+```
+
+### `utsim gemeo --help`
+
+```text
+Gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo e grava as observações; `reproduzir` reexecuta sem rede
+
+Usage: utsim gemeo [OPTIONS] <MODEL>
+       utsim gemeo <COMMAND>
+
+Commands:
+  reproduzir  Reexecuta uma gravação sem rede e sem relógio (mesmos resultados da sessão)
+  help        Print this message or the help of the given subcommand(s)
+
+Arguments:
+  <MODEL>  Modelo (.ron) que o gêmeo acompanha
+
+Options:
+      --config <CONFIG>   Arquivo do gêmeo: conexões e mapeamento (padrão: <modelo>.gemeo.ron)
+      --gravar <PASTA>    Grava todas as observações nesta pasta (uma subpasta por sessão)
+      --painel <PORTA>    Serve o painel em 127.0.0.1 nesta porta, com a página /gemeo
+      --ate <ATE>         Tempo do gêmeo em que a sessão termina (padrão: até Ctrl+C)
+      --json <JSON>       Grava o relatório final (KPIs, alertas, estado) em JSON
+      --estado <ARQUIVO>  Grava o estado observado no fim como estado inicial (.ron, para `utsim run --estado`)
+  -h, --help              Print help
+```
+
+### `utsim gemeo reproduzir --help`
+
+```text
+Reexecuta uma gravação sem rede e sem relógio (mesmos resultados da sessão)
+
+Usage: utsim gemeo reproduzir [OPTIONS] <GRAVACAO>
+
+Arguments:
+  <GRAVACAO>  Pasta da sessão (sessao-...) ou pasta de gravações (usa a mais recente)
+
+Options:
+      --modelo <MODELO>   Modelo (padrão: o da gravação)
+      --config <CONFIG>   Arquivo do gêmeo (padrão: o texto guardado na gravação)
+      --json <JSON>       Grava o relatório (KPIs, alertas, estado) em JSON
+      --estado <ARQUIVO>  Grava o estado observado no fim como estado inicial (.ron)
+  -h, --help              Print help
 ```
 
 ### `utsim experiment --help`

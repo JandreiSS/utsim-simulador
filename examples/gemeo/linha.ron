@@ -1,0 +1,14 @@
+// Linha do exemplo do gêmeo digital: chegadas de Poisson (taxa 1) e uma máquina com
+// ciclo exponencial de média 0,6 (utilização 0,6). Ver linha.gemeo.ron e o manual
+// "Gêmeo digital (modo sombra)".
+Model(
+    name: "linha",
+    run: (stop_time: 20000.0, warmup: 400.0, seed: 4),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0)), position: (0.0, 0.0, 0.0)),
+        (name: "fila",    kind: Queue(),                                position: (3.0, 0.0, 0.0)),
+        (name: "maquina", kind: Processor(process: Exp(mean: 0.6)),     position: (6.0, 0.0, 0.0)),
+        (name: "saida",   kind: Sink,                                   position: (9.0, 0.0, 0.0)),
+    ],
+    connections: [("chegada", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+)
