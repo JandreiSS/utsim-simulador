@@ -1,0 +1,35 @@
+[package]
+name = "utsim-twin"
+description = "Digital twin of a UTSim model: read-only sensor connectors (OPC UA client, MQTT, Sparkplug B), mapping, shadow mode with deviation alerts, recording and replay"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+utsim-quality.workspace = true
+utsim-stats.workspace = true
+utsim-dash.workspace = true
+serde.workspace = true
+# Exact float parsing: a replay reads back the very times and values it recorded.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+ron.workspace = true
+thiserror.workspace = true
+# Sparkplug B payloads, decoded with the message types of the official `.proto`
+# (`proto/sparkplug_b.proto`, see `proto/ORIGEM.txt`). Pinned.
+prost = { version = "=0.13.5", default-features = false, features = ["std", "derive"], optional = true }
+# MQTT 3.1.1 client (subscribe only). Pinned, without TLS (see the manual).
+rumqttc = { version = "=0.25.1", default-features = false, optional = true }
+# OPC UA client: the same crate and version `utsim-emu` uses for its server.
+async-opcua = { version = "0.19", default-features = false, features = ["client"], optional = true }
+# Runtime of the OPC UA client, and Ctrl-C for the live loop.
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "signal"] }
+
+[features]
+default = ["opcua", "mqtt"]
+opcua = ["dep:async-opcua"]
+mqtt = ["dep:rumqttc", "dep:prost"]
+
+[dev-dependencies]
+utsim-emu.workspace = true

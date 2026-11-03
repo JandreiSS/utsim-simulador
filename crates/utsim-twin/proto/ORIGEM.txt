@@ -1,0 +1,16 @@
+sparkplug_b.proto: definição oficial das mensagens Sparkplug B, copiada sem alteração.
+
+Origem: projeto Eclipse Tahu, a implementação de referência da especificação Eclipse
+Sparkplug B, onde fica a definição Protobuf das cargas.
+  https://github.com/eclipse-tahu/tahu/blob/46f25e79f34234e6145d11108660dfd9133ae50d/sparkplug_b/sparkplug_b.proto
+Commit: 46f25e79f34234e6145d11108660dfd9133ae50d (2022-05-16)
+SHA-256 do arquivo: 4432c5c483b7fb9732d0594c98a2e97dca5e517e39c5374a8b918d837f0b4a19
+Licença do arquivo: Eclipse Public License 2.0 (SPDX: EPL-2.0), conforme o cabeçalho, que
+foi mantido. O arquivo não deve ser modificado aqui; uma versão nova é copiada inteira, com
+esta nota atualizada. O arquivo não é embutido no programa: só o teste o lê.
+
+Uso: os tipos de `src/sparkplug.rs` seguem os números de campo deste arquivo (o teste
+`fields_match_the_proto_file`, em `tests/sparkplug.rs`, lê este arquivo e confere). O
+código não é gerado por `protoc`: as mensagens usadas na leitura (Payload e Metric) estão escritas à mão com as
+anotações do `prost`, e os campos não usados (DataSet, Template, PropertySet, MetaData)
+são ignorados na decodificação.

@@ -1,0 +1,17 @@
+:root { --bg: #fafafa; --fg: #1d1d1f; --muted: #666; --line: #ddd; --ok: #2e7d32; --warn: #b26a00; --bad: #c62828; --card: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #16171a; --fg: #e8e8ea; --muted: #a0a0a8; --line: #33343a; --ok: #66bb6a; --warn: #ffb74d; --bad: #ef5350; --card: #1f2024; }
+}
+body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+header, main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+h1 { font-size: 1.4em; margin: 16px 0 4px; }
+h2 { font-size: 1.1em; margin: 20px 0 8px; }
+.modo { font-size: .6em; color: var(--muted); font-weight: normal; }
+nav a { color: inherit; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px 12px; margin-bottom: 12px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; }
+.ok { color: var(--ok); } .aviso { color: var(--warn); } .desvio { color: var(--bad); font-weight: 600; }
+.vazio { color: var(--muted); }
+svg.spark { vertical-align: middle; }
