@@ -1,0 +1,45 @@
+// O "depois" de examples/homem_maquina.ron: o mesmo posto com um método melhorado.
+// - troca rápida (dispositivo de fixação e peça pré-posicionada): carga e descarga entre
+//   12 e 16 s em vez de 18 a 24 s;
+// - máquinas mais próximas: uns 4 m de caminhada em vez de 6 m.
+// O tempo automático (70 s) não muda. Teoria: a ≈ 14 s, b ≈ 4 s, t = 70 s, n' ≈ 4,7.
+//
+//   utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron
+//
+// Tempo em segundos, distâncias em metros.
+Model(
+    name: "Operadora com três máquinas (método melhorado)",
+    description: "O mesmo posto com troca rápida e máquinas mais próximas",
+    run: (stop_time: 7200.0, warmup: 600.0, seed: 3, replications: 3),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(5.0)), position: (2.0, 0.5, 0.0)),
+        (name: "estoque", kind: Queue(capacity: Some(6)), position: (2.0, 1.5, 0.0)),
+        (name: "maq1", kind: Processor(
+            setup: Some(Triangular(min: 12.0, mode: 14.0, max: 16.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (0.0, 0.0, 0.0)),
+        (name: "maq2", kind: Processor(
+            setup: Some(Triangular(min: 12.0, mode: 14.0, max: 16.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (4.0, 0.0, 0.0)),
+        (name: "maq3", kind: Processor(
+            setup: Some(Triangular(min: 12.0, mode: 14.0, max: 16.0)),
+            process: Const(70.0),
+            operators: Some(OperatorUse(team: "ana", setup: true, process: false)),
+        ), position: (2.0, 3.5, 0.0)),
+        (name: "saida", kind: Sink, position: (2.0, 2.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.0), position: (1.0, 1.0, 0.0),
+            visual: Some((asset: Some("pessoa")))),
+    ],
+    connections: [
+        ("chegada", "estoque"),
+        ("estoque", "maq1"),
+        ("estoque", "maq2"),
+        ("estoque", "maq3"),
+        ("maq1", "saida"),
+        ("maq2", "saida"),
+        ("maq3", "saida"),
+    ],
+)

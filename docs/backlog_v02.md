@@ -41,6 +41,8 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 |---|---|---|
 | Interface PERT/CPM no Godot (seleção, diagrama de rede, Gantt, histograma): **feita na G3**, falta o tornado | Sonnet | `utsim-pert`, G3 |
 | Botão "Fluxograma" na interface Godot (G3 ou a seguinte): chama `utsim-diagram` pela ponte, mostra o SVG num painel, exporta SVG, HTML, Mermaid e CSV e acende no desenho a etapa selecionada no 3D | Sonnet | `utsim-diagram`, G3 |
+| Estudo de tempos e métodos na interface (Godot ou egui, depois da migração da interface para Rust): botão "Tempos" que chama `utsim_diagram::tempos` pela ponte, mostra o gráfico do ciclo e as tabelas, escolhe operador, intervalo e ciclo, e acende no 3D o ator do elemento selecionado | Sonnet | `utsim-diagram`, interface |
+| Estudo de tempos com várias replicações (ciclos de todas as replicações juntos, IC dos tempos por elemento), atendimento sincronizado com máquinas diferentes e operador que antecipa a caminhada (sair para a próxima máquina antes do chamado) | Opus | `utsim-diagram`, `utsim-objects` |
 | Campo opcional `symbol` em `ObjectDef` (proposta): guarda no `.ron` o símbolo do fluxograma de cada objeto, em vez de depender do nome ou da opção `--simbolo`. Muda o formato do modelo: decisão do dono | Opus | `utsim-diagram` |
 | Painel de estatística avançada no Godot: P1 **feito na G3**, falta o P2 (Gantt de estados, WIP com banda, ANOVA, mapa de calor) | Sonnet | estatística, G3 |
 | Planta CAD como fundo no piso, com encaixe nas linhas | Sonnet | DXF, G2 |
