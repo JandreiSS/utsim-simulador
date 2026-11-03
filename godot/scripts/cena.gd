@@ -37,6 +37,17 @@ var _last_label: Array = []
 var _pallets := false
 var _clips2: AnimationLibrary
 var labels_visible := true
+## Labels drawn at most (the nearest ones to the camera, within `LABEL_DISTANCE`): large
+## models stay readable (A3D-4).
+const MAX_LABELS := 60
+const LABEL_DISTANCE := 160.0
+## Items farther than this are not drawn (level of detail).
+const ITEM_DISTANCE := 140.0
+## Fluid network: per node `{root, liquid, height, marker, label, shape}` and the pipes.
+var fluid_nodes: Array = []
+var fluid_pipes: Array = []
+var _fluid_materials: Array = []
+var _labels_shown := 0
 ## Editar draws its own connections (arrows, port numbers) and floor.
 var show_connections := true
 var show_floor := true
@@ -69,6 +80,9 @@ func clear(keep_templates := false) -> void:
 	mobiles.clear()
 	_last_color.clear()
 	_last_label.clear()
+	fluid_nodes.clear()
+	fluid_pipes.clear()
+	_fluid_materials.clear()
 	playback = null
 
 
@@ -156,17 +170,7 @@ func build(pb: Object, keep_templates := false) -> void:
 		if b["mobile"]:
 			mobiles.append(i)
 	_draw_lines()
-	for f in info.get("fluids", []):
-		var mi := MeshInstance3D.new()
-		var cyl := CylinderMesh.new()
-		var s: Vector3 = f["size"]
-		cyl.top_radius = maxf(s.x, s.z) * 0.5
-		cyl.bottom_radius = cyl.top_radius
-		cyl.height = maxf(s.y, 0.1)
-		mi.mesh = cyl
-		mi.material_override = _plain(Color(0.55, 0.62, 0.70), 0.5)
-		mi.position = (f["position"] as Vector3) + Vector3(0, cyl.height * 0.5, 0)
-		add_child(mi)
+	_build_fluids()
 
 
 ## The scene of an asset dictionary `{source, name, key, path}`, or null.
@@ -429,6 +433,8 @@ func apply(t: float, dt: float, snap := false) -> void:
 			_last_label[i] = label[i]
 			(rig["label"] as Label3D).text = label[i]
 	_apply_items(f)
+	if not fluid_nodes.is_empty():
+		_apply_fluids(playback.fluid_frame(t))
 	last_bridge_us = t1 - t0
 	last_apply_us = Time.get_ticks_usec() - t1
 
@@ -465,6 +471,7 @@ func _apply_items(f: Dictionary) -> void:
 				p = root.global_transform * local
 				basis = root.global_transform.basis.orthonormalized().scaled(Vector3.ONE * s)
 		node.transform = Transform3D(basis, p)
+		node.visible = _item_near(p)
 	for id in items.keys():
 		if not seen.has(id):
 			var n: Node3D = items[id]
@@ -547,3 +554,207 @@ func set_labels_visible(on: bool) -> void:
 	labels_visible = on
 	for rig in rigs:
 		(rig["label"] as Label3D).visible = on
+
+
+# ---------------------------------------------------------------------------
+# Fluids (G3)
+# ---------------------------------------------------------------------------
+
+
+## A material of its own, so each tank and pipe shows its own colour.
+func _own(color: Color, alpha := 1.0) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(color, alpha)
+	m.roughness = 0.4
+	if alpha < 1.0:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_fluid_materials.append(m)
+	return m
+
+
+## A transform that stretches a unit cylinder (along +Y, centred) from `a` to `b`.
+static func _segment(a: Vector3, b: Vector3, radius: float) -> Transform3D:
+	var d := b - a
+	var length := maxf(d.length(), 1e-4)
+	var y := d / length
+	var x := y.cross(Vector3.UP)
+	if x.length() < 1e-4:
+		x = y.cross(Vector3.RIGHT)
+	x = x.normalized()
+	var z := x.cross(y).normalized()
+	return Transform3D(Basis(x * radius, y * length, z * radius), (a + b) * 0.5)
+
+
+## The fluid network of the scene: tanks as a see-through shell with the liquid inside
+## (its height is the level), the other nodes as coloured markers, the pipes between the
+## ports and the converters' lines to their discrete object (`UtsimPlayback` gives the
+## layout; `fluid_frame(t)` the levels and rates).
+func _build_fluids() -> void:
+	for f in info.get("fluids", []):
+		var root := Node3D.new()
+		root.name = "fluido_" + String(f["name"])
+		root.position = f["position"]
+		add_child(root)
+		var e := {"root": root, "shape": f["shape"], "height": float(f["height"])}
+		var r := float(f["radius"])
+		var h := float(f["height"])
+		if f["shape"] == "tank":
+			var shell := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = r
+			cyl.bottom_radius = r
+			cyl.height = h
+			shell.mesh = cyl
+			shell.material_override = _own(Color(0.75, 0.85, 0.95), 0.22)
+			shell.position = Vector3(0, h * 0.5, 0)
+			shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(shell)
+			var liquid := MeshInstance3D.new()
+			var lc := CylinderMesh.new()
+			lc.top_radius = r * 0.94
+			lc.bottom_radius = r * 0.94
+			lc.height = 1.0
+			liquid.mesh = lc
+			liquid.material_override = _own(Color(0.12, 0.45, 0.95))
+			root.add_child(liquid)
+			e["liquid"] = liquid
+		else:
+			var marker := MeshInstance3D.new()
+			if f["shape"] == "pipe":
+				var sphere := SphereMesh.new()
+				sphere.radius = r
+				sphere.height = r * 2.0
+				marker.mesh = sphere
+			else:
+				var box := BoxMesh.new()
+				box.size = Vector3(r, r, r) * 2.0
+				marker.mesh = box
+			marker.material_override = _own(Color(0.6, 0.6, 0.6))
+			marker.position = Vector3(0, r, 0)
+			root.add_child(marker)
+			e["marker"] = marker
+		var label := Label3D.new()
+		label.text = String(f["name"])
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.fixed_size = true
+		label.no_depth_test = true
+		label.pixel_size = 0.0006
+		label.font_size = 24
+		label.outline_size = 8
+		label.outline_modulate = Color(0.08, 0.09, 0.11, 0.9)
+		label.modulate = Color(0.75, 0.88, 1.0)
+		label.render_priority = 10
+		label.outline_render_priority = 9
+		label.position = Vector3(0, h + 0.35, 0)
+		root.add_child(label)
+		e["label"] = label
+		fluid_nodes.append(e)
+	var nodes: Array = info.get("fluids", [])
+	var links: PackedInt32Array = info.get("fluid_links", PackedInt32Array())
+	for k in range(0, links.size() - 1, 2):
+		var a: Dictionary = nodes[links[k]]
+		var b: Dictionary = nodes[links[k + 1]]
+		var pa: Vector3 = (a["position"] as Vector3) + Vector3(0, float(a["port"]), 0)
+		var pb: Vector3 = (b["position"] as Vector3) + Vector3(0, float(b["port"]), 0)
+		var dir := (pb - pa).normalized()
+		pa += dir * float(a["radius"])
+		pb -= dir * float(b["radius"])
+		var pipe := MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 1.0
+		cyl.bottom_radius = 1.0
+		cyl.height = 1.0
+		cyl.radial_segments = 10
+		pipe.mesh = cyl
+		pipe.transform = _segment(pa, pb, 0.07)
+		pipe.material_override = _own(Color(0.30, 0.42, 0.52))
+		pipe.name = "tubo_%d" % (k / 2)
+		add_child(pipe)
+		fluid_pipes.append(pipe)
+	for c in info.get("fluid_converters", []):
+		var n: Dictionary = nodes[int(c["node"])]
+		var blk: Dictionary = blocks[int(c["block"])]
+		var pa: Vector3 = (n["position"] as Vector3) + Vector3(0, 0.3, 0)
+		var pb: Vector3 = (blk["position"] as Vector3) + Vector3(0, 0.3, 0)
+		var line := MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 1.0
+		cyl.bottom_radius = 1.0
+		cyl.height = 1.0
+		cyl.radial_segments = 6
+		line.mesh = cyl
+		line.transform = _segment(pa, pb, 0.03)
+		line.material_override = _own(Color(0.75, 0.45, 0.95))
+		add_child(line)
+
+
+func _apply_fluids(ff: Dictionary) -> void:
+	var fill: PackedFloat32Array = ff.get("fill", PackedFloat32Array())
+	var color: PackedColorArray = ff.get("color", PackedColorArray())
+	var text: PackedStringArray = ff.get("text", PackedStringArray())
+	var active: PackedInt32Array = ff.get("link_active", PackedInt32Array())
+	for i in mini(fluid_nodes.size(), fill.size()):
+		var e: Dictionary = fluid_nodes[i]
+		if e.has("liquid"):
+			var h := float(e["height"]) * 0.98
+			var level := maxf(fill[i] * h, 0.001)
+			var liquid: MeshInstance3D = e["liquid"]
+			liquid.scale = Vector3(1, level, 1)
+			liquid.position = Vector3(0, level * 0.5 + 0.01, 0)
+			(liquid.material_override as StandardMaterial3D).albedo_color = color[i]
+		elif e.has("marker"):
+			(( e["marker"] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color = color[i]
+		(e["label"] as Label3D).text = text[i]
+	for k in mini(fluid_pipes.size(), active.size()):
+		var c := Color(0.25, 0.85, 0.95) if active[k] != 0 else Color(0.30, 0.42, 0.52)
+		((fluid_pipes[k] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color = c
+
+
+## Filled fraction of every tank now (scripted checks), `-1` for the other nodes.
+func fluid_fill() -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for e in fluid_nodes:
+		if e.has("liquid"):
+			out.append((e["liquid"] as MeshInstance3D).scale.y / maxf(float(e["height"]) * 0.98, 1e-6))
+		else:
+			out.append(-1.0)
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Level of detail (G3)
+# ---------------------------------------------------------------------------
+
+
+func _item_near(p: Vector3) -> bool:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	return cam == null or cam.global_position.distance_to(p) <= ITEM_DISTANCE
+
+
+## Shows only the `MAX_LABELS` labels nearest to `cam` within `LABEL_DISTANCE` (the
+## others would pile up on screen in a large model). Call it every few frames.
+func limit_labels(cam: Camera3D) -> void:
+	if cam == null:
+		return
+	if not labels_visible:
+		_labels_shown = 0
+		return
+	var order := []
+	for i in rigs.size():
+		var root: Node3D = rigs[i]["root"]
+		order.append([cam.global_position.distance_squared_to(root.global_position), i])
+	order.sort_custom(func(a, b): return a[0] < b[0])
+	var max_d := LABEL_DISTANCE * LABEL_DISTANCE
+	var shown := 0
+	for k in order.size():
+		var on: bool = shown < MAX_LABELS and float(order[k][0]) <= max_d
+		(rigs[order[k][1]]["label"] as Label3D).visible = on
+		if on:
+			shown += 1
+	_labels_shown = shown
+
+
+## Labels drawn after the last `limit_labels` (scripted checks).
+func labels_shown() -> int:
+	return _labels_shown

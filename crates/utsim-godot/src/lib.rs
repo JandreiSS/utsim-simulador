@@ -327,6 +327,28 @@ impl UtsimModel {
         d
     }
 
+    /// Records replication `replication` and writes it to `path` as JSON, the format of
+    /// `utsim run --replay` that `load` reads back. False on error (see `last_error`).
+    #[func]
+    fn save_replay(&mut self, replication: i64, path: GString) -> bool {
+        let Some(model) = &self.model else {
+            self.last_error = "nenhum modelo carregado".into();
+            return false;
+        };
+        let r = model
+            .replay(replication.max(0) as u32)
+            .map_err(|e| e.to_string())
+            .and_then(|rp| serde_json::to_string(&rp).map_err(|e| e.to_string()))
+            .and_then(|text| std::fs::write(path.to_string(), text).map_err(|e| e.to_string()));
+        match r {
+            Ok(()) => true,
+            Err(e) => {
+                self.last_error = e;
+                false
+            }
+        }
+    }
+
     /// Records replication `replication` and builds its scene; `null` on error (see
     /// [`Self::last_error`]). `skeletal_people`: the interface has the mannequin files.
     #[func]

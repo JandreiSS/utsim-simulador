@@ -15,6 +15,9 @@
 ## output port to another block (or to its input port) connects them. The Ligar tool (L)
 ## does the same by dragging from block to block, or by clicking the origin and then the
 ## destination.
+##
+## The path network has its own tool, Rede (N, `rede.gd`), drawn in this same overlay.
+## Objects on the critical path of the PERT/CPM window get a red outline (`critical`).
 class_name EditorUtsim
 extends Node3D
 
@@ -30,6 +33,7 @@ const CONNECTING := Color(0.45, 0.95, 0.55)
 const PORT_OUT := Color(0.45, 0.95, 0.55)
 const PORT_IN := Color(0.55, 0.80, 1.0)
 const PORT_PIXELS := 14.0
+const CRITICAL := Color(1.0, 0.30, 0.22)
 ## Kinds without an output port (a sink only receives; mobile resources are not wired
 ## by ports) and without an input port (a source only sends).
 const NO_OUTPUT := ["Sink", "Transporter", "Dispatcher"]
@@ -40,8 +44,12 @@ var main: Node
 var selected: Array = []
 ## Selected connection `[from, to]`, or empty.
 var selected_link: Array = []
-## `selecionar`, `ligar` or `colocar`.
+## `selecionar`, `ligar`, `colocar` or `rede`.
 var tool := "selecionar"
+## Objects on the critical path of the PERT/CPM window (red outline).
+var critical: Array = []
+## The path network tool.
+var rede: EditorRede
 var place_id := ""
 var connect_from := ""
 ## Mouse position on screen (kept from the events, so scripted input works the same).
@@ -90,6 +98,10 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	_box_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_box_rect.visible = false
 	canvas.add_child(_box_rect)
+	rede = EditorRede.new()
+	rede.name = "Rede"
+	add_child(rede)
+	rede.setup(owner_main, self)
 
 
 func doc() -> Object:
@@ -138,6 +150,8 @@ func set_tool(name: String, id := "") -> void:
 			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
 		"colocar":
 			main.set_status("Clique no chão para colocar (Shift mantém a ferramenta, Esc cancela).")
+		"rede":
+			main.set_status("Rede: clique no chão para pôr nós (cada clique continua o caminho), clique num trecho para editá-lo, arraste um nó para movê-lo; Esc encerra o caminho.")
 		_:
 			main.set_status("")
 
@@ -456,6 +470,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		mouse = mm.position
 		_hover = _hover_at(mm.position)
+		if tool == "rede":
+			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+				rede.drag(mm.position)
+			return
 		if not _press.is_empty() and (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			_on_drag(mm.position)
 		return
@@ -463,6 +481,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
 	mouse = mb.position
+	if tool == "rede":
+		if mb.pressed:
+			get_viewport().gui_release_focus()
+			rede.press(mb.position, mb.shift_pressed)
+		else:
+			rede.release(mb.position)
+		get_viewport().set_input_as_handled()
+		return
 	if mb.pressed:
 		get_viewport().gui_release_focus()
 		_on_press(mb.position, mb.shift_pressed)
@@ -675,6 +701,10 @@ func _on_release(p: Vector2) -> void:
 
 ## Cancels, in order: placing, a connection begun, the Ligar tool, the selection.
 func cancel() -> void:
+	if tool == "rede":
+		if not rede.cancel():
+			set_tool("selecionar")
+		return
 	if tool == "colocar":
 		set_tool("selecionar")
 	elif connect_from != "":
@@ -698,6 +728,8 @@ func nudge(dx: int, dy: int) -> void:
 
 
 func delete_selected() -> void:
+	if tool == "rede" and rede.delete_selected():
+		return
 	if not selected_link.is_empty():
 		var link := selected_link
 		if doc().disconnect_objects(link[0], link[1]):
@@ -821,6 +853,9 @@ func _redraw() -> void:
 				_rect(box.grow(0.04), PROBLEM, 0.04)
 			if name == connect_from:
 				_rect(box.grow(0.2), CONNECTING, 0.08)
+			if critical.has(name):
+				_rect(box.grow(0.3), CRITICAL, 0.1)
+		rede.draw(self)
 		var segs := _segments()
 		var outs := {}
 		for s in segs:
