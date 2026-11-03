@@ -1,5 +1,5 @@
 //! The "Resultados" window of the Godot interface, in egui (pure: no Godot types, unit
-//! tested). It replaces `resultados.gd` and the charts it drew with `grafico.gd`.
+//! tested). It replaced `resultados.gd` and the charts it drew with `grafico.gd`.
 //!
 //! Five tabs over the 3D view, with the numbers of the last run ([`RunOutput`], the same
 //! as `utsim run`):
@@ -1530,7 +1530,7 @@ fn still(p: Plot<'_>) -> Plot<'_> {
         .show_y(false)
 }
 
-fn draw_chart(
+pub(crate) fn draw_chart(
     ui: &mut Ui,
     reg: &mut Registry,
     name: &str,

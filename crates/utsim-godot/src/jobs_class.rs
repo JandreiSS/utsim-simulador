@@ -391,6 +391,13 @@ pub struct UtsimPert {
     base: Base<RefCounted>,
 }
 
+impl UtsimPert {
+    /// The computed PERT/CPM.
+    pub(crate) fn output(&self) -> Option<&PertOutput> {
+        self.core.as_deref()
+    }
+}
+
 #[godot_api]
 impl UtsimPert {
     /// Everything the window draws (see `pert_view::PertOutput::to_json`).

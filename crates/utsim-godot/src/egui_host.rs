@@ -18,7 +18,10 @@ use crate::egui_input::{self, Input};
 use crate::egui_widgets::Registry;
 use crate::ui_bar::{self, BarMemory, BarState};
 use crate::ui_bottom::{self, PlayView, StatusView};
+use crate::ui_flows::{self, FlowsMemory, FlowsView};
+use crate::ui_form::{self, FormMemory, FormRow};
 use crate::ui_left::{self, EditView, LeftMemory, SimView};
+use crate::ui_pert::{self, PertMemory, PertView};
 use crate::ui_props::{self, PropAction, PropsState, PropsView};
 use crate::ui_results::{self, ResultsMemory, ResultsView};
 
@@ -51,6 +54,21 @@ pub struct Host {
     pub results: Option<ResultsView>,
     pub results_open: bool,
     pub results_mem: ResultsMemory,
+    /// The PERT/CPM window: the last result, whether it is open, and what it keeps.
+    pub pert: Option<PertView>,
+    pub pert_open: bool,
+    pub pert_mem: PertMemory,
+    /// The right panel of a tool (Rede, Corredor) or of a link, in place of the properties.
+    pub form: Option<Vec<FormRow>>,
+    pub form_mem: FormMemory,
+    /// The modal dialog shown over everything (discard changes, shortcuts), if any.
+    pub dialog: Option<ui_form::Dialog>,
+    /// The token flows window (Simular).
+    pub flows: Option<FlowsView>,
+    pub flows_open: bool,
+    pub flows_mem: FlowsMemory,
+    /// The performance line over the 3D view (F3).
+    pub perf: String,
     /// The egui panels of the last frame, in points.
     panels: Vec<Rect>,
     /// The last pointer event was over egui.
@@ -95,6 +113,16 @@ impl Host {
             results: None,
             results_open: false,
             results_mem: ResultsMemory::default(),
+            pert: None,
+            pert_open: false,
+            pert_mem: PertMemory::default(),
+            form: None,
+            form_mem: FormMemory::default(),
+            dialog: None,
+            perf: String::new(),
+            flows: None,
+            flows_open: false,
+            flows_mem: FlowsMemory::default(),
             panels: Vec::new(),
             was_over: false,
             central: Rect::NOTHING,
@@ -229,6 +257,66 @@ impl Host {
         }
     }
 
+    /// Opens the PERT/CPM window for a new selection (`title`), empty until the result.
+    pub fn open_pert(&mut self, title: &str) {
+        self.pert = None;
+        self.pert_open = true;
+        self.pert_mem.title = title.to_owned();
+        self.pert_mem.mode = "simulado".into();
+        self.pert_mem.info.clear();
+        self.results_open = false;
+        self.dirty = true;
+    }
+
+    /// A computed PERT/CPM for the open window.
+    pub fn set_pert(&mut self, v: PertView, default_file: &str) {
+        if self.pert_mem.file.trim().is_empty() {
+            self.pert_mem.file = default_file.to_owned();
+        }
+        self.pert_mem.info.clear();
+        self.pert = Some(v);
+        self.dirty = true;
+    }
+
+    /// The line over the PERT/CPM tabs while it calculates, or why it did not.
+    pub fn set_pert_info(&mut self, info: &str, is_error: bool) {
+        self.pert_mem.info = info.to_owned();
+        self.pert_mem.info_error = is_error;
+        self.dirty = true;
+    }
+
+    /// The rows of the tool panel (`None`: the properties again).
+    pub fn set_form(&mut self, rows: Option<Vec<FormRow>>) {
+        if let Some(r) = &rows {
+            self.form_mem.sync(r);
+        }
+        if rows != self.form {
+            self.form = rows;
+            self.dirty = true;
+        }
+    }
+
+    pub fn set_dialog(&mut self, d: Option<ui_form::Dialog>) {
+        if d != self.dialog {
+            self.dialog = d;
+            self.dirty = true;
+        }
+    }
+
+    pub fn set_perf(&mut self, text: &str) {
+        if text != self.perf {
+            self.perf = text.to_owned();
+            self.dirty = true;
+        }
+    }
+
+    pub fn close_pert(&mut self) {
+        if self.pert_open {
+            self.pert_open = false;
+            self.dirty = true;
+        }
+    }
+
     /// The rectangle of the "Resultados" window, in points: the free central area of the
     /// last frame, inside a margin.
     pub fn results_rect(&self) -> Rect {
@@ -283,6 +371,14 @@ impl Host {
             self.results.as_ref().filter(|_| self.results_open),
             &mut self.results_mem,
         );
+        let (pert_open, pert, pmem) = (self.pert_open, self.pert.as_ref(), &mut self.pert_mem);
+        let (form, fmem) = (self.form.as_ref(), &mut self.form_mem);
+        let (dialog, perf) = (self.dialog.as_ref(), self.perf.as_str());
+        let (flows, flmem) = (
+            self.flows.as_ref().filter(|_| self.flows_open),
+            &mut self.flows_mem,
+        );
+        let props_on = props.is_some();
         let output = self.ctx.run_ui(raw, |ui| {
             // A pass may run twice (egui discards the first when the layout changed):
             // only the last one counts.
@@ -312,14 +408,18 @@ impl Host {
                 panels.push(rect);
                 central.min.x = rect.max.x;
             }
-            if let Some(v) = props {
-                let rect = Rect::from_min_max(
-                    Pos2::new(below.max.x - ui_props::WIDTH, below.min.y),
-                    Pos2::new(below.max.x, below.max.y.max(below.min.y + 40.0)),
-                );
-                ui_props::show(ui, rect, v, pst, reg, &mut props_out);
-                panels.push(rect);
-                central.max.x = rect.min.x;
+            let right = Rect::from_min_max(
+                Pos2::new(below.max.x - ui_props::WIDTH, below.min.y),
+                Pos2::new(below.max.x, below.max.y.max(below.min.y + 40.0)),
+            );
+            if let (Some(rows), true) = (form, props_on) {
+                ui_form::show_panel(ui, right, rows, fmem, reg, &mut actions);
+                panels.push(right);
+                central.max.x = right.min.x;
+            } else if let Some(v) = props {
+                ui_props::show(ui, right, v, pst, reg, &mut props_out);
+                panels.push(right);
+                central.max.x = right.min.x;
             }
             if !bar.editing && play.visible {
                 let bottom = central.max.y - ui_bottom::PLAY_GAP;
@@ -333,16 +433,59 @@ impl Host {
             }
             // The "Resultados" window covers the free area (the view stays framed as if it
             // were not there: it is closed to look at the scene).
-            if let Some(v) = results {
-                let rect = central.shrink(ui_results::MARGIN);
-                if rect.width() > 200.0 && rect.height() > 150.0 {
+            if !perf.is_empty() {
+                ui.painter().text(
+                    central.min + egui::vec2(10.0, 8.0),
+                    egui::Align2::LEFT_TOP,
+                    perf,
+                    egui::FontId::proportional(utsim_ui_tema::sizes::SMALL),
+                    utsim_ui_tema::colors::TEXT_WEAK,
+                );
+            }
+            let rect = central.shrink(ui_results::MARGIN);
+            if rect.width() > 200.0 && rect.height() > 150.0 {
+                if pert_open {
+                    // The PERT/CPM window takes the same place (one window at a time).
+                    ui_pert::show(ui, rect, pert, pmem, reg, &mut actions);
+                    panels.push(rect);
+                } else if let Some(v) = results {
                     ui_results::show(ui, rect, v, rmem, reg, &mut actions);
                     panels.push(rect);
+                }
+            }
+            if let Some(v) = flows {
+                // On the right of the free area, over the view (and over a window).
+                let area = central.shrink(ui_results::MARGIN);
+                let rect = Rect::from_min_max(
+                    Pos2::new((area.max.x - ui_flows::WIDTH).max(area.min.x), area.min.y),
+                    area.max,
+                );
+                if rect.width() > 200.0 && rect.height() > 150.0 {
+                    ui_flows::show(ui, rect, v, flmem, reg, &mut actions);
+                    panels.push(rect);
+                }
+            }
+            if let Some(d) = dialog {
+                // Over everything; egui's modal keeps the panels under it from clicks.
+                if let Some(a) = ui_form::show_dialog(ui.ctx(), d, reg) {
+                    actions.push(a);
                 }
             }
         });
         if actions.iter().any(|a| a == "resultados:fechar") {
             self.results_open = false;
+            self.dirty = true;
+        }
+        if actions.iter().any(|a| a.starts_with("dialogo:")) {
+            self.dialog = None;
+            self.dirty = true;
+        }
+        if actions.iter().any(|a| a == "fluxos:fechar") {
+            self.flows_open = false;
+            self.dirty = true;
+        }
+        if actions.iter().any(|a| a == "pert:fechar") {
+            self.pert_open = false;
             self.dirty = true;
         }
         self.central = central;
@@ -663,6 +806,9 @@ mod tests {
                 extra: String::new(),
                 driver: -1,
                 miniature: true,
+                data: std::collections::HashMap::new(),
+                data_families: Vec::new(),
+                base_dir: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
             assert!(meshes > 0);

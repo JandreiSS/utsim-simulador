@@ -63,6 +63,13 @@ pub struct PropsView {
     pub driver: i32,
     /// Whether the miniature texture exists.
     pub miniature: bool,
+    /// The fields fed by real data (`model.data`), by path inside the object: the entry of
+    /// `dados::data_fields` (config, family, view...).
+    pub data: HashMap<String, serde_json::Value>,
+    /// The families a field with data can be fixed to.
+    pub data_families: Vec<String>,
+    /// The folder of the model (relative data files are read from it).
+    pub base_dir: Option<std::path::PathBuf>,
 }
 
 /// What the user did in the panel.
@@ -87,8 +94,13 @@ pub enum PropAction {
     Disconnect(String),
     /// "Mostrar motorista".
     Driver(bool),
-    /// "Fonte: Dados reais" on this distribution field: the Godot form takes over.
-    DataMode(String),
+    /// The real-data form of `path` asked `what` (`aplicar`, `analisar`, `para_dist`,
+    /// `relatorio`, `escolher_arquivo`) with its choices (the keys the main scene reads).
+    Data {
+        what: String,
+        path: String,
+        draft: serde_json::Value,
+    },
     /// The miniature should show this asset (the one chosen, or the one under the mouse).
     Miniature(String),
 }
@@ -108,6 +120,24 @@ pub struct PropsState {
     miniature_sent: Option<String>,
     /// The object shown last (its text drafts are dropped when it changes).
     object: String,
+    /// Distribution fields switched to "Dados reais" and not applied yet.
+    data_mode: HashSet<String>,
+    /// The choices of each real-data form, and the config of the entry they came from.
+    drafts: HashMap<String, DataDraft>,
+    drafts_seen: HashMap<String, serde_json::Value>,
+    /// Entries whose analysis was asked (once).
+    requested: HashSet<String>,
+}
+
+impl PropsState {
+    /// The file chosen in the dialog for the real-data form of `path`.
+    pub fn set_data_file(&mut self, path: &str, file: &str) {
+        let d = self.drafts.entry(path.to_owned()).or_default();
+        d.source = file.to_owned();
+        d.origin = "arquivo".into();
+        self.buffers
+            .remove(&format!("{}_arquivo", widget_name(path)));
+    }
 }
 
 pub fn widget_name(path: &str) -> String {
@@ -180,6 +210,10 @@ pub fn show(
     if st.object != v.props.name {
         st.object = v.props.name.clone();
         st.buffers.clear();
+        st.data_mode.clear();
+        st.drafts.clear();
+        st.drafts_seen.clear();
+        st.requested.clear();
         st.miniature_sent = None;
     }
     // The end of a colour drag: the button is up again.
@@ -862,6 +896,31 @@ fn dist(
         });
         return;
     };
+    let entry = v.data.get(path);
+    let using_data = entry.is_some() || st.data_mode.contains(path);
+    if using_data {
+        // The field comes from data: the seal instead of the family; the form below.
+        row(ui, f, |ui, _| {
+            if f.optional {
+                toggle(ui, reg, out, f);
+            }
+            if let Some(e) = entry {
+                let label = e["label"].as_str().unwrap_or_default();
+                let r = ui
+                    .add(Label::new(
+                        RichText::new(" dados ")
+                            .small()
+                            .color(colors::TEXT_STRONG)
+                            .background_color(colors::BADGE),
+                    ))
+                    .on_hover_text(format!("Este campo vem de dados reais: {label}"));
+                named(ui, reg, &format!("{name}_selo"), &r, "dados");
+                ui.add(
+                    Label::new(RichText::new(label).small().color(colors::TEXT_WEAK)).truncate(),
+                );
+            }
+        });
+    }
     let text_on = st.as_text.contains(path) || view.params.is_empty();
     let families: Vec<(String, String, String)> = v
         .families
@@ -869,37 +928,39 @@ fn dist(
         .enumerate()
         .map(|(k, n)| (k.to_string(), n.clone(), String::new()))
         .collect();
-    row(ui, f, |ui, w| {
-        let mut w = w;
-        if f.optional {
-            toggle(ui, reg, out, f);
-            w -= 30.0;
-        }
-        let picked = combo(
-            ui,
-            reg,
-            &format!("{name}_familia"),
-            &view.family.to_string(),
-            &families,
-            (w - 52.0).max(60.0),
-            "",
-        );
-        if let Some(k) = picked.and_then(|k| k.parse::<i64>().ok()) {
-            out.push(set(&format!("{path}.family"), Value::Int(k)));
-        }
-        let r = ui
-            .add(Button::new("{ }").selected(text_on))
-            .on_hover_text("Editar como texto (RON)");
-        named_toggle(ui, reg, &format!("{name}_texto"), &r, "{ }", text_on);
-        if r.clicked() {
-            if text_on {
-                st.as_text.remove(path);
-            } else {
-                st.as_text.insert(path.to_owned());
+    if !using_data {
+        row(ui, f, |ui, w| {
+            let mut w = w;
+            if f.optional {
+                toggle(ui, reg, out, f);
+                w -= 30.0;
             }
-            ui.ctx().request_repaint();
-        }
-    });
+            let picked = combo(
+                ui,
+                reg,
+                &format!("{name}_familia"),
+                &view.family.to_string(),
+                &families,
+                (w - 52.0).max(60.0),
+                "",
+            );
+            if let Some(k) = picked.and_then(|k| k.parse::<i64>().ok()) {
+                out.push(set(&format!("{path}.family"), Value::Int(k)));
+            }
+            let r = ui
+                .add(Button::new("{ }").selected(text_on))
+                .on_hover_text("Editar como texto (RON)");
+            named_toggle(ui, reg, &format!("{name}_texto"), &r, "{ }", text_on);
+            if r.clicked() {
+                if text_on {
+                    st.as_text.remove(path);
+                } else {
+                    st.as_text.insert(path.to_owned());
+                }
+                ui.ctx().request_repaint();
+            }
+        });
+    }
     let depth = f.depth + 1;
     if v.data_paths.iter().any(|p| p == path) {
         let choices = [
@@ -911,15 +972,35 @@ fn dist(
                 ui,
                 reg,
                 &format!("{name}_fonte"),
-                "dist",
+                if using_data { "dados" } else { "dist" },
                 &choices,
                 w - 8.0,
                 "De onde vem a distribuição deste campo: parâmetros informados ou valores reais, ajustados automaticamente",
             )
         });
-        if picked.as_deref() == Some("dados") {
-            out.push(PropAction::DataMode(path.to_owned()));
+        match picked.as_deref() {
+            Some("dados") => {
+                st.data_mode.insert(path.to_owned());
+                ui.ctx().request_repaint();
+            }
+            Some("dist") if entry.is_some() => {
+                st.data_mode.remove(path);
+                out.push(PropAction::Data {
+                    what: "para_dist".into(),
+                    path: path.to_owned(),
+                    draft: serde_json::Value::Null,
+                });
+            }
+            Some("dist") => {
+                st.data_mode.remove(path);
+                ui.ctx().request_repaint();
+            }
+            _ => {}
         }
+    }
+    if using_data {
+        data_form(ui, v, st, reg, out, path, entry, depth);
+        return;
     }
     if text_on {
         let picked = ui
@@ -956,6 +1037,537 @@ fn dist(
                 .color(colors::TEXT_WEAK),
         );
     });
+}
+
+// ---------------------------------------------------------------------------------------
+// Real data in a distribution field ("Fonte: Dados reais")
+// ---------------------------------------------------------------------------------------
+
+/// The criteria that rank the families accepted by the tests: key and label.
+const CRITERIA: [(&str, &str); 4] = [
+    ("aic", "AIC"),
+    ("bic", "BIC"),
+    ("ks", "Kolmogorov-Smirnov"),
+    ("ad", "Anderson-Darling"),
+];
+
+/// The choices of the real-data form of one field, kept while the panel is redrawn.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DataDraft {
+    /// `arquivo` or `valores`.
+    pub origin: String,
+    pub source: String,
+    pub column: String,
+    pub text: String,
+    pub timestamps: bool,
+    pub choose: String,
+    pub criterion: String,
+}
+
+impl Default for DataDraft {
+    fn default() -> Self {
+        DataDraft {
+            origin: "arquivo".into(),
+            source: String::new(),
+            column: String::new(),
+            text: String::new(),
+            timestamps: false,
+            choose: "Best".into(),
+            criterion: "aic".into(),
+        }
+    }
+}
+
+impl DataDraft {
+    /// The draft of an applied entry (its `config`).
+    pub fn of_config(c: &serde_json::Value) -> DataDraft {
+        let values: Vec<String> = c["values"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|v| match v.as_f64() {
+                Some(x) => num_text(x),
+                None => v.to_string(),
+            })
+            .collect();
+        let s = |k: &str| c[k].as_str().unwrap_or_default().to_owned();
+        DataDraft {
+            origin: if values.is_empty() {
+                "arquivo"
+            } else {
+                "valores"
+            }
+            .into(),
+            source: s("source"),
+            column: s("column"),
+            text: values.join("\n"),
+            timestamps: c["timestamps"].as_bool().unwrap_or(false),
+            choose: c["choose"].as_str().unwrap_or("Best").to_owned(),
+            criterion: c["criterion"].as_str().unwrap_or("aic").to_owned(),
+        }
+    }
+
+    /// As the main scene reads it (`_data_config`): the keys of the old Godot form.
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "origem": self.origin, "source": self.source, "column": self.column,
+            "text": self.text, "timestamps": self.timestamps, "choose": self.choose,
+            "criterion": self.criterion,
+        })
+    }
+}
+
+/// The real-data form of the distribution field `path` (under its "Fonte" row) and, once
+/// applied, the result: family, parameters, n, the histogram with the curve, the warnings
+/// and the candidates to swap with one click.
+#[allow(clippy::too_many_arguments)]
+fn data_form(
+    ui: &mut Ui,
+    v: &PropsView,
+    st: &mut PropsState,
+    reg: &mut Registry,
+    out: &mut Vec<PropAction>,
+    path: &str,
+    entry: Option<&serde_json::Value>,
+    depth: u8,
+) {
+    let name = widget_name(path);
+    let applied = entry.is_some();
+    // The draft follows the applied entry when it changes (undo, redo, another fit).
+    if let Some(e) = entry {
+        let config = &e["config"];
+        if st.drafts_seen.get(path) != Some(config) {
+            st.drafts_seen.insert(path.to_owned(), config.clone());
+            st.drafts
+                .insert(path.to_owned(), DataDraft::of_config(config));
+            st.requested.remove(path);
+        }
+    }
+    let mut draft = st.drafts.get(path).cloned().unwrap_or_default();
+    let send = |out: &mut Vec<PropAction>, what: &str, d: &DataDraft| {
+        out.push(PropAction::Data {
+            what: what.to_owned(),
+            path: path.to_owned(),
+            draft: d.to_json(),
+        });
+    };
+    let origins = [
+        (
+            "arquivo".to_owned(),
+            "Arquivo CSV".to_owned(),
+            String::new(),
+        ),
+        (
+            "valores".to_owned(),
+            "Valores colados".to_owned(),
+            String::new(),
+        ),
+    ];
+    if let Some(o) = row_label(ui, "Origem", "", depth, |ui, w| {
+        combo(
+            ui,
+            reg,
+            &format!("{name}_origem"),
+            &draft.origin,
+            &origins,
+            w - 8.0,
+            "",
+        )
+    }) {
+        draft.origin = o;
+    }
+    if draft.origin == "arquivo" {
+        let typed = row_label(ui, "Arquivo", "", depth, |ui, w| {
+            let t = line_edit(
+                ui,
+                st,
+                reg,
+                &format!("{name}_arquivo"),
+                &draft.source,
+                (w - 96.0).max(60.0),
+                false,
+                "arquivo .csv ou .txt",
+            );
+            let r = ui
+                .button("Escolher...")
+                .on_hover_text("Escolhe o arquivo de dados (CSV ou TXT)");
+            named(ui, reg, &format!("{name}_escolher"), &r, "Escolher...");
+            (t, r.clicked())
+        });
+        if let Some(t) = typed.0 {
+            draft.source = t.trim().to_owned();
+        }
+        if typed.1 {
+            send(out, "escolher_arquivo", &draft);
+        }
+        let columns = if draft.source.trim().is_empty() {
+            Vec::new()
+        } else {
+            let p = std::path::PathBuf::from(draft.source.trim());
+            let p = match &v.base_dir {
+                Some(b) if p.is_relative() => b.join(p),
+                _ => p,
+            };
+            crate::dados::columns_of(&p).unwrap_or_default()
+        };
+        let mut items = vec![(String::new(), "(automática)".to_owned(), String::new())];
+        items.extend(
+            columns
+                .iter()
+                .map(|c| (c.clone(), c.clone(), String::new())),
+        );
+        if let Some(c) = row_label(ui, "Coluna", "", depth, |ui, w| {
+            ui.add_enabled_ui(!columns.is_empty(), |ui| {
+                combo(
+                    ui,
+                    reg,
+                    &format!("{name}_coluna"),
+                    &draft.column,
+                    &items,
+                    w - 8.0,
+                    "Coluna do arquivo com os valores",
+                )
+            })
+            .inner
+        }) {
+            draft.column = c;
+        }
+    } else {
+        ui.horizontal(|ui| {
+            ui.add_space(INDENT * depth as f32);
+            let r = ui.add(
+                TextEdit::multiline(&mut draft.text)
+                    .id(Id::new(("utsim_prop", format!("{name}_valores"))))
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("um valor por linha (ou separados por ; ou espaço)"),
+            );
+            named(ui, reg, &format!("{name}_valores"), &r, &draft.text);
+        });
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT * depth as f32);
+        let r = ui
+            .checkbox(
+                &mut draft.timestamps,
+                "São instantes (usar os intervalos entre eles)",
+            )
+            .on_hover_text("Marque quando os valores são instantes crescentes (como horas de chegada): o ajuste usa as diferenças entre eles. Desmarcado, os valores são durações.");
+        named_toggle(
+            ui,
+            reg,
+            &format!("{name}_instantes"),
+            &r,
+            "instantes",
+            draft.timestamps,
+        );
+    });
+    let mut choices = vec![
+        (
+            "Best".to_owned(),
+            "Melhor automática".to_owned(),
+            String::new(),
+        ),
+        (
+            "Empirical".to_owned(),
+            "Empírica (os próprios valores)".to_owned(),
+            String::new(),
+        ),
+    ];
+    choices.extend(
+        v.data_families
+            .iter()
+            .map(|f| (f.clone(), format!("Só {f}"), String::new())),
+    );
+    if let Some(c) = row_label(ui, "Escolha", "", depth, |ui, w| {
+        combo(
+            ui,
+            reg,
+            &format!("{name}_escolha"),
+            &draft.choose,
+            &choices,
+            w - 8.0,
+            "",
+        )
+    }) {
+        draft.choose = c;
+    }
+    let criteria: Vec<(String, String, String)> = CRITERIA
+        .iter()
+        .map(|(k, l)| (k.to_string(), l.to_string(), String::new()))
+        .collect();
+    if let Some(c) = row_label(ui, "Critério", "", depth, |ui, w| {
+        combo(
+            ui,
+            reg,
+            &format!("{name}_criterio"),
+            &draft.criterion,
+            &criteria,
+            w - 8.0,
+            "O que ordena as famílias aceitas pelos testes",
+        )
+    }) {
+        draft.criterion = c;
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT * depth as f32);
+        let label = if applied {
+            "Reajustar com estas opções"
+        } else {
+            "Aplicar"
+        };
+        let r = ui.add(widgets::primary(label)).on_hover_text(
+            "Ajusta a distribuição aos dados (em segundo plano) e passa a usá-la neste campo",
+        );
+        named(ui, reg, &format!("{name}_aplicar"), &r, label);
+        if r.clicked() {
+            send(out, "aplicar", &draft);
+        }
+    });
+    st.drafts.insert(path.to_owned(), draft.clone());
+    let Some(e) = entry else {
+        return;
+    };
+    // The result of the applied entry.
+    ui.separator();
+    let note = |ui: &mut Ui, text: &str, color: Color32| {
+        ui.horizontal(|ui| {
+            ui.add_space(INDENT * depth as f32);
+            ui.add(Label::new(RichText::new(text).color(color)).wrap())
+        })
+        .inner
+    };
+    let err = e["error"].as_str().unwrap_or_default();
+    if !err.is_empty() {
+        note(
+            ui,
+            &format!("Não foi possível ler os dados: {err}"),
+            colors::ERROR,
+        );
+    }
+    if e["stale"].as_bool() == Some(true) {
+        note(
+            ui,
+            "Os dados mudaram desde o último ajuste.",
+            colors::WARNING,
+        );
+        ui.horizontal(|ui| {
+            ui.add_space(INDENT * depth as f32);
+            let r = ui.button("Reajustar aos dados atuais");
+            named(
+                ui,
+                reg,
+                &format!("{name}_reajustar"),
+                &r,
+                "Reajustar aos dados atuais",
+            );
+            if r.clicked() {
+                send(out, "aplicar", &draft);
+            }
+        });
+    } else if let Some(c) = e["changed_on_load"].as_str().filter(|c| !c.is_empty()) {
+        note(
+            ui,
+            &format!("{c}. O campo foi reajustado; salve para registrar."),
+            colors::WARNING,
+        );
+    }
+    let s = |k: &str| match &e[k] {
+        serde_json::Value::String(x) => x.clone(),
+        serde_json::Value::Null => "?".into(),
+        other => other.to_string(),
+    };
+    let res = format!("{} · n = {} · {}", s("family"), s("n"), s("label"));
+    let r = note(ui, &res, colors::TEXT);
+    named(ui, reg, &format!("{name}_resultado"), &r, &res);
+    let view = &e["view"];
+    if !view.is_object() {
+        if err.is_empty() {
+            note(ui, "Analisando os dados...", colors::TEXT_WEAK);
+            if st.requested.insert(path.to_owned()) {
+                send(out, "analisar", &draft);
+            }
+        }
+        return;
+    }
+    let params: Vec<String> = view["params"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|p| {
+            format!(
+                "{} = {}",
+                p["label"].as_str().unwrap_or_default(),
+                num_text(p["value"].as_f64().unwrap_or(f64::NAN))
+            )
+        })
+        .collect();
+    if !params.is_empty() {
+        let t = params.join("   ");
+        let r = note(ui, &t, colors::TEXT_WEAK);
+        named(ui, reg, &format!("{name}_parametros"), &r, &t);
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT * depth as f32);
+        mini_histogram(ui, reg, &format!("{name}_grafico"), &view["chart"]);
+    });
+    for w in view["warnings"].as_array().into_iter().flatten() {
+        note(
+            ui,
+            &format!("• {}", w.as_str().unwrap_or_default()),
+            colors::WARNING,
+        );
+    }
+    let rank = view["ranking"].as_array().cloned().unwrap_or_default();
+    if !rank.is_empty() {
+        note(
+            ui,
+            &format!(
+                "Candidatas ({})",
+                view["criterion"].as_str().unwrap_or_default()
+            ),
+            colors::HEADING,
+        );
+    }
+    for (k, r) in rank.iter().enumerate() {
+        let fam = r["family"].as_str().unwrap_or_default().to_owned();
+        let text = format!(
+            "{}. {}   {}   {}",
+            k + 1,
+            fam,
+            num_text(r["criterion"].as_f64().unwrap_or(f64::NAN)),
+            r["status"].as_str().unwrap_or_default()
+        );
+        let tip = format!(
+            "{}\nAIC {}   BIC {}\nUsa esta família neste campo",
+            r["params"].as_str().unwrap_or_default(),
+            num_text(r["aic"].as_f64().unwrap_or(f64::NAN)),
+            num_text(r["bic"].as_f64().unwrap_or(f64::NAN))
+        );
+        ui.horizontal(|ui| {
+            ui.add_space(INDENT * depth as f32);
+            let chosen = r["chosen"].as_bool() == Some(true);
+            let b = ui
+                .add_enabled(!chosen, Button::new(&text).truncate())
+                .on_hover_text(tip);
+            named(ui, reg, &format!("{name}_cand_{k}"), &b, &text);
+            if b.clicked() {
+                let mut d = draft.clone();
+                d.choose = fam.clone();
+                send(out, "aplicar", &d);
+            }
+        });
+    }
+    if view["empirical"].as_bool() != Some(true) {
+        ui.horizontal(|ui| {
+            ui.add_space(INDENT * depth as f32);
+            let b = ui.button("Usar a empírica (os próprios valores)");
+            named(ui, reg, &format!("{name}_cand_empirica"), &b, "empírica");
+            if b.clicked() {
+                let mut d = draft.clone();
+                d.choose = "Empirical".into();
+                send(out, "aplicar", &d);
+            }
+        });
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT * depth as f32);
+        let b = ui.button("Relatório").on_hover_text(
+            "Grava o relatório completo do ajuste (HTML) numa pasta e abre no navegador",
+        );
+        named(ui, reg, &format!("{name}_relatorio"), &b, "Relatório");
+        if b.clicked() {
+            send(out, "relatorio", &draft);
+        }
+    });
+}
+
+/// The small histogram of the data with the curve of the distribution chosen. It records
+/// `barras=<n> curva=<m>` for the scripted checks.
+fn mini_histogram(ui: &mut Ui, reg: &mut Registry, name: &str, chart: &serde_json::Value) {
+    let width = ui.available_width().max(120.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 110.0), Sense::hover());
+    let resp = resp.on_hover_text("Histograma dos dados e a curva da distribuição escolhida");
+    let p = ui.painter();
+    let area = Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.max.y - 16.0));
+    p.rect_filled(area, 3.0, colors::FIELD);
+    let density: Vec<f64> = chart["density"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|d| d.as_f64())
+        .collect();
+    let curve: Vec<[f64; 2]> = chart["curve"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|q| Some([q[0].as_f64()?, q[1].as_f64()?]))
+        .collect();
+    let top = density
+        .iter()
+        .copied()
+        .chain(curve.iter().map(|q| q[1]))
+        .fold(0.0, f64::max)
+        * 1.08;
+    if !density.is_empty() && top > 0.0 {
+        let w = area.width() / density.len() as f32;
+        for (k, d) in density.iter().enumerate() {
+            let h = area.height() * (*d / top) as f32;
+            p.rect_filled(
+                Rect::from_min_max(
+                    egui::pos2(area.min.x + k as f32 * w + 1.0, area.max.y - h),
+                    egui::pos2(area.min.x + (k + 1) as f32 * w - 1.0, area.max.y),
+                ),
+                0.0,
+                colors::ACCENT.gamma_multiply(0.55),
+            );
+        }
+        let lo = chart["lo"].as_f64().unwrap_or(0.0);
+        let hi = chart["hi"].as_f64().unwrap_or(1.0);
+        let span = (hi - lo).max(1e-12);
+        if curve.len() > 1 {
+            let pts: Vec<egui::Pos2> = curve
+                .iter()
+                .map(|q| {
+                    egui::pos2(
+                        area.min.x + area.width() * ((q[0] - lo) / span) as f32,
+                        area.max.y - area.height() * ((q[1] / top).min(1.0)) as f32,
+                    )
+                })
+                .collect();
+            p.add(egui::Shape::line(
+                pts,
+                egui::Stroke::new(2.0, colors::WARNING),
+            ));
+        }
+        let font = egui::FontId::proportional(sizes::SMALL);
+        p.text(
+            egui::pos2(rect.min.x + 2.0, rect.max.y - 2.0),
+            egui::Align2::LEFT_BOTTOM,
+            num_text(lo),
+            font.clone(),
+            colors::TEXT_WEAK,
+        );
+        p.text(
+            egui::pos2(rect.max.x - 2.0, rect.max.y - 2.0),
+            egui::Align2::RIGHT_BOTTOM,
+            num_text(hi),
+            font,
+            colors::TEXT_WEAK,
+        );
+    }
+    let mut info = crate::egui_widgets::WidgetInfo {
+        rect: resp.rect.intersect(ui.clip_rect()),
+        text: format!("barras={} curva={}", density.len(), curve.len()),
+        enabled: true,
+        checked: None,
+        choices: Vec::new(),
+        count: Some(density.len()),
+    };
+    if !info.rect.is_positive() {
+        info.rect = Rect::NOTHING;
+    }
+    reg.put_info(name, info);
 }
 
 /// The asset of the look: the list (library and catalogue, in groups, with the credits as
@@ -1267,6 +1879,9 @@ mod tests {
             extra: String::new(),
             driver: -1,
             miniature: false,
+            data: HashMap::new(),
+            data_families: Vec::new(),
+            base_dir: None,
         }
     }
 

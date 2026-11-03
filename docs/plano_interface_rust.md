@@ -81,8 +81,8 @@ campo, menu, texto, ajuda, erro, aviso, selo), os tamanhos (corpo 15, títulos 1
 Segoe UI no Windows e Noto Sans ou DejaVu Sans no Linux, lida de onde o sistema a guarda,
 sem ir no pacote, com as fontes do egui como reserva) e dois widgets: o botão primário
 ("Aplicar") e o controle segmentado (Editar | Simular). As cores são as do tema Godot
-(`godot/tema/utsim.tres`), então os painéis egui e os painéis Godot que ainda restam ficam
-iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
+(`godot/tema/utsim.tres`, removido no passo 5), então os painéis egui e os painéis Godot
+ficaram iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
 (`crates/utsim-lss-app`) passam a usar este tema** (`utsim_ui_tema::install(&ctx)`) quando
 forem mexidos; não foram tocados nesta frente.
 
@@ -121,7 +121,8 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | **feito** |
 | 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | **feito** |
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
-| 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
+| 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | **feito** (5a) |
+| 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | a fazer |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
@@ -266,6 +267,41 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - Achado no caminho: um `
 ` dentro de uma cadeia do `roteiro.gd` (o `digitar` com quebras de
   linha) quebra se o arquivo for gravado com CRLF; os arquivos ficam com LF (`.gitattributes`).
+
+### Passo 5a (PERT/CPM, fluxos, painéis das ferramentas, dados reais, janelas), como foi feito
+
+- **PERT/CPM** (`ui_pert.rs`): a mesma janela sobre a área livre (uma janela por vez com
+  Resultados), com os modos Simulado, Clássico e Monte Carlo, prazo (Enter recalcula),
+  sorteios, exportação HTML e CSV e as abas Rede (caixas e setas na disposição da ponte, o
+  caminho crítico em vermelho, setas mais grossas com a criticidade), Gantt, Distribuição
+  (histograma com o prazo), Tabela e Texto. O `principal.gd` só abre (`open_pert`), pede o
+  cálculo (`pert_calculate`, com `pert_form`) e devolve o resultado (`set_pert`); as
+  conferências leem `pert_data()`.
+- **Fluxos de tokens** (`ui_flows.rs`): o grafo de cada fluxo (caixas da largura do texto,
+  colunas da ponte, setas para a frente e de volta por baixo), zoom com −, +, Ajustar e
+  Ctrl + roda, e as contagens ao longo da rodada com a linha do instante. A ponte calcula as
+  séries uma vez (`set_flows_playback`) e as contagens no instante (`flows_time`).
+- **Painéis das ferramentas** (`ui_form.rs`): Rede, Corredor e a ligação selecionada são
+  linhas que o `principal.gd` descreve em JSON (`show_form`: título, texto, ajuda, aviso, erro,
+  caixa, número, linha, escolha, botão) e que voltam como `form:<ação>:<valor>`. Os nomes dos
+  controles continuam (`Rede_TrechoCapacidade`, `Corredor_NovoTipo`, `Ligacao_Remover`...).
+- **Dados reais** (`ui_props.rs`): "Fonte: Dados reais" abre o formulário no próprio painel
+  (origem, arquivo com Escolher..., coluna lida do arquivo, valores colados, instantes,
+  escolha, critério, Aplicar) e, aplicado, o selo "dados", o resultado, os parâmetros, o
+  mini-histograma com a curva, os avisos, as candidatas e o relatório. As ações voltam como
+  `dados	<ação>	<campo>	<rascunho JSON>` e o `principal.gd` usa as mesmas funções de antes.
+- **Janelas**: a confirmação de descarte e os atalhos (F1) são modais do egui
+  (`show_dialog`); a linha de desempenho (F3) é desenhada pelo egui sobre a vista. As janelas
+  de arquivo são as do sistema (`FileDialog.use_native_dialog`); sem tela, ou com um roteiro
+  rodando, ficam as do Godot, que o passo `dialogo` responde.
+- Removidos: `painel_propriedades.gd`, `dados_reais.gd`, `mini_histograma.gd`, `pert.gd`,
+  `fluxos.gd`, `grafico.gd` e o tema `godot/tema/` (o projeto não tem mais tema Godot). No
+  GDScript ficam só a vista e as ferramentas 3D (`principal.gd`, `editor.gd`, `cena.gd`,
+  `rede.gd`, `corredores.gd`, `camera_orbita.gd`, `pessoa.gd`) e o `roteiro.gd`.
+- Conferência com janela a 1600×900 e 1280×720 (`g3_pert`, `g3_dados_reais`, `g3_rede`,
+  `g4_corredores`, `g3_cena` e um roteiro das janelas). Achados e correções: o texto das caixas
+  do PERT passava da borda de baixo; a nota dos fluxos falava de uma linha amarela que é azul;
+  as janelas de arquivo do sistema não deixavam os roteiros com janela responder.
 
 ### Plano original do passo 2b
 

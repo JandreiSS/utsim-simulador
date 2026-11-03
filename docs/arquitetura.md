@@ -1458,7 +1458,7 @@ do projeto; só as capturas de tela são puladas.
   porta de entrada dele) liga; a ferramenta Ligar (`L`) liga arrastando de bloco a bloco ou
   clicando na origem e no destino. Recursos móveis não têm portas (usam `transport` e
   `operators`);
-- **painel de propriedades** (`painel_propriedades.gd`): gerado do esquema, campo por campo
+- **painel de propriedades** (egui, `ui_props.rs` na ponte; antes `painel_propriedades.gd`): gerado do esquema, campo por campo
   (texto, número, escolha, distribuição com família e parâmetros ou texto RON, listas em RON,
   conjuntos, cor, ativo com miniatura). O painel não muda o modelo: emite a edição, a ponte a
   valida e aplica como comando, e o painel é refeito no quadro seguinte. Com vários objetos do
@@ -1516,11 +1516,14 @@ classes que os expõem:
 
 Os resultados vão ao GDScript como JSON convertido em dicionários e arrays
 (`jobs_class::variant_of_json`; números não finitos viram `null`); o que muda a cada quadro
-(fluidos, tokens) continua em arrays empacotados. No GDScript: `rede.gd` (ferramenta Rede,
-desenhada na sobreposição do editor), `grafico.gd` (barras com IC, faixas de estados, linhas
-com marcadores e histograma em `draw_*`), a janela Resultados (egui na ponte, `ui_results.rs`, com as abas
-Resumo, Gráficos, Análise, Cenários e Otimização), `pert.gd` (janela PERT/CPM: rede, Gantt,
-distribuição, tabela e texto), `fluxos.gd` (fluxos de tokens em 2D) e, no `principal.gd`, a
+(fluidos, tokens) continua em arrays empacotados. Toda a interface em volta da vista 3D é egui
+na ponte (`docs/plano_interface_rust.md`): a janela Resultados (`ui_results.rs`, abas Resumo,
+Gráficos, Análise, Cenários e Otimização, gráficos com `egui_plot`), a janela PERT/CPM
+(`ui_pert.rs`: rede, Gantt, distribuição, tabela e texto), os fluxos de tokens em 2D
+(`ui_flows.rs`), os painéis das ferramentas Rede e Corredor e da ligação (`ui_form.rs`, linhas
+descritas pelo `principal.gd`), o formulário de dados reais (`ui_props.rs`) e as janelas de
+confirmação e de atalhos (`ui_form.rs`, modais). No GDScript ficam a vista e as ferramentas 3D:
+`rede.gd` (ferramenta Rede, desenhada na sobreposição do editor), `corredores.gd` e, no `principal.gd`, a
 barra de progresso com Cancelar (uma tarefa por vez, consultada a cada quadro), as câmeras
 Seguir, Primeira pessoa e Do recurso e o replay `.json`. O `cena.gd` desenha os tanques (o
 líquido na altura do nível, a cor pela taxa), os tubos e os conversores, limita os rótulos aos
