@@ -530,6 +530,54 @@ pub fn compute(model: &Model, reports: &[RunReport], cfg: &Dashboard) -> KpiSet 
             )),
         }
     }
+    // OEE measured by the kernel for objects with maintenance (`downtime` with crew,
+    // wear, preventive...), unless the file already configures that object.
+    let measured: Vec<String> = reports
+        .first()
+        .map(|r| {
+            r.blocks
+                .iter()
+                .filter(|b| b.custom.contains_key("oee"))
+                .filter(|b| !cfg.oee.iter().any(|o| o.object == b.name))
+                .map(|b| b.name.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    for name in measured {
+        let pct = |key: &str| -> Vec<f64> {
+            reports
+                .iter()
+                .map(|r| {
+                    r.block(&name)
+                        .and_then(|b| b.custom.get(key))
+                        .map_or(f64::NAN, |v| 100.0 * v)
+                })
+                .collect()
+        };
+        let mut k = Kpi::build(
+            spec(
+                cfg,
+                &format!("oee:{name}"),
+                &format!("OEE de {name}"),
+                "%",
+                "medido na simulação (manutenção): disponibilidade = (planejado - corretivas) / planejado, com o planejado sem turnos nem preventivas; desempenho = ciclo ideal × peças / tempo funcionando; qualidade = boas / peças",
+            ),
+            pct("oee"),
+        );
+        for (nome, key) in [
+            ("Disponibilidade", "oee.availability"),
+            ("Desempenho", "oee.performance"),
+            ("Qualidade", "oee.quality"),
+        ] {
+            let s = summary(&pct(key), cfg.level);
+            k.fatores.push(Fator {
+                nome: nome.to_string(),
+                valor: s.mean,
+                texto: pt_mean_hw(s.mean, s.half_width),
+            });
+        }
+        kpis.push(k);
+    }
 
     // Deadline attainment, by convention of the `prazo` label counted at the sinks.
     let otd: Vec<f64> = reports
@@ -736,6 +784,24 @@ mod tests {
             },
             values,
         )
+    }
+
+    #[test]
+    fn oee_measured_by_the_kernel_becomes_a_kpi() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/manutencao.ron");
+        let mut m = Model::load(path).unwrap();
+        m.run.replications = 2;
+        m.run.stop_time = 2000.0;
+        let reports = m.run_replications().unwrap();
+        let set = compute(&m, &reports, &cfg());
+        let k = set
+            .kpis
+            .iter()
+            .find(|k| k.id == "oee:torno")
+            .expect("KPI do OEE");
+        assert_eq!(k.fatores.len(), 3);
+        let first = reports[0].block("torno").unwrap().custom["oee"];
+        assert!(k.valor > 0.0 && k.valor <= 100.0 && first > 0.0);
     }
 
     #[test]

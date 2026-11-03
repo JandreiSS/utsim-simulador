@@ -360,7 +360,7 @@ pub fn utilization_bars(stats: &[ObjectStats], kind: UtilKind) -> Vec<WhiskerBar
         .collect()
 }
 
-const STATES: [State; 18] = [
+const STATES: [State; 20] = [
     State::Idle,
     State::Empty,
     State::Generating,
@@ -379,6 +379,8 @@ const STATES: [State; 18] = [
     State::Unloading,
     State::Utilize,
     State::Stopped,
+    State::WaitingRepair,
+    State::Maintenance,
 ];
 
 /// State with this report name (`"processing"`...).

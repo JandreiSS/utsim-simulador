@@ -1,0 +1,69 @@
+// Manutenção de máquinas: técnico que vai até a máquina, desgaste, preventiva e OEE.
+// Unidade de tempo: minutos.
+//
+// Duas máquinas em linha dividem um único técnico (a equipe "manutencao"):
+//   - o torno se desgasta com o uso (Weibull de forma 2, escala 600 min de trabalho):
+//     quanto mais velho, mais fácil quebrar. A corretiva conserta sem rejuvenescer
+//     (AsBadAsOld) e a preventiva a cada 300 min de uso o deixa como novo;
+//   - a fresa quebra pelo mtbf no relógio e faz preventiva no calendário "almoco"
+//     (todo dia às 12h, quando a linha para), além de uma a cada 400 peças.
+// Quando as duas pedem o técnico ao mesmo tempo, a corretiva passa na frente da
+// preventiva. Na quebra, a máquina fica em "waiting_repair" até o técnico chegar, e o
+// mttr conta só a partir da chegada. A preventiva espera a peça em processo terminar.
+//
+// O OEE de cada máquina aparece no relatório (oee, oee.availability, oee.performance,
+// oee.quality), com MTBF e MTTR observados, tempo esperando o técnico, número de
+// preventivas e corretivas e o custo de manutenção. Peças com defeito (5 %) saem da
+// fresa para o refugo e entram na qualidade.
+Model(
+    name: "Manutenção com técnico, desgaste e OEE",
+    run: (stop_time: 4320.0, warmup: 480.0, seed: 2026, replications: 5),
+    calendars: {
+        "almoco": (period: 1440.0, off: [(start: 360.0, duration: 60.0)]),
+    },
+    objects: [
+        (name: "entrada", kind: Source(interarrival: Exp(mean: 1.4)), position: (0.0, 0.0, 0.0)),
+        (name: "fila_torno", kind: Queue(capacity: 30), position: (3.0, 0.0, 0.0)),
+        (name: "torno", kind: Processor(process: Triangular(min: 0.9, mode: 1.0, max: 1.4)),
+         position: (6.0, 0.0, 0.0),
+         downtime: (
+            mtbf: Exp(mean: 600.0),
+            mttr: Triangular(min: 10.0, mode: 15.0, max: 30.0),
+            repair_crew: "manutencao",
+            wear: Weibull(shape: 2.0, scale: 600.0),
+            basis: Busy,
+            preventive: [(every: Hours(300.0), duration: Const(12.0))],
+            cost: (per_time_down: 3.0, per_repair: 150.0, per_preventive: 40.0),
+         )),
+        (name: "fila_fresa", kind: Queue(capacity: 30), position: (9.0, 0.0, 0.0)),
+        (name: "fresa", kind: Processor(process: Uniform(min: 0.8, max: 1.2)),
+         output: Weighted([0.95, 0.05]),
+         position: (12.0, 0.0, 0.0),
+         shifts: Calendar("almoco"),
+         downtime: (
+            mtbf: Exp(mean: 500.0),
+            mttr: Exp(mean: 12.0),
+            repair_crew: "manutencao",
+            preventive: [
+                (every: Calendar("almoco"), duration: Const(30.0)),
+                (every: Cycles(400), duration: Const(8.0)),
+            ],
+            cost: (per_time_down: 3.0, per_repair: 120.0, per_preventive: 30.0),
+            oee: (reject_to: ["refugo"]),
+         )),
+        (name: "expedicao", kind: Sink, position: (15.0, 0.0, 0.0)),
+        (name: "refugo", kind: Sink, position: (12.0, 3.0, 0.0)),
+        // O técnico mora na oficina, entre as duas máquinas, e volta para lá quando livre.
+        (name: "tecnico", kind: Transporter(speed: 60.0, home: true), position: (9.0, -6.0, 0.0),
+         visual: (asset: "operador")),
+        (name: "manutencao", kind: Dispatcher(team: ["tecnico"]), position: (9.0, -6.0, 0.0)),
+    ],
+    connections: [
+        ("entrada", "fila_torno"),
+        ("fila_torno", "torno"),
+        ("torno", "fila_fresa"),
+        ("fila_fresa", "fresa"),
+        ("fresa", "expedicao"),
+        ("fresa", "refugo"),
+    ],
+)

@@ -1093,7 +1093,7 @@ impl Editor<'_> {
             .unwrap_or_else(|| "tipo".into())
     }
 
-    fn downtime_field(&mut self, ui: &mut Ui, current: Option<&Downtime>) {
+    fn downtime_field(&mut self, ui: &mut Ui, current: Option<&utsim_model::DowntimeDef>) {
         let field = "downtime";
         let id = self.id(field);
         let mut on = current.is_some();

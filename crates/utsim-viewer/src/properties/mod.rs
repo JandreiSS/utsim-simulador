@@ -497,7 +497,7 @@ mod tests {
             mttr: Dist::Erlang { k: 3, mean: 4.0 },
         };
         apply_set(&mut doc, "maq.downtime", &ron_text::downtime(&dt));
-        assert_eq!(object(&doc, "maq").downtime, Some(dt));
+        assert_eq!(object(&doc, "maq").downtime, Some(dt.into()));
         apply_set(&mut doc, "maq.downtime", "None");
         assert_eq!(object(&doc, "maq").downtime, None);
 
