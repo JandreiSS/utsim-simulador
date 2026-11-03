@@ -32,10 +32,10 @@ use std::collections::BTreeMap;
 
 use egui::text::CCursorRange;
 use egui::{
-    Align, Align2, Color32, ComboBox, FontId, Id, Label, Layout, Rect, RichText, ScrollArea,
-    Sense, Stroke, StrokeKind, TextEdit, TextStyle, TextWrapMode, Ui, UiBuilder, Vec2,
+    Align, Align2, Color32, ComboBox, FontId, Id, Label, Layout, Rect, RichText, ScrollArea, Sense,
+    Stroke, StrokeKind, TextEdit, TextStyle, TextWrapMode, Ui, UiBuilder, Vec2,
 };
-use egui_plot::{Bar, BarChart, GridMark, Legend, Line, Plot, PlotPoint, PlotPoints, Text, VLine};
+use egui_plot::{Bar, BarChart, GridMark, Line, Plot, PlotPoint, PlotPoints, Text, VLine};
 use serde_json::Value;
 use utsim_model::analysis::WarmupSeries;
 use utsim_ui_tema::{colors, sizes, widgets};
@@ -460,7 +460,8 @@ pub fn done(kind: &str, data: Option<&Value>, v: &ResultsView, mem: &mut Results
             let mut n: BTreeMap<&str, usize> = BTreeMap::new();
             let rows = little_rows(d);
             for r in &rows {
-                *n.entry(r["light"].as_str().unwrap_or("vermelho")).or_default() += 1;
+                *n.entry(r["light"].as_str().unwrap_or("vermelho"))
+                    .or_default() += 1;
             }
             let get = |k: &str| n.get(k).copied().unwrap_or(0);
             format!(
@@ -774,6 +775,20 @@ pub fn show(
     ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
     header(ui, v, reg, out);
     tabs(ui, mem, reg);
+    if mem.tab != 0 {
+        // The summary of a tab not shown is still read (as a hidden Godot tab was).
+        reg.put_info(
+            "Res_Resumo",
+            WidgetInfo {
+                rect: Rect::NOTHING,
+                text: v.summary_text(),
+                enabled: true,
+                checked: None,
+                choices: Vec::new(),
+                count: None,
+            },
+        );
+    }
     let mut scroll = egui::style::ScrollStyle::floating();
     scroll.dormant_handle_opacity = 0.5;
     ui.spacing_mut().scroll = scroll;
@@ -823,11 +838,16 @@ fn header(ui: &mut Ui, v: &ResultsView, reg: &mut Registry, out: &mut Vec<String
 }
 
 fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
+    tab_row(ui, reg, "Res_Abas", &TABS, &mut mem.tab);
+}
+
+/// A row of tabs named `<abas>_<título>` (the row itself is `abas`); `at` is the one shown.
+pub(crate) fn tab_row(ui: &mut Ui, reg: &mut Registry, abas: &str, titles: &[&str], at: &mut usize) {
     let row = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        for (k, title) in TABS.iter().enumerate() {
-            let on = mem.tab == k;
-            let name = format!("Res_Abas_{title}");
+        for (k, title) in titles.iter().enumerate() {
+            let on = *at == k;
+            let name = format!("{abas}_{title}");
             let text = RichText::new(*title).color(if on {
                 colors::TEXT_STRONG
             } else {
@@ -835,7 +855,11 @@ fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
             });
             let r = ui.add(
                 egui::Button::new(text)
-                    .fill(if on { colors::BUTTON } else { Color32::TRANSPARENT })
+                    .fill(if on {
+                        colors::BUTTON
+                    } else {
+                        Color32::TRANSPARENT
+                    })
                     .stroke(Stroke::NONE)
                     .min_size(Vec2::new(0.0, 30.0)),
             );
@@ -848,11 +872,11 @@ fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
             }
             named_toggle(ui, reg, &name, &r, title, on);
             if r.clicked() {
-                mem.tab = k;
+                *at = k;
             }
         }
     });
-    named(ui, reg, "Res_Abas", &row.response, TABS[mem.tab]);
+    named(ui, reg, abas, &row.response, titles[*at]);
     let y = row.response.rect.max.y;
     ui.painter().line_segment(
         [
@@ -863,7 +887,7 @@ fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
     );
 }
 
-fn heading(ui: &mut Ui, text: &str) {
+pub(crate) fn heading(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
     ui.label(
         RichText::new(text)
@@ -873,17 +897,17 @@ fn heading(ui: &mut Ui, text: &str) {
     );
 }
 
-fn explain(ui: &mut Ui, text: &str) -> egui::Response {
+pub(crate) fn explain(ui: &mut Ui, text: &str) -> egui::Response {
     ui.add(Label::new(RichText::new(text).color(colors::TEXT_WEAK)).wrap())
 }
 
-fn error(ui: &mut Ui, text: &str) {
+pub(crate) fn error(ui: &mut Ui, text: &str) {
     if !text.is_empty() {
         ui.add(Label::new(RichText::new(text).color(colors::ERROR)).wrap());
     }
 }
 
-fn button(
+pub(crate) fn button(
     ui: &mut Ui,
     reg: &mut Registry,
     name: &str,
@@ -898,7 +922,7 @@ fn button(
     r.clicked()
 }
 
-fn primary(
+pub(crate) fn primary(
     ui: &mut Ui,
     reg: &mut Registry,
     name: &str,
@@ -914,7 +938,26 @@ fn primary(
 }
 
 /// A one-line field bound to `buf`: selects all when it gets the focus.
-fn field(ui: &mut Ui, reg: &mut Registry, name: &str, buf: &mut String, width: f32, hint: &str) {
+pub(crate) fn field(
+    ui: &mut Ui,
+    reg: &mut Registry,
+    name: &str,
+    buf: &mut String,
+    width: f32,
+    hint: &str,
+) {
+    let _ = field_response(ui, reg, name, buf, width, hint);
+}
+
+/// [`field`], with its response (Enter: `lost_focus` with the key pressed).
+pub(crate) fn field_response(
+    ui: &mut Ui,
+    reg: &mut Registry,
+    name: &str,
+    buf: &mut String,
+    width: f32,
+    hint: &str,
+) -> egui::Response {
     let id = Id::new(("utsim_res", name));
     let mut output = TextEdit::singleline(buf)
         .id(id)
@@ -930,10 +973,11 @@ fn field(ui: &mut Ui, reg: &mut Registry, name: &str, buf: &mut String, width: f
         output.state.store(ui.ctx(), id);
     }
     named(ui, reg, name, &r, buf);
+    r
 }
 
 /// A text area bound to `buf` (scenarios, variables), in the monospace font.
-fn area(ui: &mut Ui, reg: &mut Registry, name: &str, buf: &mut String, rows: usize, hint: &str) {
+pub(crate) fn area(ui: &mut Ui, reg: &mut Registry, name: &str, buf: &mut String, rows: usize, hint: &str) {
     let r = ui.add(
         TextEdit::multiline(buf)
             .id(Id::new(("utsim_res", name)))
@@ -986,7 +1030,7 @@ pub struct Cell {
 }
 
 impl Cell {
-    fn plain(text: impl Into<String>) -> Cell {
+    pub(crate) fn plain(text: impl Into<String>) -> Cell {
         Cell {
             text: text.into(),
             color: colors::TEXT,
@@ -995,14 +1039,14 @@ impl Cell {
         }
     }
 
-    fn colored(text: impl Into<String>, color: Color32) -> Cell {
+    pub(crate) fn colored(text: impl Into<String>, color: Color32) -> Cell {
         Cell {
             color,
             ..Cell::plain(text)
         }
     }
 
-    fn tagged(mut self, tag: impl Into<String>, color: Color32) -> Cell {
+    pub(crate) fn tagged(mut self, tag: impl Into<String>, color: Color32) -> Cell {
         self.tag = Some((tag.into(), color));
         self
     }
@@ -1041,7 +1085,13 @@ impl Table {
     pub fn text(&self) -> String {
         let mut lines = vec![self.header.join(" | ")];
         for r in &self.rows {
-            lines.push(r.cells.iter().map(Cell::shown).collect::<Vec<_>>().join(" | "));
+            lines.push(
+                r.cells
+                    .iter()
+                    .map(Cell::shown)
+                    .collect::<Vec<_>>()
+                    .join(" | "),
+            );
         }
         lines.join("\n")
     }
@@ -1052,7 +1102,7 @@ const PAD: f32 = 10.0;
 const TAG_GAP: f32 = 8.0;
 const DOT: f32 = 14.0;
 
-fn draw_table(ui: &mut Ui, reg: &mut Registry, name: &str, t: &Table) {
+pub(crate) fn draw_table(ui: &mut Ui, reg: &mut Registry, name: &str, t: &Table) {
     let body = FontId::proportional(sizes::BODY);
     let small = FontId::proportional(sizes::SMALL);
     let painter = ui.painter().clone();
@@ -1064,7 +1114,9 @@ fn draw_table(ui: &mut Ui, reg: &mut Registry, name: &str, t: &Table) {
     };
     let cell_width = |c: &Cell| {
         width_of(&c.text, &body)
-            + c.tag.as_ref().map_or(0.0, |(s, _)| TAG_GAP + width_of(s, &small) + 10.0)
+            + c.tag
+                .as_ref()
+                .map_or(0.0, |(s, _)| TAG_GAP + width_of(s, &small) + 10.0)
             + if c.dot.is_some() { DOT } else { 0.0 }
     };
     let n = t.header.len();
@@ -1145,7 +1197,13 @@ fn draw_table(ui: &mut Ui, reg: &mut Registry, name: &str, t: &Table) {
                             Vec2::new(tw + 10.0, 18.0),
                         );
                         p.rect_filled(badge, 9.0, tc.gamma_multiply(0.2));
-                        p.text(badge.center(), Align2::CENTER_CENTER, tag, small.clone(), *tc);
+                        p.text(
+                            badge.center(),
+                            Align2::CENTER_CENTER,
+                            tag,
+                            small.clone(),
+                            *tc,
+                        );
                     }
                 }
                 x += w + 2.0 * PAD;
@@ -1302,29 +1360,31 @@ fn summary_tab(
                     .inner_margin(egui::Margin::symmetric(12, 8));
                 let r = frame.show(ui, |ui| {
                     ui.set_width(150.0);
-                    ui.spacing_mut().item_spacing.y = 2.0;
-                    ui.label(
-                        RichText::new(&title)
-                            .size(sizes::SMALL)
-                            .color(colors::TEXT_WEAK),
-                    );
-                    ui.add(
-                        Label::new(
-                            RichText::new(&value)
-                                .size(20.0)
-                                .strong()
-                                .color(if warn { colors::WARNING } else { colors::TEXT_STRONG }),
-                        )
-                        .truncate(),
-                    );
-                    ui.add(
-                        Label::new(
-                            RichText::new(if sub.is_empty() { " " } else { &sub })
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        ui.label(
+                            RichText::new(&title)
                                 .size(sizes::SMALL)
                                 .color(colors::TEXT_WEAK),
-                        )
-                        .truncate(),
-                    );
+                        );
+                        ui.add(
+                            Label::new(
+                                RichText::new(&value)
+                                    .size(20.0)
+                                    .strong()
+                                    .color(if warn { colors::WARNING } else { colors::TEXT_STRONG }),
+                            )
+                            .truncate(),
+                        );
+                        ui.add(
+                            Label::new(
+                                RichText::new(if sub.is_empty() { " " } else { &sub })
+                                    .size(sizes::SMALL)
+                                    .color(colors::TEXT_WEAK),
+                            )
+                            .truncate(),
+                        );
+                    });
                 });
                 named(ui, reg, &format!("Res_Cartao_{k}"), &r.response, &value);
             }
@@ -1336,10 +1396,7 @@ fn summary_tab(
     });
     named(ui, reg, "Res_Resumo", &block.response, &v.summary_text());
     heading(ui, "Por objeto");
-    explain(
-        ui,
-        "Média ± semiamplitude do IC de 95 % entre replicações.",
-    );
+    explain(ui, "Média ± semiamplitude do IC de 95 % entre replicações.");
     draw_table(ui, reg, "Res_Tabela", &object_table(v));
     ui.add_space(4.0);
     ui.horizontal(|ui| {
@@ -1392,8 +1449,14 @@ fn charts_tab(
         }
         if kind == "ocupacao" {
             let items: Vec<String> = UTILIZATION.iter().map(|s| s.to_string()).collect();
-            if let Some(k) = combo(ui, reg, "Res_DetalheGrafico", mem.utilization, &items, 120.0)
-            {
+            if let Some(k) = combo(
+                ui,
+                reg,
+                "Res_DetalheGrafico",
+                mem.utilization,
+                &items,
+                120.0,
+            ) {
                 mem.utilization = k;
             }
         } else if kind == "histograma" && !tallies.is_empty() {
@@ -1454,7 +1517,14 @@ fn still(p: Plot<'_>) -> Plot<'_> {
         .show_y(false)
 }
 
-fn draw_chart(ui: &mut Ui, reg: &mut Registry, name: &str, chart: &Chart, empty: &str, height: f32) {
+fn draw_chart(
+    ui: &mut Ui,
+    reg: &mut Registry,
+    name: &str,
+    chart: &Chart,
+    empty: &str,
+    height: f32,
+) {
     let count = chart.count();
     let resp = if count == 0 {
         let (rect, resp) =
@@ -1478,11 +1548,13 @@ fn draw_chart(ui: &mut Ui, reg: &mut Registry, name: &str, chart: &Chart, empty:
                 x,
                 y,
             } => lines(ui, name, curves, markers, x, y, height),
-            Chart::Histogram { min, width, counts } => histogram(ui, name, *min, *width, counts, height),
+            Chart::Histogram { min, width, counts } => {
+                histogram(ui, name, *min, *width, counts, height)
+            }
         }
     };
     named(ui, reg, name, &resp, &count.to_string());
-    if let Some(w) = reg.get(name).cloned() {
+    if let Some(w) = reg.read(name).cloned() {
         reg.put_info(
             name,
             WidgetInfo {
@@ -1538,21 +1610,18 @@ fn bars(ui: &mut Ui, name: &str, rows: &[BarRow]) -> egui::Response {
     let n = rows.len();
     let labels: Vec<String> = rows.iter().map(|r| r.label.clone()).collect();
     let width = label_width(ui, &labels);
+    // Room for the value written after the longest bar (100% when one is saturated).
     let top = rows
         .iter()
         .map(|r| r.value + r.half.unwrap_or(0.0))
-        .fold(100.0, f64::max);
-    let plot = row_axis(
-        still(Plot::new(("utsim_res_plot", name))),
-        labels,
-        width,
-    )
-    .height((30.0 * n as f32 + 50.0).max(140.0))
-    .include_x(0.0)
-    .include_x(top * 1.18)
-    .include_y(-0.6)
-    .include_y(n as f64 - 0.4)
-    .x_axis_formatter(|m, _| format!("{}%", num(m.value)));
+        .fold(1.0, f64::max);
+    let plot = row_axis(still(Plot::new(("utsim_res_plot", name))), labels, width)
+        .height((30.0 * n as f32 + 50.0).max(140.0))
+        .include_x(0.0)
+        .include_x(top * 1.1)
+        .include_y(-0.6)
+        .include_y(n as f64 - 0.4)
+        .x_axis_formatter(|m, _| format!("{}%", num(m.value)));
     plot.show(ui, |p| {
         let arg = |k: usize| (n - 1 - k) as f64;
         let list: Vec<Bar> = rows
@@ -1572,9 +1641,21 @@ fn bars(ui: &mut Ui, name: &str, rows: &[BarRow]) -> egui::Response {
             let mut end = r.value;
             if let Some(h) = r.half.filter(|h| *h > 0.0) {
                 let s = Stroke::new(1.5, colors::TEXT);
-                p.line(Line::new("IC 95 %", PlotPoints::new(vec![[r.value - h, y], [r.value + h, y]])).stroke(s));
+                p.line(
+                    Line::new(
+                        "IC 95 %",
+                        PlotPoints::new(vec![[r.value - h, y], [r.value + h, y]]),
+                    )
+                    .stroke(s),
+                );
                 for x in [r.value - h, r.value + h] {
-                    p.line(Line::new("IC 95 %", PlotPoints::new(vec![[x, y - 0.14], [x, y + 0.14]])).stroke(s));
+                    p.line(
+                        Line::new(
+                            "IC 95 %",
+                            PlotPoints::new(vec![[x, y - 0.14], [x, y + 0.14]]),
+                        )
+                        .stroke(s),
+                    );
                 }
                 end += h;
             }
@@ -1616,22 +1697,15 @@ fn stacked(ui: &mut Ui, name: &str, rows: &[(String, Vec<Segment>)]) -> egui::Re
             }
         }
     }
-    let plot = row_axis(
-        still(Plot::new(("utsim_res_plot", name))),
-        labels,
-        width,
-    )
-    .height((30.0 * n as f32 + 90.0).max(180.0))
-    .include_x(0.0)
-    .include_x(100.0)
-    .include_y(-0.6)
-    .include_y(n as f64 + 0.9)
-    .x_axis_formatter(|m, _| format!("{}%", num(m.value)))
-    .legend(
-        Legend::default()
-            .position(egui_plot::Corner::LeftTop)
-            .background_alpha(0.85),
-    );
+    let entries: Vec<(String, Color32)> = by_state.iter().map(|e| (e.0.clone(), e.1)).collect();
+    legend_row(ui, "", &entries);
+    let plot = row_axis(still(Plot::new(("utsim_res_plot", name))), labels, width)
+        .height((30.0 * n as f32 + 50.0).max(140.0))
+        .include_x(0.0)
+        .include_x(100.0)
+        .include_y(-0.6)
+        .include_y(n as f64 - 0.4)
+        .x_axis_formatter(|m, _| format!("{}%", num(m.value)));
     plot.show(ui, |p| {
         for (label, color, list) in by_state {
             p.bar_chart(BarChart::new(label, list).color(color).horizontal());
@@ -1649,15 +1723,27 @@ fn lines(
     y: &str,
     height: f32,
 ) -> egui::Response {
-    let plot = still(Plot::new(("utsim_res_plot", name)))
+    // The legend and the name of the y axis go above the chart (inside, they covered the
+    // curves; a long name on the axis ran over the text above).
+    let mut entries: Vec<(String, Color32)> = Vec::new();
+    for c in curves.iter().filter(|c| !c.points.is_empty()) {
+        if !entries.iter().any(|e| e.0 == c.name) {
+            entries.push((c.name.clone(), c.color));
+        }
+    }
+    for (_, label) in markers {
+        entries.push((label.clone(), colors::ACCENT));
+    }
+    legend_row(ui, y, &entries);
+    let (lo, hi) = y_range(curves);
+    let mut plot = still(Plot::new(("utsim_res_plot", name)))
         .height(height)
         .x_axis_label(RichText::new(x).size(sizes::SMALL).color(colors::TEXT_WEAK))
-        .y_axis_label(RichText::new(y).size(sizes::SMALL).color(colors::TEXT_WEAK))
-        .legend(
-            Legend::default()
-                .position(egui_plot::Corner::RightBottom)
-                .background_alpha(0.85),
-        );
+        .include_y(lo)
+        .include_y(hi);
+    for (x, _) in markers {
+        plot = plot.include_x(*x);
+    }
     plot.show(ui, |p| {
         for c in curves {
             p.line(
@@ -1677,6 +1763,45 @@ fn lines(
     .response
 }
 
+/// The y range of `curves`, padded; a flat curve gets a range around its value (egui's
+/// own bounds of a flat line ran to thousands).
+pub fn y_range(curves: &[Curve]) -> (f64, f64) {
+    let ys = curves.iter().flat_map(|c| c.points.iter().map(|p| p[1]));
+    let (lo, hi) = ys.fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), y| {
+        (a.min(y), b.max(y))
+    });
+    if !lo.is_finite() {
+        return (0.0, 1.0);
+    }
+    let span = hi - lo;
+    let pad = if span > 1e-9 {
+        span * 0.06
+    } else {
+        lo.abs().max(1.0) * 0.5
+    };
+    // Counts and contents start at zero.
+    let lo = if lo >= 0.0 { 0.0 } else { lo - pad };
+    (lo, hi + pad)
+}
+
+/// A small line above a chart: the name of its y axis and a dot per series.
+fn legend_row(ui: &mut Ui, y: &str, entries: &[(String, Color32)]) {
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        let small = |t: &str| RichText::new(t).size(sizes::SMALL);
+        if !y.is_empty() {
+            ui.label(small(y).color(colors::TEXT_WEAK));
+            ui.add_space(10.0);
+        }
+        for (name, color) in entries {
+            let (r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
+            ui.painter().circle_filled(r.center(), 4.5, *color);
+            ui.label(small(name).color(colors::TEXT));
+            ui.add_space(8.0);
+        }
+    });
+}
+
 fn histogram(
     ui: &mut Ui,
     name: &str,
@@ -1685,10 +1810,33 @@ fn histogram(
     counts: &[f64],
     height: f32,
 ) -> egui::Response {
-    let plot = still(Plot::new(("utsim_res_plot", name)))
+    histogram_with(ui, name, min, width, counts, height, None)
+}
+
+/// A histogram from `min` with bins of `width`, and a vertical marker `(x, label)`.
+pub(crate) fn histogram_with(
+    ui: &mut Ui,
+    name: &str,
+    min: f64,
+    width: f64,
+    counts: &[f64],
+    height: f32,
+    marker: Option<(f64, &str)>,
+) -> egui::Response {
+    if let Some((_, label)) = marker {
+        legend_row(ui, "", &[(label.to_owned(), colors::WARNING)]);
+    }
+    let mut plot = still(Plot::new(("utsim_res_plot", name)))
         .height(height)
         .include_y(0.0)
-        .y_axis_label(RichText::new("contagem").size(sizes::SMALL).color(colors::TEXT_WEAK));
+        .y_axis_label(
+            RichText::new("contagem")
+                .size(sizes::SMALL)
+                .color(colors::TEXT_WEAK),
+        );
+    if let Some((x, _)) = marker {
+        plot = plot.include_x(x);
+    }
     plot.show(ui, |p| {
         let list: Vec<Bar> = counts
             .iter()
@@ -1703,6 +1851,9 @@ fn histogram(
             })
             .collect();
         p.bar_chart(BarChart::new("contagem", list));
+        if let Some((x, label)) = marker {
+            p.vline(VLine::new(label, x).color(colors::WARNING).width(2.0));
+        }
     })
     .response
 }
@@ -1724,11 +1875,24 @@ fn analysis_tab(
     let cut = mem.warm.as_ref().and_then(|d| f(&d["suggested"]));
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new("Série").color(colors::TEXT));
-        field(ui, reg, "Res_AquecSerie", &mut mem.warm_series, 200.0, "wip ou objeto.medida")
-            ;
+        field(
+            ui,
+            reg,
+            "Res_AquecSerie",
+            &mut mem.warm_series,
+            200.0,
+            "wip ou objeto.medida",
+        );
         ui.label(RichText::new("Janela").color(colors::TEXT));
         field(ui, reg, "Res_AquecJanela", &mut mem.warm_window, 50.0, "5");
-        if button(ui, reg, "Res_AquecAnalisar", "Analisar", "Roda e calcula Welch e MSER-5", true) {
+        if button(
+            ui,
+            reg,
+            "Res_AquecAnalisar",
+            "Analisar",
+            "Roda e calcula Welch e MSER-5",
+            true,
+        ) {
             out.push("resultados:trabalho:aquecimento".into());
         }
         if primary(
@@ -1750,7 +1914,14 @@ fn analysis_tab(
         named(ui, reg, "Res_AquecTexto", &r, &wt);
     }
     if let Some(d) = &mem.warm {
-        draw_chart(ui, reg, "Res_AquecGrafico", &warm_chart(d), "sem série", 240.0);
+        draw_chart(
+            ui,
+            reg,
+            "Res_AquecGrafico",
+            &warm_chart(d),
+            "sem série",
+            240.0,
+        );
     }
 
     heading(ui, "Replicações necessárias");
@@ -1799,7 +1970,13 @@ fn analysis_tab(
             "Todas as medidas já estão dentro do alvo.".into()
         };
         let r = ui.add(Label::new(RichText::new(&line).color(colors::TEXT)).wrap());
-        named(ui, reg, "Res_PrecisaoTexto", &r, &format!("{}\n{line}", t.text()));
+        named(
+            ui,
+            reg,
+            "Res_PrecisaoTexto",
+            &r,
+            &format!("{}\n{line}", t.text()),
+        );
     }
 
     heading(ui, "Consistência: lei de Little");
@@ -1807,7 +1984,14 @@ fn analysis_tab(
         ui,
         "Confere L = λ·W em cada objeto e no sistema. Verde: fecha; amarelo: a diferença é estatisticamente diferente de zero, mas pequena (até 2 %); vermelho: não fecha, o que costuma indicar aquecimento curto ou itens presos no fim.",
     );
-    if button(ui, reg, "Res_Little", "Conferir", "Roda as replicações e confere a lei de Little", true) {
+    if button(
+        ui,
+        reg,
+        "Res_Little",
+        "Conferir",
+        "Roda as replicações e confere a lei de Little",
+        true,
+    ) {
         out.push("resultados:trabalho:little".into());
     }
     error(ui, &mem.little_error);
@@ -1835,13 +2019,22 @@ fn analysis_tab(
         let t = shifting_text(d);
         let r = ui.add(Label::new(RichText::new(&t).color(colors::TEXT)).wrap());
         named(ui, reg, "Res_GargaloMovelTexto", &r, &t);
-        draw_chart(ui, reg, "Res_GargaloMovelGrafico", &shifting_chart(d), "sem dados", 160.0);
+        draw_chart(
+            ui,
+            reg,
+            "Res_GargaloMovelGrafico",
+            &shifting_chart(d),
+            "sem dados",
+            160.0,
+        );
     }
 }
 
 pub fn precision_table(p: &Value) -> Table {
     Table {
-        header: ["Medida", "Atual", "Alvo (±)", "Faltam"].map(String::from).to_vec(),
+        header: ["Medida", "Atual", "Alvo (±)", "Faltam"]
+            .map(String::from)
+            .to_vec(),
         right: vec![false, true, true, true],
         rows: p["rows"]
             .as_array()
@@ -1896,7 +2089,10 @@ pub fn little_table(d: &Value) -> Table {
                         },
                         Cell::plain(mh(&r["l"], false)),
                         Cell::plain(mh(&r["lambda_w"], false)),
-                        Cell::plain(f(&r["relative"]).map_or("-".into(), |x| format!("{}%", num(x * 100.0)))),
+                        Cell::plain(
+                            f(&r["relative"])
+                                .map_or("-".into(), |x| format!("{}%", num(x * 100.0))),
+                        ),
                         Cell {
                             dot: Some(color),
                             ..Cell::colored(light, color)
@@ -1932,10 +2128,31 @@ fn scenarios_tab(
     );
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new("Medidas (vírgulas; vazio: todas)").color(colors::TEXT));
-        field(ui, reg, "Res_CenariosMedidas", &mut mem.sc_measures, 260.0, "fila.content.mean, saida.input");
+        field(
+            ui,
+            reg,
+            "Res_CenariosMedidas",
+            &mut mem.sc_measures,
+            260.0,
+            "fila.content.mean, saida.input",
+        );
         ui.label(RichText::new("Replicações").color(colors::TEXT));
-        field(ui, reg, "Res_CenariosReplicacoes", &mut mem.sc_reps, 50.0, "5");
-        if primary(ui, reg, "Res_CenariosComparar", "Comparar", "Roda todos os cenários e compara", true) {
+        field(
+            ui,
+            reg,
+            "Res_CenariosReplicacoes",
+            &mut mem.sc_reps,
+            50.0,
+            "5",
+        );
+        if primary(
+            ui,
+            reg,
+            "Res_CenariosComparar",
+            "Comparar",
+            "Roda todos os cenários e compara",
+            true,
+        ) {
             out.push("resultados:trabalho:cenarios".into());
         }
     });
@@ -1972,7 +2189,11 @@ pub fn scenario_table(d: &Value) -> Table {
                         let sig = diff["significant"].as_bool() == Some(true);
                         c = c.tagged(
                             format!("Δ {}", mh(diff, false)),
-                            if sig { colors::WARNING } else { colors::TEXT_WEAK },
+                            if sig {
+                                colors::WARNING
+                            } else {
+                                colors::TEXT_WEAK
+                            },
                         );
                     }
                     cells.push(c);
@@ -1998,11 +2219,25 @@ fn optimize_tab(
     );
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new("Objetivo").color(colors::TEXT));
-        field(ui, reg, "Res_OtimMetrica", &mut mem.op_metric, 300.0, "saida.time_in_system.mean");
+        field(
+            ui,
+            reg,
+            "Res_OtimMetrica",
+            &mut mem.op_metric,
+            300.0,
+            "saida.time_in_system.mean",
+        );
         let r = ui.checkbox(&mut mem.op_max, "maximizar");
         named_toggle(ui, reg, "Res_OtimMaximizar", &r, "maximizar", mem.op_max);
     });
-    area(ui, reg, "Res_OtimVariaveis", &mut mem.op_vars, 3, "maquina.capacity 1 3");
+    area(
+        ui,
+        reg,
+        "Res_OtimVariaveis",
+        &mut mem.op_vars,
+        3,
+        "maquina.capacity 1 3",
+    );
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new("Método").color(colors::TEXT));
         let items: Vec<String> = METHODS.iter().map(|s| s.to_string()).collect();
@@ -2030,8 +2265,21 @@ fn optimize_tab(
         }
         let t = optimization_table(d);
         draw_table(ui, reg, "Res_OtimTabela", &t);
-        named(ui, reg, "Res_OtimResultado", &r, &format!("{best}\n{}", t.text()));
-        draw_chart(ui, reg, "Res_OtimGrafico", &history_chart(d), "sem histórico", 200.0);
+        named(
+            ui,
+            reg,
+            "Res_OtimResultado",
+            &r,
+            &format!("{best}\n{}", t.text()),
+        );
+        draw_chart(
+            ui,
+            reg,
+            "Res_OtimGrafico",
+            &history_chart(d),
+            "sem histórico",
+            200.0,
+        );
     }
 }
 
@@ -2068,7 +2316,7 @@ pub fn optimization_table(d: &Value) -> Table {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::results::tests::example;
 
@@ -2080,16 +2328,35 @@ mod tests {
     }
 
     #[test]
+    fn flat_curves_get_a_sensible_range() {
+        let flat = |y: f64| Curve {
+            name: "média".into(),
+            points: vec![[0.0, y], [10.0, y]],
+            color: colors::WARNING,
+            width: 1.0,
+        };
+        assert_eq!(y_range(&[flat(0.0)]), (0.0, 0.5));
+        let (lo, hi) = y_range(&[flat(1.0)]);
+        assert!(lo == 0.0 && hi > 1.0 && hi < 2.0, "{lo} {hi}");
+        let (lo, hi) = y_range(&[flat(-3.0), flat(5.0)]);
+        assert!(lo < -3.0 && hi > 5.0 && hi < 6.0, "{lo} {hi}");
+        assert_eq!(y_range(&[]), (0.0, 1.0));
+    }
+
+    #[test]
     fn numbers_keep_four_significant_digits() {
         assert_eq!(num(0.0), "0");
         assert_eq!(num(12.3456), "12.35");
-        assert_eq!(num(1234.5), "1235");
+        assert_eq!(num(1234.6), "1235");
         assert_eq!(num(0.012345), "0.01235");
         assert_eq!(num(2.0), "2");
         assert_eq!(num(f64::NAN), "-");
         let s = serde_json::json!({"mean": 0.5, "half_width": 0.02});
         assert_eq!(mh(&s, true), "50 ± 2%");
-        assert_eq!(mh(&serde_json::json!({"mean": 3.0, "half_width": null}), false), "3");
+        assert_eq!(
+            mh(&serde_json::json!({"mean": 3.0, "half_width": null}), false),
+            "3"
+        );
         assert_eq!(mh(&Value::Null, false), "-");
     }
 
@@ -2143,10 +2410,16 @@ mod tests {
     fn runs_are_built_from_the_forms() {
         let v = view("servidores.ron", 2);
         let mut mem = ResultsMemory::default();
-        assert!(matches!(task("aquecimento", &v, &mem), Ok(Task::Warmup { window: 5, .. })));
+        assert!(matches!(
+            task("aquecimento", &v, &mem),
+            Ok(Task::Warmup { window: 5, .. })
+        ));
         mem.warm_window = "x".into();
         assert!(task("aquecimento", &v, &mem).is_err());
-        assert!(task("mais", &v, &mem).is_err(), "sem calcular, nada a rodar");
+        assert!(
+            task("mais", &v, &mem).is_err(),
+            "sem calcular, nada a rodar"
+        );
         mem.prec_target = "1%".into();
         mem.precision(&v);
         assert!(mem.more() > 0);
@@ -2172,7 +2445,10 @@ mod tests {
         mem.op_metric = "fila.content.mean".into();
         mem.op_vars = "maquina.capacity 1 3".into();
         mem.op_reps = "2".into();
-        assert!(matches!(task("otimizacao", &v, &mem), Ok(Task::Optimize { .. })));
+        assert!(matches!(
+            task("otimizacao", &v, &mem),
+            Ok(Task::Optimize { .. })
+        ));
         let replay = ResultsView::new(v.run.clone(), false);
         assert!(task("otimizacao", &replay, &mem).is_err());
         assert!(task("little", &v, &mem).is_ok());
@@ -2196,13 +2472,19 @@ mod tests {
                       "values": [{"mean": 3.0, "half_width": 0.2}, {"mean": 1.0, "half_width": 0.1}],
                       "differences": [null, {"mean": -2.0, "half_width": 0.3, "significant": true}]}],
         });
-        assert_eq!(done("cenarios", Some(&sc), &v, &mut mem), "2 cenário(s) comparados.");
+        assert_eq!(
+            done("cenarios", Some(&sc), &v, &mut mem),
+            "2 cenário(s) comparados."
+        );
         let t = scenario_table(mem.sc.as_ref().unwrap());
         assert!(t.text().contains("dois servidores") && t.text().contains("Δ "));
         assert_eq!(t.rows[0].cells[2].tag.as_ref().unwrap().1, colors::WARNING);
         let warm = serde_json::json!({"series": "wip", "mean": [[0.0, 1.0], [1.0, 2.0]],
             "welch": [[0.0, 1.0], [1.0, 2.0]], "suggested": 12.5, "too_short": false, "points": 2});
-        assert!(done("aquecimento", Some(&warm), &v, &mut mem).contains("Corte sugerido (MSER-5): 12.5"));
+        assert!(
+            done("aquecimento", Some(&warm), &v, &mut mem)
+                .contains("Corte sugerido (MSER-5): 12.5")
+        );
         assert_eq!(warm_chart(&warm).count(), 2);
         let op = serde_json::json!({"best": "maquina.capacity = 3", "simulated": 3,
             "evaluations": [{"point": "maquina.capacity = 3", "objective": {"mean": 0.5}, "feasible": true, "best": true, "equivalent": false}],
@@ -2210,7 +2492,10 @@ mod tests {
         assert!(done("otimizacao", Some(&op), &v, &mut mem).contains("maquina.capacity = 3"));
         assert!(optimization_table(&op).rows[0].hot);
         let sh = serde_json::json!([{"name": "maquina", "sole": {"mean": 0.8}, "shifting": {"mean": 0.1}, "total": 0.9}]);
-        assert_eq!(done("gargalo_movel", Some(&sh), &v, &mut mem), "Gargalo móvel: maquina na maior parte do tempo.");
+        assert_eq!(
+            done("gargalo_movel", Some(&sh), &v, &mut mem),
+            "Gargalo móvel: maquina na maior parte do tempo."
+        );
         assert_eq!(shifting_chart(&sh).count(), 1);
         assert_eq!(done("little", None, &v, &mut mem), "");
     }

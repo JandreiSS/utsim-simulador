@@ -167,7 +167,7 @@ O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
 - **Fluxos de tokens** (`fluxos.gd`, botão Fluxos no Simular): o grafo de cada fluxo em 2D
   (camadas ao longo de `next`), os tokens de cada atividade no instante da reprodução e as
   contagens ao longo da rodada, com a linha do instante.
-- **Resultados** (`resultados.gd`, botão Resultados): resumo com o gargalo geral e dentro do
+- **Resultados** (egui, `ui_results.rs` na ponte; antes `resultados.gd`; botão Resultados): resumo com o gargalo geral e dentro do
   turno, tabela por objeto com IC de 95 %, exportação CSV; gráficos de ocupação (com o traço
   do IC), estados (cores da cena), série temporal e histograma, desenhados com `draw_*`
   (`grafico.gd`); cenários escritos como texto (`[nome]` e `objeto.campo = valor`), com números

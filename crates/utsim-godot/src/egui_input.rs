@@ -7,7 +7,7 @@
 use egui::{Event, Key, Modifiers, MouseWheelUnit, PointerButton, Pos2, TouchPhase, Vec2};
 
 /// Godot's `KEY_SPECIAL` bit: the keys that are not characters.
-const SPECIAL: i64 = 1 << 22;
+pub(crate) const SPECIAL: i64 = 1 << 22;
 
 /// The modifier keys held during an event.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

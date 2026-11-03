@@ -29,11 +29,13 @@ use crate::document_class::UtsimDocument;
 use crate::egui_host::Host;
 use crate::egui_input::{Input, Mods};
 use crate::egui_mesh::{self, Change, Textures};
+use crate::jobs_class::{UtsimJob, UtsimResults, job_object};
 use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
 use crate::ui_bottom::{PlayView, StatusView};
 use crate::ui_left::{EditView, Entry, ObjectItem, Summary};
 use crate::ui_props::{self, PropAction, PropsView};
+use crate::ui_results::{self, ResultsView};
 use crate::{put, strings};
 
 /// Godot's `Image.FORMAT_RGBA8`.
@@ -76,6 +78,8 @@ pub struct UtsimUi {
     /// What the main scene set for the left panel of Editar (the objects come from the
     /// document).
     edit_state: EditView,
+    /// Why the last run asked of the "Resultados" window did not start.
+    results_error: String,
     base: Base<Node2D>,
 }
 
@@ -103,6 +107,7 @@ impl INode2D for UtsimUi {
             icon_refs: Vec::new(),
             objects_rev: None,
             edit_state: EditView::default(),
+            results_error: String::new(),
             base,
         }
     }
@@ -247,13 +252,16 @@ impl UtsimUi {
     #[func]
     fn widget_info(&self, name: GString) -> VarDictionary {
         let mut d = VarDictionary::new();
-        if let Some(w) = self.host.reg.get(&name.to_string()) {
+        if let Some(w) = self.host.reg.read(&name.to_string()) {
             put(&mut d, "text", GString::from(w.text.as_str()));
             put(&mut d, "enabled", w.enabled);
             if let Some(on) = w.checked {
                 put(&mut d, "checked", on);
             }
             put(&mut d, "choices", strings(&w.choices));
+            if let Some(n) = w.count {
+                put(&mut d, "count", n as i64);
+            }
         }
         d
     }
@@ -493,6 +501,83 @@ impl UtsimUi {
     #[func]
     fn update_now(&mut self) {
         self.frame_if_needed();
+    }
+
+    /// A new run for the "Resultados" window (`can_run`: false for a recorded replay,
+    /// which cannot run again; `export_dir`: the CSV folder proposed when none was typed).
+    #[func]
+    fn set_results(&mut self, res: Gd<UtsimResults>, can_run: bool, export_dir: GString) {
+        let Some(run) = res.bind().run().cloned() else {
+            return;
+        };
+        self.host
+            .set_results(ResultsView::new(run, can_run), &export_dir.to_string());
+    }
+
+    /// Opens or closes the "Resultados" window (it opens only with a run to show).
+    #[func]
+    fn set_results_open(&mut self, on: bool) {
+        self.host.set_results_open(on);
+    }
+
+    #[func]
+    fn results_open(&self) -> bool {
+        self.host.results_open
+    }
+
+    /// The run of a button of the window (`aquecimento`, `mais`, `little`,
+    /// `gargalo_movel`, `cenarios`, `otimizacao`) with what its form holds, or `null` with
+    /// the reason in [`Self::results_error`] (shown under the button too).
+    #[func]
+    fn results_job(&mut self, kind: GString) -> Option<Gd<UtsimJob>> {
+        let kind = kind.to_string();
+        let v = self.host.results.as_ref()?;
+        match ui_results::task(&kind, v, &self.host.results_mem) {
+            Ok(task) => {
+                self.results_error.clear();
+                Some(job_object(task))
+            }
+            Err(e) => {
+                self.host.results_mem.set_error(&kind, &e);
+                self.results_error = e;
+                self.host.invalidate();
+                None
+            }
+        }
+    }
+
+    #[func]
+    fn results_error(&self) -> GString {
+        GString::from(self.results_error.as_str())
+    }
+
+    /// A finished run of the window: its tables and charts; returns the status line.
+    #[func]
+    fn results_done(&mut self, job: Gd<UtsimJob>) -> GString {
+        let j = job.bind();
+        let Some(v) = self.host.results.as_ref() else {
+            return GString::new();
+        };
+        let line = ui_results::done(j.kind_name(), j.data_json(), v, &mut self.host.results_mem);
+        self.host.invalidate();
+        GString::from(line.as_str())
+    }
+
+    /// Writes the CSV files of the run into the folder typed; returns the status line.
+    #[func]
+    fn results_export(&mut self) -> GString {
+        let dir = self.host.results_mem.export_dir.trim().to_owned();
+        let line = match &self.host.results {
+            None => String::new(),
+            Some(_) if dir.is_empty() => "Escreva a pasta da exportação.".into(),
+            Some(v) => {
+                match utsim_model::csv::export(&std::path::PathBuf::from(&dir), &v.run.reports) {
+                    Ok(files) => format!("{} arquivo(s) CSV em {dir}.", files.len()),
+                    Err(e) => format!("Não exportou: {e}"),
+                }
+            }
+        };
+        GString::from(line.as_str())
     }
 }
 

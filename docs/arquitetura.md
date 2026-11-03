@@ -1518,7 +1518,7 @@ Os resultados vão ao GDScript como JSON convertido em dicionários e arrays
 (`jobs_class::variant_of_json`; números não finitos viram `null`); o que muda a cada quadro
 (fluidos, tokens) continua em arrays empacotados. No GDScript: `rede.gd` (ferramenta Rede,
 desenhada na sobreposição do editor), `grafico.gd` (barras com IC, faixas de estados, linhas
-com marcadores e histograma em `draw_*`), `resultados.gd` (painel Resultados com as abas
+com marcadores e histograma em `draw_*`), a janela Resultados (egui na ponte, `ui_results.rs`, com as abas
 Resumo, Gráficos, Análise, Cenários e Otimização), `pert.gd` (janela PERT/CPM: rede, Gantt,
 distribuição, tabela e texto), `fluxos.gd` (fluxos de tokens em 2D) e, no `principal.gd`, a
 barra de progresso com Cancelar (uma tarefa por vez, consultada a cada quadro), as câmeras

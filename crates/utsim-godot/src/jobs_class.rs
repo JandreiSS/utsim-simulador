@@ -76,6 +76,19 @@ pub struct UtsimJob {
 }
 
 impl UtsimJob {
+    /// The kind of run, as [`UtsimJob::kind`] names it.
+    pub(crate) fn kind_name(&self) -> &str {
+        &self.kind
+    }
+
+    /// The table of a finished analysis, scenario comparison or optimisation.
+    pub(crate) fn data_json(&self) -> Option<&Value> {
+        match &self.outcome {
+            Some(Ok(Outcome::Data(v))) => Some(v),
+            _ => None,
+        }
+    }
+
     fn poll(&mut self) {
         if self.outcome.is_some() {
             return;
@@ -213,6 +226,11 @@ pub struct UtsimResults {
 }
 
 impl UtsimResults {
+    /// The replications held.
+    pub(crate) fn run(&self) -> Option<&RunOutput> {
+        self.core.as_ref()
+    }
+
     fn json(&self, f: impl Fn(&RunOutput) -> Value) -> Variant {
         self.core
             .as_ref()

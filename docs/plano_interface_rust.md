@@ -120,7 +120,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 2a | Barra superior em egui, com grupos e menu "Mais" | 2–3 h | **feito** |
 | 2b | Painel de propriedades em egui, chamando `schema.rs`/`utsim-edit` direto (grade de duas colunas, seções recolhíveis, texto que quebra, "Aplicar" primário); miniatura do ativo como textura de um `SubViewport` | 6–9 h | **feito** |
 | 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | **feito** |
-| 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | a fazer |
+| 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | a fazer |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
@@ -216,6 +216,56 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   novo a cada `set_edit_state`); "Desmontagem" saía cortada na biblioteca (ícone e margens
   menores); as listas cortadas não mostravam que rolam (alça fina visível em repouso); a
   biblioteca ocupa até 60 % do painel.
+
+### Passo 4 (Resultados), como foi feito
+
+- `ui_results.rs` (puro, testado com corridas de verdade de `servidores.ron`): a janela cobre a
+  área livre central (o retângulo vem do host, `Host::results_rect`, e não mais de
+  `LEFT_WIDTH`/`BOTTOM_HEIGHT`), com as cinco abas. A ponte recebe a corrida uma vez
+  (`UtsimUi.set_results(res, pode_rodar, pasta_csv)`) e guarda os formulários e as análises
+  feitas em `ResultsMemory`; uma corrida nova mantém os formulários e o objeto do gráfico.
+- **Resumo**: cartões (replicações e semente, tempo de parada e aquecimento, gargalo geral e no
+  turno com a ocupação, saídas por replicação), a tabela por objeto desenhada à mão (cabeçalho,
+  números à direita, linhas alternadas, o gargalo com fundo e marca amarelos e o selo
+  "gargalo") e a exportação CSV, feita na ponte (`results_export`).
+- **Gráficos** com `egui_plot =0.37.0` (o da mesma versão do egui): barras de ocupação com o IC,
+  estados empilhados com as cores da cena, série e histograma; a legenda e o nome do eixo y
+  ficam numa linha acima do gráfico (dentro, cobriam as curvas; um nome longo no eixo passava
+  por cima do texto); a faixa do y é calculada (`y_range`: uma curva plana do egui ia a
+  ±2000). Os gráficos não aproximam nem arrastam: a roda rola a janela.
+- **Análise, Cenários, Otimização**: cada botão vira `resultados:trabalho:<tipo>`; o
+  `principal.gd` pede a corrida à ponte (`results_job`, montada de `ui_results::task` com o
+  que os formulários têm, ou o motivo de não começar), roda com `start_job` (progresso e
+  Cancelar) e devolve o trabalho pronto (`results_done`), que guarda a tabela e dá a linha de
+  status. "Rodar mais" passa a corrida nova por `on_results` antes.
+- Outras ações: `resultados:fechar`, `resultados:exportar`, `resultados:ligar_amostras`,
+  `resultados:aplicar_aquecimento:<t>`.
+- Nomes mantidos para o `g3_resultados.json` (`PainelResultados`, `Res_Fechar`, `Res_Resumo`,
+  `Res_Tabela`, `Res_TipoGrafico`, `Res_Grafico`, `Res_AquecAnalisar`, `Res_Precisao`...). As
+  abas são widgets `Res_Abas_<título>` e o passo `{"clicar": {"aba": ["Res_Abas", "Gráficos"]}}`
+  do `roteiro.gd` acha o widget quando não há `TabContainer`; cada gráfico registra quantas
+  coisas desenha (`count` no `widget_info`) para o `grafico`. O registro guarda também o
+  texto dos widgets rolados para fora da vista (`Registry::read`), e o resumo de uma aba não
+  mostrada continua legível, como numa aba Godot oculta.
+- Removidos: `resultados.gd`. `grafico.gd` e `mini_histograma.gd` ficam para o PERT/CPM, os
+  fluxos e os dados reais (passo 5).
+- Fila com o visual de esteira (relato do dono, com vídeo): a fila usava os lugares da forma
+  simples (caixa baixa de 0,3 m, três faixas, camadas a cada 0,32 m) e a ponte só baixava os
+  itens ao chão, então as caixas ficavam no chão dentro da armação da esteira e as que
+  sobravam subiam em escada ao lado. Agora `utsim_look::visual::queue_belt` dá a esteira de
+  verdade da aparência (comprimento, largura e altura do topo dos rolos da `ConveyorSpec`) e
+  os itens em repouso ficam numa linha em cima dos rolos, com uma segunda camada por cima e o
+  resto contado no rótulo ("+N"); um item voando para a fila ou saindo dela não afunda nos
+  rolos. Testes: todos os lugares sobre o topo e dentro da área da esteira
+  (`utsim-look`) e os itens de um replay de verdade em cima da esteira (`playback.rs`).
+- Conferência com janela a 1600×900 e 1280×720 (`g3_resultados.json` inteiro e uma fila com
+  esteira de 27 e 231 itens). Achados e correções: os cartões saíam altos e com o texto em linha
+  (o conteúdo herdava o layout horizontal); a legenda cobria as barras dos estados e as curvas;
+  o eixo da ocupação ia a 120 %; o nome longo do eixo do aquecimento passava sobre o texto; a
+  série plana tinha o eixo y de -2000 a 2000.
+- Achado no caminho: um `
+` dentro de uma cadeia do `roteiro.gd` (o `digitar` com quebras de
+  linha) quebra se o arquivo for gravado com CRLF; os arquivos ficam com LF (`.gitattributes`).
 
 ### Plano original do passo 2b
 

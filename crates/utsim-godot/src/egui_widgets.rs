@@ -35,6 +35,8 @@ pub struct Registry {
     widgets: BTreeMap<String, WidgetInfo>,
     /// Every name drawn in the last frame, also the ones scrolled out of sight.
     known: BTreeSet<String>,
+    /// What the widgets scrolled out of sight show (their text is still read by scripts).
+    offscreen: BTreeMap<String, WidgetInfo>,
     requests: HashMap<String, String>,
     /// Names to scroll into view the next time they are drawn.
     reveals: BTreeSet<String>,
@@ -45,6 +47,7 @@ impl Registry {
     pub fn begin_frame(&mut self) {
         self.widgets.clear();
         self.known.clear();
+        self.offscreen.clear();
     }
 
     /// Records the widget `name` drawn with `response`.
@@ -65,7 +68,7 @@ impl Registry {
     /// Records a toggle (check box, segmented or toggle button).
     pub fn put_toggle(&mut self, name: &str, response: &Response, text: &str, on: bool) {
         self.put(name, response, text);
-        if let Some(w) = self.widgets.get_mut(name) {
+        if let Some(w) = self.entry_mut(name) {
             w.checked = Some(on);
         }
     }
@@ -73,7 +76,7 @@ impl Registry {
     /// Records a list with its choices (`text` is the selected one).
     pub fn put_list(&mut self, name: &str, response: &Response, text: &str, choices: Vec<String>) {
         self.put(name, response, text);
-        if let Some(w) = self.widgets.get_mut(name) {
+        if let Some(w) = self.entry_mut(name) {
             w.choices = choices;
         }
     }
@@ -83,11 +86,27 @@ impl Registry {
         // Only what is on screen counts: a widget clipped away has a zero rectangle.
         if info.rect.is_positive() {
             self.widgets.insert(name.to_owned(), info);
+        } else {
+            self.offscreen.insert(name.to_owned(), info);
         }
     }
 
+    fn entry_mut(&mut self, name: &str) -> Option<&mut WidgetInfo> {
+        match self.widgets.get_mut(name) {
+            Some(w) => Some(w),
+            None => self.offscreen.get_mut(name),
+        }
+    }
+
+    /// A widget on screen.
     pub fn get(&self, name: &str) -> Option<&WidgetInfo> {
         self.widgets.get(name)
+    }
+
+    /// A widget drawn in the last frame, on screen or scrolled away (its rectangle is
+    /// then empty): what it shows.
+    pub fn read(&self, name: &str) -> Option<&WidgetInfo> {
+        self.widgets.get(name).or_else(|| self.offscreen.get(name))
     }
 
     /// The rectangle of `name` in pixels, `[x, y, width, height]`.

@@ -527,7 +527,9 @@ func _target(t: Variant) -> Variant:
 	if d.has("aba"):
 		var tabs := _control(String(d["aba"][0])) as TabContainer
 		if tabs == null or not tabs.is_visible_in_tree():
-			return null
+			# The tabs of an egui window: one widget per tab, `<abas>_<título>`.
+			var r := _widget("%s_%s" % [d["aba"][0], d["aba"][1]])
+			return r.get_center() if r.has_area() else null
 		var bar := tabs.get_tab_bar()
 		for i in tabs.get_tab_count():
 			if tabs.get_tab_title(i) == String(d["aba"][1]):
@@ -717,7 +719,7 @@ func _accept_dialog(path: String, k: int) -> void:
 ## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
 ## (replications of the results shown), `execucao` ({campo, maior_que}: a run setting of
 ## the document), `ocupado` (a run on the bridge's thread), `grafico` ({controle,
-## maior_que}: things drawn by a `Grafico`), `fluidos` ({nos, tanques, nivel_entre: [a,
+## maior_que}: things drawn by an egui chart), `fluidos` ({nos, tanques, nivel_entre: [a,
 ## b], altura_no_maximo: metres of the network as drawn, enquadrados: the whole network
 ## on screen}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que, legivel: boxes
 ## apart, text whole, zoom legible}), `pert` ({modo, caixas_maior_que, tem_histograma}),
@@ -943,8 +945,11 @@ func _check(c: Dictionary, k: int) -> void:
 			"ocupado":
 				report.call("ocupado", _main.busy() == bool(want), str(_main.busy()))
 			"grafico":
+				# A Godot `Grafico`, or an egui chart (it records how many things it draws).
 				var g := _control(String(want["controle"])) as Grafico
 				var n := g.count() if g != null else -1
+				if g == null and _widget_visible(String(want["controle"])):
+					n = int(_egui().widget_info(String(want["controle"])).get("count", -1))
 				report.call("gráfico %s" % want["controle"], n > int(want.get("maior_que", 0)), str(n))
 			"fluidos":
 				var cena: CenaUtsim = _main.cena

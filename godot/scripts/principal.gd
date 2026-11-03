@@ -4,7 +4,7 @@
 ##
 ## G3: the path network is drawn and edited with the Rede tool (`rede.gd`); runs go to a
 ## thread of the bridge (`UtsimJob`, polled every frame, with progress and Cancelar), the
-## "Resultados" panel (`resultados.gd`) shows the table, the charts, the output analyses,
+## "Resultados" window (egui, `ui_results.rs` in the bridge) shows the table, the charts, the output analyses,
 ## scenarios and optimisation; the PERT/CPM window of the selection (`pert.gd`); the
 ## token flows in 2D (`fluxos.gd`); tanks with their levels (`cena.gd`); the cameras
 ## Seguir, Primeira pessoa and Do recurso; and recorded replays (`.json`) can be opened.
@@ -96,7 +96,6 @@ var _run_reps := 5
 var results: Object
 var job: Object
 var _job_done := Callable()
-var _results_panel: PainelResultados
 var _pert_panel: PainelPert
 var _flows_panel: PainelFluxos
 ## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
@@ -293,16 +292,13 @@ func _build_ui() -> void:
 			_pending.call()
 		_pending = Callable())
 	_ui.add_child(_discard)
-	_results_panel = PainelResultados.new()
-	_ui.add_child(_results_panel)
-	_results_panel.build(self)
 	_pert_panel = PainelPert.new()
 	_ui.add_child(_pert_panel)
 	_pert_panel.build(self)
 	_flows_panel = PainelFluxos.new()
 	_ui.add_child(_flows_panel)
 	_flows_panel.build(self)
-	for panel in [_results_panel, _pert_panel, _flows_panel]:
+	for panel in [_pert_panel, _flows_panel]:
 		panel.anchor_right = 1.0
 		panel.anchor_bottom = 1.0
 		panel.offset_left = LEFT_WIDTH + 12
@@ -313,8 +309,7 @@ func _build_ui() -> void:
 		panel.visible = false
 	_flows_panel.offset_left = -560
 	_flows_panel.anchor_left = 1.0
-	for panel in [_results_panel, _pert_panel]:
-		panel.visibility_changed.connect(_sync_panels)
+	_pert_panel.visibility_changed.connect(_sync_panels)
 	_data_dialog = FileDialog.new()
 	_data_dialog.name = "Dialogo_Dados"
 	_data_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -422,7 +417,7 @@ func free_span() -> Vector2:
 func over_ui(p: Vector2) -> bool:
 	if ui != null and ui.is_over(p):
 		return true
-	for c in [_right, _results_panel, _pert_panel, _flows_panel]:
+	for c in [_right, _pert_panel, _flows_panel]:
 		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
@@ -432,9 +427,8 @@ func over_ui(p: Vector2) -> bool:
 ## Simular and down to the status line in Editar (no bar there); while one is open in
 ## Editar, the properties panel, which they would half cover, is hidden.
 func _sync_panels() -> void:
-	var covering: bool = _results_panel.visible or _pert_panel.visible
-	for panel in [_results_panel, _pert_panel]:
-		panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
+	var covering: bool = _pert_panel.visible or (ui != null and ui.results_open())
+	_pert_panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
 	if mode == "editar":
 		_set_right(not covering)
 
@@ -562,6 +556,8 @@ func bar_action(what: String) -> void:
 			set_snap(snap_on, float(arg))
 		"analisar":
 			analysis_action(arg)
+		"resultados":
+			results_action(what.substr("resultados:".length()))
 		"atalhos":
 			toggle_shortcuts()
 		# The left panel of Editar.
@@ -1262,14 +1258,16 @@ func on_results(res: Object) -> void:
 		return
 	results = res
 	_show_summary()
-	_results_panel.show_results(res)
+	if ui != null:
+		var base := model_path.get_basename() if model_path != "" else OS.get_user_data_dir().path_join("resultados")
+		ui.set_results(res, not playing_replay, base + "_resultados")
 
 
 func _show_summary() -> void:
 	var s: Dictionary = results.summary()
 	var lines := PackedStringArray()
 	for r in results.table():
-		lines.append("%s: %s saídas" % [r["name"], PainelResultados.mh(r["output"])])
+		lines.append("%s: %s saídas" % [r["name"], _mh(r["output"])])
 	var b = s.get("bottleneck")
 	_summary = {
 		"title": "Resultados (%d replicações)" % s["replications"],
@@ -1277,6 +1275,16 @@ func _show_summary() -> void:
 		"lines": lines,
 	}
 	_sync_sim()
+
+
+## `mean ± half_width` with about four significant digits.
+static func _mh(s: Variant) -> String:
+	if s == null or not (s is Dictionary) or s.get("mean") == null:
+		return "-"
+	var h = s.get("half_width")
+	if h == null:
+		return _num(float(s["mean"]))
+	return "%s ± %s" % [_num(float(s["mean"])), _num(float(h))]
 
 
 ## A number with about four significant digits.
@@ -1596,9 +1604,7 @@ func analysis_action(what: String) -> void:
 			if results == null:
 				set_status("Simule o modelo para ver os resultados (Tab ou o botão Simular).")
 				return
-			_results_panel.visible = not _results_panel.visible
-			if _results_panel.visible:
-				_pert_panel.visible = false
+			show_results(not ui.results_open())
 		"fluxos":
 			if mode != "simular" or playback == null:
 				set_status("Os fluxos de tokens aparecem no Simular.")
@@ -1628,8 +1634,46 @@ func open_pert(between: bool) -> void:
 	if document_model() == null:
 		set_status("O modelo tem problemas e não roda: o PERT/CPM precisa de um modelo válido.")
 		return
-	_results_panel.visible = false
+	show_results(false)
 	_pert_panel.open(names, between)
+
+
+## Opens or closes the "Resultados" window (egui, over the free area of the view).
+func show_results(on: bool) -> void:
+	if ui == null:
+		return
+	ui.set_results_open(on)
+	if ui.results_open():
+		_pert_panel.visible = false
+	_sync_panels()
+
+
+## The actions of the "Resultados" window (`resultados:<what>`).
+func results_action(what: String) -> void:
+	var arg := what.substr(what.find(":") + 1) if what.contains(":") else ""
+	match what.get_slice(":", 0):
+		"fechar":
+			_sync_panels()
+		"exportar":
+			set_status(ui.results_export())
+		"ligar_amostras":
+			enable_samples_and_rerun()
+		"aplicar_aquecimento":
+			apply_warmup(float(arg))
+		"trabalho":
+			if job != null:
+				set_status("Aguarde: %s." % job.what())
+				return
+			var j: Object = ui.results_job(arg)
+			if j == null:
+				set_status("Não começou: %s" % ui.results_error())
+				return
+			start_job(j, func(done):
+				if done.kind() == "replicacoes":
+					on_results(done.results())
+				var line: String = ui.results_done(done)
+				if line != "":
+					set_status(line))
 
 
 ## Writes `warmup` to `run.warmup` of the document ("Aplicar" of the warm-up analysis).

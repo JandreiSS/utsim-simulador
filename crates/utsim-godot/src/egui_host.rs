@@ -841,4 +841,42 @@ mod tests {
             drop_frame(h.frame(6.0, SIZE, 1.0));
         }
     }
+
+    #[test]
+    fn the_scenarios_area_takes_new_lines() {
+        let mut h = host();
+        h.set_results(crate::ui_results::tests::view("servidores.ron", 2), "");
+        h.set_results_open(true);
+        h.results_mem.tab = 3;
+        drop_frame(h.frame(1.0, SIZE, 1.0));
+        drop_frame(h.frame(1.1, SIZE, 1.0));
+        let at = center(&h, "Res_CenariosTexto");
+        h.push(&button(at, 1, true), no_clip);
+        drop_frame(h.frame(1.2, SIZE, 1.0));
+        h.push(&button(at, 1, false), no_clip);
+        drop_frame(h.frame(1.3, SIZE, 1.0));
+        let mut t = 1.4;
+        for ch in "[a]\nb".chars() {
+            let (code, unicode) = if ch == '\n' {
+                (crate::egui_input::SPECIAL | 5, 0)
+            } else {
+                (ch as i64, ch as u32)
+            };
+            for pressed in [true, false] {
+                h.push(
+                    &Input::Key {
+                        keycode: code,
+                        unicode: if pressed { unicode } else { 0 },
+                        pressed,
+                        echo: false,
+                        mods: Mods::default(),
+                    },
+                    no_clip,
+                );
+                drop_frame(h.frame(t, SIZE, 1.0));
+                t += 0.1;
+            }
+        }
+        assert_eq!(h.results_mem.sc_text, "[a]\nb");
+    }
 }

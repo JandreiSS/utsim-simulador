@@ -472,11 +472,26 @@ impl Playback {
             } else {
                 v.name.clone()
             };
+            // A queue drawn as a conveyor counts what does not fit on its belt.
+            let hidden = v
+                .look
+                .as_ref()
+                .and_then(|l| looks::queue_belt(&v.kind, l))
+                .map_or(0, |belt| belt.hidden(content, ITEM_SIZE));
             f.label
-                .push(style::label_text(&shown, content, 0, received));
+                .push(style::label_text(&shown, content, hidden, received));
         }
         // Items: where the scene puts them, moved onto forks, hands and decks.
         let mut stacked: HashMap<usize, usize> = HashMap::new();
+        let mut resting: HashMap<usize, usize> = HashMap::new();
+        // Queues drawn as conveyors: an item flying in or out does not sink into the belt.
+        let belts: Vec<([f32; 3], looks::QueueBelt)> = (0..self.blocks.len())
+            .filter_map(|i| {
+                let v = &self.blocks[i];
+                let belt = looks::queue_belt(&v.kind, v.look.as_ref()?)?;
+                Some((self.static_pose(i).0, belt))
+            })
+            .collect();
         for p in s.items_at(t).into_iter().filter(|p| p.drawn) {
             let mut center = p.center;
             let mut scale = p.scale;
@@ -487,7 +502,21 @@ impl Playback {
                 && let Some(look) = &self.blocks[i].look
             {
                 let v = &self.blocks[i];
-                if v.kind == "Queue" {
+                if let Some(belt) = looks::queue_belt(&v.kind, look) {
+                    // On top of the belt, in a line (the scene's slots are the simple
+                    // queue's: their base is the block's).
+                    let k = resting.entry(i).or_default();
+                    let simple = style::slot_offset(Shape::LongBox, *k);
+                    let Some(at) = belt.slot(*k, ITEM_SIZE) else {
+                        continue;
+                    };
+                    *k += 1;
+                    center = [
+                        center[0] - simple[0] + at[0],
+                        center[1] - simple[1] + at[1],
+                        center[2] - simple[2] + at[2],
+                    ];
+                } else if v.kind == "Queue" {
                     center[1] -= looks::queue_drop();
                 } else if let Some(pose) = poses[i] {
                     if let Carry::Forks { .. } = look.carry {
@@ -509,6 +538,18 @@ impl Playback {
                         stack = *k as i32;
                     }
                     *k += 1;
+                }
+            }
+            if p.parent.is_none() {
+                for (base, belt) in &belts {
+                    let d = [
+                        center[0] - base[0],
+                        center[1] - base[1],
+                        center[2] - base[2],
+                    ];
+                    if belt.covers(d, scale * ITEM_SIZE) {
+                        center[1] = center[1].max(base[1] + belt.rest_height(scale * ITEM_SIZE));
+                    }
                 }
             }
             let origin = s.timeline.item_origin(p.item).unwrap_or(0);
@@ -553,6 +594,51 @@ mod tests {
         let (model, path) = example(name);
         let replay = model.replay(0).expect("replay");
         Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    #[test]
+    fn a_queue_drawn_as_a_conveyor_keeps_its_items_on_the_belt() {
+        let model = Model::parse(
+            r#"Model(
+                name: "fila na esteira",
+                run: (stop_time: 300.0, seed: 3, replications: 1),
+                objects: [
+                    (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0)), position: (0.0, 0.0, 0.0)),
+                    (name: "fila", kind: Queue(), position: (5.0, 0.0, 0.0), visual: (asset: "esteira")),
+                    (name: "maquina", kind: Processor(capacity: 1, process: Exp(mean: 4.0)), position: (10.0, 0.0, 0.0)),
+                    (name: "saida", kind: Sink, position: (14.0, 0.0, 0.0)),
+                ],
+                connections: [("chegada", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+            )"#,
+        )
+        .unwrap();
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), None, false);
+        let q = pb.blocks.iter().position(|v| v.name == "fila").unwrap();
+        let belt = looks::queue_belt("Queue", pb.blocks[q].look.as_ref().unwrap()).unwrap();
+        let base = pb.static_pose(q).0;
+        for t in [30.0, 150.0, 300.0] {
+            let f = pb.frame(t);
+            let mut on = 0;
+            for p in &f.item_position {
+                let d = [p[0] - base[0], p[1] - base[1], p[2] - base[2]];
+                // Over the belt's footprint (Godot: y up; the belt runs along x).
+                if d[0].abs() <= belt.length / 2.0 + 0.5 && d[2].abs() <= belt.width / 2.0 + 0.5 {
+                    assert!(
+                        d[1] - ITEM_SIZE / 2.0 >= belt.top - 1e-3,
+                        "t {t}: {d:?} under the belt top"
+                    );
+                    if (d[1] - belt.rest_height(ITEM_SIZE)).abs() < 1e-3 {
+                        on += 1;
+                    }
+                }
+            }
+            assert!(
+                on >= belt.per_layer(ITEM_SIZE),
+                "t {t}: {on} items on the belt"
+            );
+            assert!(f.label[q].contains('+'), "{}", f.label[q]);
+        }
     }
 
     #[test]
