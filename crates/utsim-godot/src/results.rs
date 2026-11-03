@@ -45,7 +45,7 @@ fn opt_summary(s: &Option<Summary>) -> Value {
     s.as_ref().map_or(Value::Null, summary)
 }
 
-const STATES: [State; 18] = [
+const STATES: [State; 21] = [
     State::Idle,
     State::Empty,
     State::Generating,
@@ -64,6 +64,9 @@ const STATES: [State; 18] = [
     State::Unloading,
     State::Utilize,
     State::Stopped,
+    State::WaitingRepair,
+    State::Maintenance,
+    State::Resting,
 ];
 
 /// The state called `name` in the reports (`"processing"`...).
