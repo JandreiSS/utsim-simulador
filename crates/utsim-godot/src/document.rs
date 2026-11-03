@@ -30,6 +30,23 @@ pub fn paste_offset(n: u32) -> [f64; 3] {
     [k, -k, 0.0]
 }
 
+/// Default sampling interval of the content series: about 200 points over the
+/// statistics window, rounded to 1, 2 or 5 times a power of ten (the Bevy results
+/// window's choice).
+pub fn default_sample_interval(stop_time: f64, warmup: f64) -> f64 {
+    let span = (stop_time - warmup).max(1e-9);
+    let raw = span / 200.0;
+    let p = 10f64.powf(raw.log10().floor());
+    [1.0, 2.0, 5.0, 10.0]
+        .into_iter()
+        .map(|m| m * p)
+        .find(|v| *v >= raw)
+        .unwrap_or(raw)
+}
+
+/// Default number of histogram bins.
+pub const DEFAULT_HISTOGRAM_BINS: usize = 20;
+
 /// Mobile resources are not wired by ports: the message shown when the user tries to
 /// connect one (`None` for ordinary blocks).
 pub fn connect_blocked(kind: &str) -> Option<&'static str> {
@@ -133,6 +150,41 @@ impl Editor {
 
     pub fn apply(&mut self, command: Command) -> Result<(), String> {
         self.doc.apply(command)
+    }
+
+    /// Switches on the content series (`run.sample_interval`, from the simulated time)
+    /// and the histograms (`run.histogram_bins`) that the model leaves off, as one undo
+    /// step. Returns the values written (`None` for one already on); an error when both
+    /// were on.
+    pub fn enable_samples(&mut self) -> Result<(Option<f64>, Option<usize>), String> {
+        let run = &self.model().run;
+        let interval = run
+            .sample_interval
+            .is_none()
+            .then(|| default_sample_interval(run.stop_time, run.warmup));
+        let bins = run
+            .histogram_bins
+            .is_none()
+            .then_some(DEFAULT_HISTOGRAM_BINS);
+        let mut all = Vec::new();
+        if let Some(v) = interval {
+            all.push(Command::Set {
+                key: "run.sample_interval".into(),
+                value: format!("Some({})", crate::ron_text::float(v)),
+            });
+        }
+        if let Some(b) = bins {
+            all.push(Command::Set {
+                key: "run.histogram_bins".into(),
+                value: format!("Some({b})"),
+            });
+        }
+        if all.is_empty() {
+            return Err("a série e os histogramas já estão ligados no modelo".into());
+        }
+        self.apply(Command::Batch(all))?;
+        self.doc.end_gesture();
+        Ok((interval, bins))
     }
 
     fn apply_some(&mut self, command: Option<Command>, none: &str) -> Result<(), String> {
@@ -742,6 +794,26 @@ mod tests {
         assert!(!e.doc.undo());
         while e.doc.redo() {}
         assert_eq!(e.model().connections.len(), 3);
+    }
+
+    #[test]
+    fn series_and_histograms_are_switched_on_as_one_undo_step() {
+        assert_eq!(default_sample_interval(2000.0, 100.0), 10.0);
+        assert_eq!(default_sample_interval(3000.0, 100.0), 20.0);
+        let mut e = line();
+        e.set_property("run", "stop_time", &Value::Float(2000.0), &[])
+            .unwrap();
+        e.doc.end_gesture();
+        let (interval, bins) = e.enable_samples().unwrap();
+        assert_eq!((interval, bins), (Some(10.0), Some(DEFAULT_HISTOGRAM_BINS)));
+        assert_eq!(e.model().run.sample_interval, Some(10.0));
+        assert_eq!(e.model().run.histogram_bins, Some(DEFAULT_HISTOGRAM_BINS));
+        assert!(e.model().run_replications().is_ok());
+        assert!(e.enable_samples().is_err(), "both already on");
+        assert!(e.doc.undo());
+        assert_eq!(e.model().run.sample_interval, None);
+        assert_eq!(e.model().run.histogram_bins, None);
+        assert_eq!(e.model().run.stop_time, 2000.0, "one step only");
     }
 
     #[test]

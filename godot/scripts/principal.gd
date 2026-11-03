@@ -100,6 +100,8 @@ var _flows_panel: PainelFluxos
 var _camera_pick: OptionButton
 ## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
 var camera_mode := "orbita"
+## Point the following cameras look at (scripted checks: nothing may stand between).
+var camera_aim := Vector3.ZERO
 ## Block followed by the cameras other than the orbit one.
 var follow_name := ""
 var _frames := 0
@@ -560,6 +562,8 @@ func _build_ui() -> void:
 		panel.visible = false
 	_flows_panel.offset_left = -560
 	_flows_panel.anchor_left = 1.0
+	for panel in [_results_panel, _pert_panel]:
+		panel.visibility_changed.connect(_sync_panels)
 	_replay_dialog = FileDialog.new()
 	_replay_dialog.name = "Dialogo_Replay"
 	_replay_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -606,6 +610,17 @@ func over_ui(p: Vector2) -> bool:
 		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
+
+
+## The Resultados and PERT/CPM windows cover the view down to the playback bar in
+## Simular and down to the status line in Editar (no bar there); while one is open in
+## Editar, the properties panel, which they would half cover, is hidden.
+func _sync_panels() -> void:
+	var covering: bool = _results_panel.visible or _pert_panel.visible
+	for panel in [_results_panel, _pert_panel]:
+		panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
+	if mode == "editar":
+		_right.visible = not covering
 
 
 func is_editing() -> bool:
@@ -937,6 +952,13 @@ func _frame_model() -> void:
 		lo = Vector3(minf(lo.x, p.x), 0, minf(lo.z, p.z))
 		hi = Vector3(maxf(hi.x, p.x), 0, maxf(hi.z, p.z))
 		any = true
+	# What the scene draws beyond the objects (the fluid network, the paths).
+	if cena.info.has("bounds_min"):
+		var blo: Vector3 = cena.info["bounds_min"]
+		var bhi: Vector3 = cena.info["bounds_max"]
+		lo = Vector3(minf(lo.x, blo.x), 0, minf(lo.z, blo.z))
+		hi = Vector3(maxf(hi.x, bhi.x), 0, maxf(hi.z, bhi.z))
+		any = true
 	if not any:
 		lo = Vector3(-8, 0, -8)
 		hi = Vector3(8, 0, 8)
@@ -966,6 +988,7 @@ func set_mode(which: String) -> bool:
 	_sim_left.visible = false
 	_right.visible = true
 	_bar.visible = false
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = true
 	_revision = -1
@@ -996,6 +1019,7 @@ func simulate(reps: int) -> bool:
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	_reps.value = reps
@@ -1427,6 +1451,26 @@ func open_pert(between: bool) -> void:
 
 
 ## Writes `warmup` to `run.warmup` of the document ("Aplicar" of the warm-up analysis).
+## Switches on the content series and the histograms in the model (one undo step, from
+## the Resultados charts) and runs the replications again, so the charts have data.
+func enable_samples_and_rerun() -> void:
+	if playing_replay:
+		set_status("Um replay gravado não roda de novo: abra o modelo.")
+		return
+	var r: Dictionary = doc.enable_samples()
+	if not r["ok"]:
+		set_status("Não ligou a série e os histogramas: %s" % doc.last_error())
+		return
+	after_edit()
+	var parts := PackedStringArray()
+	if float(r["sample_interval"]) > 0.0:
+		parts.append("run.sample_interval = %s" % _num(float(r["sample_interval"])))
+	if int(r["histogram_bins"]) > 0:
+		parts.append("run.histogram_bins = %d" % int(r["histogram_bins"]))
+	simulate(int(_reps.value))
+	set_status("Ligado no modelo (%s; Ctrl+Z desfaz). Simulando de novo..." % ", ".join(parts))
+
+
 func apply_warmup(warmup: float) -> void:
 	if doc.set_property("run", "warmup", warmup, PackedStringArray()):
 		doc.end_gesture()
@@ -1463,6 +1507,7 @@ func open_replay(path: String) -> bool:
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
+	_sync_panels()
 	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	on_results(model.replay_results())
@@ -1493,6 +1538,8 @@ func save_replay(path: String) -> bool:
 
 func set_camera_mode(which: String) -> void:
 	camera_mode = which
+	if which not in ["primeira_pessoa", "recurso"]:
+		cena.restore_view()
 	for k in CAMERAS.size():
 		if CAMERAS[k][0] == which:
 			_camera_pick.select(k)
@@ -1525,10 +1572,19 @@ func _drive_camera() -> void:
 			camera.update()
 		"primeira_pessoa":
 			var eye := at + Vector3(0, 1.6, 0) + forward * 0.35
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(eye + forward * 10.0 - Vector3(0, 1.2, 0), Vector3.UP)
+			camera_aim = eye + forward * 10.0 - Vector3(0, 1.2, 0)
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
+			cena.clear_view(eye, camera_aim, i)
 		"recurso":
-			var eye := at - forward * 6.0 + Vector3(0, 3.5, 0)
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(at + Vector3(0, 1.0, 0), Vector3.UP)
+			# The driving position: above the vehicle (an AGV has no cab; a forklift's
+			# seat is about its mast's height), looking ahead and a little down. The
+			# parts of the vehicle on the sight line and any block the eye goes through
+			# are hidden while the camera is there.
+			var eye_y := clampf(float(cena.rigs[i].get("top", 1.0)) + 0.6, 1.4, 2.4)
+			var eye := at + Vector3(0, eye_y, 0)
+			camera_aim = eye + forward * 10.0 - Vector3(0, eye_y * 0.8, 0)
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
+			cena.clear_view(eye, camera_aim, i)
 
 
 # ---------------------------------------------------------------------------

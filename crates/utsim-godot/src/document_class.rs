@@ -271,6 +271,22 @@ impl UtsimDocument {
         self.editor.doc.redo()
     }
 
+    /// Switches on the content series and the histograms the model leaves off
+    /// (`run.sample_interval` from the simulated time, `run.histogram_bins` = 20), as one
+    /// undo step: `{ok, sample_interval, histogram_bins}` (a value of 0 for a setting that
+    /// was already on). On failure `last_error` says why.
+    #[func]
+    fn enable_samples(&mut self) -> VarDictionary {
+        let r = self.editor.enable_samples();
+        let mut d = VarDictionary::new();
+        let (interval, bins) = r.as_ref().map_or((None, None), |v| *v);
+        let ok = self.done(r.map(|_| ()));
+        put(&mut d, "ok", ok);
+        put(&mut d, "sample_interval", interval.unwrap_or(0.0));
+        put(&mut d, "histogram_bins", bins.unwrap_or(0) as i64);
+        d
+    }
+
     /// Ends a gesture (a colour drag), so the next edit is a step of its own.
     #[func]
     fn end_gesture(&mut self) {
