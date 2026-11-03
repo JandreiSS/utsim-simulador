@@ -4,6 +4,7 @@ mod corredores;
 mod dados;
 mod emulate;
 mod estado;
+mod estatistica;
 mod experiment;
 mod fit;
 mod fluxograma;
@@ -390,6 +391,13 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Estatística descritiva e testes de hipótese (t, ANOVA, qui-quadrado, proporções,
+    /// Mann-Whitney, Wilcoxon) sobre as colunas de um CSV
+    #[command(disable_help_flag = true)]
+    Estatistica {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Ajusta os campos de um modelo alimentados por dados reais e gera os relatórios
     Dados(dados::Args),
     /// PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
@@ -450,6 +458,7 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
         Cmd::Qualidade { args } => qualidade::run_args(args)?,
+        Cmd::Estatistica { args } => estatistica::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,

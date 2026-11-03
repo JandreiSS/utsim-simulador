@@ -1,0 +1,15 @@
+# Tempo de setup (min) de 12 trocas na mesma máquina, antes e depois do SMED
+# (dados sintéticos para os exemplos do manual; cada linha é um par).
+antes,depois
+48.2,35.1
+51.7,37.9
+45.9,36.4
+55.3,40.2
+49.8,33.7
+47.1,38.8
+53.6,36.0
+50.4,39.5
+46.8,34.2
+52.9,37.3
+49.1,35.8
+54.0,41.0
