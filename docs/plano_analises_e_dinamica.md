@@ -227,7 +227,9 @@ comparação de cenários, verificação de consistência e visões no tempo e n
 ### O que falta, por prioridade
 
 **P1 (confiança nos números).** *Feito no núcleo e na CLI (`crates/utsim-stats`,
-`utsim-model::analysis`, `utsim analisar`); falta a interface Godot.* Notas da
+`utsim-model::analysis`, `utsim analisar`) e na aba Análise dos resultados do Godot (G3:
+aquecimento com Aplicar, replicações necessárias com Rodar mais, Little com semáforo, gargalo
+móvel; as médias em lotes ficam só na CLI).* Notas da
 implementação:
 - [x] 1: `utsim_stats::t_quantile`/`summary`; em 95 % continua a tabela `t_975` (tornada
   pública), porque as faixas acima de 30 gl da tabela não são o quantil exato e trocá-las

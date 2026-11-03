@@ -986,7 +986,7 @@ A janela **Resultados** do `utsim-view` roda replicações, cenários e otimiza�
 - `utsim-viewer::results` (biblioteca, sem egui): configurações da rodada, ordenação e filtro da tabela, dados dos gráficos (cores de estado de `style::state_color`), cenários montados das linhas da grade, problema de otimização montado do formulário e o comando de "Aplicar ao modelo" (um `Command::Batch` de `Set`, um passo de desfazer).
 - `results_panel.rs` (binário): a janela, com os gráficos em `egui_plot` 0.37 (a versão feita para o egui 0.36 do `bevy_egui` 0.43). Os trabalhos rodam numa thread no aplicativo de mesa e no próprio quadro no navegador; o progresso volta por um canal e "Cancelar" liga um `AtomicBool`. Arquivos (CSV, HTML, experimento `.ron`) só no aplicativo de mesa.
 
-## 4r. Interface Godot (fases G1 e G2: ponte, reprodução e edição)
+## 4r. Interface Godot (fases G1 a G3: ponte, reprodução, edição, rede, fluidos e resultados)
 
 A interface 3D da versão 0.2 (e depois a realidade virtual e aumentada) é feita no Godot 4.7.
 O editor e visualizador Bevy (`utsim-viewer`) continua sendo o da versão 0.1. O Godot não
@@ -998,7 +998,7 @@ O plano das fases G1 a G5 está em `docs/plano_godot.md`.
 0.5.5 com a feature `api-4-7`). Fica fora de `default-members` e dos passos do
 `verificar.sh` sem `UTSIM_GODOT=1`. Só as classes do núcleo do Godot são geradas (sem
 `__codegen-full`), porque a ponte devolve dados simples e todo nó é criado no GDScript; o
-build da ponte leva cerca de 1 min. Três classes, todas `RefCounted`:
+build da ponte leva cerca de 1 min. As classes da G1 e da G2, todas `RefCounted` (as da G3 estão em "Rede, fluidos e resultados", abaixo):
 
 | Classe | Métodos |
 |---|---|
@@ -1192,19 +1192,47 @@ na ponte e de 0,04 a 1,3 ms no GDScript; o maior valor é o do centro de distrib
 salto cria e apaga muitos nós de itens (palete com oito caixas), coisa que a reprodução contínua
 quase não faz.
 
-**Lacunas depois da G2:**
+**Rede, fluidos e resultados (G3).** Módulos puros novos da ponte, testados sem o motor, e as
+classes que os expõem:
+
+| Módulo | Conteúdo |
+|---|---|
+| `network_edit` | linhas de nós e trechos (sentido, capacidade, comprimento) e as edições da ferramenta Rede como comandos do `utsim-edit`: `add_node` (com o trecho a partir do nó armado no mesmo passo de desfazer), `move_node`, `rename_node`, `remove_nodes`, `add_edge`, `set_edge`, `reverse_edge`, `remove_edge`, `node_near` |
+| `extras` | fluidos da `utsim_scene::fluids::FluidView` (forma, tamanho do tanque pela capacidade, portas, tubos, conversores) e, por instante, fração cheia, nível, taxa, cor e tubos ativos; grafos dos fluxos de tokens (`layout::auto_layout` ao longo de `next`) com as contagens no instante e amostradas na rodada |
+| `results` | `RunOutput` (modelo, relatórios, `ObjectStats`) em JSON para o painel: resumo com os dois gargalos, tabela com IC, métricas, barras de ocupação, estados com as cores de `style::state_color`, série, histogramas, precisão; aquecimento, Little com semáforo (verde: o IC de `L - λW` contém zero; amarelo: não contém, mas a diferença relativa fica na tolerância de 2 %; vermelho: não fecha), gargalo móvel; cenários escritos como texto (`[nome]`, `chave = valor`, a base primeiro) e o formulário de otimização (`OptForm` → `OptProblem`) |
+| `jobs` | `Job`: uma `Task` (replicações, mais replicações, cenários, otimização, aquecimento, Little, gargalo móvel, PERT) numa thread, com progresso (`done`, `total`; 0 quando não conta) e cancelar. "Mais replicações" roda as de índice `n..n+k` (`Model::build` + `drive`, sementes próprias), em paralelo por `thread::scope`, e junta às `n` feitas: o resultado é igual ao de uma rodada de `n + k` |
+| `pert_view` | PERT/CPM da seleção (`Selection::Objects` ou `Between`) no modo pedido, em JSON: diagrama de `utsim_pert::report::diagram`, atividades com ES/EF/LS/LF e folgas, total com percentis e prazo, histograma (no clássico, a normal discretizada), caminhos, objetos críticos (criticidade ≥ 0,5), hipóteses e avisos; texto, HTML e CSV do `report` |
+
+| Classe | Métodos |
+|---|---|
+| `UtsimModel` (G3) | `load` aceita `.json` (replay gravado: `is_replay`, `replay_results`, `playback` sem modelo); `save_replay(rep, caminho)`; `start_run(n)`, `start_scenarios(texto, medidas, n)`, `start_optimize(form)`, `start_pert(nomes, de_ate, modo, prazo, sorteios)` devolvem um `UtsimJob` |
+| `UtsimJob` | `kind`, `what`, `progress()` (`{done, total, finished}`), `is_finished`, `cancel`, `wait`, `ok`, `cancelled`, `error`; `results()` (`UtsimResults`), `data()` (dicionário), `pert()` (`UtsimPert`) |
+| `UtsimResults` | `summary`, `table`, `metrics`, `utilization(tipo)`, `states`, `series(obj)`, `tallies(obj)`, `histogram(obj, medida)`, `precision(alvo, medidas)`, `export_csv(pasta)`; `start_more(k)`, `start_warmup(série, janela)`, `start_little`, `start_shifting` |
+| `UtsimPert` | `data`, `text`, `save_html`, `save_csv` |
+| `UtsimPlayback` (G3) | `static_scene` traz `fluids` (forma, raio, altura, capacidade, porta), `fluid_links`, `fluid_converters`; `fluid_frame(t)`; `flows()`, `flow_counts(k, t)`, `flow_series(k, n)` |
+| `UtsimDocument` (G3) | `network()`, `add_node`, `move_node`, `rename_node`, `remove_nodes`, `add_edge`, `set_edge`, `reverse_edge`, `remove_edge`, `node_near` |
+
+Os resultados vão ao GDScript como JSON convertido em dicionários e arrays
+(`jobs_class::variant_of_json`; números não finitos viram `null`); o que muda a cada quadro
+(fluidos, tokens) continua em arrays empacotados. No GDScript: `rede.gd` (ferramenta Rede,
+desenhada na sobreposição do editor), `grafico.gd` (barras com IC, faixas de estados, linhas
+com marcadores e histograma em `draw_*`), `resultados.gd` (painel Resultados com as abas
+Resumo, Gráficos, Análise, Cenários e Otimização), `pert.gd` (janela PERT/CPM: rede, Gantt,
+distribuição, tabela e texto), `fluxos.gd` (fluxos de tokens em 2D) e, no `principal.gd`, a
+barra de progresso com Cancelar (uma tarefa por vez, consultada a cada quadro), as câmeras
+Seguir, Primeira pessoa e Do recurso e o replay `.json`. O `cena.gd` desenha os tanques (o
+líquido na altura do nível, a cor pela taxa), os tubos e os conversores, limita os rótulos aos
+60 mais próximos até 160 m e não desenha itens além de 140 m. Os roteiros
+`godot/roteiros/g3_*.json` rodam sem janela no `scripts/godot_teste.sh`.
+
+**Lacunas depois da G3:**
 
 - o `operador_simples` (sem o boneco) não mexe braços e pernas no Godot;
-- os nós de fluido são cilindros simples, sem nível;
-- os rótulos não têm o limite por distância do Bevy (A3D-4);
-- só há a câmera de órbita;
-- o replay é sempre o da replicação 0;
-- `run` bloqueia o quadro enquanto as replicações rodam (a thread com progresso e cancelar
-  fica para a G3, com os resultados);
-- o Editar não edita a rede de caminhos, os fluidos, os fluxos de tokens nem os calendários
-  (um objeto escolhe um calendário que já existe; a G3 traz a rede e os fluidos);
-- a aparência do Editar (portas, contornos, miniatura) só foi conferida pelos roteiros sem
-  janela: a conferência visual está anotada em `docs/plano_godot.md`.
+- os tanques são cilindros simples; o Editar não cria nem edita os nós de fluido, os fluxos
+  de tokens nem os calendários;
+- o replay é sempre o da replicação 0; a cena ao vivo (`utsim-scene/1`) não foi feita;
+- a aparência da G3 só foi conferida pelos roteiros sem janela: a conferência visual está
+  anotada em `docs/plano_godot.md`.
 
 ## 4s. PERT/CPM de uma parte do processo
 
