@@ -35,6 +35,7 @@ Model(
     floor_plan: Some((...)),
     aisles: [ ... ],
     floor_marking: Some((...)),
+    line: "lean_office",
 )
 ```
 
@@ -56,6 +57,7 @@ Model(
 | `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
 | `aisles` | `[]` | corredores de circulação: `(name, kind: Pedestrian \| Forklift \| Mixed, points: [(x, y), ...], width, two_way: true, secondary: false, profile: None)`; geram a rede do modo `Aisles`. Veja [Corredores e faixas de segurança](corredores.md) |
 | `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0)` |
+| `line` | nenhuma | linha especializada do modelo (`"lean_office"`): vocabulário, biblioteca e indicadores da linha. A simulação não lê o campo. Veja [Lean Office](linhas/lean-office.md) |
 
 ## `run`
 
@@ -91,6 +93,9 @@ Model(
 | `visual` | nenhuma | aparência no 3D |
 | `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
 | `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift)` ([Pessoas](pessoas.md)) |
+| `preset` | nenhuma | predefinição da biblioteca de uma linha que criou o objeto, `"linha/predefinição"` (por exemplo `"lean_office/aprovacao"`): nome e papel do objeto nos relatórios da linha. A simulação não lê o campo |
+| `area` | nenhuma | área ou departamento do objeto (`"Compras"`): raia do fluxograma multifuncional e relatórios por departamento. A simulação não lê o campo |
+| `symbol` | inferido | símbolo do fluxograma: `inicio`, `fim`, `operacao`, `transporte`, `inspecao`, `espera` ou `armazenagem`. Ausente, o fluxograma escolhe pelo tipo do objeto; `--simbolo` do `utsim fluxograma` ainda tem precedência |
 
 ### `transfer`
 
