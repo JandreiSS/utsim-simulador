@@ -1,0 +1,81 @@
+// Dados reais: os campos de tempo vêm de valores observados e a distribuição é
+// escolhida automaticamente ao carregar o modelo (veja o manual, "Dados reais e
+// ajuste automático"). Tempo em minutos.
+//   utsim dados examples/dados_reais.ron --relatorio relatorios_dados
+// O mesmo atendimento do tutorial 05, agora sem copiar parâmetros à mão:
+// - chegadas: instantes anotados num arquivo (os intervalos entre eles são ajustados);
+// - atendimento: tempos anotados num arquivo, melhor família pelo AIC;
+// - pausa (setup) entre clientes: 30 valores escritos no próprio modelo,
+//   distribuição empírica.
+// O campo `fitted` de cada entrada registra o último ajuste (família, distribuição e
+// hash dos dados): com os mesmos dados ele é reaproveitado; se os dados mudarem, o
+// campo é reajustado e o UTSim avisa. `utsim dados ... --gravar` atualiza o registro.
+Model(
+    name: "Dados reais: atendimento com ajuste automático",
+    description: "Chegadas e atendimento ajustados a partir de arquivos; pausa empírica",
+    run: (
+        stop_time: 50000.0,
+        warmup: 2000.0,
+        seed: 3,
+        replications: 10,
+    ),
+    objects: [
+        (name: "chegada",    kind: Source(interarrival: Exp(mean: 1.0)),                  position: (0.0, 0.0, 0.0)),
+        (name: "fila",       kind: Queue(),                                               position: (4.0, 0.0, 0.0)),
+        (name: "atendentes", kind: Processor(capacity: 3, process: Const(1.0), setup: None), position: (8.0, 0.0, 0.0)),
+        (name: "saida",      kind: Sink,                                                  position: (12.0, 0.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "atendentes"),
+        ("atendentes", "saida"),
+    ],
+    data: [
+        (
+            field: "chegada.interarrival",
+            source: "dados/tutorial_05_chegadas.csv",
+            column: "instante_min",
+            timestamps: true,
+            fitted: (
+                family: "Exponencial",
+                dist: Exp(mean: 2.896262626262626),
+                hash: "fnv1a64:aa332dbe82f60dff",
+                n: 99,
+                settings: "auto1 Best Aic alpha=0.05 bootstrap=300 seed=1",
+            ),
+        ),
+        (
+            field: "atendentes.process",
+            source: "dados/tutorial_05_atendimento.csv",
+            choose: Best,
+            criterion: Aic,
+            fitted: (
+                family: "Gama",
+                dist: Gamma(shape: 3.5062574525060994, scale: 1.4587491276044857),
+                hash: "fnv1a64:97625f46d8b77ed3",
+                n: 80,
+                settings: "auto1 Best Aic alpha=0.05 bootstrap=300 seed=1",
+            ),
+        ),
+        (
+            field: "atendentes.setup",
+            values: [
+                0.3295, 0.2603, 0.4604, 0.229, 0.4144, 0.3463, 0.2232, 0.403, 0.215, 0.3735,
+                0.2279, 0.2363, 0.3698, 0.5307, 0.2495, 0.2893, 0.451, 0.5791, 0.4308, 0.3587,
+                0.5905, 0.2186, 0.5434, 0.3158, 0.2577, 0.2471, 0.3234, 0.5265, 0.2723, 0.4326,
+            ],
+            choose: Empirical,
+            fitted: (
+                family: "Empírica",
+                dist: Empirical([
+                    0.215, 0.2186, 0.2232, 0.2279, 0.229, 0.2363, 0.2471, 0.2495, 0.2577, 0.2603,
+                    0.2723, 0.2893, 0.3158, 0.3234, 0.3295, 0.3463, 0.3587, 0.3698, 0.3735, 0.403,
+                    0.4144, 0.4308, 0.4326, 0.451, 0.4604, 0.5265, 0.5307, 0.5434, 0.5791, 0.5905,
+                ]),
+                hash: "fnv1a64:73542bad2f8f96ac",
+                n: 30,
+                settings: "auto1 Empirical Aic alpha=0.05 bootstrap=300 seed=1",
+            ),
+        ),
+    ],
+)

@@ -30,6 +30,7 @@ Model(
     flows: [ ... ],
     fluids: Some((...)),
     spans: [ ... ],
+    data: [ ... ],
 )
 ```
 
@@ -46,6 +47,7 @@ Model(
 | `flows` | `[]` | fluxos de tokens |
 | `fluids` | nenhuma | rede de fluidos |
 | `spans` | `[]` | tempo entre dois pontos do fluxo: `(name, from, to)`. Veja [Resultados](resultados.md) |
+| `data` | `[]` | campos de distribuição alimentados por valores observados, ajustados ao abrir o modelo: `(field: "torno.process", source: "dados/t.csv", choose: Best, criterion: Aic)`. Veja [Dados reais e ajuste automático](dados-reais.md) |
 
 ## `run`
 

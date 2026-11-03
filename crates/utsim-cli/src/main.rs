@@ -1,5 +1,6 @@
 mod analisar;
 mod cena;
+mod dados;
 mod emulate;
 mod estado;
 mod experiment;
@@ -329,6 +330,13 @@ enum Cmd {
         /// Grava o relatório em JSON
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Grava o relatório da escolha automática (o mesmo de `utsim dados`) neste HTML,
+        /// com um CSV das candidatas ao lado
+        #[arg(long)]
+        relatorio: Option<PathBuf>,
+        /// Critério que ordena as candidatas aceitas no relatório: aic, bic, ks ou ad
+        #[arg(long, default_value = "aic")]
+        criterio: String,
     },
     // Arguments parsed by `qualidade::run_args`, so the main parser stays small (its
     // debug build overflowed the main-thread stack on Windows).
@@ -338,6 +346,8 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Ajusta os campos de um modelo alimentados por dados reais e gera os relatórios
+    Dados(dados::Args),
     /// PERT/CPM de uma parte do modelo (seleção de objetos ou trecho de A até B)
     Pert {
         model: PathBuf,
@@ -447,6 +457,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             seed,
             html,
             json,
+            relatorio,
+            criterio,
         } => fit::run(fit::Args {
             file,
             column: coluna,
@@ -456,7 +468,10 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             seed,
             html,
             json,
+            report: relatorio,
+            criterion: criterio,
         })?,
+        Cmd::Dados(args) => dados::run(args)?,
         Cmd::Otimizar {
             problema,
             html,

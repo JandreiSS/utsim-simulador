@@ -10,6 +10,7 @@
 
 - [Objetos](objetos.md)
   - [Distribuições](distribuicoes.md)
+  - [Dados reais e ajuste automático](dados-reais.md)
 - [Conexões e regras de saída](conexoes.md)
 - [Recursos móveis](recursos-moveis.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)

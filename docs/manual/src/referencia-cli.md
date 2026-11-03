@@ -10,6 +10,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
 | `utsim cena` | grava a cena 3D para outros motores | [3D realista](visual-3d.md) |
 | `utsim fit` | ajusta distribuições a dados | [Ajuste de distribuições](ajuste-de-distribuicoes.md) |
+| `utsim dados` | ajusta os campos do modelo alimentados por dados reais e gera os relatórios | [Dados reais e ajuste automático](dados-reais.md) |
 | `utsim experiment` | compara cenários | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim otimizar` | procura os melhores parâmetros | [Experimentos e otimização](experimentos-e-otimizacao.md) |
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
@@ -32,6 +33,7 @@ utsim run examples/turnos.ron --salvar-estado 480 estado_14h.ron
 utsim analisar examples/mm1.ron --precisao 2% --little --confianca 90%
 utsim replay examples/mm1.ron --out replay.json
 utsim fit examples/dados/tempos_atendimento.csv --html relatorio.html
+utsim dados examples/dados_reais.ron --relatorio relatorios_dados
 utsim experiment examples/experimento_mm1.ron
 utsim otimizar examples/otimizacao_servidores.ron --html relatorio.html
 utsim emular examples/linha_com_bloqueio.ron --velocidade 10
@@ -204,6 +206,28 @@ Options:
       --seed <SEED>            [default: 1]
       --html <HTML>            Grava o relatório completo, com gráficos, em um HTML
       --json <JSON>            Grava o relatório em JSON
+      --relatorio <RELATORIO>  Grava o relatório da escolha automática (o mesmo de `utsim dados`) neste
+                               HTML, com um CSV das candidatas ao lado
+      --criterio <CRITERIO>    Critério que ordena as candidatas aceitas no relatório: aic, bic, ks ou
+                               ad [default: aic]
+  -h, --help                   Print help
+```
+
+### `utsim dados --help`
+
+```text
+Ajusta os campos de um modelo alimentados por dados reais e gera os relatórios
+
+Usage: utsim dados [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>  Modelo (.ron) com campos alimentados por dados reais (`data: [..]`)
+
+Options:
+      --relatorio <RELATORIO>  Pasta dos relatórios: um HTML e um CSV por campo, mais index.html
+      --gravar                 Grava no modelo o resultado de cada ajuste (família, distribuição e
+                               hash dos dados), para reprodutibilidade e para avisar quando os dados
+                               mudarem
   -h, --help                   Print help
 ```
 
