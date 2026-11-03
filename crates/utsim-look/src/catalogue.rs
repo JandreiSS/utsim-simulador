@@ -50,6 +50,28 @@ pub struct Entry {
     /// Size once placed at real size, metres (for the picker's help text).
     #[serde(default)]
     pub tamanho_real_m: (f32, f32, f32),
+    /// Seat of a vehicle that carries a driver (forklifts), see [`Motorista`].
+    #[serde(default)]
+    pub motorista: Option<Motorista>,
+}
+
+/// Where the driver sits in a vehicle of the catalogue: the anchor point of the hip joint.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct Motorista {
+    /// Hip joint on the seat, in the frame of the placed vehicle (real size, centred on
+    /// the footprint, floor at 0): `x` forward, `y` up, `z` to the right, metres.
+    pub quadril_m: (f32, f32, f32),
+    /// Extra turn of the driver about the vertical, degrees (0 faces the vehicle's front).
+    #[serde(default)]
+    pub giro_graus: f32,
+    /// Size of the driver relative to the catalogue's mannequin (a small cab takes a
+    /// smaller one).
+    #[serde(default = "um")]
+    pub escala: f32,
+}
+
+fn um() -> f32 {
+    1.0
 }
 
 /// How an interface places the glTF scene of an entry under the block's root.

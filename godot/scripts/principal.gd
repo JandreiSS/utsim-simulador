@@ -450,6 +450,11 @@ func _build_ui() -> void:
 		if doc == null or editor == null or editor.selected.is_empty():
 			return null
 		return doc.look_scene(editor.selected[0], asset, CenaUtsim.skeletal_available())
+	_props.driver_provider = func(object: String) -> int:
+		if cena == null or not cena.has_driver(object):
+			return -1
+		return 1 if cena.driver_visible(object) else 0
+	_props.driver_toggled.connect(func(object: String, on: bool): cena.set_driver_visible(object, on))
 	_props.action.connect(func(what): arrange_action(what))
 	_props.columns_provider = func(file: String) -> Array:
 		if doc == null:
@@ -1739,6 +1744,12 @@ func _drive_camera() -> void:
 			# are hidden while the camera is there.
 			var eye_y := clampf(float(cena.rigs[i].get("top", 1.0)) + 0.6, 1.4, 2.4)
 			var eye := at + Vector3(0, eye_y, 0)
+			# A forklift with a driver: the camera is at the driver's head, and the
+			# driver is hidden from there.
+			var head = cena.driver_eye(i)
+			if head != null:
+				eye = head
+				eye_y = eye.y - at.y
 			camera_aim = eye + forward * 10.0 - Vector3(0, eye_y * 0.8, 0)
 			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
 			cena.clear_view(eye, camera_aim, i)

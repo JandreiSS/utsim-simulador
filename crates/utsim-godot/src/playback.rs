@@ -20,7 +20,12 @@ use utsim_scene::style::{self, Shape};
 use utsim_scene::{EntityId, EntityKind, MobileRole, Motion, Scene, SceneOptions};
 
 use crate::coords::{layout_to_godot, size_to_godot, to_godot, yaw_to_godot};
+use utsim_look::driver::{self, DriverClip, DriverMount};
+
 use crate::looks::{self, Carry, Clip, Context, Look, Source};
+
+/// Clips of the bridge's list: the person clips, then the driver's.
+pub const CLIPS: usize = Clip::ALL.len() + DriverClip::ALL.len();
 
 /// Motion codes of the frame arrays (`motion`).
 pub fn motion_code(m: Motion) -> (i32, f32) {
@@ -53,6 +58,9 @@ pub struct BlockView {
     pub kind: String,
     pub role: Option<MobileRole>,
     pub look: Option<Look>,
+    /// The seated driver of a forklift (presentation only), when the interface has the
+    /// mannequin files.
+    pub driver: Option<DriverMount>,
     /// Model coordinates of the base, and the footprint `(x, y, z)` size.
     pub position: [f32; 3],
     pub size: [f32; 3],
@@ -126,7 +134,8 @@ pub struct FrameData {
     pub color: Vec<[f32; 3]>,
     /// Distance driven divided by the asset scale (wheels: `-(rolled / radius)`).
     pub rolled: Vec<f32>,
-    /// Skeletal people: clip index ([`Clip::index`], -1 for others) and time in it.
+    /// Skeletal people: clip index ([`Clip::index`], -1 for others) and time in it. The
+    /// seated driver of a forklift: [`DriverClip::global_index`].
     pub clip: Vec<i32>,
     pub clip_time: Vec<f32>,
     pub label: Vec<String>,
@@ -155,7 +164,7 @@ pub struct Playback {
     pub fork_size: f32,
     /// Items are pallets with boxes (the scene has racks, forklifts or pallet jacks).
     pub pallets: bool,
-    durations: [f32; 7],
+    durations: [f32; CLIPS],
     specs: HashMap<String, Spec>,
     pub connections: Vec<(usize, usize)>,
     /// The model that produced the replay (token flows, network), when there is one.
@@ -207,6 +216,10 @@ impl Playback {
                 model_dir,
             );
             index_of[b] = Some(blocks.len());
+            let driver = look
+                .as_ref()
+                .filter(|_| skeletal_people)
+                .and_then(|l| driver::driver_mount(role, l));
             let stack = kind == "Queue" && is_stack(model, &name);
             blocks.push(BlockView {
                 b,
@@ -215,6 +228,7 @@ impl Playback {
                 kind,
                 role,
                 look,
+                driver,
                 position: e.position,
                 size: e.size,
             });
@@ -252,7 +266,7 @@ impl Playback {
             stations,
             fork_size,
             pallets,
-            durations: [1.0; 7],
+            durations: [1.0; CLIPS],
             specs,
             connections: replay.connections.clone(),
             model: model.cloned(),
@@ -262,7 +276,7 @@ impl Playback {
     /// Lengths of the person clips, seconds, in [`Clip::ALL`] order (read by the engine
     /// from the imported animations).
     pub fn set_clip_durations(&mut self, d: &[f32]) {
-        for (k, v) in d.iter().take(7).enumerate() {
+        for (k, v) in d.iter().take(CLIPS).enumerate() {
             if v.is_finite() && *v > 0.0 {
                 self.durations[k] = *v;
             }
@@ -430,6 +444,16 @@ impl Playback {
                         c.index() as i32,
                         looks::clip_time(timed, d, distance, scale, t, progress),
                     )
+                }
+                _ if v.driver.is_some() => {
+                    let c = driver::driver_clip(motion);
+                    let d = self.durations[c.global_index()];
+                    let time = if d > 0.0 {
+                        t.rem_euclid(d as f64) as f32
+                    } else {
+                        0.0
+                    };
+                    (c.global_index() as i32, time)
                 }
                 _ => (-1, 0.0),
             };
@@ -650,6 +674,41 @@ mod tests {
             k += pb.end() / 200.0;
         }
         assert!(walked && held);
+    }
+
+    #[test]
+    fn forklifts_get_a_seated_driver_that_drives_when_moving() {
+        let mut pb = playback("centro_de_distribuicao.ron", true);
+        pb.set_clip_durations(&[2.0, 1.333, 0.933, 2.0, 3.0, 2.5, 2.0, 1.667, 1.667]);
+        let forklifts: Vec<usize> = (0..pb.blocks.len())
+            .filter(|&i| pb.blocks[i].role == Some(MobileRole::Forklift))
+            .collect();
+        assert!(!forklifts.is_empty());
+        let (mut drove, mut sat) = (false, false);
+        let mut k = 0.0;
+        while k <= pb.end() {
+            let f = pb.frame(k);
+            for &i in &forklifts {
+                assert!(pb.blocks[i].driver.is_some());
+                let (code, _) = (f.motion[i], 0);
+                let want = driver::driver_clip(match code {
+                    1 => Motion::Moving { speed: 1.0 },
+                    2 => Motion::Loading { progress: 0.5 },
+                    3 => Motion::Unloading { progress: 0.5 },
+                    _ => Motion::Idle,
+                });
+                assert_eq!(f.clip[i], want.global_index() as i32, "t={k} motion={code}");
+                assert!(f.clip_time[i] >= 0.0 && f.clip_time[i] < 1.7);
+                drove |= want == DriverClip::Drive;
+                sat |= want == DriverClip::Sit;
+            }
+            k += pb.end() / 300.0;
+        }
+        assert!(drove && sat);
+        // Without the mannequin files there is no driver, and the clip stays -1.
+        let bare = playback("centro_de_distribuicao.ron", false);
+        assert!(bare.blocks.iter().all(|v| v.driver.is_none()));
+        assert!(bare.frame(10.0).clip.iter().all(|&c| c == -1));
     }
 
     #[test]

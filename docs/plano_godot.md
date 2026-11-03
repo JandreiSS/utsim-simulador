@@ -431,6 +431,33 @@ virtual e aumentada): o roteiro se chama `g4_corredores.json` por pedido.
 Fica para depois: desenhar e editar as paredes e colunas (`obstacles`) na cena e as áreas marcadas
 no piso.
 
+### Motorista na empilhadeira (feito, só o visual)
+
+Um boneco sentado e animado em cada empilhadeira (`docs/plano_analises_e_dinamica.md`, seção 3, parte
+visual). Não é a fase G4 deste plano: o roteiro se chama `g4_motorista.json` por pedido.
+
+- **Regras puras** em `crates/utsim-look/src/driver.rs`: `driver_clip(motion)` (`Driving_Loop`
+  enquanto anda, carrega ou descarrega; `Sitting_Idle_Loop` parada, bloqueada ou ociosa) e
+  `driver_mount(role, look)`, que devolve a posição, o giro e a escala do boneco na raiz do veículo
+  para que o quadril caia no assento, mais os olhos da câmera. O assento da empilhadeira da biblioteca
+  é uma constante; o dos ativos do catálogo vem do campo opcional `motorista: Some((quadril_m,
+  giro_graus, escala))` de `catalogo.ron`. Testes de tabela de clipes, do encaixe do quadril, da
+  escala e do giro do usuário, do catálogo e de quem não tem motorista.
+- **Ponte**: `UtsimPlayback.person_clips()` ganha os dois clipes no fim; o quadro da empilhadeira
+  traz `clip` e `clip_time` do motorista e o bloco estático traz `driver {position, yaw, scale, eye,
+  hip}` (só com os arquivos do boneco, como as pessoas).
+- **Cena** (`cena.gd`): segundo `Pessoa` filho da raiz do veículo, `drivers_off` (preferência da
+  tela, não gravada no modelo, pois `VisualDef` está no núcleo), `driver_eye(i)` para a câmera
+  **Do recurso**, que esconde o motorista nessa vista. Painel: caixa **Mostrar motorista**
+  (`Prop_visual_motorista`) no fim da seção de aparência de quem tem motorista.
+- **Roteiro** `godot/roteiros/g4_motorista.json` (modelo `g4_motorista.ron`, uma empilhadeira da
+  biblioteca e uma do catálogo): confere o clipe parado e andando, a caixa de mostrar, a câmera nos
+  olhos. Capturas em `godot/capturas/motorista/`. Novos passos do `roteiro.gd`: `focar` e
+  `conferir.motorista` e `conferir.camera_nos_olhos`.
+- **Limites**: o modelo da biblioteca é uma carcaça sólida, então as pernas entram no capô (ficam
+  escondidas) e as coxas ficam sobre o assento; o modelo do catálogo tem o volante longe do banco.
+  Persistir "Mostrar motorista" no arquivo pede um campo `driver` no `VisualDef` (núcleo).
+
 ## Lacunas conhecidas depois da G3
 
 - O ajuste de dados reais não cobre ainda os campos fora dos objetos (fluxos de tokens, fluidos,

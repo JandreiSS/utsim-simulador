@@ -3,6 +3,7 @@
 // eixo_cima: sempre +Y (glTF). eixo_frente: lado para onde o modelo olha; frente_verificada = false quando é só a convenção do pacote.
 // giro_y_graus: giro em torno do eixo vertical que leva a frente do arquivo para +X, a frente dos modelos do UTSim (assets/modelos).
 // escala_real: fator que leva o arquivo ao tamanho real em metros (tamanho_real_m = tamanho_m * escala_real).
+// motorista: ponto de ancoragem do quadril do motorista (empilhadeiras), no referencial do veículo já posto (x frente, y cima, z direita, real, centro da pegada, chão em 0).
 // mapa_movimento: Motion do UTSim (ou contexto: Carrying, Driving, Pushing, Sitting) -> clipe do arquivo.
 (
     versao: 1,
@@ -803,6 +804,7 @@
             giro_y_graus: 90.0,
             escala_real: 1.000,
             tamanho_real_m: (0.846, 1.422, 2.313),
+            motorista: Some((quadril_m: (-0.34, 0.54, 0.0), giro_graus: 0.0, escala: 0.8)),
             clipes: [],
             mapa_movimento: [],
             nos: [("Cylinder.002", "malha única")],

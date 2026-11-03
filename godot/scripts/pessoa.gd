@@ -160,6 +160,11 @@ func drive(clip: int, time: float, dt: float, snap: bool) -> void:
 	tree.advance(0.0)
 
 
+## Name of the clip playing now (the Godot animation name, without "_Loop"), or "".
+func clip_name() -> String:
+	return _names[_clip_b] if _clip_b >= 0 and _clip_b < _names.size() else ""
+
+
 ## Midpoint of the hands in world space, or null before the skeleton is bound.
 func hands() -> Variant:
 	if skeleton == null or hand_l < 0 or hand_r < 0:
