@@ -1228,6 +1228,7 @@ impl Editor<'_> {
                 capacity,
                 discipline,
                 batch,
+                ..
             } => {
                 self.opt_uint_field(
                     ui,

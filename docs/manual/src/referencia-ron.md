@@ -155,6 +155,7 @@ Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de
 | `capacity` | ilimitada (mínimo 1) |
 | `discipline` | `Fifo` (ou `Lifo`) |
 | `batch` | nenhum: `Batch(size: n, max_wait: t, flush: b)` com `max_wait` padrão `0.0` e `flush` padrão `false` |
+| `order` | nenhuma: ordem por um rótulo numérico, `Desc("prioridade")` (maior primeiro) ou `Asc("prazo")` (menor primeiro). Tem precedência sobre `discipline` (não use com `Lifo`); empates e itens sem o rótulo ficam na ordem de chegada, os sem rótulo depois dos outros |
 
 ### `Processor`
 
