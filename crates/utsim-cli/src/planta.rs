@@ -25,6 +25,7 @@ pub fn run(
     calibrar: Option<&str>,
     origem: Option<&str>,
     unidades: Option<&str>,
+    obstaculos: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let bytes = std::fs::read(file)?;
     let text = String::from_utf8_lossy(&bytes);
@@ -51,12 +52,16 @@ pub fn run(
         opts.units = Some(Units::Drawing);
     }
     let mut plan = read_dxf(&text, &opts)?;
+    let mut placed = Transform::IDENTITY;
+    let mut calibration = None;
     println!("{}", file.display());
     println!("hash: {}", utsim_cad::fnv1a_hash(&bytes));
     if let Some(c) = calibrar {
         let v = numeros(c, 5, "--calibrar x1,y1,x2,y2,distancia")?;
         let cal = Calibration::new([v[0], v[1]], [v[2], v[3]], v[4])?;
         plan = plan.transformed(&cal.transform());
+        placed = cal.transform();
+        calibration = Some(cal);
         println!(
             "calibração: escala {} m por unidade do desenho",
             cal.scale()
@@ -70,7 +75,9 @@ pub fn run(
     }
     if let Some(o) = origem {
         let v = numeros(o, 2, "--origem x,y")?;
-        plan = plan.transformed(&Transform::origin_at([v[0], v[1]]));
+        let origin = Transform::origin_at([v[0], v[1]]);
+        plan = plan.transformed(&origin);
+        placed = placed.then(&origin);
     }
     match plan.bbox() {
         Some(b) => println!(
@@ -112,6 +119,49 @@ pub fn run(
         obs.polygons.len(),
         obs.openings.len()
     );
+    if let Some(model_path) = obstaculos {
+        let model_text = std::fs::read_to_string(model_path)?;
+        let mut m = utsim_model::Model::parse(&model_text)?;
+        // The plan's previous obstacles go; hand-drawn ones stay.
+        m.obstacles.retain(|o| !o.name.starts_with("planta_"));
+        m.obstacles.extend(
+            obs.polygons
+                .iter()
+                .enumerate()
+                .map(|(i, p)| utsim_model::Obstacle {
+                    name: format!("planta_{}", i + 1),
+                    polygon: p.clone(),
+                }),
+        );
+        let dir = model_path.parent().unwrap_or(Path::new(""));
+        let relative = file.strip_prefix(dir).unwrap_or(file);
+        m.floor_plan = Some(Box::new(utsim_cad::FloorPlanDef {
+            file: relative.to_string_lossy().replace('\\', "/"),
+            hash: utsim_cad::fnv1a_hash(&bytes),
+            transform: placed,
+            calibration,
+            layers: roles
+                .iter()
+                .map(|(name, role)| utsim_cad::FloorPlanLayer {
+                    name: name.to_string(),
+                    role,
+                    visible: role != utsim_cad::Role::Ignorar,
+                })
+                .collect(),
+            wall_thickness: 0.15,
+            origin: [0.0, 0.0],
+        }));
+        m.validate()?;
+        std::fs::write(
+            model_path,
+            crate::rede::to_text(&m, &crate::rede::header(&model_text)),
+        )?;
+        println!(
+            "{} obstáculos da planta gravados em {} (gere a rede de novo com `utsim rede gerar`, se houver)",
+            obs.polygons.len(),
+            model_path.display()
+        );
+    }
     if let Some(path) = svg {
         let o = SvgOptions {
             roles: Some(roles),

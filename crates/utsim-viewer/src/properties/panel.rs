@@ -1349,6 +1349,7 @@ impl Editor<'_> {
                 unload_time,
                 home,
                 agv,
+                ..
             } => {
                 self.float_field(ui, "Velocidade máxima", "speed", *speed);
                 self.opt_float_field(ui, "Aceleração", "acceleration", *acceleration, 1.0);

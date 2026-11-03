@@ -5,7 +5,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | Comando | Para que serve | Capítulo |
 |---|---|---|
 | `utsim run` | roda um modelo e mostra as estatísticas (também a partir de um estado, e grava o estado num instante) | [Resultados](resultados.md), [Simular a partir de um estado](estado-inicial.md) |
-| `utsim check` | valida um modelo sem rodar | [Formato `.ron`](referencia-ron.md) |
+| `utsim check` | valida um modelo sem rodar e mostra o modo de movimentação de cada recurso | [Formato `.ron`](referencia-ron.md), [Movimentação](movimentacao.md) |
 | `utsim analisar` | aquecimento, replicações necessárias, médias em lotes, lei de Little e gargalo móvel | [Resultados](resultados.md) |
 | `utsim replay` | grava o rastro de uma replicação (entrada do visualizador) | [Primeiros passos](primeiros-passos.md) |
 | `utsim cena` | grava a cena 3D para outros motores | [3D realista](visual-3d.md) |
@@ -19,6 +19,8 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
+| `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) e grava paredes e colunas como obstáculos do modelo | [Planta CAD](planta-cad.md) |
+| `utsim rede gerar` | gera a rede de caminhos pelo caminho livre, desviando dos obstáculos, e grava no modelo | [Movimentação e obstáculos](movimentacao.md) |
 
 O `utsim run` e o `utsim check` imprimem, antes do resultado, **avisos** (`aviso: ...`) sobre coisas válidas mas provavelmente não pretendidas, como ligações longas e instantâneas. Eles não impedem a rodada.
 
@@ -44,6 +46,8 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
 utsim qualidade capacidade examples/qualidade/lead_time.csv --lse 18 --metodo todos
 utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
+utsim planta galpao.dxf --obstaculos modelo.ron
+utsim rede gerar modelo.ron --usar
 ```
 
 ## Observações sobre as opções
@@ -52,6 +56,8 @@ utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
 - `analisar`: `-n` e `--stop` substituem `run.replications` e `run.stop_time`. Sem nenhuma das opções de análise, roda aquecimento, precisão a 2%, Little e gargalo móvel.
 - `replay` e `cena`: `--rep` escolhe a replicação (a primeira é a 0).
 - `gerar-modelo`: `--tipo` aceita `linha`, `rede` e `armazem`.
+- `check`: depois de `ok`, uma linha `movimentação: recurso: modo (papel, folga)` por recurso móvel.
+- `rede gerar`: sobrescreve o modelo (ou grava em `--saida`), mantendo os comentários do topo; `--folga` troca a folga (padrão: a maior entre os recursos); `--usar` grava `movement: Network` em `run`; uma rede desenhada à mão só é trocada com `--substituir`.
 - `pert`: use `--objetos` ou `--de` com `--ate`. O modo padrão é `simulado`; `-n` só vale
   para ele e `--sorteios` só para `montecarlo`.
 - `qualidade`: tem quatro subcomandos (`carta`, `capacidade`, `msa`, `arl`), cada um com o seu `--help`. Na `carta`, `--excluir` e `--revisar` são da fase I e `--limites` da fase II; `--regras` aceita `1`, `we`, `nelson` ou uma lista como `1,2,5`. Na `capacidade`, `--deslocamento` é o deslocamento somado ao Z no nível sigma (1,5 por convenção).
@@ -122,6 +128,24 @@ Arguments:
 
 Options:
   -h, --help  Print help
+```
+
+### `utsim rede gerar --help`
+
+```text
+Gera a rede de caminhos pelo caminho livre (desviando dos obstáculos) e grava no modelo
+
+Usage: utsim rede gerar [OPTIONS] <MODEL>
+
+Arguments:
+  <MODEL>
+
+Options:
+      --saida <SAIDA>  Grava neste arquivo em vez de sobrescrever o modelo
+      --folga <FOLGA>  Folga em metros (padrão: a maior entre os recursos móveis)
+      --usar           Também muda `run.movement` para Network (os recursos passam a usar a rede)
+      --substituir     Substitui uma rede desenhada à mão (sem isso, só uma rede gerada é trocada)
+  -h, --help           Print help
 ```
 
 ### `utsim analisar --help`

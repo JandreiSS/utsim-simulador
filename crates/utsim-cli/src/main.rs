@@ -12,6 +12,7 @@ mod painel;
 mod pert;
 mod planta;
 mod qualidade;
+mod rede;
 mod replay;
 
 use std::path::PathBuf;
@@ -182,6 +183,14 @@ enum Cmd {
         /// Força a unidade do desenho: mm, cm, dm, m, km, pol ou pe
         #[arg(long)]
         unidades: Option<String>,
+        /// Grava as paredes e colunas como `obstacles` deste modelo (e registra a planta em `floor_plan`)
+        #[arg(long, value_name = "MODELO")]
+        obstaculos: Option<PathBuf>,
+    },
+    /// Rede de caminhos: gera pelo caminho livre, desviando dos obstáculos
+    Rede {
+        #[command(subcommand)]
+        acao: rede::Acao,
     },
     /// Gera o fluxograma do processo (SVG, HTML, Mermaid) e a carta de processo (HTML, CSV)
     Fluxograma {
@@ -516,7 +525,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 m.objects.len(),
                 m.connections.len()
             );
+            for line in m.movement_lines() {
+                println!("movimentação: {line}");
+            }
         }
+        Cmd::Rede { acao } => rede::run(acao)?,
         Cmd::Analisar {
             model,
             aquecimento,
@@ -589,6 +602,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             calibrar,
             origem,
             unidades,
+            obstaculos,
         } => planta::run(
             &arquivo,
             camadas,
@@ -596,6 +610,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             calibrar.as_deref(),
             origem.as_deref(),
             unidades.as_deref(),
+            obstaculos.as_deref(),
         )?,
         Cmd::GerarModelo {
             objetos,

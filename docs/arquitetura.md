@@ -15,6 +15,7 @@ analisado. As decisões de projeto que merecem destaque aparecem como **"Nosso j
 | Execução | `utsim-cli` | replicações em paralelo, sem tela |
 | PERT/CPM | `utsim-pert` | rede de atividades e caminho crítico de um trecho, sem tela (seção 4s) |
 | Painel web | `utsim-dash` | só lê relatórios de replicações; servidor HTTP em `std::net` só em `127.0.0.1`, API JSON somente leitura, página e gráficos SVG embutidos (`include_str!`), todo cálculo em Rust; `.xlsx` atrás da feature `xlsx` |
+| Navegação | `utsim-nav` | obstáculos, menor caminho livre (grade e A*), pontos de acesso e geração de rede; função pura dos dados (seção 4p, "Obstáculos, caminho livre e modos de movimentação") |
 | Fluxograma | `utsim-diagram` | só lê o modelo (e resultados) e escreve texto: SVG, HTML, Mermaid, CSV |
 | 3D / editor | *(fase 2+)* | **apenas lê** o estado; nunca altera a simulação |
 
@@ -414,7 +415,8 @@ sequência é:
 4. O transportador viaja até a origem (`travel_empty`), carrega (`loading`), apanha o
    item com `pick_up`, viaja (`travel_loaded`), descarrega (`unloading`) e entrega com
    `drop_off` na porta reservada.
-5. As viagens seguem `Ctx::route` (linha reta, ou a rede de caminhos quando existir),
+5. As viagens seguem o roteador do recurso (modos `Free` e `Network`, `utsim-nav`) ou
+   `Ctx::route` (modo `Legacy`: linha reta, ou a rede de caminhos quando existir),
    com perfil de velocidade trapezoidal (aceleração e desaceleração opcionais). Cada
    trecho gera um `TraceEvent::Travel` para o 3D.
 
@@ -1036,15 +1038,68 @@ Douglas-Peucker, arrays planos para a interface (`FlatLines`) e SVG determiníst
 Camadas têm papel (`Role`: fundo, parede, coluna, porta, ignorar) sugerido pelo nome e
 sobrescrito pela pessoa (`RoleMap`); `build_obstacles` devolve polígonos anti-horários
 (paredes abertas ganham espessura, padrão 0,15 m) e as aberturas das portas, a entrada da
-futura `utsim-nav`. A planta não é lida pela simulação.
+`utsim-nav`. A planta não é lida pela simulação.
 
-**Proposta `floor_plan` do modelo (ainda não ligada ao `utsim-model`).** `FloorPlanDef`
-(em `utsim-cad`, serializável em RON) traz arquivo relativo ao `.ron`, hash `fnv1a64`,
-transformação, calibração, camadas com papel e visibilidade e espessura de parede. Ligá-lo
-seria um campo opcional `floor_plan: Option<FloorPlanDef>` com `#[serde(default)]` no
-`Model`, aditivo, sem passo de `MIGRATIONS` (modelos antigos seguem válidos). Fica como
-proposta porque `utsim-model` está em mudança por outro trabalho; os obstáculos gerados
-irão para um campo `obstacles` junto com o recurso de desvio.
+**Campo `floor_plan` do modelo.** `FloorPlanDef` (em `utsim-cad`) traz arquivo relativo ao
+`.ron`, hash `fnv1a64`, transformação, calibração, camadas com papel e visibilidade e espessura
+de parede. No `Model` é `floor_plan: Option<Box<FloorPlanDef>>`, aditivo e só registro: a
+simulação nunca lê o DXF. `utsim planta arquivo.dxf --obstaculos modelo.ron` grava as paredes e
+colunas em `obstacles` (nomes `planta_N`; os obstáculos desenhados à mão ficam) e preenche
+`floor_plan`. O resultado fica no `.ron`, reprodutível sem o arquivo CAD.
+
+### Obstáculos, caminho livre e modos de movimentação (`utsim-nav`, formato 2)
+
+Crate pura (`crates/utsim-nav`), sem relógio nem sorteio:
+
+- **Obstáculos** (`body`): a área ocupada de cada objeto fixo é um retângulo pelas mesmas
+  caixas do desenho 3D (`utsim-scene::style::extents` e `geometry`: processador 1,8 × 1,8 m,
+  fila 4 × 1,4 m, esteira pelo comprimento × 1,1 m girada para a sua saída, porta-paletes
+  pelos vãos × 1 m), escalado por `visual.scale` e girado por `visual.yaw`; somam-se os
+  `obstacles` do modelo (planta ou à mão). Recursos móveis não são obstáculos.
+- **Folga** (`clearance`): meia largura do papel do recurso (pessoa 0,3, empilhadeira 0,6,
+  AGV e veículo 0,5; papel pelo ativo, `agv`, porta-paletes atendido ou operador, como no 3D)
+  mais 0,3 m; o transportador pode dar a sua. Um ponto é livre a pelo menos a folga de todo
+  obstáculo (distância exata ao polígono, isto é, a soma de Minkowski com um círculo).
+- **Grade e A\*** (`grid`): células de 0,25 m (crescem para caber em 1 milhão de células);
+  uma célula é livre quando o seu centro está a `max(folga, lado·√2/2)` dos obstáculos, então
+  um passo entre centros vizinhos nunca atravessa uma parede fina. A\* de 8 vizinhos (diagonal
+  só com os dois lados livres, heurística octil, empate pelo menor índice) e suavização em duas
+  passadas por linha de visada exata. O comprimento fica entre o menor caminho exato e ele
+  mais um lado de célula. Componentes conexas pré-calculadas respondem "há caminho?" sem busca.
+  Pontas dentro de um obstáculo saem pela célula livre mais próxima. Decisão: grade em vez de
+  grafo de visibilidade, porque cresce com a área e não com o número de vértices e trata
+  paredes finas e polígonos não convexos sem casos especiais.
+- **Pontos de acesso**: o destino de uma viagem a um objeto é o seu ponto de acesso, não o
+  centro: lado `-y` do objeto (a frente do porta-paletes, onde o 3D já encosta a empilhadeira;
+  o lado da máquina para a pessoa), à folga mais 5 cm da borda, ou o `access` dado no modelo
+  (coordenadas do objeto, giradas com ele).
+- **Roteadores** (`router`, trait `utsim_core::Router`): `FreeRouter` (menor caminho livre até
+  o ponto de acesso, cache `BTreeMap` pelos bits exatos de origem e destino) e
+  `NetworkModeRouter` (ligação livre até o nó mais próximo, menor caminho na rede, ligação
+  livre até o ponto de acesso). Sem caminho, a viagem sai em linha reta (e há aviso antes).
+- **Geração de rede** (`generate`): os caminhos livres entre cada par de pontos (posições dos
+  recursos e pontos de acesso dos objetos atendidos) viram nós (vértices a menos de 1 mm se
+  fundem) e arestas de mão dupla; o maior grupo de pontos alcançáveis fica, os outros são
+  relatados. `NetworkDef.generated` guarda a folga e a impressão digital dos obstáculos.
+
+**Modos** (`utsim_model::Movement`): `Legacy` (formato 1: linha reta ou rede até o centro),
+`Free`, `Network` e `Aisles` (reservado para os corredores, recusado na validação por enquanto).
+O modo do recurso é o seu (`Transporter.movement`), senão `run.movement`, senão `Free`.
+`Model::nav_set` monta um roteador por folga (e modo) uma vez e as replicações o compartilham
+(`Model::build_with`); `Transporter::router` troca o roteador da simulação pelo do recurso. O
+roteador global e o `TransferPath::Network` não mudam. AGVs com rede seguem o `Traffic` aresta
+por aresta em qualquer modo.
+
+**Formato 2.** `FORMAT_VERSION = 2`; o passo `(1, v1_to_v2)` de `MIGRATIONS`
+(`utsim-model/src/format2.rs`) reescreve o texto com um analisador léxico (pula comentários,
+textos e atributos): `format: 2` e, se o modelo tem transportadores, `movement: Legacy` em
+`run`. Sem transportadores o modo não significa nada e fica ausente, e o modelo migrado é igual
+ao que o editor cria. Os exemplos ficam no formato 1 e os golden não mudam.
+
+**Avisos** (`Model::warnings`, só para recursos em `Free` ou `Network`): ponto de acesso dentro
+de um obstáculo ou na folga, recurso sem caminho até os objetos que atende ou até um deles,
+trecho da rede que cruza a área de um objeto ou parede (com recurso em `Network` ou rede gerada)
+e rede gerada com outra impressão digital dos obstáculos.
 
 ### Pessoas animadas por esqueleto (A3D-3)
 
