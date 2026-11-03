@@ -180,6 +180,9 @@ enum Cmd {
         /// Força a unidade do desenho: mm, cm, dm, m, km, pol ou pe
         #[arg(long)]
         unidades: Option<String>,
+        /// Grava as paredes e colunas como `obstacles` deste modelo (e registra a planta em `floor_plan`)
+        #[arg(long, value_name = "MODELO")]
+        obstaculos: Option<PathBuf>,
     },
     /// Rede de caminhos: gera pelo caminho livre, desviando dos obstáculos
     Rede {
@@ -533,6 +536,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             calibrar,
             origem,
             unidades,
+            obstaculos,
         } => planta::run(
             &arquivo,
             camadas,
@@ -540,6 +544,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             calibrar.as_deref(),
             origem.as_deref(),
             unidades.as_deref(),
+            obstaculos.as_deref(),
         )?,
         Cmd::GerarModelo {
             objetos,

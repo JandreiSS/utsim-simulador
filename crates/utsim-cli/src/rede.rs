@@ -24,7 +24,7 @@ pub enum Acao {
 }
 
 /// Comentários antes de `Model(`, mantidos ao gravar (como no editor).
-fn header(text: &str) -> String {
+pub(crate) fn header(text: &str) -> String {
     let mut out = String::new();
     for line in text.lines() {
         let t = line.trim_start();
@@ -37,7 +37,7 @@ fn header(text: &str) -> String {
     out
 }
 
-fn to_text(model: &Model, header: &str) -> String {
+pub(crate) fn to_text(model: &Model, header: &str) -> String {
     let config = ron::ser::PrettyConfig::new()
         .struct_names(true)
         .indentor("    ".to_string())

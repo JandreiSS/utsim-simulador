@@ -39,7 +39,13 @@ Model(
 
 #[test]
 fn check_shows_modes_and_rede_gerar_writes_the_network() {
-    let (ok, stdout, stderr) = utsim(&["check", examples().join("celula_com_operadores.ron").to_str().unwrap()]);
+    let (ok, stdout, stderr) = utsim(&[
+        "check",
+        examples()
+            .join("celula_com_operadores.ron")
+            .to_str()
+            .unwrap(),
+    ]);
     assert!(ok, "{stderr}");
     assert!(
         stdout.contains("movimentação: ") && stdout.contains("legado"),
@@ -71,6 +77,61 @@ fn check_shows_modes_and_rede_gerar_writes_the_network() {
     assert!(ok, "{stderr}");
     assert!(!stderr.contains("aviso"), "{stderr}");
     assert!(stdout.contains("frota: pela rede"), "{stdout}");
+
+    // Walls of a DXF plan become obstacles of the model (and the plan is recorded).
+    let wall = [
+        "0",
+        "SECTION",
+        "2",
+        "HEADER",
+        "9",
+        "$INSUNITS",
+        "70",
+        "6",
+        "0",
+        "ENDSEC",
+        "0",
+        "SECTION",
+        "2",
+        "ENTITIES",
+        "0",
+        "LINE",
+        "8",
+        "PAREDES",
+        "10",
+        "8.0",
+        "20",
+        "-8.0",
+        "11",
+        "8.0",
+        "21",
+        "-2.0",
+        "0",
+        "ENDSEC",
+        "0",
+        "EOF",
+    ]
+    .join("\n");
+    let dxf = dir.join("galpao.dxf");
+    std::fs::write(&dxf, wall + "\n").unwrap();
+    let (ok, stdout, stderr) = utsim(&["planta", dxf.to_str().unwrap(), "--obstaculos", p]);
+    assert!(ok, "{stderr}");
+    assert!(
+        stdout.contains("1 obstáculos da planta gravados"),
+        "{stdout}"
+    );
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("planta_1") && text.contains("pilar") && text.contains("galpao.dxf"),
+        "{text}"
+    );
+    // The network generated before is now stale.
+    let (ok, _, stderr) = utsim(&["check", p]);
+    assert!(ok && stderr.contains("gere de novo"), "{stderr}");
+    let (ok, _, stderr) = utsim(&["rede", "gerar", p]);
+    assert!(ok, "{stderr}");
+    let (ok, _, stderr) = utsim(&["check", p]);
+    assert!(ok && !stderr.contains("aviso"), "{stderr}");
 
     // A hand-drawn network is not replaced without --substituir.
     let hand = MODEL.replace(
