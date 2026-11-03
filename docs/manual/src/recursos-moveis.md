@@ -156,6 +156,7 @@ O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 | `rule` | `FirstAvailable` | como escolher entre membros livres |
 | `pick` | `Priority` | qual serviço da fila um membro que fica livre pega |
 | `preempt` | `Never` | se um pedido mais urgente pode tirar o serviço de um membro que vai vazio buscá-lo |
+| `metrics` | `false` | com `true`, o relatório ganha as métricas da equipe (veja abaixo) |
 
 As regras:
 
@@ -182,6 +183,22 @@ Com `preempt: Empty`, quando chega um pedido e nenhum membro está livre, o desp
 
 - se o membro está **indo vazio** buscar o item ou indo até a máquina (ainda sem nada carregado e sem ter chegado), ele para onde está, devolve o serviço e atende o pedido urgente saindo desse ponto. O serviço devolvido volta para a frente da fila, entre os da sua prioridade, e é feito depois;
 - se já está carregando, levando o item, descarregando ou trabalhando na máquina, ele **recusa** e o despachante pergunta ao próximo candidato. Um item carregado nunca é largado no caminho.
+
+### Métricas da equipe (`metrics`)
+
+Com `metrics: true` no despachante, o relatório ganha:
+
+| Métrica | Significado |
+|---|---|
+| `eq.request_wait.mean`, `.count`, máximo | espera do pedido por um membro: do pedido chegar ao despachante até ser entregue a um membro (a primeira vez) |
+| `eq.requests.count` | pedidos recebidos |
+| `eq.member.<nome>.requests` | serviços entregues a cada membro (equilíbrio da carga) |
+| `eq.member.<nome>.busy` | fração da janela em que o membro esteve com serviço, do ponto de vista do despachante |
+| `eq.preemptions.count` | membros que devolveram o serviço (com `preempt: Empty`) |
+
+A utilização de cada membro e o tempo indo vazio e carregado continuam no relatório do próprio membro (`emp1.utilization`, `emp1.state.travel_empty`, `emp1.state.travel_loaded`). A função `Model::team_summaries` junta tudo por equipe para o painel e para quem usa a biblioteca. Sem `metrics` nada muda no relatório.
+
+Na cena 3D (`utsim cena` e a cena ao vivo), a pose de um recurso móvel que está andando ganha `task_target`: o fim do trecho em curso, para desenhar a linha do membro até o destino. Parado, o campo não aparece.
 
 A volta para casa (`home: true`) já era interrompida por qualquer pedido novo, com ou sem `preempt`. Com `preempt: Empty` o despachante ganha a métrica `preemptions.count` (membros que devolveram o serviço). Sem o campo (`Never`) tudo funciona como antes. A preempção de um trabalho em andamento na máquina, com retomada depois, não existe ainda. Um transportador só pode estar na equipe de um despachante.
 

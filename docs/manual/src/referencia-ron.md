@@ -216,6 +216,7 @@ Sem campos. Escreva `kind: Sink`.
 | `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`, `LeastBusy`, `LongestIdle`, `Random`) |
 | `pick` | `Priority` (ou `Nearest`, `NearestAny`): qual serviço da fila o membro que fica livre pega |
 | `preempt` | `Never` (ou `Empty`: um pedido de prioridade maior tira o serviço de um membro que vai vazio buscá-lo) |
+| `metrics` | `false` (com `true`: `request_wait`, `requests.count`, `member.<nome>.requests` e `.busy` no relatório) |
 
 ### `Conveyor`
 

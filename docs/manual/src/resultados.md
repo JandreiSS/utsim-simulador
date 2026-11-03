@@ -238,6 +238,8 @@ Experimentos, otimização e testes referem-se às métricas por nome, no format
 | `fonte.lost.count`, `fonte.entered.count`, `fonte.loss_fraction` | perdas de uma fonte com `Drop`; `model.lost.count`, `model.entered.count` e `model.loss_fraction` somam todas |
 | `fonte.arrivals.count`, `fonte.entered.count` | chegadas e itens de uma fonte com `table` ou `batch` |
 | `saida.time_in_system.<tipo>.mean`, `.count` | tempo no sistema e vazão por tipo de item, num modelo com `item_types` |
+| `equipe.request_wait.mean`, `equipe.requests.count`, `equipe.member.<nome>.requests`, `equipe.member.<nome>.busy` | métricas de um despachante com `metrics: true` |
+| `equipe.preemptions.count` | membros que devolveram o serviço, num despachante com `preempt: Empty` |
 | `medicao.value.mean`, `medicao.value.count` | tempo entre dois pontos do fluxo (veja `spans`) |
 | `objeto.<nome>` | métrica calculada pelo objeto (nos fluidos, `fluidos.tanque.nivel_medio`) |
 
