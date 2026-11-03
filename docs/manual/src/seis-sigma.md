@@ -520,6 +520,189 @@ de resposta e as características críticas sem controle. Cada bloco tem uma not
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
 
+## Programa de implantação (master black belt)
+
+O programa fica acima das carteiras: **programa → unidades de negócio → carteiras →
+projetos**, uma carteira por unidade (planta, área ou diretoria). É mais uma pasta com
+diário, como a de um projeto, ao lado das pastas das carteiras e dos projetos na mesma pasta
+compartilhada. Para criar, use "Novo programa de implantação" na tela inicial (a pasta vai
+para o mesmo lugar escolhido em "pasta onde criar"). Abrir a pasta do programa leva às telas
+do programa.
+
+O programa procura as carteiras e os projetos ao lado dele, nas pastas ao lado (uma por
+unidade, por exemplo `Planta 1/`) e em `carteiras/` dentro dele; os projetos de uma pasta
+pertencem à carteira da mesma pasta. Ele lê só o resumo de cada projeto (situação, belts,
+tollgates, ferramentas, ganhos), de novo a cada 30 segundos ou em "Ler as pastas de novo", e
+mostra o instante dos dados. Projetos marcados como treino nunca entram nos indicadores.
+
+```
+Programa LSS da empresa.lss/
+  projeto.json                 identificação (a entidade principal é o programa)
+  ops/  presenca/              como num projeto
+  mentoria/<belt>.lss/         diário de mentoria de cada belt (pasta restrita)
+  carteiras/<unidade>/         opcional: carteiras e projetos de cada unidade
+Planta 1/
+  Carteira.lss/  Refugo na prensa.lss/  ...
+```
+
+### Estrutura e metas
+
+- **Unidades de negócio** com champion, patrocinador, número de pessoas (para a cobertura) e a
+  carteira ligada (a lista mostra as carteiras encontradas).
+- **Objetivos estratégicos** com peso no programa e peso em cada unidade (vazio: o objetivo
+  não é desdobrado nela); abaixo da tabela, o peso de cada objetivo na unidade, normalizado.
+- **Metas anuais por unidade**: ganho hard validado, ganho soft validado, projetos
+  encerrados, belts formados e belts certificados por nível, e cobertura (belts green ou acima
+  por 100 pessoas). Definir de novo a mesma meta troca o valor.
+- **Limites**: dias entre comitês de seleção (30), projetos simultâneos por nível (yellow 1,
+  green 2, black 4, até 4 green belts em mentoria, champion 6 projetos), tempo-alvo da revisão
+  de tollgate (45 min) e retenção dos dados pessoais (60 meses).
+
+### Placar
+
+Meta × realizado por unidade e do programa no ano. **Só ganho validado conta no realizado
+oficial**: a soma dos lançamentos mensais validados pela controladoria no ano. O previsto ainda
+não validado aparece numa coluna à parte e nunca entra no realizado; ganho estimado por
+simulação também não. O gráfico compara meta e realizado do ganho hard por unidade.
+
+### Funil e comitê de seleção
+
+As ideias de todas as carteiras passam pelos mesmos estágios: **ideia** (qualquer pessoa),
+**triagem** (champion da unidade), **seleção** (comitê) e **abertura** (termo do belt
+designado), depois em execução e encerrado. Numa ideia em triagem, "Enviar ao comitê" a põe na
+pauta; só o champion da unidade da ideia ou o MBB podem.
+
+A reunião do comitê tem **pauta gerada**: as oportunidades em seleção pela pontuação
+ponderada da carteira, a capacidade livre por nível de belt e as metas do ano ainda abertas.
+Cada decisão (selecionar, adiar, devolver à triagem, recusar) exige o motivo, entra na ata da
+reunião e muda a ideia na carteira dela: selecionar aprova a ideia (com o belt candidato) e
+recusar a cancela. Se a carteira recusar a mudança (por exemplo, sem abordagem escolhida), a
+decisão não é registrada e a mensagem diz o motivo.
+
+### Capacidade e designação
+
+- **Pessoas do programa**: nível de belt, unidade, área, horas por semana dedicadas ao
+  programa, limite próprio de projetos, se precisa de projeto para a certificação, ano de
+  formação e data de certificação (a formação e a certificação da etapa L7 vão preencher esses
+  dois).
+- **Ausências** com início, fim e motivo; cada pessoa registra as suas.
+- **Carga no programa inteiro**: horas por semana das designações ativas mais as horas por
+  semana das tarefas abertas do cronograma em que a pessoa é responsável (campo
+  `horas_semana` da tarefa), somadas em **todas** as carteiras, porque uma pessoa pode estar
+  em projetos de unidades diferentes. A capacidade é das próximas quatro semanas, descontadas as
+  ausências. Os avisos de sobrecarga dizem o que passou do limite: projetos, horas, mentorados
+  ou projetos acompanhados pelo champion.
+- **Designação**: para uma oportunidade em seleção ou aprovada, os belts aparecem em ordem,
+  cada um com as razões da posição. Vêm primeiro os que atendem ao nível exigido pela abordagem
+  (black belt para DMADV, green para DMAIC, yellow para as abordagens curtas), têm vaga de
+  projeto, horas livres e não estão ausentes na maior parte do período; entre eles, quem
+  precisa de projeto para a certificação, depois a mesma unidade, a mesma área, a experiência
+  nas ferramentas previstas (aplicou ou demonstrou no mapa de competências) e as horas livres.
+  É uma ordenação por regras explicadas; quem decide é o MBB, e a decisão fica registrada com a
+  posição que a pessoa tinha na sugestão.
+
+### Mentoria e mapa de competências
+
+O **diário de mentoria** de cada belt fica numa pasta própria (`mentoria/<belt>.lss`), vista
+pelo app só pelo MBB e pelo próprio belt. Cada sessão tem data, duração, forma (individual,
+grupo, revisão no gemba), projeto e fase, temas, ferramentas discutidas e, opcional, uma
+avaliação de 1 a 4 por competência. Os **compromissos** de uma sessão vão para a lista pessoal
+do belt ou viram cartão no quadro do projeto da sessão ("Virar cartão"), com prazo e o belt
+como responsável. O progresso mostra sessões, horas, compromissos cumpridos e a evolução das
+avaliações. Sem o consentimento registrado do belt, o diário não guarda sessões dele.
+
+O **mapa de competências** cruza belts e ferramentas com quatro níveis: **E** estudou (módulo
+concluído, etapa L7), **P** praticou (exercício correto no modo de ensino, etapa L8), **A**
+aplicou (a ferramenta está num entregável concluído de fase aprovada de um projeto real, o app
+preenche sozinho) e **D** demonstrou (confirmado pelo MBB em revisão ou mentoria, com a
+evidência). Passe o mouse numa célula para ver as evidências. A linha do tempo do belt junta
+sessões, tollgates aprovados, ferramentas novas e a certificação.
+
+### Revisões de tollgate
+
+A **fila de revisões** tem todos os tollgates do programa em revisão sem parecer do MBB na
+rodada atual: projeto, unidade, belt, fase, data planejada, dias esperando e dias de atraso,
+com os vencidos primeiro e em destaque. Agrupe por data planejada ou por unidade para revisar
+em lote; "Gerar a ata do lote" registra a reunião com uma linha de decisão por projeto.
+
+O **trabalho padrão** da revisão mostra os itens verificados pelo app já conferidos, as
+perguntas padrão da fase (por exemplo, no Medir: "A definição operacional do Y é inequívoca?",
+"O MSA cobre o sistema de medição usado na linha de base?", "A linha de base usa dado de origem
+Real?"), as perguntas que a empresa acrescentou e o tempo-alvo. O **parecer técnico
+estruturado** tem cinco itens (dado suficiente, ferramenta adequada, estatística correta,
+conclusões suportadas, riscos), cada um ok, ressalva ou refazer, com comentário obrigatório
+quando não for ok; o parecer vale o pior item. O parecer é do programa; a aprovação formal
+continua no tollgate do projeto.
+
+A **qualidade das revisões** mostra, por fase e por belt, a taxa de refazer, as ressalvas, a
+mediana de dias entre o pedido e o parecer e as ressalvas recorrentes (o mesmo item sem ok em
+dois pareceres do mesmo belt), que orientam a mentoria e o currículo.
+
+### Painéis
+
+Os dois painéis têm filtro por unidade e ano, a regra de cada indicador ao lado e o instante
+dos dados.
+
+- **Painel do MBB**: funil (contagem por estágio, conversão entre estágios, idade média),
+  tempo de ciclo por fase (mediana e percentil 80 dos dias entre aprovações de tollgate, por
+  abordagem, contra a meta padrão: Definir 30, Medir 45, Analisar 45, Melhorar 60, Controlar
+  60 dias), ganhos por estado e unidade com o total oficial só com o validado, belts por área
+  (ativos, formados, certificados, cobertura, certificações de três anos a 90 dias do fim),
+  uso das ferramentas por fase e as nunca aplicadas, tollgates vencidos por unidade e belt e
+  as revisões pendentes, e a carga por nível e por pessoa.
+- **Painel da liderança**: seis indicadores com meta e tendência em relação ao ano anterior
+  (ganho validado, projetos encerrados, belts certificados, cobertura, oportunidades no funil e
+  tollgates vencidos), sem dados pessoais de formação ou mentoria.
+
+### Perfis e permissões
+
+| Perfil | Vê | Faz |
+|---|---|---|
+| MBB | tudo do programa | papéis, metas, unidades, designação, revisão de tollgate, competência demonstrada, decisões do comitê, anonimização |
+| Champion | sua unidade (ou todas, sem unidade no perfil) | triagem (enviar ao comitê), pauta do comitê, aprovação de tollgate |
+| Patrocinador | placar | aprovação de termo, tollgate e encerramento |
+| Belt | seus projetos e o próprio diário de mentoria | conduz projetos, registra a mentoria recebida |
+| Controladoria | ganhos de todo o programa | valida ganhos |
+| Instrutor | suas turmas (etapa L7) | registra estudo e prática |
+| Liderança | painel da liderança | comentar |
+| Aluno | espaço de treino (etapa L8) | exercícios e provas |
+
+Quem cria o programa é MBB desde o início; os demais perfis vêm da **lista de papéis** do
+programa (tela Perfis e dados pessoais), mantida pelo MBB. Uma ação fora do perfil é recusada
+com a mensagem de quem pode fazê-la (por exemplo, "ação reservada a: MBB (seu perfil: belt)").
+E o app confere cada alteração do diário contra o perfil do autor **naquele instante**: uma
+alteração de quem não tinha o perfil fica sem efeito e aparece na lista de "operações não
+autorizadas". Um perfil dado depois não valida alterações anteriores, e um perfil retirado
+deixa de valer dali em diante. Qualquer pessoa registra o próprio nome, e-mail e
+consentimento.
+
+**Pastas restritas no Drive.** A conferência do app é a primeira camada; a barreira real é o
+compartilhamento das pastas, que o app não confere (não usa a API do Drive):
+
+- compartilhe a pasta do programa com as pessoas do programa;
+- cada pasta `mentoria/<belt>.lss` só com o MBB e o belt (no Drive, compartilhe a subpasta com
+  essas duas pessoas e tire o acesso herdado dos demais, ou mantenha `mentoria/` fora da pasta
+  compartilhada geral);
+- valores financeiros sigilosos antes da validação numa pasta `financas/` só da controladoria
+  e do MBB; gabaritos, banco de questões e notas (etapa L7) em pastas do MBB e dos instrutores.
+
+Até a lista de papéis assinada (etapa P7), quem edita os arquivos à mão consegue gravar uma
+alteração, mas o app a ignora se o autor não tiver o perfil.
+
+### Dados pessoais
+
+- **Consentimento**: cada pessoa registra o seu, com a finalidade (formação, mentoria e
+  designação no programa); o MBB vê quem consentiu.
+- **Retenção**: pessoas sem perfil, sem projeto em execução e sem alteração há mais que o prazo
+  de retenção aparecem para anonimizar, e quem retirou o consentimento também. Nada é
+  anonimizado sozinho: o MBB confirma.
+- **Anonimizar** troca o nome por "Pessoa anonimizada" com um código, apaga e-mail, área,
+  finalidade e motivos das ausências, e esvazia os textos do diário de mentoria da pessoa; em
+  seguida reescreve o histórico desses campos nas pastas do programa e do diário (o único caso
+  em que um arquivo do diário muda depois de gravado, mantendo o mesmo identificador), para que
+  o valor original não sobreviva em nenhum arquivo. Os projetos guardam o nome na equipe deles
+  e não são reescritos.
+
 ## A pasta do projeto
 
 ```
@@ -555,7 +738,9 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 Pela ordem do plano: as telas de estatística (sobre o `utsim-quality` e o `utsim-stats`),
 integração com o modelo de simulação (SIPOC e fluxograma gerados do modelo), os relatórios em
-PDF e os modelos da empresa, e o programa de implantação do master black belt (várias
-carteiras, comitê de seleção, designação de belts, formação). Da gestão do projeto ficam para
+PDF e os modelos da empresa, a formação e certificação dos belts (ondas, turmas, provas,
+requisitos e registro de certificação, que vão preencher o nível, a formação e o "estudou" do
+mapa de competências) e o modo de ensino. Do programa ficam para depois a lista de papéis
+assinada, a exportação dos painéis e o currículo ligado ao mapa. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
