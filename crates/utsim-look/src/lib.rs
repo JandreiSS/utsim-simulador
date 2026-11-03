@@ -7,6 +7,7 @@
 //! same model the same way.
 
 pub mod catalogue;
+pub mod driver;
 pub mod visual;
 
 pub use visual::{Carry, Clip, Context, Look, Source, look_of};

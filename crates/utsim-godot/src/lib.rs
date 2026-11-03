@@ -428,7 +428,8 @@ pub struct UtsimPlayback {
 #[godot_api]
 impl UtsimPlayback {
     /// Names of the person clips in clip-index order; a `ual2/` prefix marks the clips of
-    /// the second file (`pessoa_operador_carga`). Index 6 (`IdleCarry`) is the arms layer.
+    /// the second file (`pessoa_operador_carga`). Index 6 (`IdleCarry`) is the arms layer; the
+    /// last two are the driver's clips (`Driving_Loop`, `Sitting_Idle_Loop`).
     #[func]
     fn person_clips() -> PackedStringArray {
         let names: Vec<String> = Clip::ALL
@@ -437,6 +438,11 @@ impl UtsimPlayback {
                 (n, true) => format!("ual2/{n}"),
                 (n, false) => n.to_string(),
             })
+            .chain(
+                utsim_look::driver::DriverClip::ALL
+                    .iter()
+                    .map(|c| c.source().to_string()),
+            )
             .collect();
         strings(&names)
     }
@@ -499,7 +505,8 @@ impl UtsimPlayback {
     /// network_controlled, connections, fluids}`. Each block is a dictionary with `name,
     /// kind, role, mobile, position, size, shape` and, when it has a realistic look,
     /// `asset {source, name, key, path}, scale, asset_yaw, offset, color, carry,
-    /// skeletal`.
+    /// skeletal`, and for a forklift with a seat `driver {position, yaw, scale, eye, hip}` (the
+    /// mannequin's root, the camera eye and the hip on the seat, in the block root's frame).
     #[func]
     fn static_scene(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
@@ -540,6 +547,15 @@ impl UtsimPlayback {
                 }
                 put(&mut e, "carry", l.carry.name());
                 put(&mut e, "skeletal", l.skeletal);
+            }
+            if let Some(m) = &v.driver {
+                let mut driver = VarDictionary::new();
+                put(&mut driver, "position", v3(m.position));
+                put(&mut driver, "yaw", m.yaw);
+                put(&mut driver, "scale", m.scale);
+                put(&mut driver, "eye", v3(m.eye));
+                put(&mut driver, "hip", v3(m.hip));
+                put(&mut e, "driver", driver);
             }
             blocks.push(&e.to_variant());
         }

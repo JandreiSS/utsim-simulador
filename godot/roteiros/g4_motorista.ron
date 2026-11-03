@@ -1,0 +1,28 @@
+// Ponto de partida do roteiro g4_motorista.json: duas empilhadeiras levam caixas da doca ao
+// estoque, uma com o ativo padrão da biblioteca e outra com o ativo do catálogo
+// (empilhadeira_kolosstudios). Cada uma leva um motorista sentado e animado.
+Model(
+    format: 2,
+    name: "motorista",
+    run: (stop_time: 200.0, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(25.0), first_at_zero: false, max_arrivals: 6),
+         position: (-16.0, 0.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "empilhadeira_1", position: (-10.0, 0.0, 0.0), access: (0.0, -3.0)),
+        (name: "estoque", kind: Sink, position: (10.0, 0.0, 0.0), access: (0.0, -3.0)),
+        (name: "empilhadeira_1", kind: Transporter(speed: 2.0), position: (-10.0, -4.0, 0.0),
+         visual: (asset: "empilhadeira")),
+        (name: "chegada_2", kind: Source(interarrival: Const(25.0), first_at_zero: false, max_arrivals: 6),
+         position: (-16.0, 12.0, 0.0)),
+        (name: "doca_2", kind: Queue(), transport: "empilhadeira_2", position: (-10.0, 12.0, 0.0), access: (0.0, -3.0)),
+        (name: "estoque_2", kind: Sink, position: (10.0, 12.0, 0.0), access: (0.0, -3.0)),
+        (name: "empilhadeira_2", kind: Transporter(speed: 2.0), position: (-10.0, 8.0, 0.0),
+         visual: (asset: "empilhadeira_kolosstudios")),
+    ],
+    connections: [
+        ("chegada", "doca"),
+        ("doca", "estoque"),
+        ("chegada_2", "doca_2"),
+        ("doca_2", "estoque_2"),
+    ],
+)

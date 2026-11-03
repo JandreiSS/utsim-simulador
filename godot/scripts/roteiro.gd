@@ -41,6 +41,8 @@
 ##    - `{"dialogo": "{saida}/modelo.ron"}`: accepts the open file dialog with that path
 ##    - `{"camera": {"alvo": [x, y], "distancia": 18, "giro": 0.3, "inclinacao": 0.9}}`
 ##      (model plan coordinates)
+##    - `{"focar": {"objeto": "empilhadeira_1", "distancia": 4.0, "giro": 0.5, "inclinacao": 0.3}}`:
+##      the orbit camera on a block (as the `focar` of the model captures)
 ##    - `{"abrir": "../../examples/agvs.ron"}`, `{"novo": true}`, `{"modo": "simular"}`
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
@@ -348,6 +350,11 @@ func _step(s: Dictionary, k: int) -> void:
 		var at: Array = c.get("alvo", [0, 0])
 		_main.camera.focus(Vector3(float(at[0]), 0, -float(at[1])), float(c.get("distancia", 20.0)), c.get("giro"), c.get("inclinacao"))
 		await _frames(2)
+	elif s.has("focar"):
+		var f: Dictionary = s["focar"]
+		if not _main.focus_block(String(f["objeto"]), float(f.get("distancia", 8.0)), f.get("giro"), f.get("inclinacao")):
+			_fail("passo %d: objeto não encontrado: %s" % [k, f["objeto"]])
+		await _frames(2)
 	elif s.has("abrir"):
 		var path := _resolve(_base, String(s["abrir"]))
 		if not _main.open_model(path):
@@ -622,7 +629,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## b], altura_no_maximo: metres of the network as drawn, enquadrados: the whole network
 ## on screen}), `fluxos` ({atividades_maior_que, tokens_pico_maior_que, legivel: boxes
 ## apart, text whole, zoom legible}), `pert` ({modo, caixas_maior_que, tem_histograma}),
-## `critico` (names outlined in red), `camera` (mode), `camera_distancia` ([a, b]: the orbit distance), `camera_livre` ({margem,
+## `motorista` ({objeto, existe, visivel, t, clipe}: the seated driver of a forklift),
+## `camera_nos_olhos` (a forklift: the camera is at its driver's eyes), `critico` (names outlined in red), `camera` (mode), `camera_distancia` ([a, b]: the orbit distance), `camera_livre` ({margem,
 ## distancia}: no mesh within `margem` metres of a following camera nor on the first
 ## `distancia` metres of its sight line), `modelo_contem` (pieces of the model's RON
 ## text), `rotulos_no_maximo` (labels drawn) and `replay` (a recorded replay is playing).
@@ -908,6 +916,27 @@ func _check(c: Dictionary, k: int) -> void:
 			"camera_distancia":
 				var dd: float = _main.camera.dist
 				report.call("distância da câmera entre %s e %s" % [want[0], want[1]], dd >= float(want[0]) and dd <= float(want[1]), str(dd))
+			"motorista":
+				# {"objeto", "existe", "visivel", "t", "clipe"}: the seated driver of a forklift
+				# (`clipe`: the animation playing, without the "_Loop" suffix).
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				var has: bool = i >= 0 and cena.rigs[i].has("driver")
+				if want.has("existe"):
+					report.call("motorista de %s" % want["objeto"], has == bool(want["existe"]), str(has))
+				if has:
+					if want.has("visivel"):
+						var shown: bool = (cena.rigs[i]["driver_node"] as Node3D).is_visible_in_tree()
+						report.call("motorista de %s visível" % want["objeto"], shown == bool(want["visivel"]), str(shown))
+					if want.has("clipe"):
+						var clip: String = (cena.rigs[i]["driver"] as Pessoa).clip_name()
+						report.call("clipe do motorista de %s" % want["objeto"], clip == String(want["clipe"]), clip)
+			"camera_nos_olhos":
+				var cena: CenaUtsim = _main.cena
+				var eye = cena.driver_eye(cena.block_index(String(want)))
+				report.call("a câmera nos olhos do motorista de %s" % want, eye != null and (eye as Vector3).distance_to(_main.camera.global_position) < 0.02, str(eye))
 			"camera_livre":
 				var cam: Camera3D = _main.camera
 				var eye := cam.global_position
