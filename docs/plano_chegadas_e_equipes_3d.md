@@ -260,7 +260,7 @@ globais importadas de planilha" do backlog, limitado às chegadas.
 
 **Estimativa** 8–12 h. **Modelo** Sonnet.
 
-### C6. Editores (na interface Rust/egui)
+### C6. Editores (na interface Rust/egui), feito
 
 Os editores de tabela e de horário são parte da interface em volta da vista 3D e devem ser
 feitos já na interface Rust/egui, seguindo `docs/plano_interface_rust.md` quando ele chegar.
@@ -470,7 +470,7 @@ Exemplos novos em `examples/`: `chegadas_por_tabela.ron` (pedidos por hora e tip
 | 7 | E8a Métricas de equipe e `task_target` na cena | 4–6 | Sonnet | nada | já |
 | 8 | E1b Ligações de equipe e pedido no editor 3D | 9–13 | Opus | 5, entrega do outro agente | depois |
 | 9 | C7 Fonte no 3D (portas, prévia, acumulados, selo) | 10–14 | Sonnet | 3, entrega do outro agente | depois |
-| 10 | C6 Editores de tabela e horário (egui) | 16–24 | Sonnet | 2, plano da interface Rust | depois |
+| 10 | C6 Editores de tabela e horário (egui) | 16–24 | Sonnet | 2, plano da interface Rust | feito (passo 5b da interface Rust) |
 | 11 | E5 Casa, área de espera e pausa | 8–12 | Sonnet + Opus | nada | já |
 | 12 | E4 Preempção `Empty` | 8–12 | Opus | E2 | depois de 1 |
 | 13 | C5 Tabela de chegadas de planilha | 8–12 | Sonnet | 2 | depois de 2 |

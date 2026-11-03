@@ -87,6 +87,8 @@ Regras:
 
 No editor, a seção **Chegadas por período** das propriedades da fonte mostra a tabela: ciclo, uma linha por período com início, fim, modo (igual ao padrão, distribuição, taxa ou sem chegadas) e valor, o botão "copiar do padrão" e o número esperado de chegadas por período e por ciclo, para conferir com os dados. Com ciclo de 1440 (um dia em minutos) os horários aparecem e são digitados como hh:mm e as taxas são por hora; com 10080 (uma semana) como "dia N hh:mm". O modelo não tem unidade de tempo própria: com outros ciclos os horários e as taxas ficam na unidade do modelo.
 
+Na interface Godot, o painel de propriedades mostra o horário como uma faixa do ciclo com os períodos em blocos coloridos pelo modo (padrão, distribuição, taxa, fechado; o tempo fora dos períodos aparece hachurado), uma linha por período (início, fim, modo e a taxa em itens por hora ou a distribuição), os botões "+ Período" e ✕ e um gráfico de barras das chegadas esperadas em cada período, com o total por ciclo. Os erros aparecem na linha do período. O botão `{ }` troca o editor pela linha de texto RON.
+
 Nos experimentos, as chaves `chegada.schedule`, `chegada.schedule.cycle`, `chegada.schedule[n]` e `chegada.schedule[n].<campo>` (`start`, `end`, `arrivals`, `rate`, `interarrival`, `labels`) mudam a tabela; por exemplo `"chegada.schedule[2].rate": "0.5"`.
 
 ### Tabela de chegadas (`table`)
@@ -130,6 +132,8 @@ Regras:
 - Os erros apontam a linha, contada a partir de 1: `pedidos: table.rows[2]: at (300) antes da linha anterior (480); as linhas precisam estar em ordem de at`.
 - A fonte com tabela ganha as métricas `arrivals.count` (chegadas, isto é, linhas usadas) e `entered.count` (itens que saíram).
 - O `utsim check` resume a tabela: `chegadas: pedidos: horário com 3 linha(s), 25 item(ns) a cada ciclo de 1440`.
+
+Na interface Godot, a **Tabela de chegadas** das propriedades da fonte é uma grade: modo (horário ou sequência), repetição e ciclo, e uma linha por linha da tabela com instante (só no horário; em hh:mm quando o ciclo é de um dia ou uma semana), quantidade, tipo (os tipos do modelo) e rótulos escritos como `prioridade=2; prazo=1080`. Os botões ↑, ↓ e ✕ movem e removem a linha, "+ Linha" acrescenta uma no fim e "Ordenar por instante" põe as linhas em ordem. "Colar da planilha" recebe linhas copiadas de uma planilha, separadas por tabulação ou ponto e vírgula, com vírgula decimal; a primeira linha pode ser um cabeçalho (`hora`, `qtd`, `tipo`, e qualquer outro nome vira um rótulo), e as linhas substituem a tabela ou são acrescentadas. As mensagens de erro aparecem na linha a que se referem, e embaixo ficam o total de itens por ciclo e por tipo. "Ver as primeiras chegadas" mostra um histograma por hora e por tipo de um ciclo, lido da tabela (sem rodar o modelo). Cada mudança é um passo de desfazer.
 
 ### Tipos de item (`item_types`)
 

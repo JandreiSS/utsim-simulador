@@ -127,6 +127,8 @@ pub struct PropsState {
     drafts_seen: HashMap<String, serde_json::Value>,
     /// Entries whose analysis was asked (once).
     requested: HashSet<String>,
+    /// The arrival table and schedule editors (`ui_arrivals`).
+    pub(crate) arrivals: crate::ui_arrivals::ArrivalsState,
 }
 
 impl PropsState {
@@ -214,6 +216,7 @@ pub fn show(
         st.drafts.clear();
         st.drafts_seen.clear();
         st.requested.clear();
+        st.arrivals = Default::default();
         st.miniature_sent = None;
     }
     // The end of a colour drag: the button is up again.
@@ -448,7 +451,7 @@ fn row<R>(ui: &mut Ui, f: &Field, widget: impl FnOnce(&mut Ui, f32) -> R) -> R {
     row_label(ui, &f.label, &f.help, f.depth, widget)
 }
 
-fn row_label<R>(
+pub(crate) fn row_label<R>(
     ui: &mut Ui,
     label: &str,
     help: &str,
@@ -486,7 +489,7 @@ fn row_label<R>(
 /// A one-line text field with its own draft: selects all on focus, commits on Enter or
 /// when the focus leaves (Esc discards). Returns the committed text, if it changed.
 #[allow(clippy::too_many_arguments)]
-fn line_edit(
+pub(crate) fn line_edit(
     ui: &mut Ui,
     st: &mut PropsState,
     reg: &mut Registry,
@@ -590,7 +593,7 @@ pub fn num_text(x: f64) -> String {
 
 /// A list: `choices` are `(value, label, help)`; returns the value picked (by the user or
 /// by a scripted `escolher` with the label).
-fn combo(
+pub(crate) fn combo(
     ui: &mut Ui,
     reg: &mut Registry,
     name: &str,
@@ -645,7 +648,7 @@ fn combo(
 }
 
 /// The on/off switch of an optional field (`path.on`).
-fn toggle(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, f: &Field) {
+pub(crate) fn toggle(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, f: &Field) {
     let mut on = f.enabled;
     let r = ui
         .checkbox(&mut on, "")
@@ -663,7 +666,7 @@ fn toggle(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, f: &Field)
     }
 }
 
-fn set(path: &str, value: Value) -> PropAction {
+pub(crate) fn set(path: &str, value: Value) -> PropAction {
     PropAction::Set {
         path: path.to_owned(),
         value,
@@ -790,6 +793,11 @@ fn field(
             }) {
                 out.push(set(path, Value::Text(v)));
             }
+        }
+        // The arrival table and the schedule have their own editors (with "{ }" for the
+        // plain RON line).
+        FieldType::Ron if crate::ui_arrivals::handles(path) => {
+            crate::ui_arrivals::field(ui, v, st, reg, out, f);
         }
         FieldType::Ron => {
             let picked = row(ui, f, |ui, w| {
