@@ -13,6 +13,7 @@ mod optimize;
 mod painel;
 mod pert;
 mod planta;
+mod prever;
 mod qualidade;
 mod rede;
 mod replay;
@@ -308,6 +309,9 @@ enum Cmd {
     /// Gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura,
     /// compara com o modelo e grava as observações; `reproduzir` reexecuta sem rede
     Gemeo(gemeo::Args),
+    /// Previsão a partir de um estado, sem gêmeo: R replicações até o horizonte, com metas,
+    /// limites e cenários "e se" comparados com números aleatórios comuns
+    Prever(prever::Args),
     /// Painel web para gestores e engenheiros: roda as replicações e serve a página (127.0.0.1)
     Painel {
         model: PathBuf,
@@ -494,6 +498,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         })?,
         Cmd::Dados(args) => dados::run(args)?,
         Cmd::Gemeo(args) => gemeo::run(args)?,
+        Cmd::Prever(args) => prever::run(args)?,
         Cmd::Otimizar {
             problema,
             html,

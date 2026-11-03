@@ -18,6 +18,7 @@
 //!     ],
 //!     shadow: (window: 600.0, replications: 20),
 //!     record: (keep_days: 30, anonymize_people: true),
+//!     forecast: (horizon: Hours(4.0), replications: 40, targets: {"producao": AtLeast(450.0)}),
 //! )
 //! ```
 //!
@@ -29,6 +30,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use utsim_model::{Model, ObjectKind};
+
+use crate::forecast::ForecastSettings;
 
 /// Contents of a `.gemeo.ron` file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -55,6 +58,9 @@ pub struct TwinConfig {
     pub shadow: ShadowSettings,
     #[serde(default, alias = "gravacao")]
     pub record: RecordSettings,
+    /// Forecast settings (used with `--previsao`; absent: the defaults).
+    #[serde(default, alias = "previsao", skip_serializing_if = "Option::is_none")]
+    pub forecast: Option<ForecastSettings>,
 }
 
 /// Where the twin's time comes from.
@@ -723,6 +729,9 @@ impl TwinConfig {
         }
         if self.tags.is_empty() {
             errors.push("nenhum tag mapeado".into());
+        }
+        if let Some(f) = &self.forecast {
+            warnings.extend(f.validate(model, &mut errors));
         }
         if let (Some(want), Some(text)) = (&self.model_hash, model_text) {
             let got = model_hash(text);
