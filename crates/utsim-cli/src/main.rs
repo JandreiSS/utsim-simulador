@@ -7,6 +7,7 @@ mod fit;
 mod fluxograma;
 mod gerar;
 mod optimize;
+mod painel;
 mod pert;
 mod planta;
 mod replay;
@@ -284,6 +285,25 @@ enum Cmd {
         #[arg(long, default_value_t = 20.0)]
         cena_fps: f64,
     },
+    /// Painel web para gestores e engenheiros: roda as replicações e serve a página (127.0.0.1)
+    Painel {
+        model: PathBuf,
+        /// Porta do servidor local
+        #[arg(long, default_value_t = 8080)]
+        porta: u16,
+        /// Arquivo do painel (padrão: <modelo>.painel.ron, se existir)
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Número de replicações (sobrescreve run.replications)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+        /// Não serve: grava o painel congelado (HTML único, CSV, JSON, .xlsx) nesta pasta
+        #[arg(long, value_name = "PASTA")]
+        exportar: Option<PathBuf>,
+        /// Abre o navegador padrão no endereço do painel
+        #[arg(long)]
+        abrir: bool,
+    },
     /// Ajusta distribuições a dados reais (CSV/TXT) e justifica a escolha
     Fit {
         file: PathBuf,
@@ -386,6 +406,21 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             reps,
             csv,
             html,
+        })?,
+        Cmd::Painel {
+            model,
+            porta,
+            config,
+            reps,
+            exportar,
+            abrir,
+        } => painel::run(painel::Args {
+            model,
+            port: porta,
+            config,
+            reps,
+            export: exportar,
+            open: abrir,
         })?,
         Cmd::Fit {
             file,

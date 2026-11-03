@@ -791,6 +791,16 @@ Dashboard(
 | CLI `utsim painel`, `utsim kpi`, `--painel` nos comandos | 2–3 | Haiku |
 | **Total** | **63–89** | |
 
+**Situação (2026-11-03, crate `utsim-dash`, manual `painel.md`):**
+
+- [x] D1 KPIs com IC, faixa de uma rodada, P5–P95 e semáforo por probabilidade com Wilson (em `utsim-dash/src/kpi.rs`, não em `utsim-model`); sem os campos de custo, energia, refugo no núcleo e ciclo ideal: OEE só pelo arquivo do painel; OTD lê as métricas `prazo.no_prazo` e `prazo.total` das Sinks (o núcleo ainda não as registra).
+- [x] D2 servidor HTTP em `std::net` (sem WebSocket; atualização por consulta), API JSON, só `127.0.0.1`, verificação de `Host`.
+- [x] D3 página, módulo de gráficos SVG próprio, tema claro e escuro; D4 visão do gestor (sem comparação de cenários); D5 visão do engenheiro (objetos, objeto, distribuições, séries, Gantt, estatística; faltam Sankey, cenários, gêmeo e eventos).
+- [x] D6 ao vivo por replicação com cancelamento; [ ] ritmo do relógio, gêmeo e modo quiosque.
+- [ ] D7 alertas. [x] D8 HTML estático, PDF pela impressão, `.xlsx` (feature `xlsx`), CSV e JSON; [ ] PNG dos gráficos.
+- [x] D9 arquivo `.painel.ron` (metas, cartões, limiares, OEE, nível de serviço); [ ] grupos e parâmetros expostos.
+- [x] CLI `utsim painel`; [ ] `utsim kpi` e `--painel` nos outros comandos; [ ] D10 Godot; [ ] acesso pela rede com token.
+
 ### 2.14 Requisitos sugeridos
 
 | ID | Requisito |

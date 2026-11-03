@@ -1,0 +1,25 @@
+[package]
+name = "utsim-dash"
+description = "Web dashboard for managers and engineers: KPIs with intervals and probability traffic lights, served by the program itself"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+utsim-core.workspace = true
+utsim-model.workspace = true
+utsim-stats.workspace = true
+utsim-scene.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ron.workspace = true
+# `.xlsx` export (the standard installer turns it on). Pinned: no default features.
+rust_xlsxwriter = { version = "=0.102.0", default-features = false, optional = true }
+
+[features]
+default = ["xlsx"]
+xlsx = ["dep:rust_xlsxwriter"]
+
+[dev-dependencies]
+# Reads the exported `.xlsx` back in the tests.
+zip = { version = "=2.6.1", default-features = false, features = ["deflate"] }

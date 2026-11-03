@@ -19,6 +19,7 @@ utsim-stats.workspace = true
 utsim-opt.workspace = true
 utsim-emu.workspace = true
 utsim-pert.workspace = true
+utsim-dash.workspace = true
 utsim-cad.workspace = true
 clap.workspace = true
 serde.workspace = true
