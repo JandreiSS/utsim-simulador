@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use godot::prelude::*;
 
 use crate::document::{self, Editor, Properties, edit_replay, look_model, palette_model};
+use crate::network_edit;
 use crate::playback::Playback;
 use crate::schema::{self, Field, Value};
 use crate::{UtsimModel, UtsimPlayback, put, strings};
@@ -414,6 +415,126 @@ impl UtsimDocument {
         self.done(r)
     }
 
+    /// The path network: `{nodes: [{name, position (Godot), model_position}], edges:
+    /// [{from, to, two_way, capacity (0: no limit), controlled, length}]}`.
+    #[func]
+    fn network(&self) -> VarDictionary {
+        let model = self.editor.model();
+        let mut nodes = VarArray::new();
+        for n in network_edit::nodes(model) {
+            let mut d = VarDictionary::new();
+            put(&mut d, "name", GString::from(n.name.as_str()));
+            put(&mut d, "position", to_godot(n.position));
+            put(
+                &mut d,
+                "model_position",
+                Vector3::new(
+                    n.position[0] as f32,
+                    n.position[1] as f32,
+                    n.position[2] as f32,
+                ),
+            );
+            nodes.push(&d.to_variant());
+        }
+        let mut edges = VarArray::new();
+        for e in network_edit::edges(model) {
+            let mut d = VarDictionary::new();
+            put(&mut d, "from", GString::from(e.from.as_str()));
+            put(&mut d, "to", GString::from(e.to.as_str()));
+            put(&mut d, "two_way", e.two_way);
+            put(&mut d, "capacity", e.capacity.unwrap_or(0) as i64);
+            put(&mut d, "controlled", e.controlled());
+            put(&mut d, "length", e.length);
+            edges.push(&d.to_variant());
+        }
+        let mut d = VarDictionary::new();
+        put(&mut d, "nodes", nodes);
+        put(&mut d, "edges", edges);
+        d
+    }
+
+    /// Adds a node at Godot point `at` (snapped to `step`) and, when `from` is not
+    /// empty, the edge `from -> new` (one undo step). Returns the new name, or `""`.
+    #[func]
+    fn add_node(&mut self, at: Vector3, step: f64, from: GString, two_way: bool) -> GString {
+        let f = from.to_string();
+        let r = self.editor.add_node(
+            to_model(at),
+            step,
+            (!f.is_empty()).then_some(f.as_str()),
+            two_way,
+        );
+        match r {
+            Ok(name) => {
+                self.last_error.clear();
+                GString::from(name.as_str())
+            }
+            Err(e) => {
+                self.last_error = e;
+                GString::new()
+            }
+        }
+    }
+
+    #[func]
+    fn move_node(&mut self, name: GString, at: Vector3, step: f64) -> bool {
+        let r = self.editor.move_node(&name.to_string(), to_model(at), step);
+        self.done(r)
+    }
+
+    #[func]
+    fn rename_node(&mut self, from: GString, to: GString) -> bool {
+        let r = self.editor.rename_node(&from.to_string(), &to.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn remove_nodes(&mut self, names: PackedStringArray) -> bool {
+        let r = self.editor.remove_nodes(&names_of(&names));
+        self.done(r)
+    }
+
+    #[func]
+    fn add_edge(&mut self, from: GString, to: GString, two_way: bool) -> bool {
+        let r = self
+            .editor
+            .add_edge(&from.to_string(), &to.to_string(), two_way);
+        self.done(r)
+    }
+
+    /// Direction and capacity of the edge `from -> to` (`capacity` 0: no limit; with a
+    /// capacity the edge is controlled, drawn in red).
+    #[func]
+    fn set_edge(&mut self, from: GString, to: GString, two_way: bool, capacity: i64) -> bool {
+        let r = self.editor.set_edge(
+            &from.to_string(),
+            &to.to_string(),
+            two_way,
+            capacity.max(0) as usize,
+        );
+        self.done(r)
+    }
+
+    #[func]
+    fn reverse_edge(&mut self, from: GString, to: GString) -> bool {
+        let r = self.editor.reverse_edge(&from.to_string(), &to.to_string());
+        self.done(r)
+    }
+
+    #[func]
+    fn remove_edge(&mut self, from: GString, to: GString) -> bool {
+        let r = self.editor.remove_edge(&from.to_string(), &to.to_string());
+        self.done(r)
+    }
+
+    /// The node within `radius` metres of Godot point `at`, or `""`.
+    #[func]
+    fn node_near(&self, at: Vector3, radius: f64) -> GString {
+        self.editor
+            .node_near(to_model(at), radius)
+            .map_or_else(GString::new, |n| GString::from(n.as_str()))
+    }
+
     /// Sets property `path` of `object` (`"run"`: the run settings) to `value`, and the
     /// same on `others` when they are of its kind. See `schema` for the paths.
     #[func]
@@ -532,6 +653,7 @@ impl UtsimDocument {
         let path = self.editor.doc.path().map(|p| p.to_path_buf());
         Gd::from_init_fn(|base| UtsimModel {
             model: valid.then_some(model),
+            replay: None,
             path,
             last_error: String::new(),
             base,

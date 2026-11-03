@@ -90,8 +90,9 @@ O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
     `.ron` salvo com o exemplo (`igual_a`); `g2_montar_linha.json` monta uma linha, edita
     propriedades, escolhe um ativo, simula, desfaz, salva e reabre.
 
-**Conferência visual pendente** (os roteiros rodaram só sem janela; com janela eles também
-gravam as capturas de cada passo). Com o PC livre, rode:
+**Conferência visual feita** em 2026-11-02 (os dois roteiros passaram com janela). Ela achou
+rótulos cortados no painel de propriedades, o nome do modelo cortado na barra superior e o
+resumo do Simular apertado, corrigidos na G3 (ver lá). Para repetir:
 
 ```bash
 bash scripts/godot.sh
@@ -141,7 +142,114 @@ O plano original da G2:
   - o painel de propriedades gerado precisa cobrir as distribuições e as listas
     (esteiras, porta-paletes, equipes).
 
-## G3: rede, fluidos e resultados
+## G3: rede, fluidos e resultados (feita)
+
+O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
+
+- **Rede de caminhos** (`godot/scripts/rede.gd`, ferramenta Rede ou tecla N): clicar no chão
+  põe um nó; com um nó armado (verde) o clique seguinte o liga ao novo, então um caminho sai
+  clique a clique; clicar em outro nó liga o armado a ele (laços); arrastar move o nó, com
+  encaixe na grade; clicar num trecho mostra no painel mão dupla ou única, capacidade (com
+  capacidade a pista é controlada e fica vermelha, como no Bevy), inverter e excluir. Esc
+  encerra o caminho, Del exclui. Tudo pelos comandos do `utsim-edit` (`AddNode`, `AddEdge`,
+  `SetEdge`, `MoveNode`...), com desfazer. A rede é desenhada por cima da cena em todas as
+  ferramentas. Na ponte: `crates/utsim-godot/src/network_edit.rs`.
+- **Fluidos** (`cena.gd`): tanque como casca transparente com o líquido na altura do nível e a
+  cor pela taxa (enchendo, esvaziando, parado); fonte, sumidouro, tubulação e conversores como
+  marcadores coloridos; tubos entre as portas, acesos quando passa fluido; linha roxa do
+  conversor ao objeto discreto; rótulo com a porcentagem. Na ponte: `extras.rs`
+  (`UtsimPlayback.fluid_frame(t)`).
+- **Fluxos de tokens** (`fluxos.gd`, botão Fluxos no Simular): o grafo de cada fluxo em 2D
+  (camadas ao longo de `next`), os tokens de cada atividade no instante da reprodução e as
+  contagens ao longo da rodada, com a linha do instante.
+- **Resultados** (`resultados.gd`, botão Resultados): resumo com o gargalo geral e dentro do
+  turno, tabela por objeto com IC de 95 %, exportação CSV; gráficos de ocupação (com o traço
+  do IC), estados (cores da cena), série temporal e histograma, desenhados com `draw_*`
+  (`grafico.gd`); cenários escritos como texto (`[nome]` e `objeto.campo = valor`), com números
+  aleatórios comuns; otimização (métrica, variáveis, método) pelo `utsim-opt`.
+- **Análise** (dentro de Resultados; `docs/plano_analises_e_dinamica.md`, seção 2):
+  - aquecimento: curva de Welch e corte do MSER-5, com "Aplicar", que grava `run.warmup`;
+  - replicações necessárias para uma precisão, com "Rodar mais" (acrescenta às já feitas,
+    com as sementes seguintes);
+  - lei de Little por objeto e no sistema, com semáforo (verde, amarelo, vermelho);
+  - gargalo móvel (único e compartilhado).
+
+  Cada uma diz em uma linha o que significa.
+- **Replicações em thread** (`jobs.rs`, classe `UtsimJob`): simular, rodar mais, cenários,
+  otimização, análises e PERT rodam numa thread da ponte; a barra inferior mostra o progresso
+  e o Cancelar, que para na próxima replicação (`run_replications_with`).
+- **PERT/CPM da seleção** (`pert.gd`, botão PERT/CPM ou menu Analisar): com dois objetos
+  selecionados é "de… até…" (do primeiro clicado até o segundo); com outros, a parte do
+  processo.
+  - Abre no modo **simulado** (decisão do dono); Clássico e Monte Carlo a um clique, com prazo
+    e número de sorteios.
+  - Abas: Rede (atividade no nó com ES/EF/LS/LF, folga, caminho crítico em vermelho, setas
+    pela criticidade), Gantt, Distribuição (histograma e `P(T ≤ prazo)`), Tabela e Texto (o
+    relatório do `utsim pert`); exporta HTML e CSV.
+  - Os objetos críticos ganham contorno vermelho na cena do Editar. Na ponte: `pert_view.rs`.
+- **Câmeras** (Simular): Órbita, Seguir, Primeira pessoa e Do recurso, acompanhando o bloco
+  escolhido na lista (o primeiro recurso móvel, se nenhum).
+- **Detalhe:** no máximo 60 rótulos, os mais próximos da câmera até 160 m; itens além de
+  140 m não são desenhados.
+- **Replay `.json`:** "Gravar replay" grava a replicação 0 no formato do `utsim run --replay`;
+  Abrir aceita `.json` e reproduz, com as estatísticas daquela replicação em Resultados.
+- **Ajustes da conferência visual da G2:** os rótulos do painel de propriedades quebram a linha
+  (a dica traz o texto inteiro e a ajuda) e as listas encolhem em vez de cortar o rótulo; a
+  barra superior mostra só o nome do modelo, com reticências, e o arquivo vai para o título
+  da janela; o resumo do Simular ficou curto (o resto está em Resultados, que usa a largura
+  toda da vista).
+- **Testes:**
+  - Rust (`cargo test -p utsim-godot`, 51 testes): rede desenhada clique a clique com desfazer,
+    trechos (sentido, capacidade, inverter), nós (mover, renomear, achar, excluir); tanques
+    mudando de nível com as cores; fluxos com tokens no tempo; tabela igual à do `utsim run`,
+    com o gargalo; estados somando 1 com as cores da cena; "rodar mais" igual a uma rodada
+    maior; cenários em texto; formulário de otimização; semáforo de Little; tarefas em thread
+    (mesmo resultado, cancelar, análises, cenários, otimização); PERT nos três modos;
+  - `godot/testes/teste.gd` roda as replicações também por `UtsimJob`;
+  - roteiros sem janela no `scripts/godot_teste.sh`:
+    - `g3_rede.json`: desenha, fecha um laço, mão única, pista controlada, inverte, desfaz,
+      arrasta, exclui, salva e reabre;
+    - `g3_resultados.json`: simula em thread, tabela, gráficos, aquecimento com aplicar,
+      precisão com rodar mais, Little, gargalo móvel, cenários, otimização, progresso e
+      cancelar numa rodada de 3000 replicações;
+    - `g3_pert.json`: de chegada até saída nos três modos, prazo, abas, HTML e seleção de
+      objetos;
+    - `g3_cena.json`: tanques, fluxos, câmeras, limite de rótulos, gravar e abrir o replay.
+
+**Conferência visual pendente** (os roteiros rodaram só sem janela; com janela eles também
+gravam as capturas de cada passo). Com o PC livre, rode:
+
+```bash
+bash scripts/godot.sh
+G="$HOME/Documents/Godot_v4.7.2-stable_win64.exe/Godot_v4.7.2-stable_win64_console.exe"
+for r in g3_rede g3_resultados g3_pert g3_cena; do
+    "$G" --path godot -- --utsim-roteiro=roteiros/$r.json --utsim-capturas="$(pwd -W)/godot/capturas/g3"
+done
+```
+
+e confira nas capturas (`godot/capturas/g3/*.png`, fora do git):
+
+- a rede sobre o chão: trechos âmbar, a pista controlada vermelha, a seta da mão única no meio
+  do trecho, os losangos dos nós e o nó armado verde com a linha até o mouse
+  (`g3_rede_01_caminho`, `g3_rede_02_controlada`, `g3_rede_03_editada`);
+- o painel Resultados: a tabela (colunas alinhadas, gargalo em laranja), as barras de ocupação
+  com o traço do IC, os estados com a legenda, a série e o histograma (eixos legíveis), a
+  curva de Welch com a linha do MSER-5, Little com os círculos coloridos, cenários e
+  otimização (`g3_res_*`);
+- a janela PERT/CPM: caixas sem sobreposição e o caminho crítico vermelho, o Gantt com a folga
+  clara, o histograma com a linha do prazo (`g3_pert_*`), e o contorno vermelho dos objetos
+  críticos na cena (feche a janela e olhe o Editar);
+- os tanques com o líquido na altura certa e a cor da taxa, os tubos acesos, os marcadores e
+  as linhas dos conversores (`g3_cena_01_tanques`); o grafo dos fluxos e a série
+  (`g3_cena_02_fluxos`); as câmeras Seguir, Primeira pessoa e Do recurso (`g3_cena_03` a
+  `g3_cena_05`: a primeira pessoa não deve ficar dentro do modelo do AGV);
+- o painel de propriedades sem rótulos cortados (abra `examples/tutorial_01_caixa.ron` e
+  clique na chegada) e o nome do modelo na barra superior.
+
+Abrir o projeto (`bash scripts/godot.sh --abrir`, F5) e desenhar uma rede à mão também vale a
+pena: a escolha de um trecho perto de um nó e o arrasto do nó só a mão no mouse confirma.
+
+O plano original da G3:
 
 - **Rede de caminhos:**
   - nós e trechos desenhados e editáveis (mão única, dupla, capacidade);
@@ -158,10 +266,10 @@ O plano original da G2:
   - cenários e otimização, usando `utsim-model::analysis` e o `utsim-opt` pela ponte.
 - **Replicações:** em uma thread da ponte, com progresso e cancelar (`run_replications_with`).
 - **Cena ao vivo:** cliente do socket `utsim-scene/1` para a emulação OPC UA, com os mesmos
-  arrays de quadro.
+  arrays de quadro (**não feita**, ver as lacunas).
 - **Níveis de detalhe e limite de rótulos** para modelos grandes, como no A3D-4.
 - **Riscos:** os gráficos no Godot não têm um equivalente pronto do `egui_plot`. Opções:
-  - desenhar no `Control` com `draw_*`;
+  - desenhar no `Control` com `draw_*` (a escolhida);
   - gerar SVG ou PNG no Rust.
 
 ## G4: realidade virtual e aumentada (OpenXR)
@@ -263,17 +371,23 @@ Pendente:
 - **Assinatura** do instalador e do `.apk`.
 - Capturas roteirizadas como artefato do CI (precisam de GPU).
 
-## Lacunas conhecidas depois da G2
+## Lacunas conhecidas depois da G3
 
-- A aparência do Editar só foi conferida sem janela (ver "Conferência visual pendente" na G2).
+- A aparência da G3 só foi conferida sem janela (ver "Conferência visual pendente" na G3).
 - `operador_simples` sem braços e pernas animados no Godot (só o boneco é animado).
-- Nós de fluido como cilindros simples; rede de caminhos e fluidos só desenhados, sem edição
-  (G3).
+- O Editar desenha os fluidos com o nível inicial, mas não cria nem edita os nós de fluido; os
+  tanques são cilindros simples (os modelos do `utsim-assets` ainda não entram).
 - O Editar não cria nem edita calendários, fluxos de tokens ou chegadas por período: um objeto
   escolhe um calendário que já existe, e as chegadas por período (`schedule`) são editadas
   como texto RON, sem a tabela de períodos do Bevy.
-- Só a câmera de órbita (o Bevy tem seguir, primeira pessoa e do recurso).
-- `run` bloqueia a interface durante as replicações (thread com progresso na G3).
-- A interface não lê um replay `.json` gravado; só modelos `.ron`.
+- Cena ao vivo (cliente do socket `utsim-scene/1`) não foi feita.
+- O replay mostrado é sempre o da replicação 0.
+- A aba Análise ainda não tem o Gantt de estados, a série de WIP com banda, ANOVA/Tukey nem o
+  mapa de calor (P2 do plano de análises). "Aplicar" o aquecimento muda o modelo; os números
+  com ele vêm na próxima simulação.
+- A janela PERT/CPM não tem a aba do tornado (sensibilidade do Monte Carlo); o relatório HTML
+  exportado tem.
+- O nível de detalhe é só o limite de rótulos e a distância dos itens: os modelos dos blocos
+  não têm versões simplificadas (fica para a G4, no Quest).
 - O roteiro de interface escolhe um item de lista (`escolher`) chamando a lista direto: sem
   janela, a lista aberta é uma janela à parte que os eventos simulados não alcançam.

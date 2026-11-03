@@ -1,6 +1,13 @@
-## Main scene of the Godot interface (phases G1 and G2): build a model by placing and
+## Main scene of the Godot interface (phases G1 to G3): build a model by placing and
 ## connecting blocks in 3D (Editar), then run the replications in Rust and play the
 ## replay of replication 0 (Simular).
+##
+## G3: the path network is drawn and edited with the Rede tool (`rede.gd`); runs go to a
+## thread of the bridge (`UtsimJob`, polled every frame, with progress and Cancelar), the
+## "Resultados" panel (`resultados.gd`) shows the table, the charts, the output analyses,
+## scenarios and optimisation; the PERT/CPM window of the selection (`pert.gd`); the
+## token flows in 2D (`fluxos.gd`); tanks with their levels (`cena.gd`); the cameras
+## Seguir, Primeira pessoa and Do recurso; and recorded replays (`.json`) can be opened.
 ##
 ## The model being edited is a `UtsimDocument` (the bridge over `utsim_edit::Document`):
 ## every change is a command, validated and undoable. Editar draws the document with the
@@ -21,6 +28,7 @@ const BOTTOM_HEIGHT := 40
 const PANEL := Color(0.12, 0.13, 0.16)
 const RED := Color(1.0, 0.45, 0.42)
 const YELLOW := Color(0.98, 0.80, 0.35)
+const CAMERAS := [["orbita", "Órbita"], ["seguir", "Seguir"], ["primeira_pessoa", "Primeira pessoa"], ["recurso", "Do recurso"]]
 
 var doc: Object
 var model: Object
@@ -79,6 +87,25 @@ var _revision := -1
 var _listed: Array = []
 var _pending := Callable()
 var _run_reps := 5
+## The run shown in Resultados (`UtsimResults`), and the job running now (`UtsimJob`).
+var results: Object
+var job: Object
+var _job_done := Callable()
+var _progress: ProgressBar
+var _cancel: Button
+var _tool_rede: Button
+var _results_panel: PainelResultados
+var _pert_panel: PainelPert
+var _flows_panel: PainelFluxos
+var _camera_pick: OptionButton
+## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
+var camera_mode := "orbita"
+## Block followed by the cameras other than the orbit one.
+var follow_name := ""
+var _frames := 0
+var _replay_dialog: FileDialog
+## A recorded replay (`.json`) is being played instead of the document.
+var playing_replay := false
 
 
 func _ready() -> void:
@@ -215,7 +242,8 @@ func _build_ui() -> void:
 	var tools := ButtonGroup.new()
 	_tool_select = _button(top, "Ferramenta_Selecionar", "Selecionar", "Selecionar e mover (Esc)", func(): editor.set_tool("selecionar"))
 	_tool_link = _button(top, "Ferramenta_Ligar", "Ligar", "Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)", func(): editor.set_tool("ligar"))
-	for b in [_tool_select, _tool_link]:
+	_tool_rede = _button(top, "Ferramenta_Rede", "Rede", "Rede de caminhos: nós e trechos (N)", func(): editor.set_tool("selecionar" if editor.tool == "rede" else "rede"))
+	for b in [_tool_select, _tool_link, _tool_rede]:
 		b.toggle_mode = true
 		b.button_group = tools
 	var arrange := MenuButton.new()
@@ -256,14 +284,32 @@ func _build_ui() -> void:
 	_step.selected = STEPS.find(grid_step)
 	_step.item_selected.connect(func(k): set_snap(snap_on, STEPS[k]))
 	top.add_child(_step)
+	var analysis := MenuButton.new()
+	analysis.name = "Menu_Analisar"
+	analysis.text = "Analisar"
+	analysis.flat = false
+	analysis.focus_mode = Control.FOCUS_NONE
+	var am := analysis.get_popup()
+	for item in [["Resultados", "resultados"], ["PERT/CPM da seleção", "pert"], ["PERT/CPM de... até... (dois selecionados)", "pert_trecho"], ["Fluxos de tokens", "fluxos"]]:
+		am.add_item(item[0])
+		am.set_item_metadata(am.item_count - 1, item[1])
+	am.index_pressed.connect(func(k): analysis_action(String(am.get_item_metadata(k))))
+	top.add_child(analysis)
+	_button(top, "Botao_Resultados", "Resultados", "Tabela, gráficos, análises, cenários e otimização da última rodada", func(): analysis_action("resultados"))
+	_button(top, "Botao_Pert", "PERT/CPM", "PERT/CPM da seleção (com dois objetos, de um até o outro)", func(): analysis_action("pert_auto"))
 	_button(top, "Botao_Atalhos", "Atalhos (F1)", "Lista dos atalhos de teclado e mouse", func(): toggle_shortcuts())
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(spacer)
 	_title = Label.new()
 	_title.name = "Titulo"
-	_title.clip_text = true
-	_title.custom_minimum_size = Vector2(260, 0)
+	# Only the model name, cut with an ellipsis; the file name goes to the window title
+	# and to the tooltip (the G2 visual check found "orial 01: um caixa tutorial_01.r").
+	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_title.custom_minimum_size = Vector2(120, 0)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_title.size_flags_stretch_ratio = 0.6
+	_title.mouse_filter = Control.MOUSE_FILTER_PASS
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(_title)
 
@@ -329,10 +375,31 @@ func _build_ui() -> void:
 	blocks_label.text = "Blocos (clique para focar)"
 	_sim_left.add_child(blocks_label)
 	_blocks = ItemList.new()
+	_blocks.name = "Simular_Blocos"
 	_blocks.custom_minimum_size = Vector2(260, 200)
 	_blocks.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_blocks.item_selected.connect(func(k): focus_block(cena.blocks[k]["name"], 8.0))
+	_blocks.item_selected.connect(func(k):
+		follow_name = cena.blocks[k]["name"]
+		if camera_mode == "orbita":
+			focus_block(follow_name, 8.0))
 	_sim_left.add_child(_blocks)
+	var cam_row := HBoxContainer.new()
+	_sim_left.add_child(cam_row)
+	var cam_label := Label.new()
+	cam_label.text = "Câmera"
+	cam_row.add_child(cam_label)
+	_camera_pick = OptionButton.new()
+	_camera_pick.name = "Simular_Camera"
+	_camera_pick.focus_mode = Control.FOCUS_NONE
+	_camera_pick.tooltip_text = "Seguir, Primeira pessoa e Do recurso acompanham o bloco escolhido na lista"
+	for k in CAMERAS.size():
+		_camera_pick.add_item(CAMERAS[k][1], k)
+	_camera_pick.item_selected.connect(func(k): set_camera_mode(CAMERAS[k][0]))
+	cam_row.add_child(_camera_pick)
+	var sim_row := HBoxContainer.new()
+	_sim_left.add_child(sim_row)
+	_button(sim_row, "Botao_Fluxos", "Fluxos", "Fluxos de tokens em 2D, com as contagens no tempo", func(): analysis_action("fluxos"))
+	_button(sim_row, "Botao_GravarReplay", "Gravar replay", "Grava o replay desta replicação em .json (abre de novo com Abrir)", func(): _replay_dialog.popup_centered_ratio(0.7))
 	var labels := CheckBox.new()
 	labels.text = "Rótulos"
 	labels.button_pressed = true
@@ -384,10 +451,20 @@ func _build_ui() -> void:
 	_bottom.anchor_right = 1.0
 	_bottom.anchor_bottom = 1.0
 	_bottom.offset_top = -BOTTOM_HEIGHT
+	var bottom := HBoxContainer.new()
+	_bottom.add_child(bottom)
 	_status = Label.new()
 	_status.name = "Status"
 	_status.clip_text = true
-	_bottom.add_child(_status)
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(_status)
+	_progress = ProgressBar.new()
+	_progress.name = "Progresso"
+	_progress.custom_minimum_size = Vector2(220, 0)
+	_progress.visible = false
+	bottom.add_child(_progress)
+	_cancel = _button(bottom, "Botao_Cancelar", "Cancelar", "Para na próxima replicação", func(): cancel_job())
+	_cancel.visible = false
 
 	# Playback bar (Simular), above the status bar.
 	_bar = _panel("BarraReproducao")
@@ -437,7 +514,7 @@ func _build_ui() -> void:
 	_open_dialog.name = "Dialogo_Abrir"
 	_open_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	_open_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	_open_dialog.filters = PackedStringArray(["*.ron ; Modelos do UTSim"])
+	_open_dialog.filters = PackedStringArray(["*.ron ; Modelos do UTSim", "*.json ; Replays gravados"])
 	_open_dialog.title = "Abrir modelo"
 	_open_dialog.file_selected.connect(func(p): open_model(p))
 	_ui.add_child(_open_dialog)
@@ -460,6 +537,37 @@ func _build_ui() -> void:
 			_pending.call()
 		_pending = Callable())
 	_ui.add_child(_discard)
+	_results_panel = PainelResultados.new()
+	_results_panel.add_theme_stylebox_override("panel", _panel_style())
+	_ui.add_child(_results_panel)
+	_results_panel.build(self)
+	_pert_panel = PainelPert.new()
+	_pert_panel.add_theme_stylebox_override("panel", _panel_style())
+	_ui.add_child(_pert_panel)
+	_pert_panel.build(self)
+	_flows_panel = PainelFluxos.new()
+	_flows_panel.add_theme_stylebox_override("panel", _panel_style())
+	_ui.add_child(_flows_panel)
+	_flows_panel.build(self)
+	for panel in [_results_panel, _pert_panel, _flows_panel]:
+		panel.anchor_right = 1.0
+		panel.anchor_bottom = 1.0
+		panel.offset_left = LEFT_WIDTH + 12
+		panel.offset_top = TOP_HEIGHT + 30
+		panel.offset_right = -12
+		panel.offset_bottom = -BOTTOM_HEIGHT - 60
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.visible = false
+	_flows_panel.offset_left = -560
+	_flows_panel.anchor_left = 1.0
+	_replay_dialog = FileDialog.new()
+	_replay_dialog.name = "Dialogo_Replay"
+	_replay_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_replay_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	_replay_dialog.filters = PackedStringArray(["*.json ; Replays do UTSim"])
+	_replay_dialog.title = "Gravar replay"
+	_replay_dialog.file_selected.connect(func(p): save_replay(p))
+	_ui.add_child(_replay_dialog)
 	_shortcuts = AcceptDialog.new()
 	_shortcuts.name = "Janela_Atalhos"
 	_shortcuts.title = "Atalhos"
@@ -494,8 +602,8 @@ func toggle_shortcuts() -> void:
 
 ## Whether screen point `p` is over a panel (the 3D view does not take it).
 func over_ui(p: Vector2) -> bool:
-	for c in [_top, _left, _right, _bottom, _bar]:
-		if c.visible and c.get_global_rect().has_point(p):
+	for c in [_top, _left, _right, _bottom, _bar, _results_panel, _pert_panel, _flows_panel]:
+		if c != null and c.visible and c.get_global_rect().has_point(p):
 			return true
 	return false
 
@@ -525,8 +633,15 @@ func set_status(text: String) -> void:
 
 func on_tool_changed() -> void:
 	_tool_link.set_pressed_no_signal(editor.tool == "ligar")
-	_tool_select.set_pressed_no_signal(editor.tool != "ligar")
+	_tool_rede.set_pressed_no_signal(editor.tool == "rede")
+	_tool_select.set_pressed_no_signal(editor.tool != "ligar" and editor.tool != "rede")
 	_library.mark(editor.place_id)
+	_show_properties()
+
+
+## The node or edge chosen with the Rede tool changed.
+func on_network_selection() -> void:
+	_show_properties()
 
 
 func on_selection_changed() -> void:
@@ -570,7 +685,10 @@ func new_document(force := false) -> void:
 func open_model(path: String) -> bool:
 	if doc == null:
 		return false
+	if path.get_extension().to_lower() == "json":
+		return open_replay(path)
 	set_playing(false)
+	playing_replay = false
 	var r: Dictionary = doc.open(path)
 	if not r["ok"]:
 		set_status("Não abriu %s: %s" % [path.get_file(), r["error"]])
@@ -651,6 +769,7 @@ func after_edit(force := false) -> void:
 	_revision = rev
 	var objects: Array = doc.objects()
 	editor.sync(objects, doc.connections())
+	editor.rede.sync(doc.network())
 	if mode == "editar":
 		_build_edit_scene()
 	_fill_objects()
@@ -673,7 +792,12 @@ func _build_edit_scene() -> void:
 
 func _update_title() -> void:
 	var file: String = doc.path().get_file() if doc.path() != "" else "(sem arquivo)"
-	_title.text = "%s%s  %s" % [doc.name(), " *" if doc.is_dirty() else "", file]
+	var dirty := " *" if doc.is_dirty() else ""
+	_title.text = "%s%s" % [doc.name(), dirty]
+	_title.tooltip_text = "%s%s
+%s" % [doc.name(), dirty, doc.path() if doc.path() != "" else file]
+	if is_inside_tree():
+		get_window().title = "UTSim 3D: %s%s (%s)" % [doc.name(), dirty, file]
 	_undo.disabled = not doc.can_undo()
 	_redo.disabled = not doc.can_redo()
 
@@ -712,6 +836,10 @@ func _show_properties() -> void:
 	var scroll := _props_scroll.scroll_vertical
 	if not editor.selected_link.is_empty():
 		_show_link(editor.selected_link)
+		return
+	if editor.tool == "rede":
+		_show_network()
+		_props_scroll.scroll_vertical = scroll
 		return
 	var sel: Array = editor.selected
 	var name: String = sel[0] if not sel.is_empty() else "run"
@@ -831,13 +959,14 @@ func set_mode(which: String) -> bool:
 		return simulate(_run_reps)
 	set_playing(false)
 	mode = "editar"
+	playing_replay = false
 	_mode_edit.set_pressed_no_signal(true)
 	_mode_sim.set_pressed_no_signal(false)
 	_edit_left.visible = true
 	_sim_left.visible = false
 	_right.visible = true
 	_bar.visible = false
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = true
 	_revision = -1
 	after_edit(true)
@@ -867,19 +996,40 @@ func simulate(reps: int) -> bool:
 	_sim_left.visible = true
 	_right.visible = false
 	_bar.visible = true
-	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
 		(_top.find_child(b, true, false) as Control).visible = false
 	_reps.value = reps
-	set_status("Simulando %d replicações..." % reps)
-	var r: Dictionary = model.run(reps)
-	if not r["ok"]:
-		set_status("A simulação falhou: %s" % r.get("error", ""))
+	playing_replay = false
+	if job != null:
+		set_status("Aguarde: %s." % job.what())
 		return false
-	_show_summary(r)
+	var j: Object = model.start_run(reps)
+	if j == null:
+		set_status("A simulação não começou: %s" % model.last_error())
+		return false
+	_sim_status.text = "Simulando %d replicações..." % reps
+	cena.clear(true)
+	playback = null
+	start_job(j, func(done): _on_run(done))
+	return true
+
+
+func _on_run(j: Object) -> void:
+	if not j.ok():
+		set_mode("editar")
+		set_status("A simulação %s: %s" % ["foi cancelada" if j.cancelled() else "falhou", j.error()])
+		return
+	on_results(j.results())
 	playback = model.playback(0, CenaUtsim.skeletal_available())
 	if playback == null:
 		set_status("Não foi possível gravar a replicação 0: %s" % model.last_error())
-		return false
+		return
+	_show_playback()
+	set_status("%d replicações concluídas. Reproduzindo a replicação 0." % results.replications())
+
+
+## Builds the scene of `playback` and starts at 0.
+func _show_playback() -> void:
 	cena.show_connections = true
 	cena.build(playback, true)
 	var info := cena.info
@@ -891,25 +1041,35 @@ func simulate(reps: int) -> bool:
 	_slider_lock = true
 	_slider.max_value = playback.end()
 	_slider_lock = false
-	set_status("%d replicações concluídas. Reproduzindo a replicação 0." % r["replications"])
+	_flows_panel.set_playback(playback)
+	if follow_name == "" or cena.block_index(follow_name) < 0:
+		follow_name = ""
+		for b in cena.blocks:
+			if b["mobile"]:
+				follow_name = b["name"]
+				break
 	seek(0.0, true)
-	return true
 
 
-func _show_summary(r: Dictionary) -> void:
-	var metrics: Dictionary = r["metrics"]
+## A new run to show (`UtsimResults`): the summary on the left and the Resultados panel.
+func on_results(res: Object) -> void:
+	if res == null:
+		return
+	results = res
+	_show_summary()
+	_results_panel.show_results(res)
+
+
+func _show_summary() -> void:
 	var lines := PackedStringArray()
-	lines.append("[b]Resultados (%d replicações)[/b]" % r["replications"])
-	var keys := metrics.keys()
-	keys.sort()
-	for k in keys:
-		var key := String(k)
-		if not (key.ends_with(".output") or key.ends_with(".content.mean") or key.ends_with(".staytime.mean")):
-			continue
-		var s: Dictionary = metrics[k]
-		var hw: float = s["half_width"]
-		var hw_text := "" if is_nan(hw) else " ± %s" % _num(hw)
-		lines.append("%s: %s%s" % [key, _num(s["mean"]), hw_text])
+	var s: Dictionary = results.summary()
+	lines.append("[b]Resultados (%d replicações)[/b]" % s["replications"])
+	var b = s.get("bottleneck")
+	if b != null:
+		lines.append("[color=#ff9a3d]Gargalo: %s[/color]" % b)
+	for r in results.table():
+		lines.append("%s: %s saídas" % [r["name"], PainelResultados.mh(r["output"])])
+	lines.append("[color=#aab2be]A tabela completa, os gráficos e as análises estão em Resultados.[/color]")
 	_summary.text = "\n".join(lines)
 
 
@@ -1014,6 +1174,7 @@ func seek(time: float, snap := false) -> void:
 	t = clampf(time, 0.0, playback.end())
 	cena.apply(t, 0.0, snap)
 	_show_time()
+	_flows_panel.show_time(t)
 
 
 func step_event(direction: int) -> void:
@@ -1033,6 +1194,7 @@ func _show_time() -> void:
 
 
 func _process(dt: float) -> void:
+	_poll_job()
 	if playback != null and playing:
 		t += dt * speed
 		if t >= playback.end():
@@ -1040,6 +1202,12 @@ func _process(dt: float) -> void:
 			set_playing(false)
 		cena.apply(t, dt)
 		_show_time()
+		_flows_panel.show_time(t)
+	_frames += 1
+	if mode == "simular" and playback != null:
+		_drive_camera()
+		if _frames % 10 == 0:
+			cena.limit_labels(camera)
 	_fps.text = "%d qps | ponte %.2f ms | cena %.2f ms" % [
 		Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0]
 
@@ -1118,6 +1286,8 @@ func _edit_key(k: InputEventKey) -> bool:
 			editor.nudge(0, -1)
 		KEY_L:
 			editor.set_tool("selecionar" if editor.tool == "ligar" else "ligar")
+		KEY_N:
+			editor.set_tool("selecionar" if editor.tool == "rede" else "rede")
 		KEY_G:
 			set_snap(not snap_on, grid_step)
 		_:
@@ -1133,3 +1303,339 @@ func focus_block(name: String, distance: float, yaw: Variant = null, pitch: Vari
 	camera.focus(cena.block_focus(i), distance, yaw, pitch)
 	return true
 
+
+
+# ---------------------------------------------------------------------------
+# Jobs on a thread of the bridge (G3)
+# ---------------------------------------------------------------------------
+
+
+## Whether a job is running (scripts wait for it).
+func busy() -> bool:
+	return job != null
+
+
+## Runs `j` (a `UtsimJob`) and calls `done(j)` when it ends, keeping the interface
+## drawing; the progress bar and Cancelar show meanwhile. One job at a time.
+func start_job(j: Object, done: Callable) -> void:
+	if j == null:
+		return
+	if job != null:
+		set_status("Aguarde: %s." % job.what())
+		return
+	job = j
+	_job_done = done
+	_progress.visible = true
+	_progress.value = 0
+	_cancel.visible = true
+	set_status("%s..." % j.what())
+
+
+func cancel_job() -> void:
+	if job != null:
+		job.cancel()
+		set_status("Cancelando: %s..." % job.what())
+
+
+func _poll_job() -> void:
+	if job == null:
+		return
+	var p: Dictionary = job.progress()
+	var total := int(p["total"])
+	if total > 0:
+		_progress.max_value = total
+		_progress.value = int(p["done"])
+		_progress.show_percentage = true
+	else:
+		# Unknown length: a bar that goes back and forth.
+		_progress.max_value = 100
+		_progress.value = absf(sin(Time.get_ticks_msec() / 400.0)) * 100.0
+		_progress.show_percentage = false
+	if not p["finished"]:
+		return
+	var j := job
+	var done := _job_done
+	job = null
+	_job_done = Callable()
+	_progress.visible = false
+	_cancel.visible = false
+	if not j.ok():
+		if j.cancelled():
+			set_status("%s: cancelado." % j.what())
+		else:
+			set_status("%s: erro: %s" % [j.what(), j.error()])
+		if j.kind() != "replicacoes":
+			return
+	if done.is_valid():
+		done.call(j)
+
+
+# ---------------------------------------------------------------------------
+# Analyses (G3)
+# ---------------------------------------------------------------------------
+
+
+## The document as a model that can run, or null when it has problems.
+func document_model() -> Object:
+	if doc == null:
+		return null
+	var m: Object = doc.as_model()
+	return m if m.is_loaded() else null
+
+
+## The actions of the "Analisar" menu and buttons.
+func analysis_action(what: String) -> void:
+	match what:
+		"resultados":
+			if results == null:
+				set_status("Simule o modelo para ver os resultados (Tab ou o botão Simular).")
+				return
+			_results_panel.visible = not _results_panel.visible
+			if _results_panel.visible:
+				_pert_panel.visible = false
+		"fluxos":
+			if mode != "simular" or playback == null:
+				set_status("Os fluxos de tokens aparecem no Simular.")
+				return
+			_flows_panel.visible = not _flows_panel.visible
+			if _flows_panel.visible:
+				_flows_panel.set_playback(playback)
+		"pert", "pert_trecho", "pert_auto":
+			open_pert(what == "pert_trecho" or (what == "pert_auto" and editor.selected.size() == 2))
+
+
+## Opens the PERT/CPM window for the selection (`between`: from the first object
+## selected to the second; the primary selection is the last one clicked).
+func open_pert(between: bool) -> void:
+	var sel: Array = editor.selected
+	if sel.is_empty():
+		set_status("Selecione os objetos da parte do processo (ou dois: o início e o fim) e peça o PERT/CPM.")
+		return
+	var names := PackedStringArray()
+	if between:
+		if sel.size() != 2:
+			set_status("PERT/CPM de... até...: selecione exatamente dois objetos.")
+			return
+		names = PackedStringArray([sel[1], sel[0]])
+	else:
+		names = PackedStringArray(sel)
+	if document_model() == null:
+		set_status("O modelo tem problemas e não roda: o PERT/CPM precisa de um modelo válido.")
+		return
+	_results_panel.visible = false
+	_pert_panel.open(names, between)
+
+
+## Writes `warmup` to `run.warmup` of the document ("Aplicar" of the warm-up analysis).
+func apply_warmup(warmup: float) -> void:
+	if doc.set_property("run", "warmup", warmup, PackedStringArray()):
+		doc.end_gesture()
+		after_edit()
+		set_status("Aquecimento %s aplicado ao modelo (run.warmup). Simule de novo para os números com ele." % _num(warmup))
+	else:
+		set_status("Não aplicou o aquecimento: %s" % doc.last_error())
+
+
+# ---------------------------------------------------------------------------
+# Recorded replays (G3)
+# ---------------------------------------------------------------------------
+
+
+## Opens a replay recorded by `utsim run --replay` or "Gravar replay": it plays in
+## Simular (with the statistics of that replication); the document is not touched.
+func open_replay(path: String) -> bool:
+	set_playing(false)
+	var m: Object = ClassDB.instantiate(&"UtsimModel")
+	var r: Dictionary = m.load(path)
+	if not r["ok"]:
+		set_status("Não abriu %s: %s" % [path.get_file(), ", ".join(r["errors"])])
+		return false
+	model = m
+	playback = model.playback(0, CenaUtsim.skeletal_available())
+	if playback == null:
+		set_status("Não foi possível reproduzir %s: %s" % [path.get_file(), model.last_error()])
+		return false
+	playing_replay = true
+	mode = "simular"
+	_mode_sim.set_pressed_no_signal(true)
+	_mode_edit.set_pressed_no_signal(false)
+	_edit_left.visible = false
+	_sim_left.visible = true
+	_right.visible = false
+	_bar.visible = true
+	for b in ["Botao_Desfazer", "Botao_Refazer", "Ferramenta_Selecionar", "Ferramenta_Ligar", "Ferramenta_Rede", "Menu_Organizar", "Grade_Encaixe", "Grade_Passo"]:
+		(_top.find_child(b, true, false) as Control).visible = false
+	on_results(model.replay_results())
+	_show_playback()
+	camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
+	set_status("Replay %s aberto (%d blocos): só reprodução; Editar volta ao modelo em edição." % [path.get_file(), int(r["objects"])])
+	return true
+
+
+## Writes the replay of replication 0 of the last run as `.json`.
+func save_replay(path: String) -> bool:
+	if model == null or not model.is_loaded():
+		set_status("Simule um modelo antes de gravar o replay.")
+		return false
+	if not path.ends_with(".json"):
+		path += ".json"
+	if model.save_replay(0, path):
+		set_status("Replay da replicação 0 gravado em %s." % path)
+		return true
+	set_status("Não gravou o replay: %s" % model.last_error())
+	return false
+
+
+# ---------------------------------------------------------------------------
+# Cameras (G3)
+# ---------------------------------------------------------------------------
+
+
+func set_camera_mode(which: String) -> void:
+	camera_mode = which
+	for k in CAMERAS.size():
+		if CAMERAS[k][0] == which:
+			_camera_pick.select(k)
+	if which == "orbita":
+		camera.update()
+		set_status("Câmera de órbita.")
+	elif follow_name == "":
+		set_status("Escolha na lista o bloco que a câmera acompanha.")
+	else:
+		set_status("Câmera %s: %s." % [CAMERAS[_camera_pick.selected][1].to_lower(), follow_name])
+
+
+## Places the camera for the modes that follow a block (called every frame in Simular).
+func _drive_camera() -> void:
+	if camera_mode == "orbita" or follow_name == "":
+		return
+	var i := cena.block_index(follow_name)
+	if i < 0:
+		return
+	var root: Node3D = cena.rigs[i]["root"]
+	var at := root.global_position
+	var forward := root.global_basis.x.normalized()
+	forward.y = 0.0
+	if forward.length() < 1e-3:
+		forward = Vector3.RIGHT
+	forward = forward.normalized()
+	match camera_mode:
+		"seguir":
+			camera.target = cena.block_focus(i)
+			camera.update()
+		"primeira_pessoa":
+			var eye := at + Vector3(0, 1.6, 0) + forward * 0.35
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(eye + forward * 10.0 - Vector3(0, 1.2, 0), Vector3.UP)
+		"recurso":
+			var eye := at - forward * 6.0 + Vector3(0, 3.5, 0)
+			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(at + Vector3(0, 1.0, 0), Vector3.UP)
+
+
+# ---------------------------------------------------------------------------
+# The Rede panel (G3)
+# ---------------------------------------------------------------------------
+
+
+func _show_network() -> void:
+	_props.clear()
+	var rede: EditorRede = editor.rede
+	var title := Label.new()
+	title.text = "Rede de caminhos"
+	title.add_theme_font_size_override("font_size", 16)
+	_props.add_child(title)
+	var c := rede.counts()
+	var info := Label.new()
+	info.name = "Rede_Resumo"
+	info.text = "%d nó(s), %d trecho(s), %d pista(s) controlada(s)." % [c["nos"], c["trechos"], c["controlados"]]
+	_props.add_child(info)
+	var help := Label.new()
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+	help.add_theme_color_override("font_color", Color(0.70, 0.74, 0.80))
+	help.text = "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."
+	_props.add_child(help)
+	var both := CheckBox.new()
+	both.name = "Rede_NovosMaoDupla"
+	both.text = "Novos trechos em mão dupla"
+	both.button_pressed = rede.two_way
+	both.toggled.connect(func(on): rede.two_way = on)
+	_props.add_child(both)
+	if rede.selected_node != "":
+		var head := Label.new()
+		head.text = "Nó %s" % rede.selected_node
+		head.add_theme_font_size_override("font_size", 15)
+		_props.add_child(head)
+		var row := HBoxContainer.new()
+		var l := Label.new()
+		l.text = "Nome"
+		row.add_child(l)
+		var e := LineEdit.new()
+		e.name = "Rede_NoNome"
+		e.text = rede.selected_node
+		e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		e.text_submitted.connect(func(tx): rede.rename.call_deferred(tx))
+		row.add_child(e)
+		_props.add_child(row)
+		for n in rede.net["nodes"]:
+			if n["name"] == rede.selected_node:
+				var mp: Vector3 = n["model_position"]
+				var pl := Label.new()
+				pl.text = "Posição (%s, %s) m" % [_num(mp.x), _num(mp.y)]
+				_props.add_child(pl)
+		var del := Button.new()
+		del.name = "Rede_NoExcluir"
+		del.text = "Excluir nó (Del)"
+		del.pressed.connect(func(): rede.delete_selected.call_deferred())
+		_props.add_child(del)
+	if rede.selected_edge.size() == 2:
+		var e: Dictionary = rede._edge(rede.selected_edge[0], rede.selected_edge[1])
+		var head := Label.new()
+		head.text = "Trecho %s → %s" % [e["from"], e["to"]]
+		head.add_theme_font_size_override("font_size", 15)
+		_props.add_child(head)
+		var len_label := Label.new()
+		len_label.text = "Comprimento %s m" % _num(float(e["length"]))
+		_props.add_child(len_label)
+		var two := CheckBox.new()
+		two.name = "Rede_TrechoMaoDupla"
+		two.text = "Mão dupla"
+		two.button_pressed = e["two_way"]
+		two.toggled.connect(func(on): rede.set_two_way.call_deferred(on))
+		_props.add_child(two)
+		var row := HBoxContainer.new()
+		var l := Label.new()
+		l.text = "Capacidade (veículos; 0 = sem controle)"
+		row.add_child(l)
+		var cap := SpinBox.new()
+		cap.name = "Rede_TrechoCapacidade"
+		cap.min_value = 0
+		cap.max_value = 100
+		cap.value = int(e["capacity"])
+		cap.value_changed.connect(func(v): rede.set_capacity.call_deferred(int(v)))
+		row.add_child(cap)
+		_props.add_child(row)
+		if e["controlled"]:
+			var red := Label.new()
+			red.text = "Pista controlada: no máximo %d veículo(s) ao mesmo tempo." % int(e["capacity"])
+			red.add_theme_color_override("font_color", RED)
+			_props.add_child(red)
+		var rev := Button.new()
+		rev.name = "Rede_TrechoInverter"
+		rev.text = "Inverter sentido"
+		rev.disabled = e["two_way"]
+		rev.pressed.connect(func(): rede.reverse.call_deferred())
+		_props.add_child(rev)
+		var del := Button.new()
+		del.name = "Rede_TrechoExcluir"
+		del.text = "Excluir trecho (Del)"
+		del.pressed.connect(func(): rede.delete_selected.call_deferred())
+		_props.add_child(del)
+	for i in doc.issues():
+		var m: String = i["message"]
+		if m.contains("network") or m.contains("rede") or m.contains("nó"):
+			var w := Label.new()
+			w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			w.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
+			w.text = m
+			w.add_theme_color_override("font_color", RED)
+			_props.add_child(w)

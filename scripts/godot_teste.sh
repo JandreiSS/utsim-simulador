@@ -3,14 +3,14 @@
 # console do Godot, sempre com --headless:
 #   1. godot/testes/teste.gd, que confere se a extensão carrega e se cada modelo abre,
 #      simula, monta a cena e é reproduzido até o fim;
-#   2. os roteiros da interface (godot/roteiros/g2_*.json): a cena principal inteira,
+#   2. os roteiros da interface (godot/roteiros/g2_*.json e g3_*.json): a cena principal inteira,
 #      com cliques, arrastos e teclas de verdade, conferindo o documento a cada passo (as
 #      capturas de tela são puladas sem janela).
 # Sai com 1 se algo falhar.
 #
 # Uso: scripts/godot_teste.sh [modelo.ron ...] [roteiro.json ...]
 #   sem argumentos: examples/centro_de_distribuicao.ron, examples/agvs.ron,
-#   examples/pessoas_carregando.ron e todos os godot/roteiros/g2_*.json.
+#   examples/pessoas_carregando.ron e todos os godot/roteiros/g2_*.json e g3_*.json.
 #   Só roteiros (ou só modelos) nos argumentos: roda só eles.
 # Precisa do Godot 4.7 (GODOT, `godot` no PATH ou ~/Documents/Godot_v4.7*).
 
@@ -47,7 +47,7 @@ for a in "$@"; do
 done
 if [ "$#" -eq 0 ]; then
     MODELOS=(examples/centro_de_distribuicao.ron examples/agvs.ron examples/pessoas_carregando.ron)
-    for r in godot/roteiros/g2_*.json; do
+    for r in godot/roteiros/g2_*.json godot/roteiros/g3_*.json; do
         [ -f "$r" ] && ROTEIROS+=("$r")
     done
 fi

@@ -28,7 +28,7 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 
 | Tarefa | Modelo | Depende de | Arquivos principais |
 |---|---|---|---|
-| G3 Godot: rede, fluidos, resultados e gráficos | Opus | G2 | `godot/`, `crates/utsim-godot` |
+| G3 Godot: rede, fluidos, resultados e gráficos (**feita**) | Opus | G2 | `godot/`, `crates/utsim-godot` |
 | Crate `utsim-pert` (rede de atividades, CPM, PERT, caminho crítico estocástico) | Opus | plano | crate nova |
 | Estatística: aquecimento (MSER-5), médias em lotes, replicações necessárias | Opus | plano | `utsim-model/src/analysis.rs` ou crate nova |
 | Leitura de DXF, camadas e calibração de escala (núcleo, sem interface) | Sonnet | plano | crate nova |
@@ -39,10 +39,10 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 
 | Tarefa | Modelo | Depende de |
 |---|---|---|
-| Interface PERT/CPM no Godot (seleção, diagrama de rede, Gantt, histograma) | Sonnet | `utsim-pert`, G3 |
+| Interface PERT/CPM no Godot (seleção, diagrama de rede, Gantt, histograma): **feita na G3**, falta o tornado | Sonnet | `utsim-pert`, G3 |
 | Botão "Fluxograma" na interface Godot (G3 ou a seguinte): chama `utsim-diagram` pela ponte, mostra o SVG num painel, exporta SVG, HTML, Mermaid e CSV e acende no desenho a etapa selecionada no 3D | Sonnet | `utsim-diagram`, G3 |
 | Campo opcional `symbol` em `ObjectDef` (proposta): guarda no `.ron` o símbolo do fluxograma de cada objeto, em vez de depender do nome ou da opção `--simbolo`. Muda o formato do modelo: decisão do dono | Opus | `utsim-diagram` |
-| Painel de estatística avançada no Godot | Sonnet | estatística, G3 |
+| Painel de estatística avançada no Godot: P1 **feito na G3**, falta o P2 (Gantt de estados, WIP com banda, ANOVA, mapa de calor) | Sonnet | estatística, G3 |
 | Planta CAD como fundo no piso, com encaixe nas linhas | Sonnet | DXF, G2 |
 | Obstáculos estáticos e roteamento automático (malha + A*) | Opus | plano, DXF |
 | Reservas determinísticas de trecho e cruzamento entre recursos móveis | Opus | roteamento |

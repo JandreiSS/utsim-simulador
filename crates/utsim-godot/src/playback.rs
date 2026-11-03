@@ -147,6 +147,8 @@ pub struct Playback {
     durations: [f32; 7],
     specs: HashMap<String, Spec>,
     pub connections: Vec<(usize, usize)>,
+    /// The model that produced the replay (token flows, network), when there is one.
+    pub model: Option<Model>,
 }
 
 impl Playback {
@@ -240,6 +242,7 @@ impl Playback {
             durations: [1.0; 7],
             specs,
             connections: replay.connections.clone(),
+            model: model.cloned(),
         }
     }
 
@@ -299,6 +302,11 @@ impl Playback {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Index into [`Playback::blocks`] of replay block `b`, when it is drawn.
+    pub fn drawn_index(&self, b: usize) -> Option<usize> {
+        self.index_of.get(b).copied().flatten()
     }
 
     /// Connections as pairs of drawn-block indices.

@@ -3,7 +3,8 @@
 ##   godot --headless --path godot --script res://testes/teste.gd -- --utsim-modelo=<model.ron> ...
 ##
 ## For each model: the extension is loaded (the UtsimModel and UtsimPlayback classes
-## exist), the model loads and validates, two replications run, the replay of replication
+## exist), the model loads and validates, two replications run (also on a thread of the
+## bridge, `UtsimJob`, giving the table of the results panel), the replay of replication
 ## 0 builds the 3D scene (library models, people, items) and is played from 0 to its end
 ## in 400 steps. Prints the mean cost per frame (bridge and scene) and exits with 1 on
 ## any failure.
@@ -52,6 +53,15 @@ func _check(path: String) -> void:
 	var run: Dictionary = model.run(2)
 	if not run["ok"] or (run["metrics"] as Dictionary).is_empty():
 		_fail("%s: replicações: %s" % [path, run.get("error", "sem métricas")])
+		return
+	# G3: the same run on a thread of the bridge, and the results panel's numbers.
+	var job: Object = model.start_run(2)
+	if job == null or not job.wait():
+		_fail("%s: replicações em thread: %s" % [path, job.error() if job != null else "sem tarefa"])
+		return
+	var res: Object = job.results()
+	if res == null or (res.table() as Array).is_empty() or res.replications() != 2:
+		_fail("%s: resultados da thread vazios" % path)
 		return
 	var pb: Object = model.playback(0, CenaUtsim.skeletal_available())
 	if pb == null:

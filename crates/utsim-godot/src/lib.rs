@@ -25,7 +25,13 @@
 pub mod coords;
 pub mod document;
 mod document_class;
+pub mod extras;
+pub mod jobs;
+mod jobs_class;
+pub mod network_edit;
+pub mod pert_view;
 pub mod playback;
+pub mod results;
 pub mod schema;
 
 pub use utsim_edit::ron_text;
@@ -34,10 +40,16 @@ pub use utsim_look::{catalogue, visual as looks};
 use std::path::PathBuf;
 
 use godot::prelude::*;
+use utsim_model::replay::Replay;
 use utsim_model::{Model, ModelError};
+use utsim_pert::Mode;
 
+use crate::jobs::Task;
+use crate::jobs_class::{UtsimJob, UtsimResults, job_object, results_object};
 use crate::looks::Clip;
+use crate::pert_view::PertRequest;
 use crate::playback::{AssetInfo, Playback, role_name, simple_shape};
+use crate::results::{OptForm, RunOutput};
 
 struct UtsimExtension;
 
@@ -77,6 +89,8 @@ fn messages(e: &ModelError) -> Vec<String> {
 #[class(base = RefCounted, init)]
 pub struct UtsimModel {
     pub(crate) model: Option<Model>,
+    /// A recorded replay (`.json`) opened instead of a model: played, not run.
+    pub(crate) replay: Option<Replay>,
     pub(crate) path: Option<PathBuf>,
     pub(crate) last_error: String,
     pub(crate) base: Base<RefCounted>,
@@ -91,7 +105,14 @@ impl UtsimModel {
         let path = PathBuf::from(path.to_string());
         let mut d = VarDictionary::new();
         self.model = None;
+        self.replay = None;
         self.path = None;
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
+            return self.load_replay(path);
+        }
         let result = Model::load(&path).and_then(|m| m.validate().map(|()| m));
         match result {
             Ok(m) => {
@@ -118,6 +139,141 @@ impl UtsimModel {
     #[func]
     fn is_loaded(&self) -> bool {
         self.model.is_some()
+    }
+
+    /// Whether a recorded replay (`.json`) is open: it plays, but does not run.
+    #[func]
+    fn is_replay(&self) -> bool {
+        self.replay.is_some()
+    }
+
+    /// The statistics of the recorded replay, as a run of one replication.
+    #[func]
+    fn replay_results(&self) -> Option<Gd<UtsimResults>> {
+        let r = self.replay.as_ref()?;
+        let model = Model::parse(&format!(
+            "Model(name: {:?}, run: (stop_time: {:?}, replications: 1), objects: [], connections: [])",
+            r.model,
+            r.stop_time.max(1e-9)
+        ))
+        .ok()?;
+        Some(results_object(RunOutput::new(
+            model,
+            vec![r.report.clone()],
+        )))
+    }
+
+    /// Starts `replications` replications (`0`: the model's own number) on a thread of
+    /// the bridge; `null` when no model is loaded.
+    #[func]
+    fn start_run(&mut self, replications: i64) -> Option<Gd<UtsimJob>> {
+        let mut m = self.model.clone()?;
+        if replications > 0 {
+            m.run.replications = replications.min(10_000) as u32;
+        }
+        Some(job_object(Task::Run(m)))
+    }
+
+    /// Compares the scenarios written in `text` (`[nome]` and `chave = valor` lines, the
+    /// model as it is first) with common random numbers, keeping `measures` (empty: all).
+    /// `null` on a bad text (see `last_error`).
+    #[func]
+    fn start_scenarios(
+        &mut self,
+        text: GString,
+        measures: PackedStringArray,
+        replications: i64,
+    ) -> Option<Gd<UtsimJob>> {
+        let mut model = self.model.clone()?;
+        if replications > 0 {
+            model.run.replications = replications.min(10_000) as u32;
+        }
+        match results::parse_scenarios(&text.to_string()) {
+            Ok(scenarios) => Some(job_object(Task::Scenarios {
+                model,
+                scenarios,
+                measures: measures
+                    .as_slice()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .filter(|s| !s.trim().is_empty())
+                    .collect(),
+            })),
+            Err(e) => {
+                self.last_error = e;
+                None
+            }
+        }
+    }
+
+    /// Optimises `form` = `{metric, maximize, variables, method, replications, budget}`
+    /// (see `results::OptForm`). `null` on a bad form (see `last_error`).
+    #[func]
+    fn start_optimize(&mut self, form: VarDictionary) -> Option<Gd<UtsimJob>> {
+        let model = self.model.clone()?;
+        let text = |k: &str| {
+            form.get(k)
+                .map_or_else(String::new, |v| v.stringify().to_string())
+        };
+        let int = |k: &str, default: i64| {
+            form.get(k)
+                .and_then(|v| v.try_to::<i64>().ok())
+                .unwrap_or(default)
+        };
+        let f = OptForm {
+            metric: text("metric"),
+            maximize: form
+                .get("maximize")
+                .and_then(|v| v.try_to::<bool>().ok())
+                .unwrap_or(false),
+            variables: text("variables"),
+            method: text("method"),
+            replications: int("replications", 5).clamp(2, 1000) as u32,
+            budget: int("budget", 50).clamp(1, 10_000) as usize,
+        };
+        match f.build() {
+            Ok(problem) => Some(job_object(Task::Optimize {
+                model,
+                problem: Box::new(problem),
+            })),
+            Err(e) => {
+                self.last_error = e;
+                None
+            }
+        }
+    }
+
+    /// PERT/CPM of `names` (or, with `between`, from the first to the second) in `mode`
+    /// (`simulado`, `classico` or `montecarlo`), with a `deadline` (0 or less: none) and
+    /// `samples` draws of the Monte Carlo (0: 10 000).
+    #[func]
+    fn start_pert(
+        &mut self,
+        names: PackedStringArray,
+        between: bool,
+        mode: GString,
+        deadline: f64,
+        samples: i64,
+    ) -> Option<Gd<UtsimJob>> {
+        let model = self.model.clone()?;
+        let Some(mode) = Mode::parse(&mode.to_string()) else {
+            self.last_error = format!("modo \"{mode}\" desconhecido");
+            return None;
+        };
+        let list: Vec<String> = names.as_slice().iter().map(|s| s.to_string()).collect();
+        match PertRequest::of(&list, between, mode) {
+            Ok(mut request) => {
+                request.deadline = (deadline > 0.0 && deadline.is_finite()).then_some(deadline);
+                if samples > 0 {
+                    request.samples = samples.min(1_000_000) as usize;
+                }
+                Some(job_object(Task::Pert { model, request }))
+            }
+            Err(e) => {
+                self.last_error = e;
+                None
+            }
+        }
     }
 
     /// Last error of [`Self::run`] or [`Self::playback`].
@@ -171,10 +327,40 @@ impl UtsimModel {
         d
     }
 
+    /// Records replication `replication` and writes it to `path` as JSON, the format of
+    /// `utsim run --replay` that `load` reads back. False on error (see `last_error`).
+    #[func]
+    fn save_replay(&mut self, replication: i64, path: GString) -> bool {
+        let Some(model) = &self.model else {
+            self.last_error = "nenhum modelo carregado".into();
+            return false;
+        };
+        let r = model
+            .replay(replication.max(0) as u32)
+            .map_err(|e| e.to_string())
+            .and_then(|rp| serde_json::to_string(&rp).map_err(|e| e.to_string()))
+            .and_then(|text| std::fs::write(path.to_string(), text).map_err(|e| e.to_string()));
+        match r {
+            Ok(()) => true,
+            Err(e) => {
+                self.last_error = e;
+                false
+            }
+        }
+    }
+
     /// Records replication `replication` and builds its scene; `null` on error (see
     /// [`Self::last_error`]). `skeletal_people`: the interface has the mannequin files.
     #[func]
     fn playback(&mut self, replication: i64, skeletal_people: bool) -> Option<Gd<UtsimPlayback>> {
+        if let Some(replay) = &self.replay {
+            let dir = self.path.as_ref().and_then(|p| p.parent());
+            let core = Playback::new(replay, None, dir, skeletal_people);
+            return Some(Gd::from_init_fn(|base| UtsimPlayback {
+                core: Some(core),
+                base,
+            }));
+        }
         let model = self.model.as_ref()?;
         match model.replay(replication.max(0) as u32) {
             Ok(replay) => {
@@ -190,6 +376,41 @@ impl UtsimModel {
                 None
             }
         }
+    }
+}
+
+impl UtsimModel {
+    /// Reads a replay recorded by `utsim run --replay` (`.json`): `{ok, errors, warnings,
+    /// replay: true, name, objects, replications: 1, stop_time}`.
+    fn load_replay(&mut self, path: PathBuf) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let read = std::fs::read_to_string(&path)
+            .map_err(|e| format!("não foi possível ler {}: {e}", path.display()))
+            .and_then(|text| {
+                serde_json::from_str::<Replay>(&text)
+                    .map_err(|e| format!("replay inválido em {}: {e}", path.display()))
+            });
+        match read {
+            Ok(r) => {
+                put(&mut d, "ok", true);
+                put(&mut d, "errors", strings::<String>(&[]));
+                put(&mut d, "warnings", strings::<String>(&[]));
+                put(&mut d, "replay", true);
+                put(&mut d, "name", GString::from(r.model.as_str()));
+                put(&mut d, "description", GString::new());
+                put(&mut d, "objects", r.blocks.len() as i64);
+                put(&mut d, "replications", 1_i64);
+                put(&mut d, "stop_time", r.stop_time);
+                self.replay = Some(r);
+                self.path = Some(path);
+            }
+            Err(e) => {
+                put(&mut d, "ok", false);
+                put(&mut d, "errors", strings(&[e]));
+                put(&mut d, "warnings", strings::<String>(&[]));
+            }
+        }
+        d
     }
 }
 
@@ -328,15 +549,138 @@ impl UtsimPlayback {
         }
         put(&mut d, "connections", connections);
         let mut fluids = VarArray::new();
-        for (name, kind, position, size) in c.fluid_nodes() {
+        for n in extras::fluid_nodes(c) {
             let mut e = VarDictionary::new();
-            put(&mut e, "name", GString::from(name.as_str()));
-            put(&mut e, "kind", GString::from(kind.as_str()));
-            put(&mut e, "position", v3(position));
-            put(&mut e, "size", v3(size));
+            put(&mut e, "name", GString::from(n.name.as_str()));
+            put(&mut e, "kind", n.kind_label);
+            put(&mut e, "shape", extras::shape_name(n.shape));
+            put(&mut e, "position", v3(n.position));
+            put(&mut e, "radius", n.radius);
+            put(&mut e, "height", n.height);
+            put(&mut e, "capacity", n.capacity);
+            put(&mut e, "port", n.port);
             fluids.push(&e.to_variant());
         }
         put(&mut d, "fluids", fluids);
+        let mut links = PackedInt32Array::new();
+        for (a, b) in extras::fluid_links(c) {
+            links.push(a as i32);
+            links.push(b as i32);
+        }
+        put(&mut d, "fluid_links", links);
+        let mut conv = VarArray::new();
+        for (node, block, into) in extras::fluid_converters(c) {
+            let mut e = VarDictionary::new();
+            put(&mut e, "node", node as i64);
+            put(&mut e, "block", block as i64);
+            put(&mut e, "into_fluid", into);
+            conv.push(&e.to_variant());
+        }
+        put(&mut d, "fluid_converters", conv);
+        put(
+            &mut d,
+            "flows",
+            c.model.as_ref().map_or(0, |m| m.flows.len()) as i64,
+        );
+        d
+    }
+
+    /// The fluid network at `t`: per node `fill` (tanks, 0..1), `level`, `rate`,
+    /// `color`, `text`; per link `link_active`.
+    #[func]
+    fn fluid_frame(&self, t: f64) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let Some(c) = &self.core else {
+            return d;
+        };
+        let f = extras::fluid_frame(c, t);
+        put(&mut d, "fill", PackedFloat32Array::from(f.fill.as_slice()));
+        put(
+            &mut d,
+            "level",
+            PackedFloat64Array::from(f.level.as_slice()),
+        );
+        put(&mut d, "rate", PackedFloat64Array::from(f.rate.as_slice()));
+        put(&mut d, "color", colors(&f.color));
+        put(&mut d, "text", strings(&f.text));
+        let active: Vec<i32> = f.link_active.iter().map(|&a| i32::from(a)).collect();
+        put(
+            &mut d,
+            "link_active",
+            PackedInt32Array::from(active.as_slice()),
+        );
+        d
+    }
+
+    /// The token flows of the model as 2D graphs: `[{name, nodes: [{name, label, x,
+    /// y}], edges: PackedInt32Array (pairs)}]`.
+    #[func]
+    fn flows(&self) -> VarArray {
+        let mut out = VarArray::new();
+        let Some(c) = &self.core else {
+            return out;
+        };
+        for g in extras::flow_graphs(c) {
+            let mut d = VarDictionary::new();
+            put(&mut d, "name", GString::from(g.name.as_str()));
+            let mut nodes = VarArray::new();
+            for n in &g.nodes {
+                let mut e = VarDictionary::new();
+                put(&mut e, "name", GString::from(n.name.as_str()));
+                put(&mut e, "label", n.label);
+                put(&mut e, "x", n.x);
+                put(&mut e, "y", n.y);
+                nodes.push(&e.to_variant());
+            }
+            put(&mut d, "nodes", nodes);
+            let mut edges = PackedInt32Array::new();
+            for (a, b) in &g.edges {
+                edges.push(*a as i32);
+                edges.push(*b as i32);
+            }
+            put(&mut d, "edges", edges);
+            out.push(&d.to_variant());
+        }
+        out
+    }
+
+    /// Tokens in each activity of flow `flow` (index into [`Self::flows`]) at `t`.
+    #[func]
+    fn flow_counts(&self, flow: i64, t: f64) -> PackedInt32Array {
+        let Some(c) = &self.core else {
+            return PackedInt32Array::new();
+        };
+        let graphs = extras::flow_graphs(c);
+        let Some(g) = graphs.get(flow.max(0) as usize) else {
+            return PackedInt32Array::new();
+        };
+        let v: Vec<i32> = extras::flow_counts(c, g, t)
+            .into_iter()
+            .map(|x| x as i32)
+            .collect();
+        PackedInt32Array::from(v.as_slice())
+    }
+
+    /// Tokens of every activity of flow `flow` at `samples` instants over the run:
+    /// `{times: PackedFloat64Array, counts: [PackedInt32Array per activity]}`.
+    #[func]
+    fn flow_series(&self, flow: i64, samples: i64) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let Some(c) = &self.core else {
+            return d;
+        };
+        let graphs = extras::flow_graphs(c);
+        let Some(g) = graphs.get(flow.max(0) as usize) else {
+            return d;
+        };
+        let (times, counts) = extras::flow_series(c, g, samples.clamp(2, 2000) as usize);
+        put(&mut d, "times", PackedFloat64Array::from(times.as_slice()));
+        let mut list = VarArray::new();
+        for row in counts {
+            let v: Vec<i32> = row.into_iter().map(|x| x as i32).collect();
+            list.push(&PackedInt32Array::from(v.as_slice()).to_variant());
+        }
+        put(&mut d, "counts", list);
         d
     }
 
