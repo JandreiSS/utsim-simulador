@@ -773,6 +773,26 @@ alteração, mas o app a ignora se o autor não tiver o perfil.
   o valor original não sobreviva em nenhum arquivo. Os projetos guardam o nome na equipe deles
   e não são reescritos.
 
+## Relatórios
+
+A tela **Relatórios** do projeto faz os PDF no próprio programa, sem navegador nem nada a
+instalar: termo de abertura, A3 (folha A3 deitada), relatório de tollgate de cada fase (estado,
+rodada, hash congelado, checklist com as evidências, entregáveis da fase, decisões e
+ressalvas), ata de cada reunião, FMEA e plano de controle de cada entregável (A3 deitada). O
+certificado de cada certificação sai na tela Certificação do programa. Os arquivos vão para a
+pasta `relatorios/` do projeto (ou `certificacoes/` do programa) e abrem no leitor de PDF do
+computador; refazer um relatório substitui o anterior.
+
+- **Planilha** `.xlsx` com uma aba por tabela: ações, riscos, ganhos, cada FMEA e cada plano de
+  controle, e os conjuntos de dados; números como números.
+- **CSV** das mesmas tabelas, separado por ponto e vírgula.
+- **Modelo da empresa**: nome da empresa, linha de cabeçalho, rodapé e cor de destaque.
+  "Salvar o modelo" grava `modelos/relatorio.json` na pasta ao lado dos projetos, e todos os
+  projetos dessa pasta passam a imprimir com ele; um `modelos/relatorio.json` dentro do projeto
+  vale só para ele. O modelo tem versão.
+- A **base de conhecimento** (lições aprendidas com busca nos projetos da pasta) e o arquivo
+  `.lssz` continuam como antes.
+
 ## Formação e certificação
 
 As telas **Formação: ondas, turmas e seleção**, **Currículo, sessões e presença**, **Provas e
@@ -899,7 +919,7 @@ nível":
   selecionados, formados, com projeto e certificados, por onda e nível, com o motivo das
   saídas.
 
-O certificado em PDF vem com os relatórios (etapa L5).
+O botão "PDF" de cada certificação do registro grava o certificado em `certificacoes/`.
 
 ### Pastas restritas da formação
 
@@ -949,7 +969,7 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 ## O que vem depois
 
-Pela ordem do plano: os relatórios em PDF (com o certificado) e os modelos da empresa e as
+Pela ordem do plano: as
 telas de estatística (sobre o `utsim-quality` e o `utsim-stats`) com o MSA. O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
 UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. Do
