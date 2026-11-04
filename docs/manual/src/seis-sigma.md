@@ -520,6 +520,75 @@ de resposta e as características críticas sem controle. Cada bloco tem uma not
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
 
+## Modelo UTSim
+
+A tela **Modelo UTSim** do projeto usa o modelo de simulação do processo como instrumento:
+mapear, medir, achar a causa e testar a solução antes de mexer na fábrica.
+
+### Ligação ao modelo
+
+Informe o caminho do arquivo `.ron` e escolha "copiar para a pasta do projeto" (o modelo vai
+para `modelos/`, e todos da equipe usam a mesma cópia) ou deixe referenciado no lugar onde
+está. A ligação guarda o caminho, o nome, o formato e o **hash** do conteúdo. Quando o arquivo
+muda, a tela avisa e lista o que foi feito com a versão antiga (conjuntos simulados, estudos,
+análises e o SIPOC gerado); "Atualizar a ligação para a versão atual" passa a usar a nova
+versão, e os itens antigos continuam marcados como feitos com outra versão.
+
+### Carta de processo, fluxograma e SIPOC
+
+- A **carta de processo** do caminho principal do modelo aparece na tela, com o símbolo, o
+  tempo, a distância e os recursos de cada etapa.
+- "Fluxograma (página)", "Carta de processo (página)" e "SIPOC (página)" gravam a página do
+  diagrama em `dados/` e a abrem no navegador.
+- "Gerar o SIPOC como entregável" cria um SIPOC na fase Definir com fornecedores e entradas
+  das fontes, as etapas do caminho principal e as saídas e clientes dos destinos do modelo.
+  O belt edita na tela Ferramentas; o entregável fica marcado como gerado do modelo, com o
+  hash da versão.
+
+### Replicações e conjuntos simulados
+
+"Rodar as replicações" roda o modelo (as replicações e a semente do próprio modelo) num fio de
+trabalho, sem travar a janela, e mostra cada indicador com a média e a meia-largura do
+intervalo de 95 %. Marque os indicadores e use "Guardar como conjunto simulado": o conjunto vai
+para `dados/` com a origem **Simulado**, o hash do modelo, a semente e o número de replicações.
+O rótulo acompanha o conjunto em todas as telas: dado simulado nunca é coleta e nunca é linha de
+base real.
+
+### Gargalo e gargalo móvel
+
+Depois das replicações, a tela mostra os recursos pela utilização, o gargalo (maior
+utilização) e o gargalo no turno. "Gargalo móvel" roda o modelo com o rastro e dá a fração do
+tempo em que cada recurso foi o gargalo único e compartilhado. Os dois podem ser guardados
+como análises do projeto, ligados à versão do modelo.
+
+### Estudo de cenários
+
+Cada cenário descreve a solução como mudanças de parâmetros do modelo, uma por linha, no
+formato `objeto.campo = valor` (por exemplo `maquina.process = Exp(mean: 0.5)`); o primeiro é
+a linha de base. Todos os cenários usam as mesmas sementes (números aleatórios comuns), e cada
+indicador escolhido é comparado com a linha de base por **diferença pareada** por replicação,
+com intervalo de 95 %. A decisão é:
+
+- **significativa** quando o intervalo não contém zero;
+- **relevante** quando é significativa e todo o intervalo fica pelo menos na diferença mínima
+  de interesse informada pelo belt (sem mínimo, basta ser significativa).
+
+"Guardar o estudo" grava o pacote `estudo.json` em `dados/`, com o nome e o hash do modelo, os
+cenários, a semente, as replicações, a versão do app, os resultados de cada replicação e as
+diferenças: qualquer pessoa reproduz o número. O projeto registra o estudo com a conclusão.
+
+### Caminho crítico observado
+
+Escolha o objeto de início e o de fim de um trecho do processo: o app roda o modelo e segue o
+que realmente segurou cada unidade (espera em fila, trabalho, bloqueio e transportes), com a
+criticidade de cada atividade e os caminhos mais frequentes. Responde "o que atrasa este
+trecho".
+
+### Abrir no UTSim
+
+"Abrir no UTSim" abre a versão ativa do UTSim instalada pelo launcher com o modelo ligado (ou
+o `utsim-view` do PATH, quando não há launcher).
+
 ## Programa de implantação (master black belt)
 
 O programa fica acima das carteiras: **programa → unidades de negócio → carteiras →
@@ -880,9 +949,10 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 ## O que vem depois
 
-Pela ordem do plano: integração com o modelo de simulação (SIPOC e fluxograma gerados do
-modelo), os relatórios em PDF (com o certificado) e os modelos da empresa, as telas de
-estatística (sobre o `utsim-quality` e o `utsim-stats`) com o MSA e o modo de ensino. Do
+Pela ordem do plano: os relatórios em PDF (com o certificado) e os modelos da empresa e as
+telas de estatística (sobre o `utsim-quality` e o `utsim-stats`) com o MSA. O modo de ensino
+(projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
+UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. Do
 programa ficam para depois a lista de papéis assinada e a exportação dos painéis. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
