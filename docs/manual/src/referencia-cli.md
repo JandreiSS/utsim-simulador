@@ -17,7 +17,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim tempos` | estudo de tempos e métodos: ciclo homem-máquina, tempos por elemento, máquinas por operador, tempo padrão e comparação de métodos | [Estudo de tempos e métodos](tempos-e-metodos.md) |
-| `utsim linha` | linhas especializadas (Lean Office): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office.md) |
+| `utsim linha` | linhas especializadas (Lean Office, processos administrativos): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office/index.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
@@ -51,7 +51,7 @@ utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --co
 utsim tempos examples/homem_maquina.ron --tolerancia 15 --html estudo.html
 utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron --csv elementos.csv
 utsim linha lean_office relatorio examples/aprovacao_de_compras.ron --html relatorio.html
-utsim linha lean_office colocar escritorio.ron posto --departamento Compras --campo ca=0.9
+utsim linha lean_office colocar processo.ron posto --departamento Compras --campo ca=0.9
 utsim run examples/aprovacao_de_compras.ron --linha lean_office
 utsim gerar-modelo --objetos 100 --tipo linha --itens 1000 --saida grande.ron
 utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo 10
@@ -630,7 +630,7 @@ Arguments:
 
 Options:
   -n, --reps <REPS>          Número de replicações (sobrescreve run.replications)
-      --html <HTML>          Grava o relatório completo (indicadores, gráficos, VSM de escritório, raias)
+      --html <HTML>          Grava o relatório completo (indicadores, gráficos, VSM administrativo, raias)
       --comparar <COMPARAR>  Cenário do estado futuro (outro .ron): VSM e indicadores lado a lado
       --json <JSON>          Grava os indicadores de cada replicação em JSON
   -h, --help                 Print help

@@ -38,7 +38,13 @@
 
 # Linhas especializadas
 
-- [Lean Office](linhas/lean-office.md)
+- [Lean Office](linhas/lean-office/index.md)
+  - [Biblioteca](linhas/lean-office/biblioteca.md)
+  - [Multitarefa](linhas/lean-office/multitarefa.md)
+  - [Indicadores e relatório](linhas/lean-office/indicadores.md)
+  - [Modelos prontos](linhas/lean-office/modelos-prontos.md)
+  - [Tutorial: do mapa ao modelo](linhas/lean-office/tutorial.md)
+  - [Pacote da linha](linhas/lean-office/pacote.md)
 
 # Recursos avançados
 

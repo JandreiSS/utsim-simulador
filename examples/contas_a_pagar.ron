@@ -1,0 +1,164 @@
+// Contas a pagar (linha Lean Office): modelo pronto da linha, montado só com as
+// predefinições de linhas/lean_office/biblioteca.ron.
+//
+// As notas fiscais dos fornecedores chegam no horário comercial, com valor, prioridade e
+// prazo de pagamento (sla de 5 dias corridos). Contas a pagar lança cada nota (8 % saem
+// com algum dado errado), junta as notas lançadas num lote diário e confere o lote: os
+// erros percebidos (85 %) voltam ao fornecedor, que demora a responder, e a nota é lançada
+// de novo. A controladoria aprova (3 % voltam para novo lançamento) e a tesouraria paga,
+// pelo prazo mais curto. No fechamento do mês (quinta e sexta da quarta semana) a
+// tesouraria não paga: as notas esperam.
+//
+// Tempo em minutos; a semana começa na segunda às 0h (calendário "expediente": das 8h às
+// 18h com almoço das 12h às 13h, de segunda a sexta; "fechamento": o mesmo em ciclos de 4
+// semanas, sem quinta e sexta da última). Rode com:
+//   utsim linha lean_office relatorio examples/contas_a_pagar.ron --html relatorio.html
+//
+//   notas -> caixa_lancamento -> lancamento -> lote_diario -> conferencia -> caixa_aprovacao -> aprovacao -> caixa_pagamento -> pagamento -> pago
+//                 ^                                               |                               |
+//                 +------------ espera_fornecedor <---------------+                               |
+//                 +---------------------------------- devolução ---------------------------------+
+Model(
+    name: "Contas a pagar",
+    description: "Lean Office: lançamento com erro, lote diário, conferência, espera pelo fornecedor, aprovação e pagamento com fechamento do mês",
+    line: "lean_office",
+    run: (stop_time: 80640.0, warmup: 10080.0, seed: 23, replications: 5),
+    calendars: {
+        "expediente": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3240.0),
+        ]),
+        "fechamento": (period: 40320.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3720.0),
+            (start: 10800.0, duration: 60.0),
+            (start: 11160.0, duration: 840.0),
+            (start: 12240.0, duration: 60.0),
+            (start: 12600.0, duration: 840.0),
+            (start: 13680.0, duration: 60.0),
+            (start: 14040.0, duration: 840.0),
+            (start: 15120.0, duration: 60.0),
+            (start: 15480.0, duration: 840.0),
+            (start: 16560.0, duration: 60.0),
+            (start: 16920.0, duration: 3720.0),
+            (start: 20880.0, duration: 60.0),
+            (start: 21240.0, duration: 840.0),
+            (start: 22320.0, duration: 60.0),
+            (start: 22680.0, duration: 840.0),
+            (start: 23760.0, duration: 60.0),
+            (start: 24120.0, duration: 840.0),
+            (start: 25200.0, duration: 60.0),
+            (start: 25560.0, duration: 840.0),
+            (start: 26640.0, duration: 60.0),
+            (start: 27000.0, duration: 3720.0),
+            (start: 30960.0, duration: 60.0),
+            (start: 31320.0, duration: 840.0),
+            (start: 32400.0, duration: 60.0),
+            (start: 32760.0, duration: 840.0),
+            (start: 33840.0, duration: 60.0),
+            (start: 34200.0, duration: 6120.0),
+        ]),
+    },
+    objects: [
+        // Fornecedor.
+        (name: "notas", kind: Source(interarrival: Exp(mean: 15.0),
+            labels: {
+                "valor": LogNormal(mean: 3000.0, sd: 6000.0),
+                "prioridade": Discrete([(1.0, 0.9), (2.0, 0.1)]),
+                "sla": Const(7200.0),
+            }),
+            shifts: Calendar("expediente"), position: (0.0, 0.0, 0.0),
+            preset: "lean_office/entrada", department: "Fornecedor", symbol: "inicio"),
+        (name: "espera_fornecedor", kind: Processor(capacity: 100000, process: Exp(mean: 1440.0)),
+            position: (3.2, 0.0, 0.0),
+            preset: "lean_office/espera_informacao", department: "Fornecedor", symbol: "espera"),
+        // Contas a pagar.
+        (name: "caixa_lancamento", kind: Queue(order: Desc("prioridade")), position: (0.0, 1.6, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Contas a pagar", symbol: "espera"),
+        (name: "lancamento", kind: Processor(capacity: 3, process: Triangular(min: 5.0, mode: 10.0, max: 25.0),
+            operators: Some(OperatorUse(team: "analistas"))), position: (1.6, 1.6, 0.0),
+            on_entry: "if random() > 0.92 { item.erro = 1.0; item.erros_lancamento = label(item, \"erros_lancamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Contas a pagar", symbol: "operacao"),
+        (name: "lote_diario", kind: Queue(batch: Some(Batch(size: 25, max_wait: 480.0))), position: (3.2, 1.6, 0.0),
+            preset: "lean_office/lote", department: "Contas a pagar", symbol: "espera"),
+        (name: "conferencia", kind: Processor(process: Triangular(min: 2.0, mode: 4.0, max: 8.0),
+            operators: Some(OperatorUse(team: "analistas"))), position: (4.8, 1.6, 0.0),
+            output: ByLabel("rota"),
+            on_entry: "item.rota = 1.0; if label(item, \"erro\", 0.0) >= 1.0 && random() < 0.85 { item.erro = 0.0; item.rota = 2.0; }",
+            preset: "lean_office/verificacao", department: "Contas a pagar", symbol: "inspecao"),
+        // Controladoria.
+        (name: "caixa_aprovacao", kind: Queue(), position: (6.4, 3.2, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Controladoria", symbol: "espera"),
+        (name: "aprovacao", kind: Processor(process: Triangular(min: 2.0, mode: 5.0, max: 10.0),
+            operators: Some(OperatorUse(team: "controladoria"))), position: (8.0, 3.2, 0.0),
+            output: Weighted([0.97, 0.03]),
+            preset: "lean_office/aprovacao", department: "Controladoria", symbol: "inspecao"),
+        // Tesouraria.
+        (name: "caixa_pagamento", kind: Queue(order: Asc("prazo")), position: (6.4, 4.8, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Tesouraria", symbol: "espera"),
+        (name: "pagamento", kind: Processor(capacity: 2, process: Triangular(min: 3.0, mode: 6.0, max: 12.0),
+            operators: Some(OperatorUse(team: "tesouraria"))), position: (8.0, 4.8, 0.0),
+            shifts: Calendar("fechamento"),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_pagamento = label(item, \"erros_pagamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Tesouraria", symbol: "operacao"),
+        (name: "pago", kind: Sink, position: (9.6, 4.8, 0.0),
+            preset: "lean_office/conclusao", department: "Tesouraria", symbol: "fim"),
+        // Pessoas e equipes.
+        (name: "analistas", kind: Dispatcher(team: ["analista_1", "analista_2", "analista_3"]),
+            position: (2.4, 2.8, 0.0), preset: "lean_office/equipe", department: "Contas a pagar"),
+        (name: "analista_1", kind: Transporter(speed: 72.0), position: (1.6, 2.4, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Contas a pagar"),
+        (name: "analista_2", kind: Transporter(speed: 72.0), position: (2.4, 2.4, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Contas a pagar"),
+        (name: "analista_3", kind: Transporter(speed: 72.0), position: (3.2, 2.4, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Contas a pagar"),
+        (name: "controladoria", kind: Dispatcher(team: ["controller"]), position: (8.8, 4.0, 0.0),
+            preset: "lean_office/equipe", department: "Controladoria"),
+        (name: "controller", kind: Transporter(speed: 72.0), position: (8.0, 4.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Controladoria"),
+        (name: "tesouraria", kind: Dispatcher(team: ["tesoureiro"]), position: (8.8, 5.6, 0.0),
+            preset: "lean_office/equipe", department: "Tesouraria"),
+        (name: "tesoureiro", kind: Transporter(speed: 72.0), position: (8.0, 5.6, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Tesouraria"),
+    ],
+    connections: [
+        ("notas", "caixa_lancamento"),
+        ("caixa_lancamento", "lancamento"),
+        ("lancamento", "lote_diario"),
+        ("lote_diario", "conferencia"),
+        ("conferencia", "caixa_aprovacao"),       // porta 1: segue
+        ("conferencia", "espera_fornecedor"),     // porta 2: erro percebido
+        ("espera_fornecedor", "caixa_lancamento"),
+        ("caixa_aprovacao", "aprovacao"),
+        ("aprovacao", "caixa_pagamento"),         // aprova
+        ("aprovacao", "caixa_lancamento"),        // devolve
+        ("caixa_pagamento", "pagamento"),
+        ("pagamento", "pago"),
+    ],
+)

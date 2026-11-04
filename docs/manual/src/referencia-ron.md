@@ -59,7 +59,7 @@ Model(
 | `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
 | `aisles` | `[]` | corredores de circulação: `(name, kind: Pedestrian \| Forklift \| Mixed, points: [(x, y), ...], width, two_way: true, secondary: false, profile: None)`; geram a rede do modo `Aisles`. Veja [Corredores e faixas de segurança](corredores.md) |
 | `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0)` |
-| `line` | nenhuma | linha especializada do modelo (`"lean_office"`): vocabulário, biblioteca e indicadores da linha. A simulação não lê o campo. Veja [Lean Office](linhas/lean-office.md) |
+| `line` | nenhuma | linha especializada do modelo (`"lean_office"`): vocabulário, biblioteca e indicadores da linha. A simulação não lê o campo. Veja [Lean Office](linhas/lean-office/index.md) |
 
 ## `run`
 
@@ -213,7 +213,7 @@ Sem campos. Escreva `kind: Sink`.
 | `clearance` | pelo papel: pessoa 0,6, empilhadeira 0,9, outros 0,8 (finita, maior ou igual a 0) |
 | `home_at` / `home_object` | nenhum: casa num ponto, ou num objeto ou área (um ou outro; ligam a volta para casa) |
 | `break_at` / `break_object` | nenhum: local de pausa num ponto, ou num objeto ou área (um ou outro) |
-| `multitask` | nenhuma: um serviço por vez. `Some((max_open: n, slice: Dist, switch: Dist))`: até `n` serviços de operador abertos ao mesmo tempo (`max_open` maior ou igual a 1; com 1, igual a não ter o campo), trabalhados em turnos de `slice` (não pode ser `Const(0.0)`), perdendo `switch` (padrão `Const(0.0)`) a cada troca. Veja "Multitarefa" no capítulo Lean Office |
+| `multitask` | nenhuma: um serviço por vez. `Some((max_open: n, slice: Dist, switch: Dist))`: até `n` serviços de operador abertos ao mesmo tempo (`max_open` maior ou igual a 1; com 1, igual a não ter o campo), trabalhados em turnos de `slice` (não pode ser `Const(0.0)`), perdendo `switch` (padrão `Const(0.0)`) a cada troca. Veja [Multitarefa](linhas/lean-office/multitarefa.md) |
 
 ### `Dispatcher`
 
