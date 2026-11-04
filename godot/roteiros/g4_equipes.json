@@ -1,0 +1,33 @@
+{
+	"saida": "../capturas/equipes",
+	"passos": [
+		{"nota": "Ligações de equipe e de pedido (E1b, E8b): a ferramenta Equipe tira e põe um membro, define o transporte de um objeto e os operadores de um processo; no Simular as linhas ficam apagadas, o membro seguido acende e mostra a tarefa."},
+		{"abrir": "../../examples/equipe_com_prioridade.ron"},
+		{"camera": {"alvo": [14.0, 2.0], "distancia": 34.0, "giro": 0.0, "inclinacao": 0.95}},
+		{"conferir": {"problemas": 0, "visivel": ["Ferramenta_Equipe"]}},
+		{"capturar": "g4_equipes_01_linhas"},
+		{"tecla": "e"},
+		{"conferir": {"texto": {"controle": "Ferramenta_Equipe", "contem": "Equipe"}}},
+		{"nota": "Do despachante a um membro: sai da equipe; de novo, volta."},
+		{"arrastar": {"de": {"objeto": "operadores"}, "para": {"objeto": "op2"}, "passos": 12}},
+		{"conferir": {"status_contem": "op2 saiu da equipe de operadores", "pode_desfazer": true}},
+		{"arrastar": {"de": {"objeto": "operadores"}, "para": {"objeto": "op2"}, "passos": 12}},
+		{"conferir": {"status_contem": "op2 entrou na equipe de operadores"}},
+		{"nota": "De um objeto a quem leva os itens: o transporte; com Shift, de um processo: os operadores."},
+		{"arrastar": {"de": {"objeto": "fila_urgente"}, "para": {"objeto": "op1"}, "passos": 12}},
+		{"conferir": {"status_contem": "fila_urgente pede transporte a op1"}},
+		{"capturar": "g4_equipes_02_transporte"},
+		{"tecla": "ctrl+z"},
+		{"arrastar": {"de": {"objeto": "urgente"}, "para": {"objeto": "operadores"}, "passos": 12, "shift": true}},
+		{"conferir": {"status_contem": "urgente"}},
+		{"tecla": "ctrl+z"},
+		{"tecla": "escape"},
+		{"nota": "No Simular: as linhas apagadas, o anel de estado dos membros e a tarefa do seguido."},
+		{"clicar": {"controle": "Modo_Simular"}},
+		{"esperar_trabalho": 120},
+		{"clicar": {"controle": "Bloco_8"}},
+		{"tempo": 60.0},
+		{"esperar": 10},
+		{"capturar": "g4_equipes_03_simular"}
+	]
+}

@@ -45,11 +45,16 @@ pub mod pert_view;
 pub mod playback;
 pub mod results;
 pub mod schema;
+pub mod ui_arrivals;
 pub mod ui_bar;
 pub mod ui_bottom;
 mod ui_class;
+pub mod ui_flows;
+pub mod ui_form;
 pub mod ui_left;
+pub mod ui_pert;
 pub mod ui_props;
+pub mod ui_results;
 
 pub use utsim_edit::ron_text;
 pub use utsim_look::{catalogue, visual as looks};
@@ -545,6 +550,11 @@ impl UtsimPlayback {
             put(&mut e, "size", v3(size));
             put(&mut e, "shape", simple_shape(&v.kind));
             put(&mut e, "stack", v.stack);
+            if v.kind == "Source" {
+                // C7: the item a source creates, in the colour its items get.
+                let c = utsim_scene::style::origin_color(v.b);
+                put(&mut e, "preview_color", Color::from_rgb(c[0], c[1], c[2]));
+            }
             if let Some(l) = &v.look {
                 let a = AssetInfo::of(&l.source);
                 let mut asset = VarDictionary::new();
@@ -791,7 +801,31 @@ impl UtsimPlayback {
             "item_stack",
             PackedInt32Array::from(f.item_stack.as_slice()),
         );
+        put(&mut d, "task_target", vectors(&f.task_target));
         d
+    }
+
+    /// The team and request lines (E1b): `[{kind, from, to, point}]` with block indices
+    /// (`to` is -1 for a home or break place, then `point` is where it is).
+    #[func]
+    fn team_links(&self) -> VarArray {
+        let mut out = VarArray::new();
+        let Some(c) = &self.core else {
+            return out;
+        };
+        for l in &c.links {
+            let mut d = VarDictionary::new();
+            put(&mut d, "kind", l.kind);
+            put(&mut d, "from", l.from as i64);
+            put(&mut d, "to", l.to.map_or(-1, |t| t as i64));
+            put(
+                &mut d,
+                "point",
+                Vector3::new(l.to_point[0], l.to_point[1], l.to_point[2]),
+            );
+            out.push(&d.to_variant());
+        }
+        out
     }
 }
 

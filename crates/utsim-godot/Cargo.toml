@@ -31,6 +31,8 @@ utsim-ui-tema.workspace = true
 # The interface around the 3D view is egui, drawn by the bridge (`egui_*`, `ui_class`): the
 # workspace's single egui (the launcher's eframe 0.36.2, the viewer's bevy_egui 0.43).
 egui = { version = "=0.36.2", default-features = false, features = ["default_fonts"] }
+# The charts of the "Resultados" window (`ui_results.rs`): the version built on that egui.
+egui_plot = { version = "=0.37.0", default-features = false }
 # Only the core classes are generated (no `__codegen-full`): the bridge returns plain data
 # (dictionaries and packed arrays) and every node is built in GDScript, which keeps the
 # build short. `api-4-7` matches Godot 4.7; GDExtension is forward compatible.

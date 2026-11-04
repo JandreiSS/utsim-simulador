@@ -385,6 +385,28 @@ impl UtsimDocument {
         self.done(r)
     }
 
+    /// The drag of the Equipe tool (`document::Editor::team_link`): `{ok, message}`.
+    #[func]
+    fn team_link(&mut self, from: GString, to: GString, operators: bool) -> VarDictionary {
+        let r = self
+            .editor
+            .team_link(&from.to_string(), &to.to_string(), operators);
+        let mut d = VarDictionary::new();
+        match r {
+            Ok(m) => {
+                self.last_error.clear();
+                put(&mut d, "ok", true);
+                put(&mut d, "message", GString::from(m.as_str()));
+            }
+            Err(e) => {
+                put(&mut d, "ok", false);
+                put(&mut d, "message", GString::from(e.as_str()));
+                self.last_error = e;
+            }
+        }
+        d
+    }
+
     #[func]
     fn disconnect_objects(&mut self, from: GString, to: GString) -> bool {
         let r = self.editor.disconnect(&from.to_string(), &to.to_string());
