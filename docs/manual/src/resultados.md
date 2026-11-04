@@ -220,6 +220,10 @@ No aplicativo de mesa, o fim da aba Resumo tem a pasta de exportação (por padr
 - **Exportar CSV** grava os mesmos arquivos do `utsim run --csv` (`resumo.csv`, `replicacoes.csv`, `series.csv`, `histogramas.csv`) e mais `objetos.csv`, a tabela de resumo com uma coluna `_mw` (meia-amplitude) ao lado de cada média, incluindo as quatro ocupações (`ocupacao`, `ocupacao_com_bloqueio`, `ocupacao_no_turno`, `ocupacao_sem_bloqueio`);
 - **Exportar HTML** grava `relatorio.html`, um arquivo único com a tabela, o gargalo, os gráficos de ocupação e de estados em SVG e, se houver fontes com `Drop`, as perdas do modelo. Se houver uma comparação de cenários, ela entra no relatório.
 
+### Na interface 3D (Godot)
+
+Na interface 3D o botão **Resultados** (ou o menu **Analisar**) abre a mesma janela sobre a vista, com cinco abas: **Resumo** (cartões com as replicações, o tempo de parada, o gargalo geral e o do turno e as saídas; a tabela por objeto com os números alinhados à direita, linhas alternadas e o gargalo destacado em amarelo; e a exportação em CSV), **Gráficos** (ocupação, estados, série temporal e histograma, com a legenda e o nome do eixo acima do gráfico), **Análise** (aquecimento, replicações necessárias com **Rodar mais**, lei de Little e gargalo móvel), **Cenários** e **Otimização**. Cada rodada pedida pela janela vai para a barra de status, com o progresso e **Cancelar**. **Fechar** volta à cena; aberta no Editar, a janela esconde o painel de propriedades enquanto está aberta.
+
 ## Nomes das métricas
 
 Experimentos, otimização e testes referem-se às métricas por nome, no formato `objeto.métrica`:

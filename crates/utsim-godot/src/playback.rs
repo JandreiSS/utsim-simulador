@@ -17,7 +17,7 @@ use utsim_model::Model;
 use utsim_model::replay::Replay;
 use utsim_scene::compose::ITEM_SIZE;
 use utsim_scene::style::{self, Shape};
-use utsim_scene::{EntityId, EntityKind, MobileRole, Motion, Scene, SceneOptions};
+use utsim_scene::{EntityId, EntityKind, LinkKind, MobileRole, Motion, Scene, SceneOptions};
 
 use crate::coords::{layout_to_godot, size_to_godot, to_godot, yaw_to_godot};
 use utsim_look::driver::{self, DriverClip, DriverMount};
@@ -66,6 +66,39 @@ pub struct BlockView {
     pub size: [f32; 3],
     /// A queue with `discipline: Lifo` (a stack): labelled and drawn as one.
     pub stack: bool,
+    /// A source's arrival mode, for the badge of its label (`horário`, `tabela`,
+    /// `sequência`, `taxa`, with `lote` for batches); empty for the plain interval.
+    pub badge: String,
+}
+
+/// The badge of a source's label: how it creates items (`docs/plano_chegadas_e_equipes_3d.md`,
+/// C7).
+fn source_badge(model: Option<&Model>, name: &str) -> String {
+    let Some(obj) = model.and_then(|m| m.objects.iter().find(|o| o.name == name)) else {
+        return String::new();
+    };
+    let utsim_model::ObjectKind::Source {
+        schedule,
+        table,
+        batch,
+        ..
+    } = &obj.kind
+    else {
+        return String::new();
+    };
+    let mut parts = Vec::new();
+    if let Some(t) = table {
+        parts.push(match t.mode {
+            utsim_model::TableMode::Sequence => "sequência",
+            _ => "tabela",
+        });
+    } else if schedule.is_some() {
+        parts.push("horário");
+    }
+    if batch.is_some() {
+        parts.push("lote");
+    }
+    parts.join(", ")
 }
 
 /// Whether `name` is a queue with `discipline: Lifo` in `model`.
@@ -150,6 +183,52 @@ pub struct FrameData {
     pub item_carrier: Vec<i32>,
     /// Position of the item in its carrier's stack (0 = lowest).
     pub item_stack: Vec<i32>,
+    /// Where each mobile resource is going for its current task (Godot coordinates), or
+    /// NaN when it has none (the line of the selected member, E8b).
+    pub task_target: Vec<[f32; 3]>,
+}
+
+/// A team or request line (`utsim_scene::team_links`) between drawn blocks: kind name
+/// (`equipe`, `transporte`, `operadores`, `manutencao`, `casa`, `pausa`), the block it
+/// starts from and the one it ends at (or `None` for a place), with the end point.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TeamLink {
+    pub kind: &'static str,
+    pub from: usize,
+    pub to: Option<usize>,
+    pub to_point: [f32; 3],
+}
+
+/// The name of a link kind in the interface.
+pub fn link_kind_name(kind: LinkKind) -> &'static str {
+    match kind {
+        LinkKind::Team => "equipe",
+        LinkKind::Transport => "transporte",
+        LinkKind::Operators => "operadores",
+        LinkKind::Repair => "manutencao",
+        LinkKind::Home => "casa",
+        LinkKind::Break => "pausa",
+    }
+}
+
+/// The team and request lines of `model` with block indices mapped by `index_of`
+/// (model object order to the drawn blocks); lines to blocks not drawn are skipped.
+pub fn team_lines(model: &Model, index_of: impl Fn(usize) -> Option<usize>) -> Vec<TeamLink> {
+    utsim_scene::team_links(model)
+        .into_iter()
+        .filter_map(|l| {
+            let to = match l.to {
+                Some(b) => Some(index_of(b as usize)?),
+                None => None,
+            };
+            Some(TeamLink {
+                kind: link_kind_name(l.kind),
+                from: index_of(l.from as usize)?,
+                to,
+                to_point: to_godot(l.to_point),
+            })
+        })
+        .collect()
 }
 
 /// A replay ready to be played in Godot.
@@ -169,6 +248,12 @@ pub struct Playback {
     pub connections: Vec<(usize, usize)>,
     /// The model that produced the replay (token flows, network), when there is one.
     pub model: Option<Model>,
+    /// The team and request lines between the drawn blocks.
+    pub links: Vec<TeamLink>,
+    /// Each dispatcher (index into [`Playback::blocks`]) and the members of its team.
+    teams: Vec<(usize, Vec<usize>)>,
+    /// The instants each source created its items, by replay block (empty for others).
+    created: Vec<Vec<f64>>,
 }
 
 impl Playback {
@@ -221,9 +306,15 @@ impl Playback {
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
             let stack = kind == "Queue" && is_stack(model, &name);
+            let badge = if kind == "Source" {
+                source_badge(model, &name)
+            } else {
+                String::new()
+            };
             blocks.push(BlockView {
                 b,
                 stack,
+                badge,
                 name,
                 kind,
                 role,
@@ -259,6 +350,25 @@ impl Playback {
         let stations = (0..n)
             .filter(|&b| matches!(replay.blocks[b].kind.as_str(), "Processor" | "Combiner"))
             .collect();
+        let mut created = vec![Vec::new(); n];
+        for r in &replay.records {
+            if let utsim_core::TraceEvent::Created { block, .. } = r.event
+                && let Some(v) = created.get_mut(block)
+            {
+                v.push(r.t);
+            }
+        }
+        let links = model.map_or_else(Vec::new, |m| {
+            team_lines(m, |b| index_of.get(b).copied().flatten())
+        });
+        let mut teams: Vec<(usize, Vec<usize>)> = Vec::new();
+        for l in links.iter().filter(|l| l.kind == "equipe") {
+            let Some(to) = l.to else { continue };
+            match teams.iter_mut().find(|t| t.0 == l.from) {
+                Some(t) => t.1.push(to),
+                None => teams.push((l.from, vec![to])),
+            }
+        }
         Playback {
             scene,
             blocks,
@@ -270,6 +380,9 @@ impl Playback {
             specs,
             connections: replay.connections.clone(),
             model: model.cloned(),
+            links,
+            teams,
+            created,
         }
     }
 
@@ -395,6 +508,10 @@ impl Playback {
                 (None, Some(_)) => s.mobile_at(b, t),
                 _ => None,
             };
+            f.task_target.push(
+                pose.and_then(|_| s.timeline.travel_target(b, t))
+                    .map_or([f32::NAN; 3], |p| to_godot(p.map(|v| v as f32))),
+            );
             poses.push(pose);
             let (position, yaw, motion, lift) = match pose {
                 Some(p) => (
@@ -467,16 +584,51 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
-            let shown = if v.stack {
+            let mut shown = if v.stack {
                 format!("{} · pilha", v.name)
             } else {
                 v.name.clone()
             };
+            if v.kind == "Source" {
+                // C7: the mode badge, and in a run the items created so far.
+                if !v.badge.is_empty() {
+                    shown.push_str(&format!(" · {}", v.badge));
+                }
+                let made = self.created[b].partition_point(|&c| c <= t);
+                if !self.created[b].is_empty() {
+                    shown.push_str(&format!(" · {made} criados"));
+                }
+            }
+            // A queue drawn as a conveyor counts what does not fit on its belt.
+            let hidden = v
+                .look
+                .as_ref()
+                .and_then(|l| looks::queue_belt(&v.kind, l))
+                .map_or(0, |belt| belt.hidden(content, ITEM_SIZE));
             f.label
-                .push(style::label_text(&shown, content, 0, received));
+                .push(style::label_text(&shown, content, hidden, received));
+        }
+        // A dispatcher says how many of its members are free (idle) now.
+        for (d, members) in &self.teams {
+            let free = members
+                .iter()
+                .filter(|&&m| f.motion.get(m).copied() == Some(motion_code(Motion::Idle).0))
+                .count();
+            if let Some(l) = f.label.get_mut(*d) {
+                l.push_str(&format!(" · {free}/{} livres", members.len()));
+            }
         }
         // Items: where the scene puts them, moved onto forks, hands and decks.
         let mut stacked: HashMap<usize, usize> = HashMap::new();
+        let mut resting: HashMap<usize, usize> = HashMap::new();
+        // Queues drawn as conveyors: an item flying in or out does not sink into the belt.
+        let belts: Vec<([f32; 3], looks::QueueBelt)> = (0..self.blocks.len())
+            .filter_map(|i| {
+                let v = &self.blocks[i];
+                let belt = looks::queue_belt(&v.kind, v.look.as_ref()?)?;
+                Some((self.static_pose(i).0, belt))
+            })
+            .collect();
         for p in s.items_at(t).into_iter().filter(|p| p.drawn) {
             let mut center = p.center;
             let mut scale = p.scale;
@@ -487,7 +639,21 @@ impl Playback {
                 && let Some(look) = &self.blocks[i].look
             {
                 let v = &self.blocks[i];
-                if v.kind == "Queue" {
+                if let Some(belt) = looks::queue_belt(&v.kind, look) {
+                    // On top of the belt, in a line (the scene's slots are the simple
+                    // queue's: their base is the block's).
+                    let k = resting.entry(i).or_default();
+                    let simple = style::slot_offset(Shape::LongBox, *k);
+                    let Some(at) = belt.slot(*k, ITEM_SIZE) else {
+                        continue;
+                    };
+                    *k += 1;
+                    center = [
+                        center[0] - simple[0] + at[0],
+                        center[1] - simple[1] + at[1],
+                        center[2] - simple[2] + at[2],
+                    ];
+                } else if v.kind == "Queue" {
                     center[1] -= looks::queue_drop();
                 } else if let Some(pose) = poses[i] {
                     if let Carry::Forks { .. } = look.carry {
@@ -509,6 +675,18 @@ impl Playback {
                         stack = *k as i32;
                     }
                     *k += 1;
+                }
+            }
+            if p.parent.is_none() {
+                for (base, belt) in &belts {
+                    let d = [
+                        center[0] - base[0],
+                        center[1] - base[1],
+                        center[2] - base[2],
+                    ];
+                    if belt.covers(d, scale * ITEM_SIZE) {
+                        center[1] = center[1].max(base[1] + belt.rest_height(scale * ITEM_SIZE));
+                    }
                 }
             }
             let origin = s.timeline.item_origin(p.item).unwrap_or(0);
@@ -553,6 +731,116 @@ mod tests {
         let (model, path) = example(name);
         let replay = model.replay(0).expect("replay");
         Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    #[test]
+    fn a_source_label_says_how_it_creates_and_how_many() {
+        let pb = playback("chegadas_por_tabela.ron", false);
+        let (i, v) = pb
+            .blocks
+            .iter()
+            .enumerate()
+            .find(|(_, v)| v.kind == "Source" && !v.badge.is_empty())
+            .expect("a source with a table");
+        assert!(
+            v.badge.contains("tabela") || v.badge.contains("sequência"),
+            "{}",
+            v.badge
+        );
+        let first = pb.frame(0.0).label[i].clone();
+        let last = pb.frame(pb.end()).label[i].clone();
+        assert!(first.contains(&v.badge), "{first}");
+        assert!(last.contains(" criados"), "{last}");
+        let count = |l: &str| {
+            l.split(" · ")
+                .find_map(|p| p.strip_suffix(" criados")?.parse::<usize>().ok())
+                .unwrap_or(0)
+        };
+        assert!(count(&last) > count(&first), "{first} / {last}");
+        // A plain source has no badge.
+        let plain = playback("mm1.ron", false);
+        let s = plain.blocks.iter().find(|v| v.kind == "Source").unwrap();
+        assert!(s.badge.is_empty());
+    }
+
+    #[test]
+    fn team_lines_and_the_free_members_come_with_the_frame() {
+        let pb = playback("equipe_com_prioridade.ron", false);
+        let at = |n: &str| pb.blocks.iter().position(|v| v.name == n).unwrap();
+        let (d, op1, op2) = (at("operadores"), at("op1"), at("op2"));
+        let team: Vec<_> = pb.links.iter().filter(|l| l.kind == "equipe").collect();
+        assert_eq!(team.len(), 2);
+        assert!(team.iter().all(|l| l.from == d));
+        assert!(team.iter().any(|l| l.to == Some(op1)) && team.iter().any(|l| l.to == Some(op2)));
+        // The processors ask the team for operators; the members have home and break places.
+        assert!(
+            pb.links
+                .iter()
+                .any(|l| l.kind == "operadores" && l.to == Some(d))
+        );
+        assert!(
+            pb.links
+                .iter()
+                .any(|l| l.kind == "casa" && l.from == op1 && l.to.is_none())
+        );
+        for t in [0.0, 60.0, 300.0] {
+            let f = pb.frame(t);
+            assert_eq!(f.task_target.len(), pb.blocks.len());
+            assert!(f.label[d].contains("/2 livres"), "{}", f.label[d]);
+            // Only mobile resources have a task target.
+            assert!(f.task_target[at("torno")][0].is_nan());
+        }
+        // Someone travels at some point of the run.
+        let moving = (0..200).any(|k| {
+            let f = pb.frame(k as f64 * 10.0);
+            !f.task_target[op1][0].is_nan() || !f.task_target[op2][0].is_nan()
+        });
+        assert!(moving);
+    }
+
+    #[test]
+    fn a_queue_drawn_as_a_conveyor_keeps_its_items_on_the_belt() {
+        let model = Model::parse(
+            r#"Model(
+                name: "fila na esteira",
+                run: (stop_time: 300.0, seed: 3, replications: 1),
+                objects: [
+                    (name: "chegada", kind: Source(interarrival: Exp(mean: 1.0)), position: (0.0, 0.0, 0.0)),
+                    (name: "fila", kind: Queue(), position: (5.0, 0.0, 0.0), visual: (asset: "esteira")),
+                    (name: "maquina", kind: Processor(capacity: 1, process: Exp(mean: 4.0)), position: (10.0, 0.0, 0.0)),
+                    (name: "saida", kind: Sink, position: (14.0, 0.0, 0.0)),
+                ],
+                connections: [("chegada", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+            )"#,
+        )
+        .unwrap();
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), None, false);
+        let q = pb.blocks.iter().position(|v| v.name == "fila").unwrap();
+        let belt = looks::queue_belt("Queue", pb.blocks[q].look.as_ref().unwrap()).unwrap();
+        let base = pb.static_pose(q).0;
+        for t in [30.0, 150.0, 300.0] {
+            let f = pb.frame(t);
+            let mut on = 0;
+            for p in &f.item_position {
+                let d = [p[0] - base[0], p[1] - base[1], p[2] - base[2]];
+                // Over the belt's footprint (Godot: y up; the belt runs along x).
+                if d[0].abs() <= belt.length / 2.0 + 0.5 && d[2].abs() <= belt.width / 2.0 + 0.5 {
+                    assert!(
+                        d[1] - ITEM_SIZE / 2.0 >= belt.top - 1e-3,
+                        "t {t}: {d:?} under the belt top"
+                    );
+                    if (d[1] - belt.rest_height(ITEM_SIZE)).abs() < 1e-3 {
+                        on += 1;
+                    }
+                }
+            }
+            assert!(
+                on >= belt.per_layer(ITEM_SIZE),
+                "t {t}: {on} items on the belt"
+            );
+            assert!(f.label[q].contains('+'), "{}", f.label[q]);
+        }
     }
 
     #[test]

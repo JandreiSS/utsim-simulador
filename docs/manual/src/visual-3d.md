@@ -56,6 +56,8 @@ Sem `visual.asset`, o visualizador escolhe pelo papel do objeto:
 | `Queue` | `area`, uma faixa pintada no chão |
 | demais | forma simples |
 
+Uma fila (`Queue`) com `visual: (asset: "esteira")` é desenhada como uma esteira de rolos de 3 m: os itens ficam em cima dos rolos, em fila ao longo da esteira, o mais antigo na ponta de saída; com a primeira linha cheia começa uma segunda camada por cima, e o que não cabe nas duas fica só contado no rótulo (`fila (27) +9`).
+
 Os itens aparecem como um palete com caixas numa cena com paletes (porta-paletes ou empilhadeiras), e como uma caixa nas demais. Veículos e pessoas param na borda das máquinas, e a empilhadeira que opera um porta-paletes vai ao corredor em frente a ele.
 
 ## Movimento

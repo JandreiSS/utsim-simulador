@@ -89,7 +89,6 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 
 | Tarefa | Modelo |
 |---|---|
-| Fila com aparência de esteira: as caixas devem ficar em cima da esteira, em fila ao longo do comprimento (altura do topo da malha), e as que não cabem empilham por cima ou somem com o contador; hoje ficam no chão, dentro da estrutura, e o excesso flutua em escada (vídeo do dono, 2026-11-03) | Sonnet |
 | Gravar vídeo da simulação pelo próprio programa (MP4, com câmeras roteirizadas) | Sonnet |
 | Tutorial interativo dentro do programa | Sonnet |
 | Tradução da interface e do manual (inglês, espanhol): extrair e organizar textos | Haiku |

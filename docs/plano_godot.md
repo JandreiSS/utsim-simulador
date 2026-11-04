@@ -1,5 +1,11 @@
 # Plano da interface Godot (versão 0.2)
 
+> Desde 2026-11-03 só a vista 3D central é Godot: os painéis descritos abaixo em GDScript
+> (`painel_propriedades.gd`, `resultados.gd`, `pert.gd`, `fluxos.gd`, `grafico.gd`,
+> `dados_reais.gd`, `mini_histograma.gd`, o tema `godot/tema/utsim.tres`) foram refeitos em
+> Rust/egui na ponte e removidos; veja `docs/plano_interface_rust.md`. O que cada painel faz
+> continua como está descrito aqui.
+
 A interface 3D do UTSim passa a ser feita no Godot 4.7, que também leva a realidade virtual e a
 realidade aumentada (OpenXR). O editor e visualizador Bevy (`utsim-viewer`) continua sendo o da
 versão 0.1 até a interface Godot cobrir o que ele faz. A arquitetura está em
@@ -167,7 +173,7 @@ O que ficou feito (detalhes em `docs/arquitetura.md`, seção 4r):
 - **Fluxos de tokens** (`fluxos.gd`, botão Fluxos no Simular): o grafo de cada fluxo em 2D
   (camadas ao longo de `next`), os tokens de cada atividade no instante da reprodução e as
   contagens ao longo da rodada, com a linha do instante.
-- **Resultados** (`resultados.gd`, botão Resultados): resumo com o gargalo geral e dentro do
+- **Resultados** (egui, `ui_results.rs` na ponte; antes `resultados.gd`; botão Resultados): resumo com o gargalo geral e dentro do
   turno, tabela por objeto com IC de 95 %, exportação CSV; gráficos de ocupação (com o traço
   do IC), estados (cores da cena), série temporal e histograma, desenhados com `draw_*`
   (`grafico.gd`); cenários escritos como texto (`[nome]` e `objeto.campo = valor`), com números
