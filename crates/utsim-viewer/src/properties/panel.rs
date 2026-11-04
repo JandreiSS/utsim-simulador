@@ -1423,7 +1423,7 @@ impl Editor<'_> {
                 self.float_field(ui, "Altura do nível", "level_height", *level_height);
                 ui.weak(format!("Capacidade: {} posições", bays * levels));
             }
-            ObjectKind::Dispatcher { team, rule } => {
+            ObjectKind::Dispatcher { team, rule, .. } => {
                 self.team_field(ui, "team", team);
                 self.choice_field(
                     ui,
