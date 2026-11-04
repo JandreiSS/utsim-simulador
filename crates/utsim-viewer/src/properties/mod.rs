@@ -363,7 +363,7 @@ mod tests {
         );
         assert_eq!(load_time, Dist::Exp { mean: 2.0 });
         assert_eq!(unload_time, Dist::Const(0.0));
-        let ObjectKind::Dispatcher { team, rule } = object(&doc, "equipe").kind else {
+        let ObjectKind::Dispatcher { team, rule, .. } = object(&doc, "equipe").kind else {
             unreachable!()
         };
         assert_eq!(team, vec!["emp2".to_string()]);
