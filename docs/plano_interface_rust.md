@@ -122,7 +122,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 3 | Biblioteca (arrastar para o chão), lista de objetos com busca, barra de status com progresso e Cancelar, painel do Simular (replicações, blocos, câmera, resumo) e barra de reprodução | 5–7 h | **feito** |
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | **feito** (5a) |
-| 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | a fazer |
+| 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | **feito** (C7 em parte) |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
@@ -330,6 +330,40 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   `a_source_label_says_how_it_creates_and_how_many`.
 - Ficaram para depois: o anel com as proporções dos tipos, o item preso na boca da porta com
   `on_blocked: Wait` e os perdidos piscando, e os itens de um lote lado a lado.
+### Passo 5b, C6 (editores de tabela e horário da fonte), como foi feito
+
+- **Campo novo**: `table` da fonte entra no esquema (`schema.rs`) como RON opcional, como
+  `schedule`; ligado, começa com uma linha de 10 itens às 08:00 num ciclo de um dia. As escolhas
+  do campo são os tipos de item do modelo. `utsim-edit` ganhou `ron_text::table`.
+- **Editores** (`ui_arrivals.rs`, puro e testado): o painel desenha os dois campos com editor
+  próprio em vez da linha de RON, e o botão `{ }` volta para a linha de texto (`Prop_table`,
+  `Prop_schedule`, como antes).
+  - Tabela: modo (horário ou sequência), repetição e ciclo, grade com instante (só no
+    horário, em hh:mm quando o ciclo é de dia ou semana), quantidade, tipo e rótulos
+    (`nome=valor; ...`), subir, descer e remover, "+ Linha", "Ordenar por instante", "Colar da
+    planilha" (linhas separadas por tabulação ou `;`, vírgula decimal, cabeçalho opcional; um
+    nome de coluna desconhecido vira rótulo), as mensagens de `ArrivalTable::validate` na
+    linha a que se referem e os totais por ciclo e por tipo. "Ver as primeiras chegadas"
+    desenha o histograma por hora e por tipo de um ciclo (ou de uma volta da sequência) lido
+    da tabela; não roda a fonte, então o espaçamento de `release` e o bloqueio ficam de fora.
+  - Horário: ciclo, faixa do ciclo com os períodos como blocos coloridos por modo (padrão,
+    distribuição, taxa, fechado; o tempo fora dos períodos hachurado), uma linha por período
+    (início, fim, modo, taxa em itens por hora ou a distribuição em RON), "+ Período",
+    remover e o gráfico de barras das chegadas esperadas por período
+    (`ArrivalSchedule::expected_in_period`), com o total por ciclo.
+  - Cada edição sai como um único `PropAction::Set` de `table` ou `schedule` com o RON inteiro
+    (um passo de desfazer). Uma célula que não se lê (um número inválido) não manda nada e
+    mostra o motivo na linha.
+- Nomes para os roteiros: `Prop_table_modo`, `_repetir`, `_ciclo`, `_linha_<k>_<coluna>`
+  (`at`, `count`, `tipo`, `rotulos`, `subir`, `descer`, `remover`, `erro`), `_mais`,
+  `_ordenar`, `_colar` (`_colar_texto`, `_colar_substituir`, `_colar_acrescentar`,
+  `_colar_erro`), `_total`, `_previa`, `_previa_grafico`, `_texto`; `Prop_schedule_ciclo`,
+  `_faixa`, `_periodo_<k>_<campo>` (`inicio`, `fim`, `modo`, `valor`, `remover`, `erro`),
+  `_mais`, `_grafico`, `_total`, `_texto`. Linhas e períodos contam a partir de 1, como nas
+  mensagens do núcleo.
+- Roteiro `godot/roteiros/g4_chegadas.json` (sem janela): edita uma célula, cola linhas,
+  confere a mensagem fora de ordem, ordena e desfaz. Fica para depois: arrastar as bordas dos
+  blocos na faixa e uma prévia que rode de fato só a fonte.
 
 ### Plano original do passo 2b
 

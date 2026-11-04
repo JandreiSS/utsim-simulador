@@ -826,6 +826,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             labels,
             on_blocked,
             schedule,
+            table,
             ..
         } => {
             out.push(
@@ -875,6 +876,30 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .help(
                     "Ciclo e períodos com o próprio intervalo, taxa ou fechados: \
                      (cycle: 1440.0, periods: [(start: 0.0, end: 480.0, arrivals: Rate(0.5))]).",
+                ),
+            );
+            // The choices are the model's item types (the table editor's "tipo" column).
+            out.push(
+                Field::new(
+                    s,
+                    "table",
+                    "Tabela de chegadas",
+                    FieldType::Ron,
+                    table
+                        .as_ref()
+                        .map_or(Value::Null, |v| Value::Text(ron::table(v))),
+                )
+                .optional(table.is_some())
+                .choices(
+                    model
+                        .item_types
+                        .iter()
+                        .map(|t| choice(&t.name, &t.name))
+                        .collect(),
+                )
+                .help(
+                    "Horário (instante, quantidade, tipo e rótulos de cada linha) ou sequência \
+                     de linhas: (mode: Times, repeat: Cycle(1440.0), rows: [(at: 480.0, count: 12)]).",
                 ),
             );
         }
@@ -1684,6 +1709,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Source { labels, .. }, "labels") => ron::labels(labels),
         (ObjectKind::Source { on_blocked, .. }, "on_blocked") => ron::debug(on_blocked),
         (ObjectKind::Source { schedule, .. }, "schedule") => ron::option(schedule, ron::schedule),
+        (ObjectKind::Source { table, .. }, "table") => ron::option(table, ron::table),
         (ObjectKind::Queue { capacity, .. }, "capacity") => {
             ron::option(capacity, |v| v.to_string())
         }
@@ -1710,6 +1736,8 @@ fn default_on(model: &Model, obj: &ObjectDef, head: &str) -> Result<String, Stri
         "max_arrivals" => "100".into(),
         // One day: the default interval in the morning, closed the rest of the day.
         "schedule" => "(cycle: 1440.0, periods: [(start: 0.0, end: 480.0), (start: 480.0, end: 1440.0, arrivals: Closed)])".into(),
+        // A daily timetable with one row: ten items at 08:00.
+        "table" => "(mode: Times, repeat: Cycle(1440.0), rows: [(at: 480.0, count: 10)])".into(),
         "capacity" => "10".into(),
         "batch" => ron::batch(2, 0.0, false),
         "setup" => ron::dist(&Dist::Const(1.0)),
@@ -2446,6 +2474,27 @@ mod tests {
         assert_eq!(read_field(object(&d, "a"), "schedule").unwrap(), text);
         apply(&mut d, "a", "schedule.on", Value::Bool(false));
         assert_eq!(field(&d, "a", "schedule").value, Value::Null);
+    }
+
+    #[test]
+    fn a_source_has_an_arrival_table_as_ron() {
+        let mut d = doc();
+        assert_eq!(field(&d, "a", "table").value, Value::Null);
+        assert!(!field(&d, "a", "table").enabled);
+        apply(&mut d, "a", "table.on", Value::Bool(true));
+        let f = field(&d, "a", "table");
+        assert!(f.enabled);
+        let ObjectKind::Source { table, .. } = &object(&d, "a").kind else {
+            panic!()
+        };
+        let t = table.as_ref().unwrap();
+        assert_eq!((t.rows.len(), t.rows[0].count), (1, 10));
+        let text = "(mode: Sequence, repeat: Loop, rows: [(count: 2, item_type: \"A\"), \
+                    (count: 1, labels: {\"prioridade\": 2.0})])";
+        apply(&mut d, "a", "table", Value::Text(text.into()));
+        assert_eq!(read_field(object(&d, "a"), "table").unwrap(), text);
+        apply(&mut d, "a", "table.on", Value::Bool(false));
+        assert_eq!(field(&d, "a", "table").value, Value::Null);
     }
 
     #[test]

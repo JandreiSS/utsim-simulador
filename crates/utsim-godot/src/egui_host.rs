@@ -830,6 +830,79 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_canvas_commands_with_the_arrival_editors_are_consistent() {
+        use crate::schema::Value;
+        let mut e = crate::document::Editor::new("teste");
+        let name = e.add("Source", [0.0, 0.0, 0.0]).unwrap();
+        // Both at once is a model error, but both editors are drawn.
+        for path in ["table.on", "schedule.on"] {
+            e.set_property(&name, path, &Value::Bool(true), &[])
+                .unwrap();
+        }
+        e.set_property(
+            &name,
+            "table",
+            &Value::Text(
+                "(mode: Times, repeat: Cycle(1440.0), rows: [(at: 480.0, count: 12, \
+                 labels: {\"prioridade\": 2.0}), (at: 600.0, count: 5)])"
+                    .into(),
+            ),
+            &[],
+        )
+        .unwrap();
+        for size in [[1600.0, 900.0], [1280.0, 720.0]] {
+            let mut h = Host::new();
+            h.props = Some(crate::ui_props::PropsView {
+                props: e.properties(&name),
+                families: crate::schema::FAMILIES
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                data_paths: Vec::new(),
+                extra: String::new(),
+                driver: -1,
+                miniature: false,
+                data: std::collections::HashMap::new(),
+                data_families: Vec::new(),
+                base_dir: None,
+            });
+            let (meshes, _) = check_canvas(&mut h, size, 3);
+            assert!(meshes > 0);
+            for w in [
+                "Prop_table_modo",
+                "Prop_table_repetir",
+                "Prop_table_ciclo",
+                "Prop_table_linha_1_at",
+                "Prop_table_linha_2_count",
+                "Prop_table_linha_2_tipo",
+                "Prop_table_linha_1_rotulos",
+                "Prop_table_linha_2_remover",
+                "Prop_table_mais",
+                "Prop_table_colar",
+                "Prop_table_ordenar",
+                "Prop_table_total",
+                "Prop_schedule_ciclo",
+                "Prop_schedule_faixa",
+                "Prop_schedule_periodo_1_inicio",
+                "Prop_schedule_periodo_2_modo",
+                "Prop_schedule_periodo_2_valor",
+                "Prop_schedule_mais",
+                "Prop_schedule_grafico",
+                "Prop_schedule_total",
+            ] {
+                assert!(h.reg.knows(w), "{size:?}: {w} ausente");
+            }
+            assert!(
+                h.reg
+                    .read("Prop_table_total")
+                    .is_some_and(|w| w.text.starts_with("17 itens")),
+                "{:?}",
+                h.reg.read("Prop_table_total")
+            );
+        }
+    }
+
     fn edit_view() -> crate::ui_left::EditView {
         use crate::ui_left::{Entry, ObjectItem};
         crate::ui_left::EditView {
