@@ -1,0 +1,51 @@
+// Qualidade: o torno gera dois tipos de defeito e mede o diâmetro de cada peça; a inspeção
+// mede o diâmetro com o erro do sistema de medição e olha o acabamento; peça rejeitada vai
+// para o retrabalho e volta para a inspeção; depois de duas passagens vai para o refugo.
+// Tempos em minutos, distâncias em metros. Veja docs/formato_qualidade_seguranca.md.
+//
+//   chegada -> torno -> fila -> inspecao -> cliente
+//                         ^        |  \--> refugo
+//                         |        v
+//                         +-- retrabalho
+Model(
+    name: "Inspeção e retrabalho",
+    description: "Defeito por processo, característica com deriva, inspeção por medição, retrabalho com limite e refugo",
+    run: (stop_time: 4800.0, warmup: 240.0, seed: 21, replications: 10),
+    packs: ["qualidade"],
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 2.0)), position: (0.0, 0.0, 0.0)),
+        (name: "torno", kind: Processor(process: Triangular(min: 1.2, mode: 1.5, max: 2.0)),
+         position: (4.0, 0.0, 0.0), ppe: ["oculos", "protetor_auricular"],
+         quality: Some((
+            defects: [
+                // Depois de cada troca de ferramenta (a cada 100 peças) as 5 primeiras
+                // têm o triplo de risco.
+                (name: "risco", probability: 0.02, factors: [Cycle(every: 100, first: 5, times: 3.0)]),
+                (name: "rebarba", probability: 0.03),
+            ],
+            characteristics: [
+                (name: "diametro", value: Normal(mean: 25.0, sd: 0.012),
+                 drift: 0.0002, cycle: Some(100), shift: Some(Normal(mean: 0.0, sd: 0.005)),
+                 lsl: Some(24.95), usl: Some(25.05)),
+            ],
+            unit_cost: Some(18.0),
+         ))),
+        (name: "fila", kind: Queue(), position: (7.0, 0.0, 0.0)),
+        (name: "inspecao", kind: Processor(process: Const(0.8)), output: ByLabel("inspecao"),
+         position: (10.0, 0.0, 0.0),
+         inspection: Some((
+            detect: 0.9, detect_by: {"rebarba": 0.7}, false_reject: 0.005,
+            measure: [(characteristic: "diametro", sigma: 0.004)],
+            on_reject: Rework, max_rework: Some(2),
+         ))),
+        (name: "cliente", kind: Sink, sink_role: Some(Customer), position: (14.0, 0.0, 0.0)),
+        (name: "retrabalho", kind: Processor(process: Exp(mean: 3.0)), position: (10.0, -4.0, 0.0),
+         rework: Some((fix: 0.9, fix_by: {"risco": 0.6})), ppe: ["luvas"]),
+        (name: "refugo", kind: Sink, sink_role: Some(Scrap), position: (14.0, -4.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "torno"), ("torno", "fila"), ("fila", "inspecao"),
+        ("inspecao", "cliente"), ("inspecao", "retrabalho"), ("inspecao", "refugo"),
+        ("retrabalho", "fila"),
+    ],
+)

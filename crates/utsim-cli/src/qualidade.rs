@@ -33,6 +33,23 @@ pub fn run_args(args: Vec<String>) -> Result<(), String> {
 
 #[derive(Subcommand)]
 pub enum Cmd {
+    /// Indicadores de qualidade de um modelo com blocos `quality`, `inspection` e `rework`:
+    /// rendimentos, refugo, retrabalho, DPU, DPMO, escape, eficácia da inspeção, Pareto e
+    /// capacidade das características simuladas (origem Simulado)
+    Simulado {
+        /// Modelo (.ron)
+        model: PathBuf,
+        /// Número de replicações (sobrescreve run.replications)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+        /// Grava o relatório em HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Grava a saída longa das características (replicacao, item, objeto,
+        /// caracteristica, instante, valor) em CSV
+        #[arg(long)]
+        csv: Option<PathBuf>,
+    },
     /// Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
     Carta {
         arquivo: PathBuf,
@@ -180,6 +197,12 @@ pub enum Cmd {
 
 pub fn run(cmd: Cmd) -> Result<(), String> {
     match cmd {
+        Cmd::Simulado {
+            model,
+            reps,
+            html,
+            csv,
+        } => simulado(&model, reps, html.as_deref(), csv.as_deref()),
         Cmd::Carta {
             arquivo,
             tipo,
@@ -754,4 +777,52 @@ fn percentile(
     }
     let r = capability::percentile_capability_empirical(values, spec)?;
     Ok(("empírica (nenhuma família aceita)".into(), r))
+}
+
+/// `utsim qualidade simulado`.
+fn simulado(
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<&Path>,
+    csv: Option<&Path>,
+) -> Result<(), String> {
+    use utsim_qualidade_core::{relatorio, rodar};
+    let model = utsim_model::Model::load(path).map_err(|e| e.to_string())?;
+    let r = rodar(&model, reps).map_err(|e| e.to_string())?;
+    println!(
+        "Qualidade de {} (origem: Simulado), {} replicações",
+        r.modelo,
+        r.replicacoes.len()
+    );
+    for (nome, i) in &r.resumo {
+        println!("  {nome}: {:.4} ± {:.4}", i.media, i.meia_largura);
+    }
+    if !r.pareto_tipo.is_empty() {
+        println!("Pareto por tipo de defeito (média por replicação):");
+        for (k, v) in &r.pareto_tipo {
+            println!("  {k}: {v:.1}");
+        }
+    }
+    for c in &r.capacidades {
+        match &c.capacidade {
+            Some(k) => println!(
+                "  {} ({}): n = {}, Cpk = {:.3}, Ppk = {:.3}",
+                c.caracteristica, c.objeto, c.n, k.cpk.value, k.ppk.value
+            ),
+            None => println!(
+                "  {}: {}",
+                c.caracteristica,
+                c.erro.as_deref().unwrap_or("")
+            ),
+        }
+    }
+    if let Some(p) = html {
+        std::fs::write(p, relatorio::html(&r)).map_err(|e| e.to_string())?;
+        println!("Relatório: {}", p.display());
+    }
+    if let Some(p) = csv {
+        std::fs::write(p, relatorio::csv(&r.medicoes)).map_err(|e| e.to_string())?;
+        println!("Saída longa: {}", p.display());
+    }
+    Ok(())
 }
