@@ -1,7 +1,7 @@
 # Modelos prontos
 
-Os oito modelos prontos, de áreas diferentes (compras, financeiro, atendimento e TI, RH,
-comercial, jurídico, serviço público, secretaria acadêmica), foram montados só com as predefinições da [biblioteca](biblioteca.md), com o
+Os nove modelos prontos, de áreas diferentes (compras, financeiro, atendimento e TI, RH,
+comercial, jurídico, serviço público, secretaria acadêmica, pós-venda), foram montados só com as predefinições da [biblioteca](biblioteca.md), com o
 horário comercial de segunda a sexta. `utsim linha lean_office modelos` lista todos. Para
 cada um:
 
@@ -113,6 +113,14 @@ depois ao registro no sistema. Os documentos emitidos são assinados digitalment
 
 Experimentos típicos: emissão automática das declarações, um atendente a mais só no pico,
 prazo para os professores lançarem as notas.
+
+## Pós-venda com interrupções
+
+`examples/pos_venda_com_interrupcoes.ron`. Pedidos de troca e garantia chegam pelo portal; três
+analistas em multitarefa analisam, pedem fotos ou nota ao cliente quando falta algo, e o
+supervisor aprova. O telefone toca a cada 15 minutos, em média, e a ligação tira um analista do
+caso (equipe com interrupções `Full`). Veja [Interrupções](interrupcoes.md) para a comparação
+com a equipe sem interrupções.
 
 ## Reembolso de despesas (tutorial)
 

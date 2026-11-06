@@ -47,6 +47,7 @@
 - [Lean Office](linhas/lean-office/index.md)
   - [Biblioteca](linhas/lean-office/biblioteca.md)
   - [Multitarefa](linhas/lean-office/multitarefa.md)
+  - [Interrupções](linhas/lean-office/interrupcoes.md)
   - [Indicadores e relatório](linhas/lean-office/indicadores.md)
   - [Modelos prontos](linhas/lean-office/modelos-prontos.md)
   - [Tutorial: do mapa ao modelo](linhas/lean-office/tutorial.md)
