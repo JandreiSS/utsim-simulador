@@ -43,6 +43,8 @@ var _last_label: Array = []
 var _pallets := false
 var _clips2: AnimationLibrary
 var labels_visible := true
+## A camada de segurança e qualidade (camada_seguranca.gd), quando a reprodução tem uma.
+var camada: CamadaSeguranca
 ## Names of the vehicles whose driver is hidden ("Mostrar motorista" off). A preference of
 ## the viewer, kept across rebuilds; the model file does not store it.
 var drivers_off := {}
@@ -102,6 +104,7 @@ func clear(keep_templates := false) -> void:
 	_fluid_materials.clear()
 	_hidden_for_view.clear()
 	_view_hidden.clear()
+	camada = null
 	playback = null
 
 
@@ -564,6 +567,8 @@ func apply(t: float, dt: float, snap := false) -> void:
 			_last_label[i] = label[i]
 			set_label_text(rig["label"], label[i])
 	_apply_items(f)
+	if camada != null:
+		camada.aplicar(t)
 	if not fluid_nodes.is_empty():
 		_apply_fluids(playback.fluid_frame(t))
 	last_bridge_us = t1 - t0

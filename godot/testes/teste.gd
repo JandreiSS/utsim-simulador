@@ -110,4 +110,15 @@ func _check(path: String) -> void:
 		path.get_file(), cena.blocks.size(), realistic, people, cena.mobiles.size(), max_items, end])
 	print("  custo médio por quadro: ponte %.3f ms, cena %.3f ms (%d quadros, depuração)" % [
 		bridge / 1000.0 / (steps + 1), apply / 1000.0 / (steps + 1), steps + 1])
+	# QS6: a camada de segurança e qualidade liga, desenha e acompanha a reprodução.
+	cena.camada = CamadaSeguranca.criar(cena, model)
+	if cena.camada == null:
+		_fail("%s: a camada de segurança não foi criada" % path)
+	else:
+		cena.camada.ligar(true)
+		cena.camada.ligar_calor(true)
+		for k in 21:
+			cena.apply(end * k / 20.0, 1.0 / 60.0)
+		print("  camada de segurança: %d quase-conflitos, %d pessoas" % [
+			cena.camada.lista_quase().size(), cena.camada.seg.people().size()])
 	cena.free()

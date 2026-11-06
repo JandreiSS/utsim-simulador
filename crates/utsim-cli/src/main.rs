@@ -6,6 +6,7 @@ mod emulate;
 mod estado;
 mod estatistica;
 mod experiment;
+mod exposicao;
 mod fit;
 mod fluxograma;
 mod gemeo;
@@ -449,6 +450,13 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// Exposição a riscos na simulação: tempo em zona, entradas sem EPI e quase-conflitos
+    /// simulados entre pessoas e veículos
+    #[command(disable_help_flag = true)]
+    Exposicao {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Linhas especializadas (Lean Office, processos administrativos): predefinições,
     /// vocabulário, modelos prontos, indicadores e relatório da linha
     #[command(disable_help_flag = true)]
@@ -480,6 +488,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::Estatistica { args } => estatistica::run_args(args)?,
         Cmd::Tempos { args } => tempos::run_args(args)?,
         Cmd::Linha { args } => linha::run_args(args)?,
+        Cmd::Exposicao { args } => exposicao::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,

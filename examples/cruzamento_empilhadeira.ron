@@ -1,0 +1,44 @@
+// Segurança do trabalho: o operador leva peças a pé da bancada A para a prensa e cruza o
+// corredor por onde a empilhadeira leva paletes da doca ao estoque. O corredor é uma zona
+// de circulação de veículos que pede colete, e a prensa fica numa zona de ruído que pede
+// protetor auricular. `utsim exposicao` mede o tempo do operador em cada zona, as entradas
+// sem o EPI pedido e os quase-conflitos simulados (pessoa a menos de 1,5 m da empilhadeira).
+// Tempos em segundos, distâncias em metros.
+//
+//                 bancada_a (0, 0)
+//                      | operador
+//   doca (-10, 6) ====[corredor]==== estoque (10, 6)     (empilhadeira)
+//                      |
+//                 prensa (0, 12)
+Model(
+    name: "Cruzamento com empilhadeira",
+    description: "Operador a pé cruzando o corredor da empilhadeira, com zonas de risco e EPI por posto",
+    run: (stop_time: 7200.0, seed: 5, replications: 5),
+    packs: ["seguranca"],
+    objects: [
+        (name: "chegada_pecas", kind: Source(interarrival: Exp(mean: 60.0)), position: (-3.0, 0.0, 0.0)),
+        (name: "bancada_a", kind: Processor(process: Exp(mean: 20.0)), transport: "operador",
+         position: (0.0, 0.0, 0.0), ppe: ["oculos", "luvas"]),
+        (name: "prensa", kind: Processor(process: Exp(mean: 25.0)), position: (0.0, 12.0, 0.0),
+         ppe: ["oculos", "luvas", "protetor_auricular"]),
+        (name: "saida", kind: Sink, position: (3.0, 12.0, 0.0)),
+        (name: "chegada_paletes", kind: Source(interarrival: Exp(mean: 120.0)), position: (-13.0, 6.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "empilhadeira", position: (-10.0, 6.0, 0.0)),
+        (name: "estoque", kind: Queue(), position: (10.0, 6.0, 0.0)),
+        (name: "armazenado", kind: Sink, position: (13.0, 6.0, 0.0)),
+        (name: "operador", kind: Transporter(speed: 1.2, load_time: Const(3.0), unload_time: Const(3.0)),
+         position: (1.5, 1.5, 0.0), visual: Some((asset: Some("pessoa")))),
+        (name: "empilhadeira", kind: Transporter(speed: 2.2, load_time: Const(10.0), unload_time: Const(10.0), home: true),
+         position: (-9.0, 6.0, 0.0), visual: Some((asset: Some("empilhadeira")))),
+    ],
+    connections: [
+        ("chegada_pecas", "bancada_a"), ("bancada_a", "prensa"), ("prensa", "saida"),
+        ("chegada_paletes", "doca"), ("doca", "estoque"), ("estoque", "armazenado"),
+    ],
+    zones: [
+        (name: "corredor_empilhadeira", kind: Vehicle, level: Some(4), ppe: ["colete"],
+         polygon: [(-12.0, 4.5), (12.0, 4.5), (12.0, 7.5), (-12.0, 7.5)]),
+        (name: "ruido_prensa", kind: Noise, level: Some(3), ppe: ["protetor_auricular"],
+         polygon: [(-3.0, 10.0), (3.0, 10.0), (3.0, 14.0), (-3.0, 14.0)]),
+    ],
+)

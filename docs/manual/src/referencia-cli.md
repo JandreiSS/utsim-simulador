@@ -21,6 +21,8 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
+| `utsim qualidade simulado` | indicadores de qualidade de um modelo com defeitos, inspeção e retrabalho | [Defeitos, inspeção e retrabalho](defeitos-e-inspecao.md) |
+| `utsim exposicao` | tempo em zona de risco, entradas sem EPI e quase-conflitos simulados | [Zonas de risco, EPI e exposição](zonas-e-exposicao.md) |
 | `utsim estatistica` | descritiva e testes de hipótese (t, ANOVA com Tukey, qui-quadrado, proporções, Fisher, Mann-Whitney, Wilcoxon) sobre as colunas de um CSV | [Estatística](estatistica.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) e grava paredes e colunas como obstáculos do modelo | [Planta CAD](planta-cad.md) |
@@ -58,6 +60,8 @@ utsim pert examples/montagem_paletes.ron --de paletes --ate saida_caixas --prazo
 utsim qualidade carta examples/qualidade/diametros.csv --tipo xbarr --regras we --html carta.html
 utsim qualidade capacidade examples/qualidade/lead_time.csv --lse 18 --metodo todos
 utsim qualidade msa examples/qualidade/grr.csv --tolerancia 6
+utsim qualidade simulado examples/inspecao_e_retrabalho.ron --html qualidade.html
+utsim exposicao examples/cruzamento_empilhadeira.ron --html exposicao.html
 utsim estatistica descritiva examples/estatistica/setup.csv --coluna antes
 utsim estatistica teste-t examples/estatistica/setup.csv --coluna antes --coluna2 depois --pareado
 utsim planta galpao.dxf --obstaculos modelo.ron

@@ -18,6 +18,8 @@ utsim-scene = { workspace = true, features = ["server"] }
 utsim-fit.workspace = true
 utsim-stats.workspace = true
 utsim-quality.workspace = true
+utsim-qualidade-core.workspace = true
+utsim-exposicao.workspace = true
 utsim-opt.workspace = true
 utsim-emu.workspace = true
 utsim-pert.workspace = true

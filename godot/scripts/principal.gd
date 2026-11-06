@@ -75,6 +75,10 @@ var _status_fallback: Label
 var _summary := {}
 var _block_labels := PackedStringArray()
 var labels_on := true
+## Camadas de segurança e qualidade (camada_seguranca.gd): zonas, EPI, quase-conflitos e
+## itens com defeito; e o mapa de calor.
+var seguranca_on := false
+var calor_on := false
 var _open_dialog: FileDialog
 var _save_dialog: FileDialog
 var _grid: MeshInstance3D
@@ -507,6 +511,18 @@ func bar_action(what: String) -> void:
 			labels_on = arg == "ligar"
 			cena.set_labels_visible(labels_on)
 			_sync_sim()
+		"seguranca":
+			seguranca_on = arg == "ligar"
+			_aplicar_camadas()
+			_sync_sim()
+		"calor":
+			calor_on = arg == "ligar"
+			_aplicar_camadas()
+			_sync_sim()
+		"quase":
+			# Salto da reprodução até o instante de um quase-conflito.
+			set_playing(false)
+			seek(maxf(0.0, float(arg) - 2.0), true)
 		"sombras":
 			sun.shadow_enabled = arg == "ligar"
 			_sync_sim()
@@ -548,6 +564,9 @@ func _sync_sim() -> void:
 		"follow": cena.block_index(follow_name) if follow_name != "" else -1,
 		"camera": camera_mode,
 		"labels": labels_on,
+		"seguranca": seguranca_on,
+		"calor": calor_on,
+		"quase": cena.camada.lista_quase() if cena.camada != null else [],
 		"shadows": sun.shadow_enabled,
 		"summary": _summary,
 	})
@@ -1115,10 +1134,19 @@ func _on_run(j: Object) -> void:
 	set_status("%d replicações concluídas. Reproduzindo a replicação 0." % results.replications())
 
 
+## Liga ou desliga as camadas de segurança e de calor da cena.
+func _aplicar_camadas() -> void:
+	if cena.camada != null:
+		cena.camada.ligar(seguranca_on)
+		cena.camada.ligar_calor(calor_on)
+
+
 ## Builds the scene of `playback` and starts at 0.
 func _show_playback() -> void:
 	cena.show_connections = true
 	cena.build(playback, true)
+	cena.camada = CamadaSeguranca.criar(cena, model) if model != null and model.is_loaded() else null
+	_aplicar_camadas()
 	var info := cena.info
 	_update_shadows(info["bounds_min"], info["bounds_max"])
 	_draw_grid(info)

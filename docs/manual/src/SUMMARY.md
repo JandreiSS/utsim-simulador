@@ -7,6 +7,8 @@
 - [Launcher (para testadores)](launcher.md)
 - [UTSim Seis Sigma (projetos Lean Seis Sigma)](seis-sigma.md)
 - [UTSim Ensino (o jogo e a sala de aula)](ensino.md)
+- [UTSim Qualidade](qualidade-app.md)
+- [UTSim Segurança do Trabalho](seguranca-app.md)
 
 # Construindo modelos
 
@@ -19,6 +21,7 @@
   - [Corredores e faixas de segurança](corredores.md)
   - [Pessoas: fadiga, aprendizado e habilidades](pessoas.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)
+- [Defeitos, inspeção e retrabalho](defeitos-e-inspecao.md)
 - [Quebras e turnos](quebras-e-turnos.md)
   - [Manutenção de máquinas e OEE](manutencao.md)
 - [Fluxos de tokens e scripts](fluxos-e-scripts.md)
@@ -35,6 +38,7 @@
 - [Experimentos e otimização](experimentos-e-otimizacao.md)
 - [PERT/CPM de uma parte do processo](pert-cpm.md)
 - [Qualidade: cartas de controle, capacidade e MSA](qualidade.md)
+- [Zonas de risco, EPI e exposição](zonas-e-exposicao.md)
 - [Estatística: descritiva e testes de hipótese](estatistica.md)
 
 # Linhas especializadas
@@ -46,6 +50,7 @@
   - [Modelos prontos](linhas/lean-office/modelos-prontos.md)
   - [Tutorial: do mapa ao modelo](linhas/lean-office/tutorial.md)
   - [Pacote da linha](linhas/lean-office/pacote.md)
+- [Pacotes transversais](linhas/pacotes-transversais.md)
 
 # Recursos avançados
 
