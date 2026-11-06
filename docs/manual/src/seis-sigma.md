@@ -48,7 +48,13 @@ Na tela inicial:
 - **Novo projeto**: título, pasta onde criar e abordagem (DMAIC, DMADV, kaizen rápido, A3,
   PDCA ou ação direta). O programa cria a pasta `<título>.lss` com as fases padrão da
   abordagem (no DMAIC: Definir, Medir, Analisar, Melhorar e Controlar) e registra você na
-  equipe. Caracteres que o Windows não aceita em nomes de pasta viram `-`.
+  equipe. Caracteres que o Windows não aceita em nomes de pasta viram `-`. Em **Modelo de
+  projeto**, os modelos das linhas especializadas do UTSim: "Kaizen administrativo (Lean
+  Office)" (abordagem kaizen) e "DMAIC transacional (Lean Office)" (abordagem DMAIC), para
+  melhorar processos administrativos. O modelo escolhe a abordagem e acrescenta ao checklist
+  de cada tollgate os entregáveis da linha (VSM administrativo do estado atual e futuro, %C&A
+  medido por etapa, fluxograma de raias por departamento, lead time e % dentro do SLA no plano
+  de controle). Veja [Lean Office](linhas/lean-office/index.md).
 - **Abrir uma pasta de projeto**: o caminho de uma pasta `.lss`.
 - **Recentes**: um clique abre. Projetos cuja pasta sumiu aparecem desabilitados.
 - **Importar um arquivo .lssz**: desembrulha o projeto numa pasta à sua escolha e o abre.
