@@ -1030,6 +1030,17 @@ impl UtsimUi {
             PropAction::Data { what, path, draft } => {
                 self.emit(&format!("dados\t{what}\t{path}\t{draft}"))
             }
+            PropAction::ArrivalsPreview => {
+                if let Some(doc) = &self.doc {
+                    let d = doc.bind();
+                    let model = d.editor.model();
+                    let key = crate::ui_arrivals::preview_key(model, &self.object);
+                    let r = crate::ui_arrivals::run_preview(model, &self.object);
+                    drop(d);
+                    self.host.props_state.arrivals.set_run(key, r);
+                    self.host.invalidate();
+                }
+            }
             PropAction::Miniature(asset) => self.emit(&format!("miniatura\t{asset}")),
         }
     }

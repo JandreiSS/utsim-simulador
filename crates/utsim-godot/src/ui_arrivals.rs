@@ -32,15 +32,15 @@
 //! `_periodo_<k>_<campo>` (`inicio`, `fim`, `modo`, `valor`, `remover`, `erro`), `_grafico`.
 //! Rows and periods are numbered from 1, as in the core's messages.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{
     Button, Color32, Label, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit, Ui, Vec2,
 };
-use utsim_core::Dist;
+use utsim_core::{Dist, TraceEvent};
 use utsim_model::{
-    ArrivalPeriod, ArrivalRow, ArrivalSchedule, ArrivalTable, PeriodArrivals, TableMode,
-    TableRepeat,
+    ArrivalPeriod, ArrivalRow, ArrivalSchedule, ArrivalTable, Model, ObjectKind, PeriodArrivals,
+    TableMode, TableRepeat,
 };
 use utsim_ui_tema::{colors, sizes};
 
@@ -70,6 +70,18 @@ pub struct ArrivalsState {
     cell_errors: BTreeMap<String, String>,
     /// "Ver as primeiras chegadas" is open.
     preview: bool,
+    /// The source run alone for the preview ([`run_preview`]), for the table or schedule it
+    /// was run with (RON text); the bridge fills it when the panel asks.
+    pub run: Option<(String, Result<Histogram, String>)>,
+    /// A block of the band being dragged: the period, what was grabbed, the x of the press.
+    drag: Option<(usize, Grab, f32)>,
+}
+
+impl ArrivalsState {
+    /// The result of the source run alone for `key` (the RON it was run with).
+    pub fn set_run(&mut self, key: String, r: Result<Histogram, String>) {
+        self.run = Some((key, r));
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1277,13 +1289,59 @@ fn table_editor(
         st.arrivals.preview = !open;
     }
     if st.arrivals.preview && !t.rows.is_empty() {
-        let h = preview(t, &default, first_at_zero(v));
-        histogram(ui, reg, &format!("{p}_previa_grafico"), &h);
+        let key = ron::table(t);
+        run_or_estimate(ui, st, reg, out, p, &key, || {
+            preview(t, &default, first_at_zero(v))
+        });
     }
 
     if changed && work != *t {
         out.push(set("table", Value::Text(ron::table(&work))));
     }
+}
+
+/// The preview: the source run alone (asked of the bridge once per table or schedule), or,
+/// until it comes or when it cannot run, the estimate read from the table.
+#[allow(clippy::too_many_arguments)]
+fn run_or_estimate(
+    ui: &mut Ui,
+    st: &mut PropsState,
+    reg: &mut Registry,
+    out: &mut Vec<PropAction>,
+    p: &str,
+    key: &str,
+    estimate: impl FnOnce() -> Histogram,
+) {
+    let ran = st
+        .arrivals
+        .run
+        .as_ref()
+        .filter(|r| r.0 == key)
+        .map(|r| r.1.clone());
+    let (h, note) = match ran {
+        Some(Ok(h)) => (
+            h,
+            "Simulado: só a fonte, ligada a uma saída, por um ciclo.".to_owned(),
+        ),
+        Some(Err(e)) => (
+            estimate(),
+            format!("Estimado pela tabela (a fonte sozinha não rodou: {e})."),
+        ),
+        None => {
+            if st.arrivals.run.as_ref().is_none_or(|r| r.0 != key) {
+                // Ask once for this table; the mark keeps it from asking every frame.
+                st.arrivals.run = Some((key.to_owned(), Err("rodando".into())));
+                out.push(PropAction::ArrivalsPreview);
+            }
+            (
+                estimate(),
+                "Estimado pela tabela; rodando a fonte...".to_owned(),
+            )
+        }
+    };
+    let r = ui.add(Label::new(small(&note)).wrap());
+    named(ui, reg, &format!("{p}_previa_nota"), &r, &note);
+    histogram(ui, reg, &format!("{p}_previa_grafico"), &h);
 }
 
 /// The preview's stacked bars, with the legend of the types.
@@ -1395,7 +1453,38 @@ fn schedule_editor(
 
     // The band of the cycle.
     let w = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 26.0), Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 26.0), Sense::click_and_drag());
+    // Dragging a block (an edge, or the whole period) shows the schedule being dragged and
+    // sends it when the button is released (one undo step).
+    if resp.drag_started()
+        && let Some(q) = resp.interact_pointer_pos()
+        && let Some((k, g)) = grab_at(&band(s, w), q.x - rect.left())
+    {
+        st.arrivals.drag = Some((k, g, q.x));
+    }
+    let dragged = match (st.arrivals.drag, resp.interact_pointer_pos()) {
+        (Some((k, g, x0)), Some(q)) if w > 0.0 => {
+            Some(drag_period(s, k, g, ((q.x - x0) / w) as f64 * s.cycle))
+        }
+        _ => None,
+    };
+    if resp.drag_stopped() {
+        if let Some(d) = &dragged {
+            work = d.clone();
+            changed = true;
+        }
+        st.arrivals.drag = None;
+    }
+    let shown = dragged.clone().unwrap_or_else(|| s.clone());
+    if let Some(q) = resp.hover_pos() {
+        let cursor = match grab_at(&band(s, w), q.x - rect.left()) {
+            Some((_, Grab::Whole)) => egui::CursorIcon::Grab,
+            Some(_) => egui::CursorIcon::ResizeHorizontal,
+            None => egui::CursorIcon::Default,
+        };
+        ui.ctx().set_cursor_icon(cursor);
+    }
+    let s = &shown;
     let blocks = band(s, w);
     let painter = ui.painter_at(rect.expand(1.0));
     let mut hovered = None;
@@ -1728,6 +1817,222 @@ fn expected_chart(ui: &mut Ui, reg: &mut Registry, name: &str, s: &ArrivalSchedu
     }
 }
 
+// ---------------------------------------------------------------------------------------
+// Dragging the blocks of the band.
+
+/// What a press on the band grabbed: one edge of a period, or the whole block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Grab {
+    Start,
+    End,
+    Whole,
+}
+
+/// Points from an edge that grab it instead of the whole block.
+const EDGE_POINTS: f32 = 6.0;
+
+/// The period and the part of it under `x` (points from the band's left edge).
+pub fn grab_at(blocks: &[Block], x: f32) -> Option<(usize, Grab)> {
+    let b = blocks
+        .iter()
+        .filter(|b| b.period.is_some())
+        .find(|b| x >= b.x0 - EDGE_POINTS && x <= b.x1 + EDGE_POINTS)?;
+    let k = b.period?;
+    let edge = EDGE_POINTS.min((b.x1 - b.x0) / 3.0);
+    Some(if x <= b.x0 + edge {
+        (k, Grab::Start)
+    } else if x >= b.x1 - edge {
+        (k, Grab::End)
+    } else {
+        (k, Grab::Whole)
+    })
+}
+
+/// The step the band snaps to: a quarter of an hour when the cycle is a day or a week in a
+/// known unit, else 1/96 of the cycle.
+pub fn snap_step(cycle: f64) -> f64 {
+    match unit_of_cycle(cycle) {
+        Some(u) => u.per_hour() / 4.0,
+        None => cycle / 96.0,
+    }
+}
+
+fn snap(t: f64, step: f64) -> f64 {
+    if step > 0.0 {
+        (t / step).round() * step
+    } else {
+        t
+    }
+}
+
+/// `s` with period `k` dragged by `dt` (model time): one edge moves (never past the other,
+/// at least one step long), or the whole period moves keeping its length; inside the cycle,
+/// snapped to [`snap_step`].
+pub fn drag_period(s: &ArrivalSchedule, k: usize, grab: Grab, dt: f64) -> ArrivalSchedule {
+    let mut out = s.clone();
+    let Some(p) = out.periods.get_mut(k) else {
+        return out;
+    };
+    let step = snap_step(s.cycle);
+    let min_len = step.max(1e-9);
+    let (a, b) = (p.start, p.end);
+    match grab {
+        Grab::Start => p.start = snap(a + dt, step).clamp(0.0, b - min_len),
+        Grab::End => p.end = snap(b + dt, step).clamp(a + min_len, s.cycle),
+        Grab::Whole => {
+            let len = b - a;
+            let start = snap(a + dt, step).clamp(0.0, (s.cycle - len).max(0.0));
+            p.start = start;
+            p.end = start + len;
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------------------
+// "Ver as primeiras chegadas": running the source alone.
+
+/// What a preview run of `source` is for: the RON of its table, else of its schedule (the
+/// panel shows a run only for the table or schedule it was made with).
+pub fn preview_key(model: &Model, source: &str) -> String {
+    match model
+        .objects
+        .iter()
+        .find(|o| o.name == source)
+        .map(|o| &o.kind)
+    {
+        Some(ObjectKind::Source { table: Some(t), .. }) => ron::table(t),
+        Some(ObjectKind::Source {
+            schedule: Some(s), ..
+        }) => ron::schedule(s),
+        _ => String::new(),
+    }
+}
+
+/// The arrivals of `source` run alone (connected to a sink, nothing else of the model) for
+/// one cycle of its table or schedule (a day of the model's unit otherwise), binned per
+/// hour and per item type. Unlike [`preview`], this runs the source: `release`, batches,
+/// shifts and the random interarrivals are in it.
+pub fn run_preview(model: &Model, source: &str) -> Result<Histogram, String> {
+    let obj = model
+        .objects
+        .iter()
+        .find(|o| o.name == source)
+        .ok_or_else(|| format!("'{source}' não existe"))?;
+    let ObjectKind::Source {
+        interarrival,
+        schedule,
+        table,
+        first_at_zero,
+        ..
+    } = &obj.kind
+    else {
+        return Err(format!("'{source}' não é uma chegada"));
+    };
+    // The span and the bins: those of the table's preview, else the schedule's cycle.
+    let (bin, n, hours) = match (table, schedule) {
+        (Some(t), _) => {
+            let h = preview(t, interarrival, *first_at_zero);
+            (h.bin, h.bins.len(), h.hours)
+        }
+        (None, Some(s)) if s.cycle.is_finite() && s.cycle > 0.0 => match unit_of_cycle(s.cycle) {
+            Some(u) => (
+                u.per_hour(),
+                ((s.cycle / u.per_hour()).ceil() as usize).clamp(1, 24 * 7),
+                true,
+            ),
+            None => (s.cycle / 24.0, 24, false),
+        },
+        _ => (60.0, 24, true),
+    };
+    let span = bin * n as f64;
+    let sink_name = "previa_saida";
+    let mut sink = Model::parse(&format!(
+        "Model(name: \"p\", run: (stop_time: 1.0), objects: [(name: \"{sink_name}\", kind: Sink)], connections: [])"
+    ))
+    .map_err(|e| e.to_string())?
+    .objects
+    .remove(0);
+    sink.position = obj.position;
+    let mut alone = obj.clone();
+    alone.transport = None;
+    alone.downtime = None;
+    alone.transfer = None;
+    alone.on_entry = None;
+    // One output port: a rule that picks among several (by label, by share) has no say.
+    alone.output = Default::default();
+    let mut m = model.clone();
+    m.objects = vec![alone, sink];
+    m.connections = vec![(source.to_owned(), sink_name.to_owned())];
+    m.network = None;
+    m.flows.clear();
+    m.fluids = None;
+    m.spans.clear();
+    m.data
+        .retain(|d| d.field.starts_with(&format!("{source}.")));
+    m.floor_plan = None;
+    m.obstacles.clear();
+    m.aisles.clear();
+    m.floor_marking = None;
+    m.run.stop_time = span;
+    m.run.warmup = 0.0;
+    m.run.replications = 1;
+    m.run.sample_interval = None;
+    m.run.histogram_bins = None;
+    let replay = m.replay(0).map_err(|e| e.to_string())?;
+    // Created items, then their type (the trace says it right after).
+    let mut types: Vec<Option<String>> = Vec::new();
+    let mut bins = vec![Vec::<f64>::new(); n];
+    let mut born: HashMap<u64, usize> = HashMap::new();
+    let mut add = |k: usize, ty: Option<String>, sign: f64, bins: &mut Vec<Vec<f64>>| {
+        let j = match types.iter().position(|x| *x == ty) {
+            Some(j) => j,
+            None => {
+                types.push(ty);
+                for b in bins.iter_mut() {
+                    b.push(0.0);
+                }
+                types.len() - 1
+            }
+        };
+        bins[k][j] += sign;
+    };
+    for r in &replay.records {
+        match &r.event {
+            TraceEvent::Created { item, .. } if r.t <= span => {
+                let k = ((r.t / bin).floor().max(0.0) as usize).min(n - 1);
+                born.insert(*item, k);
+                add(k, None, 1.0, &mut bins);
+            }
+            TraceEvent::ItemType { item, item_type } => {
+                if let Some(&k) = born.get(item) {
+                    let name = model
+                        .item_types
+                        .get((*item_type as usize).saturating_sub(1))
+                        .map(|d| d.name.clone());
+                    // Counted as untyped at creation: move it to its type.
+                    add(k, None, -1.0, &mut bins);
+                    add(k, name, 1.0, &mut bins);
+                }
+            }
+            _ => {}
+        }
+    }
+    // Types left empty by the moves (the untyped column when every item has a type).
+    let keep: Vec<usize> = (0..types.len())
+        .filter(|&j| bins.iter().any(|b| b[j].abs() > 1e-9))
+        .collect();
+    Ok(Histogram {
+        bin,
+        types: keep.iter().map(|&j| types[j].clone()).collect(),
+        bins: bins
+            .iter()
+            .map(|b| keep.iter().map(|&j| b[j]).collect())
+            .collect(),
+        hours,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1907,6 +2212,57 @@ mod tests {
              (start: 720.0, end: 780.0, arrivals: Closed), (start: 780.0, end: 1080.0)])",
         )
         .unwrap()
+    }
+
+    #[test]
+    fn blocks_of_the_band_drag_by_edge_or_whole() {
+        let s = schedule();
+        let w = 1440.0;
+        let blocks = band(&s, w);
+        // A minute is a point here: edges within a few points, the middle is the block.
+        assert_eq!(grab_at(&blocks, 481.0), Some((0, Grab::Start)));
+        assert_eq!(grab_at(&blocks, 719.0), Some((0, Grab::End)));
+        assert_eq!(grab_at(&blocks, 600.0), Some((0, Grab::Whole)));
+        assert_eq!(grab_at(&blocks, 200.0), None);
+        // A quarter of an hour in a day of minutes.
+        assert_eq!(snap_step(1440.0), 15.0);
+        let d = drag_period(&s, 0, Grab::Start, 40.0);
+        assert_eq!((d.periods[0].start, d.periods[0].end), (525.0, 720.0));
+        // An edge never passes the other one.
+        let d = drag_period(&s, 0, Grab::End, -1000.0);
+        assert_eq!(d.periods[0].end, 495.0);
+        // The whole block keeps its length and stays in the cycle.
+        let d = drag_period(&s, 2, Grab::Whole, 10_000.0);
+        assert_eq!((d.periods[2].start, d.periods[2].end), (1140.0, 1440.0));
+        assert_eq!(d.periods[1], s.periods[1]);
+    }
+
+    #[test]
+    fn the_preview_runs_the_source_alone() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/chegadas_por_tabela.ron");
+        let model = Model::load(&path).unwrap();
+        // A timetable: the run creates exactly what the table says in a cycle.
+        let ObjectKind::Source { table: Some(t), .. } = &model
+            .objects
+            .iter()
+            .find(|o| o.name == "caminhoes")
+            .unwrap()
+            .kind
+        else {
+            panic!("a source with a table");
+        };
+        let h = run_preview(&model, "caminhoes").unwrap();
+        let ran: f64 = h.bins.iter().flatten().sum();
+        assert_eq!(ran, totals(t).items as f64, "{h:?}");
+        assert!(
+            h.types.iter().all(|t| t.is_some()),
+            "typed items: {:?}",
+            h.types
+        );
+        // The key is the table's text; another object is refused.
+        assert_eq!(preview_key(&model, "caminhoes"), ron::table(t));
+        assert!(run_preview(&model, "fila_caixas").is_err());
     }
 
     #[test]

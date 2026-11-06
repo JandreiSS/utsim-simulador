@@ -554,6 +554,15 @@ impl UtsimPlayback {
                 // C7: the item a source creates, in the colour its items get.
                 let c = utsim_scene::style::origin_color(v.b);
                 put(&mut e, "preview_color", Color::from_rgb(c[0], c[1], c[2]));
+                // The ring of the item types: `[colour, share]` per type.
+                let mut mix = VarArray::new();
+                for (c, w) in &v.type_mix {
+                    let mut pair = VarArray::new();
+                    pair.push(&Color::from_rgb(c[0], c[1], c[2]).to_variant());
+                    pair.push(&w.to_variant());
+                    mix.push(&pair.to_variant());
+                }
+                put(&mut e, "type_mix", mix);
             }
             if let Some(l) = &v.look {
                 let a = AssetInfo::of(&l.source);
@@ -802,6 +811,11 @@ impl UtsimPlayback {
             PackedInt32Array::from(f.item_stack.as_slice()),
         );
         put(&mut d, "task_target", vectors(&f.task_target));
+        put(
+            &mut d,
+            "flash",
+            PackedFloat32Array::from(f.flash.as_slice()),
+        );
         d
     }
 
