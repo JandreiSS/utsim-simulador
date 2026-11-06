@@ -50,6 +50,26 @@ pub enum Cmd {
         #[arg(long)]
         csv: Option<PathBuf>,
     },
+    /// Custo da qualidade de um modelo (prevenção, avaliação, falha interna, falha externa)
+    /// pelos custos unitários dos blocos `quality`, `inspection` e `rework`, com lançamentos
+    /// digitados e comparação de cenários
+    Custos {
+        /// Modelo (.ron)
+        model: PathBuf,
+        /// Número de replicações (sobrescreve run.replications)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+        /// Lançamentos em CSV: categoria;descricao;valor (categoria: prevencao, avaliacao,
+        /// falha_interna ou falha_externa)
+        #[arg(long)]
+        lancamentos: Option<PathBuf>,
+        /// Outro cenário do mesmo modelo (.ron), comparado com números aleatórios comuns
+        #[arg(long)]
+        comparar: Option<PathBuf>,
+        /// Grava o relatório em HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+    },
     /// Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
     Carta {
         arquivo: PathBuf,
@@ -203,6 +223,19 @@ pub fn run(cmd: Cmd) -> Result<(), String> {
             html,
             csv,
         } => simulado(&model, reps, html.as_deref(), csv.as_deref()),
+        Cmd::Custos {
+            model,
+            reps,
+            lancamentos,
+            comparar,
+            html,
+        } => custos(
+            &model,
+            reps,
+            lancamentos.as_deref(),
+            comparar.as_deref(),
+            html.as_deref(),
+        ),
         Cmd::Carta {
             arquivo,
             tipo,
@@ -823,6 +856,106 @@ fn simulado(
     if let Some(p) = csv {
         std::fs::write(p, relatorio::csv(&r.medicoes)).map_err(|e| e.to_string())?;
         println!("Saída longa: {}", p.display());
+    }
+    Ok(())
+}
+
+/// Typed entries of the cost of quality: `categoria;descricao;valor` (header optional).
+fn lancamentos_csv(texto: &str) -> Result<Vec<utsim_qualidade_core::custos::Lancamento>, String> {
+    use utsim_qualidade_core::custos::{Categoria, Lancamento};
+    let mut out = Vec::new();
+    for (k, linha) in texto.trim_start_matches('\u{feff}').lines().enumerate() {
+        let linha = linha.trim();
+        if linha.is_empty() || linha.starts_with("categoria") {
+            continue;
+        }
+        let c: Vec<&str> = linha.split(';').map(str::trim).collect();
+        if c.len() < 3 {
+            return Err(format!(
+                "linha {}: esperado categoria;descricao;valor",
+                k + 1
+            ));
+        }
+        let categoria = match c[0] {
+            "prevencao" => Categoria::Prevencao,
+            "avaliacao" => Categoria::Avaliacao,
+            "falha_interna" => Categoria::FalhaInterna,
+            "falha_externa" => Categoria::FalhaExterna,
+            outra => return Err(format!("linha {}: categoria desconhecida '{outra}'", k + 1)),
+        };
+        let valor = c[2]
+            .replace(',', ".")
+            .parse::<f64>()
+            .map_err(|_| format!("linha {}: valor não numérico", k + 1))?;
+        out.push(Lancamento {
+            categoria: Some(categoria),
+            descricao: c[1].to_string(),
+            valor,
+            ..Lancamento::default()
+        });
+    }
+    Ok(out)
+}
+
+/// `utsim qualidade custos`.
+fn custos(
+    path: &Path,
+    reps: Option<u32>,
+    lancamentos: Option<&Path>,
+    comparar: Option<&Path>,
+    html: Option<&Path>,
+) -> Result<(), String> {
+    use utsim_qualidade_core::custos;
+    let model = utsim_model::Model::load(path).map_err(|e| e.to_string())?;
+    let manual = match lancamentos {
+        Some(p) => lancamentos_csv(&std::fs::read_to_string(p).map_err(|e| e.to_string())?)?,
+        None => Vec::new(),
+    };
+    let (r, c) = match comparar {
+        Some(outro) => {
+            let b = utsim_model::Model::load(outro).map_err(|e| e.to_string())?;
+            let c =
+                custos::comparar(&model, &b, reps, &manual, &manual).map_err(|e| e.to_string())?;
+            (c.a.clone(), Some(c))
+        }
+        None => (
+            custos::rodar(&model, reps, &manual).map_err(|e| e.to_string())?,
+            None,
+        ),
+    };
+    println!(
+        "Custo da qualidade de {} (modelo: origem Simulado), {} replicações",
+        r.modelo,
+        r.replicacoes.len()
+    );
+    for (cat, i) in &r.por_categoria {
+        let l = r.lancamentos.get(cat).copied().unwrap_or(0.0);
+        println!(
+            "  {}: {:.2} ± {:.2} do modelo, {:.2} lançado",
+            cat.nome(),
+            i.media,
+            i.meia_largura,
+            l
+        );
+    }
+    println!("  Total: {:.2}", r.total);
+    if let Some(c) = &c {
+        println!(
+            "{} - {}: {:.2} ± {:.2} por replicação ({})",
+            c.b.modelo,
+            c.a.modelo,
+            c.diferenca.media,
+            c.diferenca.meia_largura,
+            if c.significativa {
+                "significativa a 95 %"
+            } else {
+                "não significativa a 95 %"
+            }
+        );
+    }
+    if let Some(p) = html {
+        std::fs::write(p, custos::html(&r, c.as_ref())).map_err(|e| e.to_string())?;
+        println!("Relatório: {}", p.display());
     }
     Ok(())
 }
