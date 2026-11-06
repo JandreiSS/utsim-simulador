@@ -334,8 +334,11 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   boca da porta de saída, lado a lado (`port_slot`); a prévia pisca em vermelho por um
   segundo de simulação a cada item perdido com `Drop` (`flash` no quadro, dos itens criados e
   destruídos sem sair). Teste `a_source_shows_its_types_its_losses_and_what_it_holds`.
-- Os itens de um lote em voo continuam um sobre o outro (a cena não diz quais são do mesmo
-  lote).
+- Os itens de um lote em voo (2026-11-07): a cena não diz quais são do mesmo lote, mas os
+  itens soltos que estão no mesmo lugar no mesmo instante saíram juntos; o quadro os põe lado
+  a lado numa grade pequena centrada no lugar (`flight_slot`). Teste
+  `a_batch_in_flight_travels_side_by_side` (falha sem a correção: dois itens no mesmo ponto em
+  `chegadas_por_tabela.ron`).
 
 ### Passo 5b, C6 (editores de tabela e horário da fonte), como foi feito
 
@@ -474,6 +477,12 @@ vez e ter a explicação de cada método.
   `dados\taplicar` de sempre com os valores e a família; "Gerar relatório" grava o HTML.
 - Roteiro `godot/roteiros/g4_valores_reais.json` (passo `esperar_valores`, conferência
   `janela_valores`).
+
+### Coluna da família fixa na comparação (2026-11-07)
+
+- Na janela "Valores reais…", a tabela de comparação virou duas grades com a mesma altura de
+  linha (`ROW`): a coluna da família (com o ⓘ) fica parada à esquerda e as medidas rolam de
+  lado ao lado dela; as duas rolam juntas na vertical.
 
 ### Plano original do passo 2b
 
