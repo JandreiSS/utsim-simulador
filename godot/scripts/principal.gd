@@ -1124,7 +1124,9 @@ func _show_playback() -> void:
 	_draw_grid(info)
 	_block_labels = PackedStringArray()
 	for b in cena.blocks:
-		_block_labels.append("%s (%s)" % [b["name"], b["kind"]])
+		# A model of a specialised line names the kinds with the line's words.
+		var term: String = doc.kind_term(b["kind"])
+		_block_labels.append("%s (%s)" % [b["name"], term if term != "" else b["kind"]])
 	if ui != null:
 		ui.set_flows_playback(playback)
 	if follow_name == "" or cena.block_index(follow_name) < 0:
