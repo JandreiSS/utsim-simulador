@@ -9,12 +9,16 @@
 ## at the same point walks through the blocks under it. Connections are hit within a
 ## few pixels of their line on screen.
 ##
-## Connecting: each block that can send items has an output port (a green mark on its
-## `+x` side) and each one that can receive has an input port (on its `-x` side). The
-## ports show on the selected blocks and on the block under the mouse; dragging from an
-## output port to another block (or to its input port) connects them. The Ligar tool (L)
-## does the same by dragging from block to block, or by clicking the origin and then the
-## destination.
+## Connecting: each block that can send items has an output node (a green disc on its
+## `+x` side) and each one that can receive has an input node (a blue disc on its `-x`
+## side); a source has only the output, a sink only the input. The nodes show on every
+## block in Editar and grow under the mouse. Dragging from an output node to another
+## block (or to its input node) connects them, with a preview arrow while dragging; from
+## an input node to another block (or its output node) connects that block to this one.
+## A click on a node selects its connections (again: the next one); a selected connection
+## shows a red × in its middle: clicking it (or Del) removes it. The Ligar tool (L) still
+## connects by dragging from block to block, or by clicking the origin and then the
+## destination. The selection is marked only at the corners, so nothing covers the nodes.
 ##
 ## The path network has its own tool, Rede (N, `rede.gd`), drawn in this same overlay, and
 ## so do the circulation aisles: the Corredor tool (C, `corredores.gd`), which also draws
@@ -45,6 +49,9 @@ const CONNECTING := Color(0.45, 0.95, 0.55)
 const PORT_OUT := Color(0.45, 0.95, 0.55)
 const PORT_IN := Color(0.55, 0.80, 1.0)
 const PORT_PIXELS := 14.0
+const PORT_HOVER := Color(1.0, 1.0, 1.0)
+const PORT_RING := Color(0.06, 0.07, 0.09, 0.9)
+const REMOVE := Color(0.92, 0.26, 0.22)
 const CRITICAL := Color(1.0, 0.30, 0.22)
 ## The team and request lines by kind: colour and dash (metres drawn, metres skipped).
 const TEAM_LINES := {
@@ -100,6 +107,11 @@ var _ghost: Node3D
 var _connections: Array = []
 var _objects: Array = []
 var _hover := ""
+## The node under the mouse: `[block, "out"|"in"]`, or [].
+var _hover_port: Array = []
+## The block an input node was dragged from (the connection ends there), or "".
+var connect_to := ""
+var _remove_label: Label3D
 var _team_lines: MeshInstance3D
 var _team_mesh: ImmediateMesh
 var _links: Array = []
@@ -366,18 +378,14 @@ func port_in(name: String) -> Variant:
 	return Vector3(box.position.x - 0.25, 0.06, box.get_center().z)
 
 
-## Blocks whose ports are drawn and can be grabbed: the selection and the block under
-## the mouse.
+## Blocks whose nodes are drawn and can be grabbed: every block (the kinds without a
+## port get no node, see `port_out` and `port_in`).
 func _port_blocks() -> Array:
-	var out := selected.duplicate()
-	if _hover != "" and not out.has(_hover):
-		out.append(_hover)
-	# C7: sources and sinks always show their ports in Editar.
+	var out := []
 	var c := cena()
 	if c != null:
 		for b in c.blocks:
-			if String(b["kind"]) in ["Source", "Sink"] and not out.has(b["name"]):
-				out.append(b["name"])
+			out.append(b["name"])
 	return out
 
 
@@ -393,10 +401,8 @@ func _hover_at(p: Vector2) -> String:
 	var hits := hits_at(p)
 	if not hits.is_empty():
 		return hits[0]
-	for o in _objects:
-		if _near(port_out(o["name"]), p):
-			return o["name"]
-	return ""
+	var node := node_at(p)
+	return node[0] if not node.is_empty() else ""
 
 
 ## The block whose output port is under screen point `p`, or "".
@@ -405,6 +411,58 @@ func port_at(p: Vector2) -> String:
 		if _near(port_out(n), p):
 			return n
 	return ""
+
+
+## The block whose input port is under screen point `p`, or "".
+func port_in_at(p: Vector2) -> String:
+	for n in _port_blocks():
+		if _near(port_in(n), p):
+			return n
+	return ""
+
+
+## The node under screen point `p`: `[block, "out"|"in"]`, or [].
+func node_at(p: Vector2) -> Array:
+	var n := port_at(p)
+	if n != "":
+		return [n, "out"]
+	n = port_in_at(p)
+	return [n, "in"] if n != "" else []
+
+
+## The connections of a node: `[from, to]` pairs, in the model's order.
+func node_links(name: String, side: String) -> Array:
+	var out := []
+	for c in _connections:
+		if (side == "out" and c["from"] == name) or (side == "in" and c["to"] == name):
+			out.append([c["from"], c["to"]])
+	return out
+
+
+## Where the × that removes the selected connection is drawn (the middle of its line), or
+## null when no connection is selected.
+func remove_point() -> Variant:
+	if selected_link.size() != 2:
+		return null
+	for seg in _segments():
+		if seg["from"] == selected_link[0] and seg["to"] == selected_link[1]:
+			var a: Vector3 = seg["a"]
+			var b: Vector3 = seg["b"]
+			var m := a.lerp(b, 0.5)
+			# A short connection: the × goes to the side, off the nodes.
+			if a.distance_to(b) < 1.4:
+				var d := (b - a).normalized()
+				m += Vector3(-d.z, 0, d.x) * 0.5
+			return m
+	return null
+
+
+## The × of the selected connection on screen, or null.
+func remove_screen() -> Variant:
+	var at = remove_point()
+	if at == null or camera().is_position_behind(at):
+		return null
+	return camera().unproject_position(at)
 
 
 ## The block a connection dragged from `from` lands on at screen point `p`: an input port
@@ -416,6 +474,19 @@ func drop_target(p: Vector2, from: String) -> String:
 			return n
 	for n in hits_at(p):
 		if n != from:
+			return n
+	return ""
+
+
+## The block a connection dragged back from the input node of `to` starts at: an output
+## node under the point, else the block under it; "" for none.
+func drop_source(p: Vector2, to: String) -> String:
+	for o in _objects:
+		var n: String = o["name"]
+		if n != to and _near(port_out(n), p):
+			return n
+	for n in hits_at(p):
+		if n != to:
 			return n
 	return ""
 
@@ -467,8 +538,18 @@ func _segments() -> Array:
 		if ra + rb >= length - 0.2:
 			ra = length * 0.3
 			rb = length * 0.3
+		var sa := a + dir * ra
+		var sb := b - dir * rb
+		# From node to node when the destination's input node is ahead of the origin's
+		# output node (a line back would cross both blocks: then edge to edge).
+		var po = port_out(c["from"])
+		var pi = port_in(c["to"])
+		if po != null and pi != null and (pi as Vector3).x - (po as Vector3).x > 0.4:
+			var d2: Vector3 = ((pi as Vector3) - (po as Vector3)).normalized()
+			sa = (po as Vector3) + d2 * 0.13
+			sb = (pi as Vector3) - d2 * 0.13
 		out.append({"from": c["from"], "to": c["to"], "port": c["port"], "logical": c["logical"],
-			"a": a + dir * ra, "b": b - dir * rb})
+			"a": sa, "b": sb})
 	return out
 
 
@@ -523,6 +604,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		mouse = mm.position
 		_hover = _hover_at(mm.position)
+		_hover_port = node_at(mm.position)
 		if tool == "rede":
 			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 				rede.drag(mm.position)
@@ -602,9 +684,18 @@ func _on_press(p: Vector2, shift: bool) -> void:
 	if tool == "equipe" or (tool == "ligar" and _alt):
 		_team_press(p, hits, shift)
 		return
+	if remove_point() != null and _near(remove_point(), p):
+		_remove_selected_link()
+		return
 	var port := port_at(p) if connect_from == "" else ""
 	if port != "":
 		_begin_link(p, port, false)
+		return
+	var port_in_name := port_in_at(p) if connect_from == "" else ""
+	if port_in_name != "":
+		_press = {"pos": p, "shift": false, "kind": "link_in", "name": port_in_name}
+		connect_to = port_in_name
+		main.set_status("Ligar: solte sobre a origem (ou o nó de saída dela). Esc cancela.")
 		return
 	if tool == "ligar":
 		if connect_from == "" and not hits.is_empty():
@@ -648,8 +739,58 @@ func _begin_link(p: Vector2, from: String, from_tool: bool) -> void:
 	main.set_status("Ligar: solte sobre o destino (ou clique nele). Esc cancela.")
 
 
+## Selects the connections of a node in turn (a click on it): the next one after the one
+## selected. Returns false when the node has none.
+func _select_node_links(name: String, side: String) -> bool:
+	var links := node_links(name, side)
+	if links.is_empty():
+		return false
+	var k := links.find(selected_link)
+	var next := (k + 1) % links.size()
+	selected = []
+	selected_link = links[next]
+	main.on_selection_changed()
+	var extra := ""
+	if links.size() > 1:
+		extra = " (%d de %d: clique no nó de novo para a próxima)" % [next + 1, links.size()]
+	main.set_status("Ligação %s → %s selecionada%s. Clique no × ou Del remove." % [selected_link[0], selected_link[1], extra])
+	return true
+
+
+func _remove_selected_link() -> void:
+	var link := selected_link
+	if doc().disconnect_objects(link[0], link[1]):
+		selected_link = []
+		main.after_edit()
+		main.set_status("Ligação %s → %s removida (Ctrl+Z desfaz)." % link)
+	else:
+		main.set_status("Não removeu: %s" % doc().last_error())
+
+
+## The end of a drag (or a click) begun at an input node.
+func _finish_link_in(p: Vector2, press: Dictionary) -> void:
+	var to: String = press["name"]
+	connect_to = ""
+	if not press.get("moved", false):
+		if not _select_node_links(to, "in"):
+			main.set_status("%s não recebe de ninguém: arraste do nó de saída da origem até aqui." % to)
+		return
+	var from := drop_source(p, to)
+	if from == "":
+		main.set_status("Ligação cancelada: solte sobre o bloco de origem.")
+		return
+	if doc().connect_objects(from, to):
+		main.after_edit()
+		main.set_status("Ligado: %s → %s." % [from, to])
+	else:
+		main.set_status("Não ligou: %s" % doc().last_error())
+
+
 func _finish_link(p: Vector2, press: Dictionary) -> void:
 	var from: String = press["name"]
+	if not press.get("moved", false) and not press["tool"] and _select_node_links(from, "out"):
+		connect_from = ""
+		return
 	if not press.get("moved", false):
 		# A click: wait for the destination with the Ligar tool.
 		if tool != "ligar":
@@ -720,7 +861,7 @@ func _on_drag(p: Vector2) -> void:
 	if not _dragging and not _box and p.distance_to(start) < DRAG_PIXELS:
 		return
 	match _press["kind"]:
-		"link", "team":
+		"link", "link_in", "team":
 			_press["moved"] = true
 		"block":
 			if _press["shift"]:
@@ -783,6 +924,9 @@ func _on_release(p: Vector2) -> void:
 	if press["kind"] == "link":
 		_finish_link(p, press)
 		return
+	if press["kind"] == "link_in":
+		_finish_link_in(p, press)
+		return
 	if press["kind"] == "team":
 		if not press.get("moved", false):
 			# A click: the next click is the destination.
@@ -839,8 +983,10 @@ func cancel() -> void:
 		main.set_status("Equipe: cancelado.")
 	elif tool == "equipe":
 		set_tool("selecionar")
-	elif connect_from != "":
+	elif connect_from != "" or connect_to != "":
 		connect_from = ""
+		connect_to = ""
+		_press = {}
 		main.set_status("Ligação cancelada.")
 	elif tool == "ligar":
 		set_tool("selecionar")
@@ -867,11 +1013,7 @@ func delete_selected() -> void:
 			main.set_status("Nenhum corredor selecionado para excluir.")
 		return
 	if not selected_link.is_empty():
-		var link := selected_link
-		if doc().disconnect_objects(link[0], link[1]):
-			selected_link = []
-			main.after_edit()
-			main.set_status("Ligação %s → %s removida." % link)
+		_remove_selected_link()
 		return
 	if selected.is_empty():
 		main.set_status("Nada selecionado para excluir.")
@@ -919,6 +1061,8 @@ func _process(_dt: float) -> void:
 		_lines.visible = false
 		for l in _ports:
 			l.visible = false
+		if _remove_label != null:
+			_remove_label.visible = false
 		if _ghost != null:
 			_ghost.visible = false
 		return
@@ -985,11 +1129,9 @@ func _redraw() -> void:
 			var name: String = c.blocks[i]["name"]
 			var box := _box_of(i)
 			if selected.has(name):
-				_rect(box.grow(0.12), PRIMARY if selected[0] == name else OTHERS, 0.08)
+				_corners(box.grow(0.08), PRIMARY if selected[0] == name else OTHERS, 0.05)
 			if problems.has(name):
-				_rect(box.grow(0.04), PROBLEM, 0.04)
-			if name == connect_from:
-				_rect(box.grow(0.2), CONNECTING, 0.08)
+				_corners(box.grow(0.04), PROBLEM, 0.04)
 			if critical.has(name):
 				_rect(box.grow(0.3), CRITICAL, 0.1)
 		corredores.draw(self)
@@ -1010,12 +1152,21 @@ func _redraw() -> void:
 		for j in range(k, _ports.size()):
 			_ports[j].visible = false
 		for n in _port_blocks():
-			_port_mark(port_out(n), PORT_OUT)
-			_port_mark(port_in(n), PORT_IN)
+			var i := c.block_index(n)
+			var box: AABB = _box_of(i) if i >= 0 else AABB()
+			var out_lit: bool = n == connect_from or _hover_port == [n, "out"]
+			var in_lit: bool = n == connect_to or _hover_port == [n, "in"]
+			_port_mark(port_out(n), PORT_OUT, out_lit, box.end.x)
+			_port_mark(port_in(n), PORT_IN, in_lit, box.position.x)
+		_draw_remove()
+		if connect_to != "" and _press.get("moved", false):
+			var tb = port_in(connect_to)
+			var ta = floor_at(mouse)
+			if ta != null and tb != null:
+				var qa: Vector3 = ta
+				qa.y = 0.06
+				_arrow(qa, tb, CONNECTING, 0.07)
 		if connect_from != "":
-			for o in _objects:
-				if o["name"] != connect_from:
-					_port_mark(port_in(o["name"]), PORT_IN)
 			var a = port_out(connect_from)
 			if a == null:
 				a = block_position(connect_from)
@@ -1130,17 +1281,74 @@ func _ring(c: Vector3, r: float, color: Color) -> void:
 			_team_mesh.surface_add_vertex(v)
 
 
-## A port: a small diamond on the floor.
-func _port_mark(at: Variant, color: Color) -> void:
+## A node: a disc on the floor with a dark rim, joined to the side of its block (at
+## `edge_x`) by a short stub; bigger and white-rimmed when `lit` (under the mouse, or the
+## end of the connection being made).
+func _port_mark(at: Variant, color: Color, lit := false, edge_x := NAN) -> void:
 	if at == null:
 		return
 	var c: Vector3 = at
-	var r := 0.18
-	var pts := [c + Vector3(r, 0, 0), c + Vector3(0, 0, r), c + Vector3(-r, 0, 0), c + Vector3(0, 0, -r)]
-	for k in [[0, 1, 2], [0, 2, 3]]:
-		for j in k:
+	if not is_nan(edge_x):
+		_ribbon(Vector3(edge_x, c.y, c.z), c, 0.04, Color(color, 0.8))
+	var r := 0.17 if lit else 0.12
+	_disc(c, r + 0.035, PORT_HOVER if lit else PORT_RING)
+	_disc(c, r, color.lightened(0.25) if lit else color)
+
+
+## A filled disc on the floor plane.
+func _disc(c: Vector3, r: float, color: Color) -> void:
+	var n := 16
+	for k in n:
+		var a0 := TAU * k / n
+		var a1 := TAU * (k + 1) / n
+		for v in [c, c + Vector3(cos(a0), 0, sin(a0)) * r, c + Vector3(cos(a1), 0, sin(a1)) * r]:
 			_mesh.surface_set_color(color)
-			_mesh.surface_add_vertex(pts[j])
+			_mesh.surface_add_vertex(v)
+
+
+## The red × in the middle of the selected connection (a click on it removes it).
+func _draw_remove() -> void:
+	var at = remove_point()
+	if at == null:
+		if _remove_label != null:
+			_remove_label.visible = false
+		return
+	var lit := _near(at, mouse)
+	for seg in _segments():
+		if seg["from"] == selected_link[0] and seg["to"] == selected_link[1]:
+			var m: Vector3 = (seg["a"] as Vector3).lerp(seg["b"], 0.5)
+			if m.distance_to(at) > 0.05:
+				_ribbon(m, at, 0.03, Color(REMOVE, 0.8))
+	_disc(at, 0.2 if lit else 0.17, PORT_HOVER)
+	_disc(at, 0.17 if lit else 0.14, REMOVE)
+	if _remove_label == null:
+		_remove_label = Label3D.new()
+		_remove_label.name = "RemoverLigacao"
+		_remove_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_remove_label.fixed_size = true
+		_remove_label.no_depth_test = true
+		_remove_label.pixel_size = 0.0006
+		_remove_label.font_size = 34
+		_remove_label.modulate = Color.WHITE
+		_remove_label.render_priority = 13
+		_remove_label.text = "×"
+		add_child(_remove_label)
+	_remove_label.visible = true
+	_remove_label.position = (at as Vector3) + Vector3(0, 0.02, 0)
+
+
+## The selection: L marks at the four corners of the footprint (no frame over the nodes).
+func _corners(box: AABB, color: Color, width: float) -> void:
+	var y := 0.03
+	var arm := clampf(minf(box.size.x, box.size.z) * 0.25, 0.15, 0.5)
+	var x0 := box.position.x
+	var x1 := box.end.x
+	var z0 := box.position.z
+	var z1 := box.end.z
+	for corner in [[x0, z0, 1, 1], [x1, z0, -1, 1], [x1, z1, -1, -1], [x0, z1, 1, -1]]:
+		var p := Vector3(corner[0], y, corner[1])
+		_ribbon(p, p + Vector3(corner[2] * arm, 0, 0), width, color)
+		_ribbon(p, p + Vector3(0, 0, corner[3] * arm), width, color)
 
 
 func _port_label(k: int, at: Vector3, text: String, color: Color) -> void:

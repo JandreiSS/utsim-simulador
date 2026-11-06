@@ -67,6 +67,20 @@ A **barra de status**, no pé da janela, mostra o que acabou de acontecer. Quand
 
 No painel de propriedades, um rótulo que não cabe na coluna quebra em duas linhas, e a coluna de rótulos cresce com o painel. Um rótulo nunca é cortado sem que o texto inteiro apareça ao parar o mouse sobre ele.
 
+### Ligar pelos nós (UTSim 3D)
+
+No Editar, cada objeto com fluxo tem dois **nós** pequenos nos lados: o de **saída** (verde, à direita do objeto) e o de **entrada** (azul, à esquerda). A chegada só tem o nó de saída e a saída só o de entrada; transportadores e despachantes não têm nós, porque se ligam pela ferramenta **Equipe**. O nó sob o mouse cresce e ganha uma borda branca.
+
+| Ação | Como |
+|---|---|
+| Ligar | arraste do nó de saída de um objeto até o outro objeto ou até o nó de entrada dele. Uma seta acompanha o mouse enquanto você arrasta |
+| Ligar ao contrário | arraste do nó de entrada até o objeto de origem ou até o nó de saída dele |
+| Selecionar uma ligação | clique na seta, ou clique num nó: ele seleciona a ligação que sai (ou chega) por ali. Com várias, cada clique passa à seguinte |
+| Remover a ligação selecionada | clique no **×** vermelho no meio da seta, ou tecle `Delete` |
+| Desfazer e refazer | `Ctrl+Z` e `Ctrl+Y`, um passo por ligação |
+
+O objeto selecionado é marcado só nos quatro cantos (em vermelho, os objetos com problema), sem moldura em volta, para não cobrir os nós. Numa ligação curta, o × fica ao lado da seta. A ferramenta **Ligar** (`L`) continua valendo: arraste de um objeto ao outro, ou clique na origem e depois no destino. O arquivo `.ron` grava as ligações como sempre, na lista `connections`.
+
 A simulação nunca é conduzida pela janela. O botão **▶ Simular** roda o motor em outra tarefa e a janela apenas lê o resultado gravado. Por isso o que você vê é exatamente o que o `utsim run` calcula.
 
 ## Modo Editar

@@ -115,7 +115,7 @@ bash scripts/godot.sh
 
 e confira nas capturas (`godot/capturas/g2/*.png`, fora do git):
 
-- as portas (losangos verde e azul) no bloco selecionado e a seta de ligação seguindo o mouse
+- os nós de entrada e saída (discos azul e verde) em todos os blocos e a seta de ligação seguindo o mouse
   (`g2_linha_04_ligando`);
 - o fantasma do objeto ao colocar (`g2_linha_02_fantasma`);
 - o painel de propriedades sem cortar à direita (as listas de escolha não alargam mais o

@@ -59,7 +59,8 @@
 ##    plan coordinates), `{"objeto": "nome"}` (where a block is drawn),
 ##    `{"item": ["Lista", 0]}` (an item of an ItemList),
 ##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
-##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's ports),
+##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's nodes),
+##    `{"remover_ligacao": true}` (the × of the selected connection),
 ##    `{"no": "nome"}` (a node of the path network), `{"trecho": ["de", "para"]}` (the
 ##    middle of an edge), `{"vertice": ["corredor_1", 0]}` (a vertex of an aisle),
 ##    `{"corredor": "corredor_1"}` (the middle of its first segment), `{"acesso": "objeto"}`
@@ -535,6 +536,8 @@ func _target(t: Variant) -> Variant:
 			if tabs.get_tab_title(i) == String(d["aba"][1]):
 				return bar.get_global_transform() * bar.get_tab_rect(i).get_center()
 		return null
+	if d.has("remover_ligacao"):
+		return _main.editor.remove_screen()
 	if d.has("ligacao"):
 		var l: Array = d["ligacao"]
 		var a = _main.editor.block_position(l[0])
@@ -710,6 +713,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## the reference, comments and formatting aside; each difference is a failure),
 ## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
 ## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
+## `ligacao_selecionada` (`[de, para]`, or []), `no_destacado` (the node under the mouse,
+## `[bloco, "out"|"in"]`, or []),
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
 ## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
 ##
@@ -819,6 +824,12 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("foco", focused == want, focused)
 			"ligando":
 				report.call("ligando", _main.editor.connect_from == want, _main.editor.connect_from)
+			"ligacao_selecionada":
+				var sel: Array = _main.editor.selected_link
+				report.call("ligação selecionada", sel == Array(want), str(sel))
+			"no_destacado":
+				var lit: Array = _main.editor._hover_port
+				report.call("nó destacado", lit == Array(want), str(lit))
 			"status_contem":
 				var status: String = _main.status_text
 				report.call("status contém %s" % want, status.contains(want), status)

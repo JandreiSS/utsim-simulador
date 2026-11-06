@@ -392,6 +392,31 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   janela abria o relatório dos dados no navegador e o Godot não fechava no fim (com roteiro, o
   navegador não abre).
 
+### Nós de entrada e saída no editor 3D (2026-11-06)
+
+Pedido do dono: ligar e desligar o fluxo por nós, sem a caixa em volta do elemento (a caixa que
+ele viu era a do editor antigo; no cliente Godot as portas já existiam, mas só apareciam no
+bloco selecionado e sob o mouse, e a seleção e a origem da ligação ganhavam uma moldura).
+
+- `editor.gd`: os nós (disco verde de saída no lado `+x`, azul de entrada no `-x`, com borda
+  escura e um toco até o bloco) aparecem em todos os blocos no Editar; a fonte só tem saída, a
+  saída só entrada, transportador e despachante nenhum. O nó sob o mouse cresce e ganha borda
+  branca (`_hover_port`, `node_at`).
+- Ligar: do nó de saída até o bloco ou o nó de entrada (como antes, agora em qualquer bloco) e,
+  novo, do nó de entrada até o bloco ou o nó de saída da origem (`link_in`, `drop_source`),
+  com a seta de prévia nos dois sentidos.
+- Desligar: um clique num nó seleciona a ligação dele (de novo: a próxima,
+  `_select_node_links`); a ligação selecionada mostra um × vermelho no meio
+  (`remove_point`, `_draw_remove`), e o clique nele ou o Del a remove pelo
+  `disconnect_objects` (um passo de desfazer; o `.ron` não muda de formato).
+- A seleção e a marca dos objetos com problema passaram a cantos em L (`_corners`) e a moldura
+  verde da origem da ligação saiu (o nó de origem fica aceso). A linha da ligação vai de nó a nó
+  quando o destino está à frente da origem (senão, de borda a borda, como antes), e numa
+  ligação curta o × fica ao lado, preso à linha, para não cobrir os nós.
+- Conferência com janela a 1600×900 e 1280×720 (roteiro `g4_nos` com capturas).
+- Roteiro `godot/roteiros/g4_nos.json` (alvo `remover_ligacao`, conferências
+  `ligacao_selecionada` e `no_destacado`); o `g2_tutorial_01` continua passando.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
