@@ -1151,6 +1151,14 @@ impl UtsimDocument {
         edit_playback(&model, dir.as_deref(), skeletal_people).map(playback_object)
     }
 
+    /// The word of the model's specialised line for a core kind ("Processor" → "Posto de
+    /// trabalho"), or `""` outside a line or for a kind the line does not rename.
+    #[func]
+    fn kind_term(&self, kind: GString) -> GString {
+        crate::linha::kind_label(self.editor.model(), &kind.to_string())
+            .map_or_else(GString::new, |t| GString::from(t.as_str()))
+    }
+
     /// The scene of one object of palette entry `id` at the origin (the ghost shown while
     /// placing it), or `null`.
     #[func]

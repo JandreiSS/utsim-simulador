@@ -281,11 +281,15 @@ fn library(
         ui.add_space(2.0);
         ui.label(RichText::new(cat).small().strong().color(colors::TEXT_WEAK));
         let entries: Vec<&Entry> = v.library.iter().filter(|e| &e.category == cat).collect();
-        for pair in entries.chunks(2) {
+        // The presets of a specialised line ("lean_office/posto") have longer names: one per
+        // row, so they are not cut.
+        let line = entries.iter().any(|e| e.id.contains('/'));
+        let (per_row, width) = if line { (1, w * 2.0 + gap) } else { (2, w) };
+        for row in entries.chunks(per_row) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = gap;
-                for e in pair {
-                    entry_button(ui, e, w, v.armed == e.id, mem, reg, out);
+                for e in row {
+                    entry_button(ui, e, width, v.armed == e.id, mem, reg, out);
                 }
             });
         }

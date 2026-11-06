@@ -115,6 +115,8 @@ A navegação à esquerda tem a **Carteira** e as telas do projeto.
 - **Termo de abertura**, **Equipe e RACI**, **Fases e tollgates**, **Ações**, **Riscos**,
   **Reuniões**, **Cronograma**, **Ganhos** e **Encerramento e lições**: descritas abaixo.
 - **Ferramentas**: os entregáveis das fases, descritos em [Ferramentas](#ferramentas).
+- **Roteiro DMAIC**, **Dados e análises**, **Experimentos**, **Modelo UTSim** e **Relatórios**:
+  descritas nos capítulos de mesmo nome.
 - **Dados** (etapa L3) mostra o que vai trazer; já está lá a exportação `.lssz`.
 
 Em todas as telas, cada campo é gravado quando você sai dele, datas são `DD/MM/AAAA` e números
@@ -513,6 +515,30 @@ com o sinal e a ação imediata no título, a contenção no "como", quem aciona
 prazo (se for uma data) e a origem "sinal do plano de resposta". Cada vez que o sinal ocorre,
 um cartão novo; "Abrir cartão" leva ao último.
 
+### Mapa do fluxo de valor
+
+Um mapa por estado: o **atual** (fase Medir) e o **futuro** (fase Melhorar). Cada linha é um
+processo na ordem do fluxo, com o tempo de ciclo, o setup, a disponibilidade em %, os
+operadores, o estoque que espera antes dele (em unidades) e se ele agrega valor. No alto do
+mapa ficam a demanda por dia, o tempo disponível por dia e a unidade de tempo.
+
+Com a demanda e o tempo disponível, o app calcula:
+
+- o **takt**: tempo disponível ÷ demanda, o ritmo do cliente;
+- a **espera** de cada estoque: estoque × takt, o tempo que ele leva para ser consumido no
+  ritmo do cliente;
+- a **escada do lead time**, desenhada abaixo da tabela: a espera de cada estoque no degrau de
+  baixo (laranja) e o tempo de ciclo do processo no de cima (verde quando agrega valor);
+- o **lead time** (soma das esperas e dos ciclos), o tempo que agrega valor, a **eficiência do
+  ciclo do processo** (tempo que agrega valor ÷ lead time) e o estoque em dias de demanda;
+- os processos **acima do takt**, pelo ciclo dividido pela disponibilidade, e o mais lento.
+
+"Criar o estado futuro a partir deste" copia o mapa atual para um entregável novo na fase
+Melhorar, ligado ao atual; nele a equipe muda os processos e os estoques para o fluxo desejado,
+e o mapa mostra o lead time e a eficiência antes e depois. Com o modelo UTSim ligado, "Gerar o
+VSM atual como entregável" (tela Modelo UTSim) preenche o mapa atual com os processos do caminho
+principal do modelo, o estoque médio antes de cada um e a disponibilidade medida numa rodada.
+
 ### A3
 
 Uma página com o projeto inteiro em sete blocos: contexto, condição atual, objetivo, análise
@@ -571,6 +597,10 @@ Escolha o conjunto, a análise e as colunas:
 | Mann-Whitney e Wilcoxon pareado | duas colunas |
 | MSA: Gage R&R (ANOVA ou médias e amplitudes) | peça, operador, medida e a tolerância opcional |
 | MSA: estudo do tipo 1 | coluna, valor de referência e tolerância |
+| MSA: viés | coluna, valor de referência e a tolerância opcional |
+| MSA: linearidade | coluna da referência e coluna da medida, a variação do processo opcional |
+| MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
+| Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
 
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
@@ -580,14 +610,74 @@ novo sobre o mesmo arquivo e confere se os números são os mesmos.
 O estudo do tipo 1 usa Cg = 0,2·T / (6·s) e Cgk = (0,1·T − |média − referência|) / (3·s),
 com T a tolerância; o instrumento é capaz com Cg e Cgk ≥ 1,33.
 
+O **viés** compara a média de medições repetidas de uma peça de referência com o valor dela
+pelo teste t (viés = 0) e dá o intervalo de 95 % do viés; com a tolerância, mostra o viés em
+porcentagem dela. A **linearidade** usa várias peças de referência espalhadas pela faixa de
+uso, medidas algumas vezes cada: o app faz a reta do viés contra a referência. Inclinação
+significativa quer dizer que o viés muda ao longo da faixa; só o intercepto significativo quer
+dizer um deslocamento constante, que se corrige com um ajuste. A tabela mostra também o viés em
+cada referência.
+
+A **concordância de atributos** é para características julgadas por pessoas (bom ou ruim, tipo
+de defeito). Cada linha do CSV é uma avaliação: o item, quem avaliou e a resposta, e o padrão
+conhecido do item quando existe. Cada avaliador avalia todos os itens o mesmo número de vezes,
+em ordem aleatória e sem saber qual é o item. O app dá a porcentagem de itens em que cada
+avaliador concorda consigo mesmo, com o padrão, entre todos os avaliadores e de todos com o
+padrão, e o kappa de Fleiss de todas as avaliações: 0,75 ou mais é concordância boa, de 0,40 a
+0,75 é razoável e pede critério mais claro, abaixo de 0,40 é fraca.
+
 ### Checklist do Medir
 
 Dois itens do tollgate do Medir passam a ser conferidos pelo app:
 
-- **MSA aprovado**: há um Gage R&R guardado com %VE do GRR total ≤ 30 %, ou um acima disso
-  com a justificativa registrada (botão "Justificar" na lista das análises);
+- **MSA aprovado**: há um Gage R&R guardado com %VE do GRR total ≤ 30 %, ou uma concordância
+  de atributos com kappa ≥ 0,75 (quando o Y é julgado por pessoas), ou um dos dois fora do
+  limite com a justificativa registrada (botão "Justificar" na lista das análises);
 - **Linha de base com dado de origem Real**: há uma capacidade ou uma carta de controle
   guardada sobre um conjunto de origem Real (simulado ou do gêmeo não vale).
+
+## Planejamento de experimentos
+
+A tela **Experimentos** do projeto planeja um experimento de dois níveis, para descobrir quais
+fatores mexem no Y e se eles agem juntos.
+
+- **Fatores**: dê a cada um o nome, o nível baixo (−1) e o alto (+1). Os níveis podem ser
+  números (temperatura 180 e 200) ou qualquer texto (fornecedor X e Y). O centro é o ponto do
+  meio, usado pelos pontos centrais: para níveis numéricos o app usa a média dos dois; para
+  texto, escreva-o (ou não use pontos centrais).
+- **Plano**: o fatorial completo roda as 2^k combinações. Com muitos fatores, uma fração (1/2,
+  1/4, 1/8, 1/16) roda só uma parte delas. O preço é que alguns efeitos ficam **confundidos**:
+  o app mostra a relação de definição (por exemplo I = ABCD), a resolução e a tabela do que
+  se confunde com o quê. Em resolução III um efeito principal se confunde com uma interação de
+  dois fatores; em resolução IV os principais ficam limpos e as interações de dois fatores se
+  confundem entre si; em resolução V ou mais os principais e as interações de dois fatores
+  ficam limpos. As frações oferecidas vão de 3 a 8 fatores.
+- **Réplicas** repetem cada corrida (dão o erro puro); **pontos centrais** são corridas com
+  todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
+- **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma
+  ordem; rode na ordem sorteada para não confundir um fator com o que muda ao longo do dia.
+
+"Gravar a planilha de coleta" grava em `dados/` um CSV na ordem de execução, com a ordem
+padrão, as colunas codificadas `A`, `B`, `C`..., os níveis reais e a coluna da resposta vazia;
+a primeira linha guarda o planejamento inteiro. Preencha a resposta na planilha e importe-a em
+**Dados e análises** como um conjunto de origem Real.
+
+**No modelo UTSim.** Se o projeto tem um modelo ligado e cada fator diz o parâmetro que muda
+(`objeto.campo`, com os níveis escritos como no `.ron`, por exemplo `Exp(mean: 0.5)`), "Rodar
+no modelo UTSim" roda um cenário por ponto do plano, com as mesmas sementes em todos (números
+aleatórios comuns) e as replicações do modelo como réplicas, num fio de trabalho. O resultado
+vira um conjunto de dados de origem **Simulado**, com uma coluna por indicador. O erro dessa
+análise é a variabilidade da simulação, não a da fábrica.
+
+**Análise.** Em Dados e análises, "Experimento fatorial 2^k" acha sozinho as colunas `A`, `B`...
+da planilha (ou escolha as colunas dos fatores; níveis reais são codificados pelo app), a
+resposta e a ordem máxima das interações (2 por padrão). O resultado traz o efeito de cada
+termo (média no alto menos média no baixo), os valores-p, o R², a curvatura pelos pontos
+centrais e os termos confundidos. O erro vem das réplicas, dos pontos centrais e dos termos
+deixados fora do modelo; sem nenhum grau de liberdade para o erro, os valores-p vêm do pseudo
+erro padrão de Lenth. Os gráficos são o Pareto dos efeitos, os efeitos principais e um gráfico
+de interação para cada interação de dois fatores do modelo (linhas que se cruzam ou se abrem
+indicam interação). Como as outras análises, fica guardado como receita.
 
 ## Modelo UTSim
 
@@ -645,6 +735,26 @@ com intervalo de 95 %. A decisão é:
 "Guardar o estudo" grava o pacote `estudo.json` em `dados/`, com o nome e o hash do modelo, os
 cenários, a semente, as replicações, a versão do app, os resultados de cada replicação e as
 diferenças: qualquer pessoa reproduz o número. O projeto registra o estudo com a conclusão.
+
+"Lançar ganho estimado", ao lado de um estudo guardado, transforma uma diferença significativa
+em ganho. Informe a descrição, quanto vale uma unidade do indicador (por exemplo o lucro de uma
+peça a mais) e quantas vezes por ano o horizonte simulado acontece (uma semana simulada: 52), e
+diga se o aumento do indicador é melhora (vazão) ou se é a redução (lead time, fila). O modo
+conservador, marcado de início, usa a ponta do intervalo mais próxima de zero em vez da média.
+A conta é melhora × valor por unidade × períodos por ano. O ganho entra em **Ganhos** como
+estimado, origem simulação, ligado ao estudo, com a memória de cálculo completa (estudo, hash do
+arquivo e do modelo, semente, replicações, diferença com o intervalo e a conta). O app relê o
+`estudo.json` e confere o hash antes de lançar: um arquivo mudado depois de guardado é recusado.
+Como todo ganho por simulação, ele só passa a validado com lançamentos reais.
+
+### Mapa do fluxo de valor e diagrama de espaguete
+
+"Mapa do fluxo de valor (página)" e "Diagrama de espaguete (página)" rodam o modelo uma vez com
+o rastro, num fio de trabalho, gravam a página em `dados/` e a abrem no navegador. O espaguete
+desenha sobre a planta todos os deslocamentos de itens, pessoas e veículos; a tela mostra as
+viagens e a distância de cada recurso móvel e dos itens, e guarda essas distâncias como análise
+do modelo, ligada à versão dele. "Gerar o VSM atual como entregável" cria o mapa do fluxo de
+valor do projeto a partir do modelo (veja [Mapa do fluxo de valor](#mapa-do-fluxo-de-valor)).
 
 ### Caminho crítico observado
 
@@ -792,6 +902,12 @@ dos dados.
   (ganho validado, projetos encerrados, belts certificados, cobertura, oportunidades no funil e
   tollgates vencidos), sem dados pessoais de formação ou mentoria.
 
+Os dois painéis têm "Exportar PDF" e "Exportar planilha (.xlsx)", com o filtro de unidade e o
+ano escolhidos. O PDF traz cada indicador em tabela, com a regra dele, o instante dos dados e os
+gráficos (funil, tempo de ciclo contra o alvo, ganho validado por unidade), no modelo de
+relatório da empresa; a planilha tem uma aba por indicador. Os arquivos vão para a pasta
+`relatorios/` do programa. O PDF do painel da liderança, como a tela, não leva dados pessoais.
+
 ### Perfis e permissões
 
 | Perfil | Vê | Faz |
@@ -851,6 +967,16 @@ ressalvas), ata de cada reunião, FMEA e plano de controle de cada entregável (
 certificado de cada certificação sai na tela Certificação do programa. Os arquivos vão para a
 pasta `relatorios/` do projeto (ou `certificacoes/` do programa) e abrem no leitor de PDF do
 computador; refazer um relatório substitui o anterior.
+
+Os PDF trazem **gráficos** desenhados pelo próprio programa (linhas e barras, sem imagem):
+
+- cada análise guardada em Dados e análises tem o seu relatório, com o conjunto e a origem, o
+  hash, a conclusão, a tabela dos números e o gráfico: a carta de controle com a linha central,
+  os limites e os pontos com sinal em vermelho; num experimento, o Pareto dos efeitos, os
+  efeitos principais e as interações;
+- o A3 mostra o gráfico de cada Pareto do projeto, com a linha dos 80 %;
+- cada mapa do fluxo de valor tem o seu relatório, com os processos, os indicadores (e os do
+  estado atual, num mapa futuro) e a escada do lead time em barras de espera e de processo.
 
 - **Planilha** `.xlsx` com uma aba por tabela: ações, riscos, ganhos, cada FMEA e cada plano de
   controle, e os conjuntos de dados; números como números.
@@ -1040,7 +1166,11 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com P1). O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
-UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. Do
-programa ficam para depois a lista de papéis assinada e a exportação dos painéis. Da gestão do projeto ficam para
+UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
+trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
+experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
+exportação dos painéis. Ficam para depois Plackett-Burman, superfície de resposta e
+desejabilidade no DOE, o espaguete desenhado sem modelo e, do programa, a lista de papéis
+assinada. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
