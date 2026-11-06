@@ -374,6 +374,17 @@ arriscado: precisa de protocolo novo entre despachante, membro e estação. Prop
 
 **Estimativa** `Empty` 8–12 h, `Full` 14–20 h. **Modelo** Opus.
 
+**`Full` feito em 2026-11-06.** O despachante manda `MSG_PREEMPT_FULL`; o membro que só tem
+serviços de operador de prioridade menor (no posto, a caminho dele ou trocando de caso na
+multitarefa) manda `MSG_WITHDRAW` a cada estação onde já chegou, devolve as tarefas
+(`MSG_PREEMPTED`, à frente da sua prioridade) e se declara livre. A estação para o relógio com
+o tempo restante, volta a `waiting_operator` e, quando um operador chega para a mesma
+requisição, continua o estágio sem sortear de novo (o touch time é o sorteado no início).
+Transporte carregado, manutenção, pausa de fadiga e membro parado recusam. Um membro em
+multitarefa só intercala trabalho de mesma prioridade: o urgente é feito sozinho. Testes em
+`crates/utsim-model/tests/interrupcoes.rs` (linhas do tempo à mão, conservação e repetição
+pela semente); golden sem mudança.
+
 ### E5. Casa, área de espera e local de pausa
 
 - `home_at: Option<[f64; 3]>` ou `home_object: Option<String>` no `Transporter`: a casa deixa
@@ -476,7 +487,7 @@ Exemplos novos em `examples/`: `chegadas_por_tabela.ron` (pedidos por hora e tip
 | 13 | C5 Tabela de chegadas de planilha | 8–12 | Sonnet | 2 | depois de 2 |
 | 14 | E8b Equipe ao vivo no 3D | 6–8 | Sonnet | 7, 8 | **feito** (interface em Rust, passo 5b) |
 | 15 | C4 Rótulos de texto e por expressão | 8–12 | Opus | 2 | depois de 2 |
-| 16 | E4 Preempção `Full` | 14–20 | Opus | 12 | se o dono quiser |
+| 16 | E4 Preempção `Full` | 14–20 | Opus | 12 | **feito** em 2026-11-06 (pedido do Lean Office: interrupções) |
 | 17 | E6 Hierarquia e membros compartilhados | 12–18 | Opus | 6 | se um caso pedir |
 | 18 | E7 Sequências de tarefa compostas | 20–30 (ou 3–4 com fluxo) | Opus | 12 | se um caso pedir |
 | 19 | Manual, exemplos e tutorial | 6–8 | Sonnet | cada entrega | junto |
