@@ -1,0 +1,24 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "QS6: camada Segurança no cruzamento com empilhadeira. Zonas de risco no piso, EPI do operador pelo posto atendido, aviso de quem está na zona sem o EPI, quase-conflitos com salto e mapa de calor."},
+		{"abrir": "../../examples/cruzamento_empilhadeira.ron"},
+		{"modo": "simular"},
+		{"conferir": {"modo": "simular"}},
+		{"tempo": 600.0},
+		{"capturar": "g4_seguranca_01_sem_camada"},
+		{"clicar": {"controle": "Simular_Seguranca"}},
+		{"esperar": 3},
+		{"capturar": "g4_seguranca_02_zonas_e_epi"},
+		{"clicar": {"controle": "Simular_Quase_0"}},
+		{"esperar": 3},
+		{"capturar": "g4_seguranca_03_quase_conflito"},
+		{"clicar": {"controle": "Simular_Calor"}},
+		{"esperar": 3},
+		{"capturar": "g4_seguranca_04_calor"},
+		{"clicar": {"controle": "Simular_Calor"}},
+		{"clicar": {"controle": "Simular_Seguranca"}},
+		{"esperar": 2},
+		{"conferir": {"modo": "simular"}}
+	]
+}
