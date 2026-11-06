@@ -51,27 +51,32 @@ pub const DEFAULT_HISTOGRAM_BINS: usize = 20;
 /// it right after "Fila", which stays FIFO).
 pub const STACK_ID: &str = "QueueLifo";
 
-/// The object library of the Godot editor: [`utsim_edit::PALETTE`] plus "Pilha (LIFO)"
-/// after "Fila".
+/// The object library of the Godot editor: [`utsim_edit::PALETTE`] with the queue called
+/// "Espera" (named `espera`, `espera_2`...): FIFO or LIFO is its "Política de acesso", not
+/// a second entry. `STACK_ID` still adds a LIFO wait (older scripts), but is not listed.
 pub fn palette() -> Vec<PaletteEntry> {
-    let mut out = Vec::new();
-    for e in utsim_edit::PALETTE {
-        out.push(e);
-        if e.id == "Queue" {
-            out.push(PaletteEntry {
-                id: STACK_ID,
-                kind: "Queue",
-                label: "Pilha (LIFO)",
-                category: e.category,
-                name_base: "pilha",
-                asset: None,
-            });
-        }
-    }
-    out
+    utsim_edit::PALETTE
+        .into_iter()
+        .map(|e| {
+            if e.id == "Queue" {
+                PaletteEntry {
+                    label: "Espera",
+                    name_base: "espera",
+                    ..e
+                }
+            } else {
+                e
+            }
+        })
+        .collect()
 }
 
 pub fn palette_entry(id: &str) -> Option<PaletteEntry> {
+    if id == STACK_ID {
+        let mut e = palette().into_iter().find(|e| e.id == "Queue")?;
+        e.id = STACK_ID;
+        return Some(e);
+    }
     palette().into_iter().find(|e| e.id == id)
 }
 
@@ -909,8 +914,8 @@ mod tests {
             e.add(id, [3.0 * i as f64, 0.0, 0.0]).unwrap();
         }
         for (a, b) in [
-            ("chegada", "fila"),
-            ("fila", "processo"),
+            ("chegada", "espera"),
+            ("espera", "processo"),
             ("processo", "saida"),
         ] {
             e.connect(a, b).unwrap();
@@ -955,32 +960,71 @@ mod tests {
     }
 
     #[test]
-    fn the_library_has_a_stack_after_the_fifo_queue() {
+    fn the_wait_is_one_entry_and_its_policy_chooses_lifo_or_a_priority() {
         let p = palette();
-        let at = p.iter().position(|e| e.id == "Queue").unwrap();
-        assert_eq!(p[at + 1].id, STACK_ID);
-        assert_eq!(p[at + 1].category, p[at].category);
+        assert!(p.iter().all(|e| e.id != STACK_ID), "no second entry");
+        let q = p.iter().find(|e| e.id == "Queue").unwrap();
+        assert_eq!((q.label, q.name_base), ("Espera", "espera"));
         let mut e = line();
-        let name = e.add(STACK_ID, [0.0, 6.0, 0.0]).unwrap();
-        assert_eq!(name, "pilha");
+        let name = e.add("Queue", [0.0, 6.0, 0.0]).unwrap();
+        assert_eq!(name, "espera_2");
+        assert_eq!(e.objects().last().unwrap().kind_label, "Espera");
+        let policy = |e: &Editor, n: &str| {
+            schema::object_fields(e.model(), object(e, n))
+                .into_iter()
+                .find(|f| f.path == "discipline")
+                .unwrap()
+        };
+        assert_eq!(policy(&e, &name).label, "Política de acesso");
+        assert_eq!(policy(&e, &name).value, Value::Text("Fifo".into()));
+        // LIFO: one undo step; the scene marks it.
+        e.set_property(&name, "discipline", &Value::Text("Lifo".into()), &[])
+            .unwrap();
         assert_eq!(
             schema::read_field(object(&e, &name), "discipline").as_deref(),
             Some("Lifo")
         );
+        let pb =
+            crate::playback::Playback::new(&edit_replay(e.model()), Some(e.model()), None, false);
+        let at = pb.blocks.iter().position(|b| b.name == name).unwrap();
+        assert!(pb.blocks[at].stack);
+        assert_eq!(pb.frame(0.0).label[at], "espera_2 · LIFO");
+        // A priority: FIFO plus `order`, never LIFO with `order` (the model's rule).
+        e.set_property(&name, "discipline", &Value::Text("Desc".into()), &[])
+            .unwrap();
         assert_eq!(
-            schema::read_field(object(&e, "fila"), "discipline").as_deref(),
+            schema::read_field(object(&e, &name), "discipline").as_deref(),
             Some("Fifo")
         );
-        // The scene labels it and marks it for the turned-around look.
-        let p =
-            crate::playback::Playback::new(&edit_replay(e.model()), Some(e.model()), None, false);
-        let at = p.blocks.iter().position(|b| b.name == "pilha").unwrap();
-        assert!(p.blocks[at].stack);
-        assert_eq!(p.frame(0.0).label[at], "pilha · pilha");
-        let fila = p.blocks.iter().position(|b| b.name == "fila").unwrap();
-        assert!(!p.blocks[fila].stack);
-        assert!(e.doc.undo(), "one step");
-        assert!(e.model().objects.iter().all(|o| o.name != "pilha"));
+        assert_eq!(
+            schema::read_field(object(&e, &name), "order").as_deref(),
+            Some("Some(Desc(\"prioridade\"))")
+        );
+        assert_eq!(policy(&e, &name).value, Value::Text("Desc".into()));
+        e.set_property(&name, "order.label", &Value::Text("urgencia".into()), &[])
+            .unwrap();
+        assert_eq!(
+            schema::read_field(object(&e, &name), "order").as_deref(),
+            Some("Some(Desc(\"urgencia\"))")
+        );
+        e.set_property(&name, "discipline", &Value::Text("Lifo".into()), &[])
+            .unwrap();
+        assert_eq!(
+            schema::read_field(object(&e, &name), "order").as_deref(),
+            Some("None")
+        );
+        assert!(
+            e.doc
+                .issues()
+                .iter()
+                .all(|i| !format!("{i:?}").contains("os dois"))
+        );
+        assert!(e.doc.undo(), "one step per change");
+        assert_eq!(
+            schema::read_field(object(&e, &name), "order").as_deref(),
+            Some("Some(Desc(\"urgencia\"))")
+        );
+        // Older scripts: the stack id still adds a LIFO wait.
         let ghost = palette_model(STACK_ID).unwrap();
         assert_eq!(
             schema::read_field(&ghost.objects[0], "discipline").as_deref(),
@@ -1017,10 +1061,13 @@ mod tests {
         let mut e = line();
         let agv = e.add("Agv", [0.0, 5.0, 0.0]).unwrap();
         assert_eq!(agv, "agv");
-        let err = e.connect("fila", &agv).unwrap_err();
-        assert!(err.contains("Transporte de saída"), "{err}");
-        assert!(e.connect("fila", "fila").is_err());
-        assert!(e.connect("fila", "processo").is_err(), "already connected");
+        let err = e.connect("espera", &agv).unwrap_err();
+        assert!(err.contains("nó laranja"), "{err}");
+        assert!(e.connect("espera", "espera").is_err());
+        assert!(
+            e.connect("espera", "processo").is_err(),
+            "already connected"
+        );
     }
 
     #[test]
@@ -1061,7 +1108,7 @@ mod tests {
             e.outputs("processo"),
             names(&["saida_3", "saida", "saida_2"])
         );
-        assert_eq!(e.outputs("chegada"), names(&["fila"]));
+        assert_eq!(e.outputs("chegada"), names(&["espera"]));
         e.disconnect("processo", "saida").unwrap();
         assert_eq!(e.outputs("processo"), names(&["saida_3", "saida_2"]));
     }
@@ -1069,33 +1116,37 @@ mod tests {
     #[test]
     fn a_drag_is_one_undo_step_and_nudge_moves_by_the_step() {
         let mut e = line();
-        let sel = names(&["fila", "processo"]);
+        let sel = names(&["espera", "processo"]);
         e.begin_drag(&sel);
         for k in 1..=5 {
             e.drag([k as f64, 0.5 * k as f64], 0.0).unwrap();
         }
         e.end_drag();
-        assert_eq!(position(&e, "fila"), [8.0, 2.5, 0.0]);
+        assert_eq!(position(&e, "espera"), [8.0, 2.5, 0.0]);
         assert_eq!(position(&e, "processo"), [11.0, 2.5, 0.0]);
         e.doc.undo();
-        assert_eq!(position(&e, "fila"), [3.0, 0.0, 0.0]);
+        assert_eq!(position(&e, "espera"), [3.0, 0.0, 0.0]);
         e.nudge(&sel, [0.0, -1.0]).unwrap();
         assert_eq!(position(&e, "processo"), [6.0, -1.0, 0.0]);
         assert!(e.drag([1.0, 1.0], 0.0).is_err(), "no drag going on");
         e.begin_drag(&sel);
         e.drag([0.3, 0.8], 1.0).unwrap();
         e.end_drag();
-        assert_eq!(position(&e, "fila"), [3.0, 0.0, 0.0], "snapped to the grid");
+        assert_eq!(
+            position(&e, "espera"),
+            [3.0, 0.0, 0.0],
+            "snapped to the grid"
+        );
     }
 
     #[test]
     fn copy_paste_cut_and_duplicate() {
         let mut e = line();
-        assert_eq!(e.copy(&names(&["fila", "processo"])), 2);
+        assert_eq!(e.copy(&names(&["espera", "processo"])), 2);
         let pasted = e.paste().unwrap();
-        assert_eq!(pasted, names(&["fila_2", "processo_2"]));
-        assert_eq!(position(&e, "fila_2"), [5.0, -2.0, 0.0]);
-        assert!(e.outputs("fila_2").contains(&"processo_2".to_string()));
+        assert_eq!(pasted, names(&["espera_2", "processo_2"]));
+        assert_eq!(position(&e, "espera_2"), [5.0, -2.0, 0.0]);
+        assert!(e.outputs("espera_2").contains(&"processo_2".to_string()));
         let again = e.paste().unwrap();
         assert_eq!(position(&e, again[0].as_str()), [7.0, -4.0, 0.0]);
         let dup = e.duplicate(&names(&["saida"])).unwrap();
@@ -1114,16 +1165,16 @@ mod tests {
     #[test]
     fn align_and_distribute() {
         let mut e = line();
-        e.nudge(&names(&["fila"]), [0.0, 2.0]).unwrap();
-        e.align(&names(&["chegada", "fila", "processo"]), "topo")
+        e.nudge(&names(&["espera"]), [0.0, 2.0]).unwrap();
+        e.align(&names(&["chegada", "espera", "processo"]), "topo")
             .unwrap();
         assert_eq!(position(&e, "processo")[1], 2.0);
-        e.nudge(&names(&["fila"]), [1.0, 0.0]).unwrap();
-        e.distribute(&names(&["chegada", "fila", "processo"]), "x")
+        e.nudge(&names(&["espera"]), [1.0, 0.0]).unwrap();
+        e.distribute(&names(&["chegada", "espera", "processo"]), "x")
             .unwrap();
-        assert_eq!(position(&e, "fila")[0], 3.0);
-        assert!(e.align(&names(&["fila"]), "esquerda").is_err());
-        assert!(e.align(&names(&["fila", "saida"]), "nada").is_err());
+        assert_eq!(position(&e, "espera")[0], 3.0);
+        assert!(e.align(&names(&["espera"]), "esquerda").is_err());
+        assert!(e.align(&names(&["espera", "saida"]), "nada").is_err());
     }
 
     #[test]
@@ -1233,6 +1284,8 @@ mod tests {
             e.set_property(object, path, &v, &[])
                 .unwrap_or_else(|err| panic!("{object}.{path}: {err}"));
         };
+        // The library names it "espera"; the example calls it "fila".
+        set(&mut e, "espera", "name", Value::Text("fila".into()));
         set(&mut e, "processo", "name", Value::Text("caixa".into()));
         set(&mut e, "chegada", "interarrival.mean", Value::Float(5.0));
         set(&mut e, "caixa", "process.family", Value::Int(2));

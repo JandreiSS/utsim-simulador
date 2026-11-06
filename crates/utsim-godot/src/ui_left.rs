@@ -837,7 +837,7 @@ mod tests {
                 },
                 ObjectItem {
                     name: "fila".into(),
-                    kind_label: "Fila".into(),
+                    kind_label: "Espera".into(),
                     problems: 0,
                     warnings: 0,
                 },
@@ -858,7 +858,6 @@ mod tests {
             "Biblioteca",
             "Biblioteca_Source",
             "Biblioteca_Queue",
-            "Biblioteca_QueueLifo",
             "Biblioteca_Processor",
             "Biblioteca_Sink",
             "Objetos_Busca",

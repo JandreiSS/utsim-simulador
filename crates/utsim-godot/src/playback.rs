@@ -679,7 +679,7 @@ impl Playback {
             f.clip.push(clip);
             f.clip_time.push(clip_time);
             let mut shown = if v.stack {
-                format!("{} · pilha", v.name)
+                format!("{} · LIFO", v.name)
             } else {
                 v.name.clone()
             };

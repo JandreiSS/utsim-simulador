@@ -220,7 +220,7 @@ A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`lin
 
 Na interface 3D essas linhas aparecem nos dois modos, cada tipo com a sua cor e o seu traço (equipe em lilás tracejado, transporte e operadores pontilhados, manutenção em vermelho, casa e pausa em verde e azul). No **Editar** ficam acesas, mais fortes as do objeto selecionado; no **Simular** ficam apagadas, e acendem as do bloco seguido (clique nele na lista de blocos). No Simular cada membro de uma equipe tem um anel no chão na cor do estado, o membro seguido mostra uma linha até aonde a tarefa atual o leva, e o rótulo do despachante diz quantos membros estão livres (`operadores · 1/2 livres`). O menu ▼ ao lado de **PERT/CPM** liga ou desliga cada tipo de linha.
 
-### Como ligar um operador a uma máquina
+### Como ligar um operador a uma máquina (e a empilhadeira ao que ela transporta)
 
 1. No **Editar**, com a ferramenta **Selecionar** (a de sempre), coloque a máquina (**Processo**) e o **Operador**, pela Biblioteca.
 2. Clique no operador. Ao lado dele aparece um **nó laranja** (o despachante de uma equipe tem o mesmo nó), e a barra de status lembra o que fazer.
@@ -229,7 +229,14 @@ Na interface 3D essas linhas aparecem nos dois modos, cada tipo com a sua cor e 
 5. Para conferir ou ajustar, clique na máquina. No painel de propriedades, a seção **Operadores** mostra **Quem opera** e quantos operadores ela pede; ali você também pode escolher outro operador ou desmarcar a seção.
 6. Para desligar, clique na linha tracejada. Ela acende, e um **×** vermelho aparece no meio dela: clique no × ou tecle `Delete`. `Ctrl+Z` desfaz.
 
-O mesmo nó laranja serve para os outros pedidos: soltando sobre um objeto que não é máquina (uma fila, uma chegada), o recurso passa a levar os itens dele (`transport`); com `Shift` ao soltar sobre uma máquina, também. Arrastar um transportador até um despachante o põe na equipe dele. Se a ligação já existe, nada muda e a barra de status avisa. Transportador, empilhadeira e AGV têm o mesmo nó do operador.
+A **empilhadeira** (e o transportador e o AGV) usa o mesmo nó laranja para dizer o que ela transporta:
+
+1. Coloque a empilhadeira e o objeto de onde saem os itens que ela leva (uma **Espera**, uma doca, uma chegada).
+2. Arraste do nó laranja da empilhadeira até esse objeto. A linha tracejada aparece entre os dois, e daí em diante os itens que saem desse objeto esperam a empilhadeira para ir ao destino da ligação de fluxo (o "de onde para onde" é a seta verde do objeto até o próximo).
+3. Clique na empilhadeira: a seção **Atende** do painel mostra **Leva os itens de** (os objetos ligados) e **Opera as máquinas**; a do operador mostra as máquinas que ele opera.
+4. Para tirar, clique na linha tracejada e no ×, ou tecle `Delete`.
+
+Resumindo o nó laranja: soltando sobre uma máquina, o recurso a opera; soltando sobre um objeto que não é máquina (uma fila, uma chegada), o recurso passa a levar os itens dele (`transport`); com `Shift` ao soltar sobre uma máquina, também. Arrastar um transportador até um despachante o põe na equipe dele. Se a ligação já existe, nada muda e a barra de status avisa. Transportador, empilhadeira e AGV têm o mesmo nó do operador.
 
 A ferramenta **Equipe** (botão na barra, tecla `E`, ou `Alt` segurado com a ferramenta Ligar) continua valendo e edita as ligações arrastando de um objeto a outro:
 

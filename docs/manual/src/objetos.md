@@ -199,6 +199,17 @@ Com `batch: Batch(size: 4, max_wait: 10.0, flush: true)`:
 
 Se a fila tem `capacity` menor que `batch.size`, o lote nunca fecharia, e o `utsim check` recusa o modelo.
 
+Na interface 3D a Queue se chama **Espera**: há um só item na Biblioteca (os novos objetos se chamam `espera`, `espera_2`...), e o painel de propriedades tem o seletor **Política de acesso**:
+
+| Política | No arquivo |
+|---|---|
+| FIFO (padrão) | `discipline: Fifo` |
+| LIFO | `discipline: Lifo` |
+| Prioridade: maior rótulo primeiro | `order: Some(Desc("prioridade"))` |
+| Prioridade: menor rótulo primeiro (prazo) | `order: Some(Asc("prazo"))` |
+
+Com prioridade aparece o campo **Rótulo da prioridade**, o nome do rótulo lido em cada item; empates e itens sem o rótulo saem na ordem de chegada. LIFO e `order` nunca vão juntos: escolher uma política limpa a outra. O arquivo `.ron` não muda de formato, e um modelo antigo com uma pilha abre como Espera LIFO (na cena o rótulo diz `· LIFO`).
+
 **Use** uma Queue entre duas etapas para absorver variações. Uma fila de capacidade pequena cria **bloqueio**: a etapa anterior para quando o buffer enche. Estados: `empty` e `releasing`. A fila é o lugar certo para medir o tempo de espera (`staytime`).
 
 ## Processor (Processo)

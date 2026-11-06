@@ -441,6 +441,20 @@ Pedido do dono depois da dev.5: o Selecionar tem de ser o padrão e melhor, e li
 - Roteiro `godot/roteiros/g4_operador.json`; manual com o passo a passo "Como ligar um operador
   a uma máquina" (`recursos-moveis.md`). Conferência com janela a 1600×900 e 1280×720.
 
+### Empilhadeira no nó laranja e a Espera (2026-11-06)
+
+- O nó laranja vale para todo transportador (operador, transportador, empilhadeira, AGV) e
+  despachante. Painel desses recursos: seção **Atende** (`schema::serves_fields`), com "Opera
+  as máquinas" e "Leva os itens de", só leitura, com a ajuda do nó. Roteiro `g4_operador`
+  liga uma empilhadeira a uma espera, confere o painel, remove pelo × e desfaz.
+- Pedido do dono: "Fila" e "Pilha (LIFO)" viram um só item, **Espera** (`document::palette`
+  troca o rótulo e o nome base; `STACK_ID` continua aceito por roteiros antigos, fora da
+  lista). O campo `discipline` do painel virou **Política de acesso** com FIFO, LIFO e as
+  duas prioridades por rótulo (`order`, novo no `patch` do `utsim-model`); escolher uma
+  política grava `discipline` e `order` num passo só e nunca junta LIFO com `order`; com
+  prioridade aparece "Rótulo da prioridade". O rótulo da cena diz `· LIFO`. O tutorial g2
+  renomeia a espera para `fila` (o exemplo comparado chama assim) e escolhe LIFO pelo painel.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do

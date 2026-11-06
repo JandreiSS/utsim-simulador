@@ -2,7 +2,7 @@
 	"saida": "../capturas",
 	"passos": [
 		{
-			"nota": "Selecionar é a ferramenta padrão; o operador liga à máquina arrastando do nó laranja dele, a linha tracejada aparece, um clique nela mostra o × que a remove, com desfazer."
+			"nota": "Selecionar é a ferramenta padrão; o operador liga à máquina e a empilhadeira ao que ela transporta arrastando do nó laranja, a linha tracejada aparece, um clique nela mostra o × que a remove, com desfazer; o painel mostra quem atende o quê."
 		},
 		{
 			"novo": true
@@ -268,6 +268,159 @@
 					"operador"
 				],
 				"objetos": 3
+			}
+		},
+		{
+			"nota": "Empilhadeira: do nó laranja dela até a espera, ela passa a levar os itens dessa espera."
+		},
+		{
+			"camera": {
+				"alvo": [
+					6,
+					2
+				],
+				"distancia": 22.0,
+				"giro": 0.0,
+				"inclinacao": 0.85
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"controle": "Biblioteca_Queue"
+				},
+				"para": {
+					"chao": [
+						12.0,
+						0.0
+					]
+				}
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"controle": "Biblioteca_Forklift"
+				},
+				"para": {
+					"chao": [
+						12.0,
+						5.0
+					]
+				}
+			}
+		},
+		{
+			"conferir": {
+				"existe": [
+					"espera",
+					"empilhadeira"
+				],
+				"selecao": [
+					"empilhadeira"
+				],
+				"status_contem": "nó laranja"
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"no_atende": "empilhadeira"
+				},
+				"para": {
+					"objeto": "espera"
+				}
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"transporte",
+					"espera",
+					"empilhadeira"
+				],
+				"status_contem": "empilhadeira leva os itens de espera"
+			}
+		},
+		{
+			"clicar": {
+				"objeto": "empilhadeira"
+			}
+		},
+		{
+			"conferir": {
+				"texto": {
+					"controle": "Prop_serves_carries",
+					"contem": "espera"
+				}
+			}
+		},
+		{
+			"clicar": {
+				"objeto": "operador"
+			}
+		},
+		{
+			"conferir": {
+				"texto": {
+					"controle": "Prop_serves_operates",
+					"contem": "processo"
+				}
+			}
+		},
+		{
+			"clicar": {
+				"linha_equipe": [
+					"transporte",
+					"espera",
+					"empilhadeira"
+				]
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe_selecionada": [
+					"transporte",
+					"espera",
+					"empilhadeira"
+				]
+			}
+		},
+		{
+			"clicar": {
+				"remover_ligacao": true
+			}
+		},
+		{
+			"conferir": {
+				"sem_linha_equipe": [
+					"transporte",
+					"espera",
+					"empilhadeira"
+				]
+			}
+		},
+		{
+			"tecla": "ctrl+z"
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"transporte",
+					"espera",
+					"empilhadeira"
+				]
+			}
+		},
+		{
+			"camera": {
+				"alvo": [
+					4,
+					2
+				],
+				"distancia": 18.0,
+				"giro": 0.0,
+				"inclinacao": 0.85
 			}
 		},
 		{

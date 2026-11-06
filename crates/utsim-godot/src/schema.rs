@@ -262,7 +262,7 @@ pub const S_MODEL: &str = "Modelo";
 pub fn kind_label(kind: &ObjectKind) -> &'static str {
     match kind {
         ObjectKind::Source { .. } => "Chegada",
-        ObjectKind::Queue { .. } => "Fila",
+        ObjectKind::Queue { .. } => "Espera",
         ObjectKind::Processor { .. } => "Processo",
         ObjectKind::Combiner { .. } => "Montagem",
         ObjectKind::Separator { .. } => "Desmontagem",
@@ -907,7 +907,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             capacity,
             discipline,
             batch,
-            ..
+            order,
         } => {
             out.push(
                 Field::new(
@@ -920,18 +920,35 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .optional(capacity.is_some())
                 .min(1.0)
                 .unit("itens")
-                .help("Desligada, a fila não tem limite."),
+                .help("Desligada, a espera não tem limite."),
             );
-            out.push(pick(
-                s,
-                "discipline",
-                "Disciplina",
-                &ron::debug(discipline),
-                &[
-                    ("Fifo", "FIFO (primeiro a entrar, primeiro a sair)"),
-                    ("Lifo", "LIFO (último a entrar, primeiro a sair)"),
-                ],
-            ));
+            out.push(
+                pick(
+                    s,
+                    "discipline",
+                    "Política de acesso",
+                    &access_policy(*discipline, order.as_ref()),
+                    &[
+                        ("Fifo", "FIFO (primeiro a entrar, primeiro a sair)"),
+                        ("Lifo", "LIFO (último a entrar, primeiro a sair)"),
+                        ("Desc", "Prioridade: maior rótulo primeiro"),
+                        ("Asc", "Prioridade: menor rótulo primeiro (prazo)"),
+                    ],
+                )
+                .help("Qual item sai primeiro. Pela prioridade, sai antes o item com o maior (ou o menor) valor do rótulo; empates e itens sem o rótulo saem na ordem de chegada."),
+            );
+            if let Some(o) = order {
+                out.push(
+                    Field::new(
+                        s,
+                        "order.label",
+                        "Rótulo da prioridade",
+                        FieldType::Text,
+                        Value::Text(o.label().to_owned()),
+                    )
+                    .depth(1),
+                );
+            }
             out.push(
                 group(s, "batch", "Lote", batch.is_some())
                     .help("Segura os itens e libera em grupos."),
@@ -1568,6 +1585,7 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             .unit("m"),
         );
     }
+    out.extend(serves_fields(model, obj));
     out.extend(kind_fields(model, obj));
     if !is_mobile(&obj.kind) {
         out.extend(output_fields(model, obj));
@@ -1576,6 +1594,68 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     out.extend(downtime_fields(model, obj));
     out.extend(look_fields(obj));
     out
+}
+
+/// The value of the "Política de acesso" of a wait: `Fifo`, `Lifo`, or `Desc` / `Asc` when
+/// it orders by a label.
+pub fn access_policy(
+    discipline: utsim_objects::Discipline,
+    order: Option<&utsim_objects::LabelOrder>,
+) -> String {
+    match order {
+        Some(utsim_objects::LabelOrder::Desc(_)) => "Desc".into(),
+        Some(utsim_objects::LabelOrder::Asc(_)) => "Asc".into(),
+        None => ron::debug(&discipline),
+    }
+}
+
+/// What a transporter, forklift, AGV or dispatcher serves (section "Atende"): the machines
+/// it operates and the objects whose items it carries, and how to change them.
+fn serves_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
+    if !is_mobile(&obj.kind) {
+        return Vec::new();
+    }
+    let s = "Atende";
+    let me = obj.name.as_str();
+    let operates: Vec<&str> = model
+        .objects
+        .iter()
+        .filter(|o| {
+            matches!(&o.kind, ObjectKind::Processor { operators: Some(op), .. } if op.team == me)
+        })
+        .map(|o| o.name.as_str())
+        .collect();
+    let carries: Vec<&str> = model
+        .objects
+        .iter()
+        .filter(|o| o.transport.as_deref() == Some(me))
+        .map(|o| o.name.as_str())
+        .collect();
+    let list = |v: &[&str]| {
+        if v.is_empty() {
+            "nenhum".to_owned()
+        } else {
+            v.join(", ")
+        }
+    };
+    vec![
+        Field::new(
+            s,
+            "serves.operates",
+            "Opera as máquinas",
+            FieldType::Info,
+            Value::Text(list(&operates)),
+        )
+        .help("Arraste do nó laranja até a máquina para ligar; clique na linha tracejada e no × para tirar."),
+        Field::new(
+            s,
+            "serves.carries",
+            "Leva os itens de",
+            FieldType::Info,
+            Value::Text(list(&carries)),
+        )
+        .help("Arraste do nó laranja até o objeto (uma espera, uma chegada, ou com Shift uma máquina) para ligar."),
+    ]
 }
 
 /// The model's name and description and its `run` settings, edited as object `"run"`.
@@ -1714,6 +1794,11 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
             ron::option(capacity, |v| v.to_string())
         }
         (ObjectKind::Queue { discipline, .. }, "discipline") => ron::debug(discipline),
+        (ObjectKind::Queue { order, .. }, "order") => match order {
+            Some(utsim_objects::LabelOrder::Asc(l)) => format!("Some(Asc({}))", ron::string(l)),
+            Some(utsim_objects::LabelOrder::Desc(l)) => format!("Some(Desc({}))", ron::string(l)),
+            None => "None".into(),
+        },
         (ObjectKind::Queue { batch, .. }, "batch") => {
             ron::option(batch, |b| ron::batch(b.size, b.max_wait, b.flush))
         }
@@ -2010,6 +2095,44 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
             "None".to_string()
         };
         return Ok(set(&obj.name, head, text));
+    }
+    if let ObjectKind::Queue { order, .. } = &obj.kind {
+        match (head, rest) {
+            ("discipline", "") => {
+                let v = value.as_text().ok_or("política esperada")?;
+                let label = order
+                    .as_ref()
+                    .map_or("prioridade".to_owned(), |o| o.label().to_owned());
+                let (discipline, order) = match v {
+                    "Fifo" | "Lifo" => (v.to_owned(), "None".to_owned()),
+                    "Desc" | "Asc" => (
+                        "Fifo".to_owned(),
+                        format!("Some({v}({}))", ron::string(&label)),
+                    ),
+                    _ => return Err(format!("política de acesso desconhecida: {v}")),
+                };
+                return Ok(Command::Batch(vec![
+                    set(&obj.name, "discipline", discipline),
+                    set(&obj.name, "order", order),
+                ]));
+            }
+            ("order", "label") => {
+                let l = value.as_text().ok_or("rótulo esperado")?.trim().to_owned();
+                if l.is_empty() {
+                    return Err("o rótulo da prioridade não pode ficar vazio".into());
+                }
+                let kind = match order {
+                    Some(utsim_objects::LabelOrder::Asc(_)) => "Asc",
+                    _ => "Desc",
+                };
+                return Ok(set(
+                    &obj.name,
+                    "order",
+                    format!("Some({kind}({}))", ron::string(&l)),
+                ));
+            }
+            _ => {}
+        }
     }
     match (head, rest) {
         ("transport", "") => {

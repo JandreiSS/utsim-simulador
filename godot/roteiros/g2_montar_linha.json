@@ -1,7 +1,7 @@
 {
 	"saida": "../capturas",
 	"passos": [
-		{"nota": "Monta chegada, fila, processo e saída pela Biblioteca, liga, simula, desfaz, salva e reabre."},
+		{"nota": "Monta chegada, espera, processo e saída pela Biblioteca, liga, simula, desfaz, salva e reabre."},
 		{"novo": true},
 		{"camera": {"alvo": [0, 0], "distancia": 22.0, "giro": 0.0, "inclinacao": 0.85}},
 		{"capturar": "g2_linha_01_vazio"},
@@ -13,16 +13,16 @@
 		{"esperar": 4},
 		{"capturar": "g2_linha_02_fantasma"},
 		{"clicar": {"chao": [-2.3, 0.2]}},
-		{"conferir": {"objetos": 2, "posicao": {"objeto": "fila", "x": -2.0, "y": 0.0}, "ferramenta": "selecionar"}},
+		{"conferir": {"objetos": 2, "posicao": {"objeto": "espera", "x": -2.0, "y": 0.0}, "ferramenta": "selecionar"}},
 		{"arrastar": {"de": {"controle": "Biblioteca_Processor"}, "para": {"chao": [2.0, 0.0]}}},
 		{"arrastar": {"de": {"controle": "Biblioteca_Sink"}, "para": {"chao": [6.0, 0.0]}}},
-		{"conferir": {"objetos": 4, "existe": ["chegada", "fila", "processo", "saida"], "problemas": 3}},
+		{"conferir": {"objetos": 4, "existe": ["chegada", "espera", "processo", "saida"], "problemas": 3}},
 		{"capturar": "g2_linha_03_blocos"},
 		{"nota": "Liga com a ferramenta Ligar: origem e destino."},
 		{"clicar": {"controle": "Ferramenta_Ligar"}},
 		{"clicar": {"objeto": "chegada"}},
-		{"clicar": {"objeto": "fila"}},
-		{"clicar": {"objeto": "fila"}},
+		{"clicar": {"objeto": "espera"}},
+		{"clicar": {"objeto": "espera"}},
 		{"clicar": {"objeto": "processo"}},
 		{"clicar": {"objeto": "processo"}},
 		{"mover": {"chao": [4.5, 1.5]}},
@@ -70,7 +70,7 @@
 		{"dialogo": "{saida}/g2_linha.ron"},
 		{"conferir": {"objetos": 4, "ligacoes": 3, "problemas": 0, "sujo": false,
 			"campo": {"objeto": "processo", "campo": "process", "valor": "Triangular(min: 1.0, mode: 2.0, max: 4.0)"},
-			"posicao": {"objeto": "fila", "x": -2.0, "y": 0.0}}},
+			"posicao": {"objeto": "espera", "x": -2.0, "y": 0.0}}},
 		{"capturar": "g2_linha_07_reaberto"}
 	]
 }
