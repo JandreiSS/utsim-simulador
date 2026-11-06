@@ -28,7 +28,7 @@ Model(
                  drift: 0.0002, cycle: Some(100), shift: Some(Normal(mean: 0.0, sd: 0.005)),
                  lsl: Some(24.95), usl: Some(25.05)),
             ],
-            unit_cost: Some(18.0),
+            unit_cost: Some(18.0), escape_cost: Some(250.0),
          ))),
         (name: "fila", kind: Queue(), position: (7.0, 0.0, 0.0)),
         (name: "inspecao", kind: Processor(process: Const(0.8)), output: ByLabel("inspecao"),
@@ -36,11 +36,11 @@ Model(
          inspection: Some((
             detect: 0.9, detect_by: {"rebarba": 0.7}, false_reject: 0.005,
             measure: [(characteristic: "diametro", sigma: 0.004)],
-            on_reject: Rework, max_rework: Some(2),
+            on_reject: Rework, max_rework: Some(2), cost: Some(0.6),
          ))),
         (name: "cliente", kind: Sink, sink_role: Some(Customer), position: (14.0, 0.0, 0.0)),
         (name: "retrabalho", kind: Processor(process: Exp(mean: 3.0)), position: (10.0, -4.0, 0.0),
-         rework: Some((fix: 0.9, fix_by: {"risco": 0.6})), ppe: ["luvas"]),
+         rework: Some((fix: 0.9, fix_by: {"risco": 0.6}, cost: Some(4.5))), ppe: ["luvas"]),
         (name: "refugo", kind: Sink, sink_role: Some(Scrap), position: (14.0, -4.0, 0.0)),
     ],
     connections: [

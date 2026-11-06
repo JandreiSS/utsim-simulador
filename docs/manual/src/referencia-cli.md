@@ -22,6 +22,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
 | `utsim qualidade simulado` | indicadores de qualidade de um modelo com defeitos, inspeção e retrabalho | [Defeitos, inspeção e retrabalho](defeitos-e-inspecao.md) |
+| `utsim ergonomia` | nota de ergonomia própria por elemento e por posto, sobre o estudo de tempos | [Ergonomia](ergonomia.md) |
 | `utsim exposicao` | tempo em zona de risco, entradas sem EPI e quase-conflitos simulados | [Zonas de risco, EPI e exposição](zonas-e-exposicao.md) |
 | `utsim estatistica` | descritiva e testes de hipótese (t, ANOVA com Tukey, qui-quadrado, proporções, Fisher, Mann-Whitney, Wilcoxon) sobre as colunas de um CSV | [Estatística](estatistica.md) |
 | `utsim planta` | lê uma planta DXF 2D (camadas, calibração, SVG) | [Planta CAD](planta-cad.md) |

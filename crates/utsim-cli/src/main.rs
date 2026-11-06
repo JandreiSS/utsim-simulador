@@ -3,6 +3,7 @@ mod cena;
 mod corredores;
 mod dados;
 mod emulate;
+mod ergonomia;
 mod estado;
 mod estatistica;
 mod experiment;
@@ -450,6 +451,12 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// Nota de ergonomia própria por elemento e por posto, sobre o estudo de tempos
+    #[command(disable_help_flag = true)]
+    Ergonomia {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Exposição a riscos na simulação: tempo em zona, entradas sem EPI e quase-conflitos
     /// simulados entre pessoas e veículos
     #[command(disable_help_flag = true)]
@@ -489,6 +496,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::Tempos { args } => tempos::run_args(args)?,
         Cmd::Linha { args } => linha::run_args(args)?,
         Cmd::Exposicao { args } => exposicao::run_args(args)?,
+        Cmd::Ergonomia { args } => ergonomia::run_args(args)?,
         Cmd::Pert {
             model,
             objetos,
