@@ -956,6 +956,16 @@ certificado de cada certificação sai na tela Certificação do programa. Os ar
 pasta `relatorios/` do projeto (ou `certificacoes/` do programa) e abrem no leitor de PDF do
 computador; refazer um relatório substitui o anterior.
 
+Os PDF trazem **gráficos** desenhados pelo próprio programa (linhas e barras, sem imagem):
+
+- cada análise guardada em Dados e análises tem o seu relatório, com o conjunto e a origem, o
+  hash, a conclusão, a tabela dos números e o gráfico: a carta de controle com a linha central,
+  os limites e os pontos com sinal em vermelho; num experimento, o Pareto dos efeitos, os
+  efeitos principais e as interações;
+- o A3 mostra o gráfico de cada Pareto do projeto, com a linha dos 80 %;
+- cada mapa do fluxo de valor tem o seu relatório, com os processos, os indicadores (e os do
+  estado atual, num mapa futuro) e a escada do lead time em barras de espera e de processo.
+
 - **Planilha** `.xlsx` com uma aba por tabela: ações, riscos, ganhos, cada FMEA e cada plano de
   controle, e os conjuntos de dados; números como números.
 - **CSV** das mesmas tabelas, separado por ponto e vírgula.
