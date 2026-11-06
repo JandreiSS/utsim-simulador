@@ -30,6 +30,14 @@ O resultado traz:
 
 Os botões "Gravar relatório HTML" e "Gravar CSV das medições" escrevem os arquivos na pasta `relatorios/` da unidade.
 
+## Custo da qualidade
+
+Escolha o modelo e o número de replicações e use "Rodar". O cálculo roda em segundo plano. Os custos do modelo aparecem com o rótulo "Origem: Simulado". A tabela mostra, para as quatro categorias (prevenção, avaliação, falha interna e falha externa), a média, o intervalo de confiança de 95 %, os lançamentos digitados e o total. Abaixo ficam os custos por posto e por defeito.
+
+Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar.
+
+"Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
+
 ## Limites desta versão
 
 O PDF do relatório, o plano de controle e as ferramentas de projeto (FMEA, A3, 8D) ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
