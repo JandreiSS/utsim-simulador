@@ -38,6 +38,11 @@ Os modelos da biblioteca são gerados pelo próprio UTSim, estão em `assets/mod
 | `bancada` | bancada de trabalho | |
 | `operador_simples` | pessoa estilizada, feita de blocos | |
 | `area` | faixa pintada no chão | |
+| `mesa` | mesa de trabalho com monitor e teclado (processos administrativos) | `desk`, `mesa_computador` |
+| `armario` | armário de pastas com duas portas | `armario_pastas` |
+| `bandeja` | bandeja de entrada de dois andares | `bandeja_entrada` |
+| `pilha_papeis` | pilha de pastas e papéis: o estoque de casos de uma caixa de entrada | `papeis`, `pilha_casos` |
+| `divisoria` | divisória entre mesas | |
 
 ### Escolha automática
 
@@ -134,6 +139,7 @@ Em **Simular** (e a primeira pessoa também em Editar), o menu **Câmera** da ba
 | Órbita | `1` | o de sempre: arrastar desloca, botão direito gira, roda aproxima |
 | Seguir | `2` | acompanha um recurso móvel por trás e por cima; o botão direito gira em volta dele e a roda muda a distância (ou use o controle "distância" do quadro no canto da vista) |
 | Primeira pessoa | `3` | anda pela planta a 1,6 m do chão |
+| Planta (2D) | | só na interface Godot: vista de cima, sem perspectiva, como uma planta baixa; arrastar com o botão direito desloca, a roda aproxima, e a vista nunca gira. Voltar à Órbita devolve o mesmo ângulo de antes |
 | Do recurso | `4` | vai nos olhos do motorista (empilhadeira; o motorista fica escondido), no ponto de vista de uma pessoa ou sobre o AGV; o botão direito olha em volta |
 
 - **Seguir um recurso:** clique num recurso móvel (ou escolha na lista de blocos) e use **Seguir este recurso** ou **Ver do recurso** no painel. Sem seleção, as teclas `2` e `4` escolhem o primeiro recurso móvel. Clicar em outro recurso enquanto segue passa a seguir esse. `Esc` sai do modo, e **Enquadrar (F)** volta à órbita e enquadra o modelo.
