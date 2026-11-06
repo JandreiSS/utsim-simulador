@@ -46,6 +46,7 @@
 //! `-distance / radius`.
 
 pub mod builder;
+pub mod epi;
 pub mod glb;
 pub mod loads;
 pub mod office;

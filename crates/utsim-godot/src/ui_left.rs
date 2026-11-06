@@ -104,6 +104,11 @@ pub struct SimView {
     pub camera: String,
     pub labels: bool,
     pub shadows: bool,
+    /// Camada "Segurança" (zonas, EPI, quase-conflitos, itens com defeito) e mapa de calor.
+    pub seguranca: bool,
+    pub calor: bool,
+    /// Quase-conflitos simulados `(instante, texto)`, para o salto da reprodução.
+    pub quase: Vec<(f64, String)>,
     pub summary: Summary,
 }
 
@@ -117,6 +122,9 @@ impl Default for SimView {
             camera: "orbita".into(),
             labels: true,
             shadows: true,
+            seguranca: false,
+            calor: false,
+            quase: Vec::new(),
             summary: Summary::default(),
         }
     }
@@ -490,7 +498,8 @@ fn sim_panel(
     ui.label(RichText::new("Blocos (clique para focar)").color(colors::TEXT));
     // Below the list: the camera, the buttons, the switches and the summary.
     let summary_h = (ui.available_height() * 0.32).clamp(110.0, 220.0);
-    let below = 3.0 * 32.0 + summary_h + 4.0 * 6.0;
+    let lista_quase = v.seguranca && !v.quase.is_empty();
+    let below = 3.0 * 32.0 + summary_h + 4.0 * 6.0 + 30.0 + if lista_quase { 110.0 } else { 0.0 };
     let list_h = (ui.available_height() - below).max(90.0);
     let area = ScrollArea::vertical()
         .id_salt("utsim_blocos")
@@ -546,7 +555,58 @@ fn sim_panel(
             }
         }
     });
+    camadas(ui, v, reg, out);
     summary(ui, &v.summary, summary_h, reg);
+}
+
+/// A camada de segurança e o mapa de calor (QS6): duas chaves e, com a camada ligada, a
+/// lista dos quase-conflitos simulados, cada um um botão que salta a reprodução até ele.
+fn camadas(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) {
+    ui.horizontal(|ui| {
+        for (name, text, on, what, tip) in [
+            (
+                "Simular_Seguranca",
+                "Segurança",
+                v.seguranca,
+                "seguranca",
+                "Zonas de risco, EPI das pessoas, quase-conflitos simulados, itens com defeito e inspeções",
+            ),
+            (
+                "Simular_Calor",
+                "Calor",
+                v.calor,
+                "calor",
+                "Mapa de calor da presença das pessoas e dos quase-conflitos no piso",
+            ),
+        ] {
+            let mut now = on;
+            let r = ui.checkbox(&mut now, text).on_hover_text(tip);
+            named_toggle(ui, reg, name, &r, text, on);
+            if r.changed() {
+                out.push(format!("{what}:{}", if now { "ligar" } else { "desligar" }));
+            }
+        }
+    });
+    if v.seguranca && !v.quase.is_empty() {
+        let area = ScrollArea::vertical()
+            .id_salt("utsim_quase")
+            .max_height(100.0)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new(format!("Quase-conflitos simulados ({})", v.quase.len()))
+                        .color(colors::TEXT_WEAK),
+                );
+                for (k, (t, text)) in v.quase.iter().enumerate().take(200) {
+                    let r = ui.small_button(text.as_str());
+                    named(ui, reg, &format!("Simular_Quase_{k}"), &r, text);
+                    if r.clicked() {
+                        out.push(format!("quase:{t}"));
+                    }
+                }
+            });
+        named_area(ui, reg, "Simular_Quase", area.inner_rect);
+    }
 }
 
 /// "Replicações" with a field and − +: the number is sent when typed (Enter or focus out)
@@ -948,6 +1008,7 @@ mod tests {
                 bottleneck: "processo".into(),
                 lines: vec!["processo: 120 saídas".into()],
             },
+            ..SimView::default()
         }
     }
 

@@ -418,6 +418,21 @@ impl UtsimUi {
         if let Some(x) = get("shadows") {
             v.shadows = x.try_to::<bool>().unwrap_or(v.shadows);
         }
+        if let Some(x) = get("seguranca") {
+            v.seguranca = x.try_to::<bool>().unwrap_or(v.seguranca);
+        }
+        if let Some(x) = get("calor") {
+            v.calor = x.try_to::<bool>().unwrap_or(v.calor);
+        }
+        if let Some(x) = get("quase")
+            && let Ok(list) = x.try_to::<VarArray>()
+        {
+            v.quase = list
+                .iter_shared()
+                .filter_map(|e| e.try_to::<VarArray>().ok())
+                .filter_map(|p| Some((p.get(0)?.try_to::<f64>().ok()?, p.get(1)?.to_string())))
+                .collect();
+        }
         if let Some(x) = get("summary")
             && let Ok(d) = x.try_to::<VarDictionary>()
         {

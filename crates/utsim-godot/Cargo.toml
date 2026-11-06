@@ -18,6 +18,7 @@ utsim-model.workspace = true
 utsim-objects.workspace = true
 utsim-scene.workspace = true
 utsim-assets.workspace = true
+utsim-exposicao.workspace = true
 utsim-edit.workspace = true
 utsim-linhas.workspace = true
 utsim-fit.workspace = true
