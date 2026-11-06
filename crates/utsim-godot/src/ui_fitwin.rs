@@ -712,108 +712,160 @@ fn comparison_table(
 ) {
     let order = cmp.order_by(w.sort);
     let mut summary = Vec::new();
-    ScrollArea::both()
+    let color_of = |c: &utsim_fit::CandidateResult| {
+        if c.fit_error.is_some() {
+            colors::TEXT_WEAK
+        } else if c.accepted() {
+            colors::TEXT
+        } else {
+            colors::WARNING
+        }
+    };
+    // The family column stays put; the measures scroll sideways beside it. Both grids
+    // have the same row height, so the rows line up.
+    ScrollArea::vertical()
         .id_salt("utsim_valores_comparacao")
         .max_height(height)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            egui::Grid::new("utsim_valores_grade")
-                .striped(true)
-                .spacing([14.0, 4.0])
-                .show(ui, |ui| {
-                    // Header: the measures sort the table; each one has its ⓘ.
-                    ui.label(small("família"));
-                    ui.label(small("parâmetros"));
-                    for m in Measure::ALL {
-                        ui.horizontal(|ui| {
-                            let on = w.sort == m;
-                            let text = if on {
-                                RichText::new(format!("{} ▼", m.short())).strong().color(colors::ACCENT)
-                            } else {
-                                RichText::new(m.short()).color(colors::TEXT_WEAK)
-                            };
-                            let r = ui
-                                .add(egui::Button::new(text).frame(false))
-                                .on_hover_text(format!("Ordena por {} ({})", m.label(), if m.lower_is_better() { "menor é melhor" } else { "maior é melhor" }));
-                            named(ui, reg, &format!("Valores_Ordem_{}", m.key()), &r, m.short());
-                            if r.clicked() {
-                                w.sort = m;
-                            }
-                            info_button(ui, w, reg, m.key());
-                        });
-                        if m.p_value_applies() {
-                            ui.label(small(&format!("{} p", m.short())));
-                        }
-                    }
-                    ui.label(small("escolhida por"));
-                    ui.end_row();
-                    for (pos, &i) in order.iter().enumerate() {
-                        let c = &cands[i];
-                        let sel = w.selected == Some(i);
-                        let color = if c.fit_error.is_some() {
-                            colors::TEXT_WEAK
-                        } else if c.accepted() {
-                            colors::TEXT
-                        } else {
-                            colors::WARNING
-                        };
-                        ui.horizontal(|ui| {
-                            let fam = if sel {
-                                RichText::new(format!("▶ {}", c.family)).strong().color(colors::ACCENT)
-                            } else {
-                                RichText::new(&c.family).color(color)
-                            };
-                            let r = ui
-                                .add_enabled(c.fit_error.is_none(), egui::Button::new(fam).frame(false))
-                                .on_hover_text(if c.accepted() {
-                                    "Aceita pelos testes. Clique para ver os gráficos e escolher."
-                                } else if c.fit_error.is_some() {
-                                    "Não se aplica a estes dados."
-                                } else {
-                                    "Rejeitada por algum teste (valor-p abaixo de 0,05). Ainda pode ser escolhida."
-                                });
-                            named(ui, reg, &format!("Valores_Cand_{pos}"), &r, &c.family);
-                            if r.clicked() {
-                                w.selected = Some(i);
-                            }
-                            if compare::explain(&c.family).is_some() {
-                                info_button(ui, w, reg, &c.family);
-                            }
-                        });
-                        let params = match &c.fit_error {
-                            Some(e) => e.clone(),
-                            None => c
-                                .params
-                                .iter()
-                                .map(|(k, v)| format!("{k} = {}", num(*v)))
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                        };
-                        ui.label(RichText::new(params).size(sizes::SMALL).color(color));
-                        for (m, measure) in Measure::ALL.iter().enumerate() {
-                            let v = measure.value(c).map_or("-".into(), |v| {
-                                format!("{} ({})", num(v), cmp.ranks[i][m].unwrap_or(0))
-                            });
-                            let mut t = RichText::new(v).color(color);
-                            if cmp.winners[m] == Some(i) {
-                                t = t.strong();
-                            }
-                            ui.label(t);
-                            if measure.p_value_applies() {
-                                let p = measure.p_value(c);
-                                let pc = match p {
-                                    Some(p) if p < 0.05 => colors::WARNING,
-                                    _ => color,
-                                };
-                                ui.label(RichText::new(p.map_or("-".into(), num)).color(pc));
-                            }
-                        }
-                        let by: Vec<&str> = cmp.chosen_by(i).iter().map(|m| m.short()).collect();
-                        ui.label(RichText::new(by.join(", ")).color(colors::ACCENT));
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                egui::Grid::new("utsim_valores_familias")
+                    .striped(true)
+                    .min_row_height(ROW)
+                    .spacing([14.0, 4.0])
+                    .show(ui, |ui| {
+                        ui.label(small("família"));
                         ui.end_row();
-                        summary.push(format!("{}:{}", c.family, by.join("+")));
-                    }
-                });
+                        for (pos, &i) in order.iter().enumerate() {
+                            let c = &cands[i];
+                            let sel = w.selected == Some(i);
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                let fam = if sel {
+                                    RichText::new(format!("▶ {}", c.family))
+                                        .strong()
+                                        .color(colors::ACCENT)
+                                } else {
+                                    RichText::new(&c.family).color(color_of(c))
+                                };
+                                let r = ui
+                                    .add_enabled(
+                                        c.fit_error.is_none(),
+                                        egui::Button::new(fam).frame(false),
+                                    )
+                                    .on_hover_text(if c.accepted() {
+                                        "Aceita pelos testes. Clique para ver os gráficos e escolher."
+                                    } else if c.fit_error.is_some() {
+                                        "Não se aplica a estes dados."
+                                    } else {
+                                        "Rejeitada por algum teste (valor-p abaixo de 0,05). Ainda pode ser escolhida."
+                                    });
+                                named(ui, reg, &format!("Valores_Cand_{pos}"), &r, &c.family);
+                                if r.clicked() {
+                                    w.selected = Some(i);
+                                }
+                                if compare::explain(&c.family).is_some() {
+                                    info_button(ui, w, reg, &c.family);
+                                }
+                            });
+                            ui.end_row();
+                        }
+                    });
+                ui.separator();
+                ScrollArea::horizontal()
+                    .id_salt("utsim_valores_medidas")
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        egui::Grid::new("utsim_valores_grade")
+                            .striped(true)
+                            .min_row_height(ROW)
+                            .spacing([14.0, 4.0])
+                            .show(ui, |ui| {
+                                // Header: the measures sort the table; each one has its ⓘ.
+                                ui.label(small("parâmetros"));
+                                for m in Measure::ALL {
+                                    ui.horizontal(|ui| {
+                                        ui.spacing_mut().item_spacing.x = 4.0;
+                                        let on = w.sort == m;
+                                        let text = if on {
+                                            RichText::new(format!("{} ▼", m.short()))
+                                                .strong()
+                                                .color(colors::ACCENT)
+                                        } else {
+                                            RichText::new(m.short()).color(colors::TEXT_WEAK)
+                                        };
+                                        let r = ui
+                                            .add(egui::Button::new(text).frame(false))
+                                            .on_hover_text(format!(
+                                                "Ordena por {} ({})",
+                                                m.label(),
+                                                if m.lower_is_better() {
+                                                    "menor é melhor"
+                                                } else {
+                                                    "maior é melhor"
+                                                }
+                                            ));
+                                        named(
+                                            ui,
+                                            reg,
+                                            &format!("Valores_Ordem_{}", m.key()),
+                                            &r,
+                                            m.short(),
+                                        );
+                                        if r.clicked() {
+                                            w.sort = m;
+                                        }
+                                        info_button(ui, w, reg, m.key());
+                                    });
+                                    if m.p_value_applies() {
+                                        ui.label(small(&format!("{} p", m.short())));
+                                    }
+                                }
+                                ui.label(small("escolhida por"));
+                                ui.end_row();
+                                for &i in &order {
+                                    let c = &cands[i];
+                                    let color = color_of(c);
+                                    let params = match &c.fit_error {
+                                        Some(e) => e.clone(),
+                                        None => c
+                                            .params
+                                            .iter()
+                                            .map(|(k, v)| format!("{k} = {}", num(*v)))
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
+                                    };
+                                    ui.label(RichText::new(params).size(sizes::SMALL).color(color));
+                                    for (m, measure) in Measure::ALL.iter().enumerate() {
+                                        let v = measure.value(c).map_or("-".into(), |v| {
+                                            format!("{} ({})", num(v), cmp.ranks[i][m].unwrap_or(0))
+                                        });
+                                        let mut t = RichText::new(v).color(color);
+                                        if cmp.winners[m] == Some(i) {
+                                            t = t.strong();
+                                        }
+                                        ui.label(t);
+                                        if measure.p_value_applies() {
+                                            let p = measure.p_value(c);
+                                            let pc = match p {
+                                                Some(p) if p < 0.05 => colors::WARNING,
+                                                _ => color,
+                                            };
+                                            ui.label(
+                                                RichText::new(p.map_or("-".into(), num)).color(pc),
+                                            );
+                                        }
+                                    }
+                                    let by: Vec<&str> =
+                                        cmp.chosen_by(i).iter().map(|m| m.short()).collect();
+                                    ui.label(RichText::new(by.join(", ")).color(colors::ACCENT));
+                                    ui.end_row();
+                                    summary.push(format!("{}:{}", c.family, by.join("+")));
+                                }
+                            });
+                    });
+            });
         });
     let text = format!(
         "linhas={} ordem={} escolhida={} criterios={}",
@@ -838,6 +890,9 @@ fn comparison_table(
         },
     );
 }
+
+/// The height of a row of the comparison (both halves, so they line up).
+const ROW: f32 = 24.0;
 
 fn still(p: Plot<'_>) -> Plot<'_> {
     p.allow_zoom(false)
