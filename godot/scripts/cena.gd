@@ -184,6 +184,8 @@ func build(pb: Object, keep_templates := false) -> void:
 		label.position = Vector3(0, top + 0.3, 0)
 		root.add_child(label)
 		if b.has("preview_color"):
+			# The label goes up over the preview item (and the ring of its types).
+			label.position.y = top + 0.55
 			# C7: a small item of the colour the source's items get, over it.
 			var item := MeshInstance3D.new()
 			item.name = "PreviaItem"
