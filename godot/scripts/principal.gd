@@ -106,6 +106,8 @@ var _data_pick_path := ""
 var last_report := {}
 ## A recorded replay (`.json`) is being played instead of the document.
 var playing_replay := false
+## A scripted run (`roteiro.gd`) drives the window: no system dialogs, no browser.
+var scripted := false
 ## The kinds of team and request lines hidden (the "Ligações" toggles of the bar).
 var links_hidden: Array = []
 
@@ -231,7 +233,7 @@ func _build_ui() -> void:
 	_ui.add_child(_replay_dialog)
 	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
 	# answers them itself, so it keeps the Godot ones.
-	var scripted := Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	scripted = Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
 	if DisplayServer.get_name() != "headless" and not scripted:
 		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
 			d.use_native_dialog = true
@@ -933,7 +935,8 @@ func write_data_report(dir: String) -> void:
 		last_report = done.data()
 		var index := String(last_report.get("index", ""))
 		set_status("Relatório gravado em %s (%d arquivos)." % [dir, int(last_report.get("files", 0))])
-		if index != "" and DisplayServer.get_name() != "headless":
+		# A scripted run checks the files; it does not open the browser.
+		if index != "" and DisplayServer.get_name() != "headless" and not scripted:
 			OS.shell_open(index))
 
 

@@ -385,7 +385,12 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
   resultado pela tabela com que rodou. Até chegar, ou se a fonte sozinha não rodar, o painel
   mostra a estimativa lida da tabela e diz qual das duas é. Teste
   `the_preview_runs_the_source_alone` (a rodada cria o que a tabela diz).
-- Conferência com janela pendente (tela não liberada).
+- Conferência com janela a 1600×900 e 1280×720 (2026-11-05: Resultados, fila na esteira,
+  PERT/CPM, dados reais, rede, fluxos, equipes, fonte no 3D e editores de chegadas). Achados e
+  correções: o × de remover linha e período saía como caixa (o ✕ não existe na fonte de
+  interface); a caixinha de prévia da fonte ficava sob o rótulo (o rótulo sobe); um roteiro com
+  janela abria o relatório dos dados no navegador e o Godot não fechava no fim (com roteiro, o
+  navegador não abre).
 
 ### Plano original do passo 2b
 

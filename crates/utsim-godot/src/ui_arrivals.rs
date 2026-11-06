@@ -1146,7 +1146,7 @@ fn table_editor(
                 ui,
                 reg,
                 &format!("{line}_remover"),
-                "✕",
+                "×",
                 "Remover a linha",
                 true,
             ) {
@@ -1688,7 +1688,7 @@ fn schedule_editor(
                 ui,
                 reg,
                 &format!("{line}_remover"),
-                "✕",
+                "×",
                 "Remover o período",
                 true,
             ) {
