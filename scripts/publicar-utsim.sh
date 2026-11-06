@@ -34,8 +34,15 @@ PASTA=$(mktemp -d)
 trap 'rm -rf "$PASTA"' EXIT
 # A interface 3D entra quando já foi exportada (scripts/godot_exportar.sh).
 GODOT_EXPORT=target/godot-export/${PLATAFORMA%%-*}
+# Com ela, o launcher abre a interface 3D (Godot com a moldura em Rust); sem ela, o editor utsim-view.
+ARGS=(--arg=--novo)
 if [ -f "$GODOT_EXPORT/utsim-3d.pck" ]; then
     bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release "$GODOT_EXPORT"
+    case "$PLATAFORMA" in
+        windows-x64) EXE=3d/utsim-3d.exe ;;
+        *) EXE=3d/utsim-3d.x86_64 ;;
+    esac
+    ARGS=()
 else
     bash scripts/preparar-pacote.sh "$PASTA/utsim" target/release
 fi
