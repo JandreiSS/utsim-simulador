@@ -509,6 +509,30 @@ com o sinal e a ação imediata no título, a contenção no "como", quem aciona
 prazo (se for uma data) e a origem "sinal do plano de resposta". Cada vez que o sinal ocorre,
 um cartão novo; "Abrir cartão" leva ao último.
 
+### Mapa do fluxo de valor
+
+Um mapa por estado: o **atual** (fase Medir) e o **futuro** (fase Melhorar). Cada linha é um
+processo na ordem do fluxo, com o tempo de ciclo, o setup, a disponibilidade em %, os
+operadores, o estoque que espera antes dele (em unidades) e se ele agrega valor. No alto do
+mapa ficam a demanda por dia, o tempo disponível por dia e a unidade de tempo.
+
+Com a demanda e o tempo disponível, o app calcula:
+
+- o **takt**: tempo disponível ÷ demanda, o ritmo do cliente;
+- a **espera** de cada estoque: estoque × takt, o tempo que ele leva para ser consumido no
+  ritmo do cliente;
+- a **escada do lead time**, desenhada abaixo da tabela: a espera de cada estoque no degrau de
+  baixo (laranja) e o tempo de ciclo do processo no de cima (verde quando agrega valor);
+- o **lead time** (soma das esperas e dos ciclos), o tempo que agrega valor, a **eficiência do
+  ciclo do processo** (tempo que agrega valor ÷ lead time) e o estoque em dias de demanda;
+- os processos **acima do takt**, pelo ciclo dividido pela disponibilidade, e o mais lento.
+
+"Criar o estado futuro a partir deste" copia o mapa atual para um entregável novo na fase
+Melhorar, ligado ao atual; nele a equipe muda os processos e os estoques para o fluxo desejado,
+e o mapa mostra o lead time e a eficiência antes e depois. Com o modelo UTSim ligado, "Gerar o
+VSM atual como entregável" (tela Modelo UTSim) preenche o mapa atual com os processos do caminho
+principal do modelo, o estoque médio antes de cada um e a disponibilidade medida numa rodada.
+
 ### A3
 
 Uma página com o projeto inteiro em sete blocos: contexto, condição atual, objetivo, análise
@@ -716,6 +740,15 @@ estimado, origem simulação, ligado ao estudo, com a memória de cálculo compl
 arquivo e do modelo, semente, replicações, diferença com o intervalo e a conta). O app relê o
 `estudo.json` e confere o hash antes de lançar: um arquivo mudado depois de guardado é recusado.
 Como todo ganho por simulação, ele só passa a validado com lançamentos reais.
+
+### Mapa do fluxo de valor e diagrama de espaguete
+
+"Mapa do fluxo de valor (página)" e "Diagrama de espaguete (página)" rodam o modelo uma vez com
+o rastro, num fio de trabalho, gravam a página em `dados/` e a abrem no navegador. O espaguete
+desenha sobre a planta todos os deslocamentos de itens, pessoas e veículos; a tela mostra as
+viagens e a distância de cada recurso móvel e dos itens, e guarda essas distâncias como análise
+do modelo, ligada à versão dele. "Gerar o VSM atual como entregável" cria o mapa do fluxo de
+valor do projeto a partir do modelo (veja [Mapa do fluxo de valor](#mapa-do-fluxo-de-valor)).
 
 ### Caminho crítico observado
 
