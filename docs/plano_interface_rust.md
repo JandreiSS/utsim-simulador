@@ -417,6 +417,30 @@ bloco selecionado e sob o mouse, e a seleção e a origem da ligação ganhavam 
 - Roteiro `godot/roteiros/g4_nos.json` (alvo `remover_ligacao`, conferências
   `ligacao_selecionada` e `no_destacado`); o `g2_tutorial_01` continua passando.
 
+### Selecionar como padrão e o nó do operador (2026-11-06)
+
+Pedido do dono depois da dev.5: o Selecionar tem de ser o padrão e melhor, e ligar o operador
+às máquinas tem de ser óbvio.
+
+- Selecionar: a ferramenta ao abrir e ao criar um modelo (`principal.gd`), depois de colocar,
+  depois de uma ligação pelos nós (um clique num nó de saída sem ligação não troca mais para o
+  Ligar: a barra diz para arrastar) e com Esc nas outras (já era). A seleção não some ao trocar
+  de ferramenta. Clique: um bloco pequeno na tela é pego a até 18 px do centro (`PICK_CENTRE`);
+  cantos da seleção mais grossos e longos. Arrastar move e a caixa no chão seleciona (já
+  existiam; o roteiro confere). Corrigido: um clique numa ligação passava pelo fim de uma
+  ligação pelo nó e trocava a ferramenta para o Ligar.
+- Operador: transportador e despachante ganham um nó laranja (`port_service`, lado `+x`).
+  Arrastar dele até um processo liga os `operators` do processo (`team_link(processo, recurso,
+  true)`); até um despachante, o transportador entra na equipe; até outro objeto, o `transport`
+  (com Shift também num processo). Ligação que já existe não é desfeita pelo arrasto, só avisa.
+  As linhas tracejadas de equipe se selecionam com um clique (`team_line_at`), mostram o × e
+  saem pelo × ou pelo Del (o mesmo `team_link`, um passo de desfazer); a barra diz "operador
+  opera processo". Com o operador selecionado ou recém-colocado, a barra explica o nó.
+- Painel: a seção do processo passou de "Precisa de operadores" a **Operadores**, com "Quem
+  opera" e a ajuda do nó laranja.
+- Roteiro `godot/roteiros/g4_operador.json`; manual com o passo a passo "Como ligar um operador
+  a uma máquina" (`recursos-moveis.md`). Conferência com janela a 1600×900 e 1280×720.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do

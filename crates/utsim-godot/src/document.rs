@@ -97,8 +97,8 @@ pub fn add_command(id: &str, name: &str, position: [f64; 3]) -> Option<Command> 
 pub fn connect_blocked(kind: &str) -> Option<&'static str> {
     match kind {
         "Transporter" | "Dispatcher" => Some(
-            "Transportadores e despachantes não usam ligações. Use o campo \"Transporte de \
-             saída\" (nos objetos que enviam itens) ou \"Precisa de operadores\" (nos processos).",
+            "Transportadores e despachantes não usam ligações de fluxo: arraste do nó laranja \
+             deles até a máquina que operam (ou até o objeto cujos itens levam).",
         ),
         _ => None,
     }

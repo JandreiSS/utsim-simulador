@@ -1,0 +1,362 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{
+			"nota": "Selecionar é a ferramenta padrão; o operador liga à máquina arrastando do nó laranja dele, a linha tracejada aparece, um clique nela mostra o × que a remove, com desfazer."
+		},
+		{
+			"novo": true
+		},
+		{
+			"conferir": {
+				"ferramenta": "selecionar"
+			}
+		},
+		{
+			"camera": {
+				"alvo": [
+					4,
+					2
+				],
+				"distancia": 18.0,
+				"giro": 0.0,
+				"inclinacao": 0.85
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"controle": "Biblioteca_Processor"
+				},
+				"para": {
+					"chao": [
+						2.0,
+						0.0
+					]
+				}
+			}
+		},
+		{
+			"conferir": {
+				"ferramenta": "selecionar",
+				"selecao": [
+					"processo"
+				]
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"controle": "Biblioteca_Processor"
+				},
+				"para": {
+					"chao": [
+						7.0,
+						0.0
+					]
+				}
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"controle": "Biblioteca_Operator"
+				},
+				"para": {
+					"chao": [
+						4.0,
+						4.0
+					]
+				}
+			}
+		},
+		{
+			"conferir": {
+				"objetos": 3,
+				"existe": [
+					"operador"
+				],
+				"ferramenta": "selecionar"
+			}
+		},
+		{
+			"nota": "Com o operador selecionado, a barra de status explica o nó laranja."
+		},
+		{
+			"clicar": {
+				"objeto": "operador"
+			}
+		},
+		{
+			"conferir": {
+				"selecao": [
+					"operador"
+				],
+				"status_contem": "nó laranja"
+			}
+		},
+		{
+			"mover": {
+				"no_atende": "operador"
+			}
+		},
+		{
+			"conferir": {
+				"no_destacado": [
+					"operador",
+					"service"
+				]
+			}
+		},
+		{
+			"nota": "Do nó laranja até a máquina: o operador passa a operá-la."
+		},
+		{
+			"arrastar": {
+				"de": {
+					"no_atende": "operador"
+				},
+				"para": {
+					"objeto": "processo"
+				}
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"operadores",
+					"processo",
+					"operador"
+				],
+				"ferramenta": "selecionar"
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"no_atende": "operador"
+				},
+				"para": {
+					"objeto": "processo_2"
+				}
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"operadores",
+					"processo_2",
+					"operador"
+				]
+			}
+		},
+		{
+			"nota": "No painel da máquina, a seção Operadores mostra quem a opera."
+		},
+		{
+			"clicar": {
+				"objeto": "processo_2"
+			}
+		},
+		{
+			"conferir": {
+				"visivel": [
+					"Prop_operators_ligado",
+					"Prop_operators_team"
+				]
+			}
+		},
+		{
+			"nota": "Arrastar de novo até a mesma máquina não desfaz: só avisa."
+		},
+		{
+			"arrastar": {
+				"de": {
+					"no_atende": "operador"
+				},
+				"para": {
+					"objeto": "processo"
+				}
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"operadores",
+					"processo",
+					"operador"
+				],
+				"status_contem": "Já está ligado"
+			}
+		},
+		{
+			"nota": "Clique na linha tracejada: selecionada, o × a remove; Ctrl+Z volta."
+		},
+		{
+			"tecla": "escape"
+		},
+		{
+			"clicar": {
+				"linha_equipe": [
+					"operadores",
+					"processo",
+					"operador"
+				]
+			}
+		},
+		{
+			"conferir": {
+				"linha_equipe_selecionada": [
+					"operadores",
+					"processo",
+					"operador"
+				],
+				"status_contem": "operador opera processo"
+			}
+		},
+		{
+			"clicar": {
+				"remover_ligacao": true
+			}
+		},
+		{
+			"conferir": {
+				"sem_linha_equipe": [
+					"operadores",
+					"processo",
+					"operador"
+				],
+				"linha_equipe": [
+					"operadores",
+					"processo_2",
+					"operador"
+				]
+			}
+		},
+		{
+			"tecla": "ctrl+z"
+		},
+		{
+			"conferir": {
+				"linha_equipe": [
+					"operadores",
+					"processo",
+					"operador"
+				]
+			}
+		},
+		{
+			"nota": "Del também remove a linha selecionada."
+		},
+		{
+			"clicar": {
+				"linha_equipe": [
+					"operadores",
+					"processo_2",
+					"operador"
+				]
+			}
+		},
+		{
+			"tecla": "delete"
+		},
+		{
+			"conferir": {
+				"sem_linha_equipe": [
+					"operadores",
+					"processo_2",
+					"operador"
+				],
+				"objetos": 3
+			}
+		},
+		{
+			"nota": "Esc em outra ferramenta volta ao Selecionar, e a seleção continua."
+		},
+		{
+			"clicar": {
+				"objeto": "processo"
+			}
+		},
+		{
+			"tecla": "l"
+		},
+		{
+			"conferir": {
+				"ferramenta": "ligar"
+			}
+		},
+		{
+			"tecla": "escape"
+		},
+		{
+			"conferir": {
+				"ferramenta": "selecionar",
+				"selecao": [
+					"processo"
+				]
+			}
+		},
+		{
+			"nota": "Caixa de seleção no chão pega as duas máquinas; arrastar uma move as duas."
+		},
+		{
+			"arrastar": {
+				"de": {
+					"chao": [
+						0.0,
+						-2.0
+					]
+				},
+				"para": {
+					"chao": [
+						9.0,
+						1.5
+					]
+				}
+			}
+		},
+		{
+			"conferir": {
+				"selecao": [
+					"processo",
+					"processo_2"
+				]
+			}
+		},
+		{
+			"arrastar": {
+				"de": {
+					"objeto": "processo_2"
+				},
+				"para": {
+					"chao": [
+						7.0,
+						-1.0
+					]
+				}
+			}
+		},
+		{
+			"conferir": {
+				"posicao": {
+					"objeto": "processo_2",
+					"x": 7.0,
+					"y": -1.0
+				}
+			}
+		},
+		{
+			"conferir": {
+				"posicao": {
+					"objeto": "processo",
+					"x": 2.0,
+					"y": -1.0
+				}
+			}
+		},
+		{
+			"capturar": "g4_operador"
+		}
+	]
+}

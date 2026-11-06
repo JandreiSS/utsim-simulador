@@ -79,6 +79,8 @@ No Editar, cada objeto com fluxo tem dois **nós** pequenos nos lados: o de **sa
 | Remover a ligação selecionada | clique no **×** vermelho no meio da seta, ou tecle `Delete` |
 | Desfazer e refazer | `Ctrl+Z` e `Ctrl+Y`, um passo por ligação |
 
+**Selecionar** é a ferramenta padrão: ela está ativa ao abrir um modelo, depois de colocar um objeto da Biblioteca e depois de uma ligação, e `Esc` em qualquer outra ferramenta volta a ela, sem perder a seleção. Com ela, um clique seleciona (um objeto pequeno na tela também é pego clicando perto do centro dele), arrastar um objeto move a seleção, `Shift` + clique soma à seleção, e arrastar no chão vazio desenha uma caixa que seleciona o que estiver dentro. Transportadores e despachantes têm um terceiro nó, **laranja**, que liga quem opera cada máquina; veja [Como ligar um operador a uma máquina](recursos-moveis.md#como-ligar-um-operador-a-uma-máquina).
+
 O objeto selecionado é marcado só nos quatro cantos (em vermelho, os objetos com problema), sem moldura em volta, para não cobrir os nós. Numa ligação curta, o × fica ao lado da seta. A ferramenta **Ligar** (`L`) continua valendo: arraste de um objeto ao outro, ou clique na origem e depois no destino. O arquivo `.ron` grava as ligações como sempre, na lista `connections`.
 
 A simulação nunca é conduzida pela janela. O botão **▶ Simular** roda o motor em outra tarefa e a janela apenas lê o resultado gravado. Por isso o que você vê é exatamente o que o `utsim run` calcula.

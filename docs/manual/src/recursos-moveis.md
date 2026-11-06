@@ -220,7 +220,18 @@ A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`lin
 
 Na interface 3D essas linhas aparecem nos dois modos, cada tipo com a sua cor e o seu traço (equipe em lilás tracejado, transporte e operadores pontilhados, manutenção em vermelho, casa e pausa em verde e azul). No **Editar** ficam acesas, mais fortes as do objeto selecionado; no **Simular** ficam apagadas, e acendem as do bloco seguido (clique nele na lista de blocos). No Simular cada membro de uma equipe tem um anel no chão na cor do estado, o membro seguido mostra uma linha até aonde a tarefa atual o leva, e o rótulo do despachante diz quantos membros estão livres (`operadores · 1/2 livres`). O menu ▼ ao lado de **PERT/CPM** liga ou desliga cada tipo de linha.
 
-A ferramenta **Equipe** (botão na barra, tecla `E`, ou `Alt` segurado com a ferramenta Ligar) edita as ligações arrastando de um objeto a outro:
+### Como ligar um operador a uma máquina
+
+1. No **Editar**, com a ferramenta **Selecionar** (a de sempre), coloque a máquina (**Processo**) e o **Operador**, pela Biblioteca.
+2. Clique no operador. Ao lado dele aparece um **nó laranja** (o despachante de uma equipe tem o mesmo nó), e a barra de status lembra o que fazer.
+3. Arraste do nó laranja até a máquina e solte. Uma linha laranja tracejada acompanha o mouse enquanto você arrasta.
+4. Pronto: a linha tracejada fica entre o operador e a máquina, e a máquina passa a esperar o operador livre para a preparação e o processamento. Repita para cada máquina que ele atende.
+5. Para conferir ou ajustar, clique na máquina. No painel de propriedades, a seção **Operadores** mostra **Quem opera** e quantos operadores ela pede; ali você também pode escolher outro operador ou desmarcar a seção.
+6. Para desligar, clique na linha tracejada. Ela acende, e um **×** vermelho aparece no meio dela: clique no × ou tecle `Delete`. `Ctrl+Z` desfaz.
+
+O mesmo nó laranja serve para os outros pedidos: soltando sobre um objeto que não é máquina (uma fila, uma chegada), o recurso passa a levar os itens dele (`transport`); com `Shift` ao soltar sobre uma máquina, também. Arrastar um transportador até um despachante o põe na equipe dele. Se a ligação já existe, nada muda e a barra de status avisa. Transportador, empilhadeira e AGV têm o mesmo nó do operador.
+
+A ferramenta **Equipe** (botão na barra, tecla `E`, ou `Alt` segurado com a ferramenta Ligar) continua valendo e edita as ligações arrastando de um objeto a outro:
 
 - do despachante a um transportador: o transportador entra na equipe (de novo: sai);
 - de um objeto a um transportador ou despachante: esse passa a levar os itens do objeto (`transport`; de novo: limpa);

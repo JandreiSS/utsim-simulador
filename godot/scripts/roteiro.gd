@@ -60,7 +60,9 @@
 ##    `{"item": ["Lista", 0]}` (an item of an ItemList),
 ##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
 ##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's nodes),
-##    `{"remover_ligacao": true}` (the × of the selected connection),
+##    `{"remover_ligacao": true}` (the × of the selected connection or team line),
+##    `{"no_atende": "operador_1"}` (the orange service node of a transporter or dispatcher),
+##    `{"linha_equipe": ["operadores", "processo", "operador_1"]}` (the middle of a team line),
 ##    `{"no": "nome"}` (a node of the path network), `{"trecho": ["de", "para"]}` (the
 ##    middle of an edge), `{"vertice": ["corredor_1", 0]}` (a vertex of an aisle),
 ##    `{"corredor": "corredor_1"}` (the middle of its first segment), `{"acesso": "objeto"}`
@@ -536,6 +538,14 @@ func _target(t: Variant) -> Variant:
 			if tabs.get_tab_title(i) == String(d["aba"][1]):
 				return bar.get_global_transform() * bar.get_tab_rect(i).get_center()
 		return null
+	if d.has("no_atende"):
+		var at = _main.editor.port_service(String(d["no_atende"]))
+		if at == null or cam.is_position_behind(at):
+			return null
+		return cam.unproject_position(at)
+	if d.has("linha_equipe"):
+		var l: Array = d["linha_equipe"]
+		return _main.editor.team_line_screen(String(l[0]), String(l[1]), String(l[2]))
 	if d.has("remover_ligacao"):
 		return _main.editor.remove_screen()
 	if d.has("ligacao"):
@@ -714,7 +724,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
 ## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
 ## `ligacao_selecionada` (`[de, para]`, or []), `no_destacado` (the node under the mouse,
-## `[bloco, "out"|"in"]`, or []),
+## `[bloco, "out"|"in"|"service"]`, or []), `linha_equipe` / `sem_linha_equipe`
+## (`[tipo, de, para]`: a team line exists or not), `linha_equipe_selecionada`,
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
 ## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
 ##
@@ -827,6 +838,16 @@ func _check(c: Dictionary, k: int) -> void:
 			"ligacao_selecionada":
 				var sel: Array = _main.editor.selected_link
 				report.call("ligação selecionada", sel == Array(want), str(sel))
+			"linha_equipe":
+				var l: Array = want
+				report.call("linha %s" % str(l), _main.editor.has_team_line(l[0], l[1], l[2]), "")
+			"sem_linha_equipe":
+				var l: Array = want
+				report.call("sem linha %s" % str(l), not _main.editor.has_team_line(l[0], l[1], l[2]), "")
+			"linha_equipe_selecionada":
+				var sel: Dictionary = _main.editor.selected_team
+				var got := [sel.get("kind", ""), sel.get("from", ""), sel.get("to", "")] if not sel.is_empty() else []
+				report.call("linha de equipe selecionada", got == Array(want), str(got))
 			"no_destacado":
 				var lit: Array = _main.editor._hover_port
 				report.call("nó destacado", lit == Array(want), str(lit))

@@ -623,6 +623,7 @@ func new_document(force := false) -> void:
 	var go := func():
 		doc.new_model("novo_modelo")
 		model_path = ""
+		editor.set_tool("selecionar")
 		editor.clear_selection()
 		set_mode("editar")
 		after_edit(true)
@@ -647,6 +648,7 @@ func open_model(path: String) -> bool:
 		set_status("Não abriu %s: %s" % [path.get_file(), r["error"]])
 		return false
 	model_path = path
+	editor.set_tool("selecionar")
 	editor.clear_selection()
 	if mode != "editar":
 		set_mode("editar")

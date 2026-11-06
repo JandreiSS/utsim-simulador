@@ -973,8 +973,8 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             ));
             out.push(dist_field(s, "process", "Tempo de processamento", process));
             out.push(
-                group(s, "operators", "Precisa de operadores", operators.is_some())
-                    .help("O processo espera um transportador ou despachante livre."),
+                group(s, "operators", "Operadores", operators.is_some())
+                    .help("Quem opera esta máquina: marque e escolha abaixo, ou arraste do nó laranja do operador (ou da equipe) até a máquina. O processo espera um deles livre."),
             );
             if let Some(op) = operators {
                 let mut names = vec![];
@@ -988,7 +988,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     Field::new(
                         s,
                         "operators.team",
-                        "Equipe",
+                        "Quem opera",
                         FieldType::Choice,
                         Value::Text(op.team.clone()),
                     )

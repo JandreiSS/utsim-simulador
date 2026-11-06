@@ -20,6 +20,18 @@
 ## connects by dragging from block to block, or by clicking the origin and then the
 ## destination. The selection is marked only at the corners, so nothing covers the nodes.
 ##
+## Selecionar is the tool in use by default: when a model opens, after placing an object,
+## after a connection and after Esc in any other tool. A click hits a block by its box or,
+## when the box is small on screen, within a few pixels of its centre; dragging a block
+## moves the selection and dragging on the floor draws a box that selects what is inside.
+##
+## Who serves whom (operators): a transporter or dispatcher has an orange service node.
+## Dragging from it to a processor makes that resource operate the processor (the
+## processor's `operators`); to a dispatcher, the transporter joins its team; to any other
+## object, the resource carries that object's items (its `transport`; Shift on a processor
+## does this too). The links are the dashed lines; a click on one selects it and its × (or
+## Del) removes it.
+##
 ## The path network has its own tool, Rede (N, `rede.gd`), drawn in this same overlay, and
 ## so do the circulation aisles: the Corredor tool (C, `corredores.gd`), which also draws
 ## the obstacles, the clearances and the access points when they are shown.
@@ -52,6 +64,12 @@ const PORT_PIXELS := 14.0
 const PORT_HOVER := Color(1.0, 1.0, 1.0)
 const PORT_RING := Color(0.06, 0.07, 0.09, 0.9)
 const REMOVE := Color(0.92, 0.26, 0.22)
+## The service node of a transporter or dispatcher (the colour of the operator lines).
+const PORT_SERVICE := Color(1.0, 0.58, 0.12)
+## Kinds with a service node.
+const SERVICE := ["Transporter", "Dispatcher"]
+## Screen radius around a block's centre that still picks it (small blocks far away).
+const PICK_CENTRE := 18.0
 const CRITICAL := Color(1.0, 0.30, 0.22)
 ## The team and request lines by kind: colour and dash (metres drawn, metres skipped).
 const TEAM_LINES := {
@@ -112,6 +130,10 @@ var _hover_port: Array = []
 ## The block an input node was dragged from (the connection ends there), or "".
 var connect_to := ""
 var _remove_label: Label3D
+## Selected team or request line: `{kind, from, to}` (block names), or empty.
+var selected_team := {}
+## The resource a service link is dragged from, or "".
+var serve_from := ""
 var _team_lines: MeshInstance3D
 var _team_mesh: ImmediateMesh
 var _links: Array = []
@@ -197,12 +219,14 @@ func set_tool(name: String, id := "") -> void:
 	tool = name
 	place_id = id if name == "colocar" else ""
 	connect_from = ""
+	connect_to = ""
 	team_from = ""
+	serve_from = ""
 	_show_ghost(place_id)
 	main.on_tool_changed()
 	match name:
 		"equipe":
-			main.set_status("Equipe: arraste do despachante a um transportador, ou de um objeto a quem leva os itens (Shift: de um processo a quem fornece os operadores); de novo desfaz. Esc cancela.")
+			main.set_status("Equipe: arraste do despachante a um transportador, ou de um objeto a quem leva os itens (Shift: de um processo a quem fornece os operadores); de novo desfaz. Mais fácil: arraste do nó laranja do operador até a máquina. Esc cancela.")
 		"ligar":
 			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
 		"colocar":
@@ -218,7 +242,17 @@ func set_tool(name: String, id := "") -> void:
 func select_only(name: String) -> void:
 	selected = [name]
 	selected_link = []
+	selected_team = {}
 	main.on_selection_changed()
+	_service_hint(name)
+
+
+## The hint shown when a transporter or dispatcher is selected or placed.
+func _service_hint(name: String) -> void:
+	var c := cena()
+	var i := c.block_index(name) if c != null else -1
+	if i >= 0 and SERVICE.has(_kind_of(i)):
+		main.set_status("%s: arraste do nó laranja dele até uma máquina para que ele a opere (ou até um objeto, para levar os itens dele)." % name)
 
 
 func select_names(names: Array, add: bool) -> void:
@@ -228,6 +262,7 @@ func select_names(names: Array, add: bool) -> void:
 		if not selected.has(n):
 			selected.append(n)
 	selected_link = []
+	selected_team = {}
 	main.on_selection_changed()
 
 
@@ -243,6 +278,7 @@ func toggle(name: String) -> void:
 func clear_selection() -> void:
 	selected = []
 	selected_link = []
+	selected_team = {}
 	main.on_selection_changed()
 
 
@@ -332,6 +368,14 @@ func hits_at(p: Vector2) -> Array:
 	var names := []
 	for f in found:
 		names.append(f[1])
+	if names.is_empty():
+		# A block small on screen: within PICK_CENTRE pixels of its centre.
+		var best := PICK_CENTRE
+		for i in c.blocks.size():
+			var sp = block_screen(String(c.blocks[i]["name"]))
+			if sp != null and (sp as Vector2).distance_to(p) < best:
+				best = (sp as Vector2).distance_to(p)
+				names = [String(c.blocks[i]["name"])]
 	return names
 
 
@@ -376,6 +420,23 @@ func port_in(name: String) -> Variant:
 		return null
 	var box := _box_of(i)
 	return Vector3(box.position.x - 0.25, 0.06, box.get_center().z)
+
+
+## The service node of a transporter or dispatcher (on its `+x` side), or null.
+func port_service(name: String) -> Variant:
+	var i := cena().block_index(name)
+	if i < 0 or not SERVICE.has(_kind_of(i)):
+		return null
+	var box := _box_of(i)
+	return Vector3(box.end.x + 0.3, 0.06, box.get_center().z)
+
+
+## The resource whose service node is under screen point `p`, or "".
+func service_at(p: Vector2) -> String:
+	for n in _port_blocks():
+		if _near(port_service(n), p):
+			return n
+	return ""
 
 
 ## Blocks whose nodes are drawn and can be grabbed: every block (the kinds without a
@@ -423,7 +484,10 @@ func port_in_at(p: Vector2) -> String:
 
 ## The node under screen point `p`: `[block, "out"|"in"]`, or [].
 func node_at(p: Vector2) -> Array:
-	var n := port_at(p)
+	var n := service_at(p)
+	if n != "":
+		return [n, "service"]
+	n = port_at(p)
 	if n != "":
 		return [n, "out"]
 	n = port_in_at(p)
@@ -442,6 +506,11 @@ func node_links(name: String, side: String) -> Array:
 ## Where the × that removes the selected connection is drawn (the middle of its line), or
 ## null when no connection is selected.
 func remove_point() -> Variant:
+	if not selected_team.is_empty():
+		var ends := _team_ends(selected_team)
+		if ends.is_empty():
+			return null
+		return (ends[0] as Vector3).lerp(ends[1], 0.5) + Vector3(0, 0.03, 0)
 	if selected_link.size() != 2:
 		return null
 	for seg in _segments():
@@ -476,6 +545,83 @@ func drop_target(p: Vector2, from: String) -> String:
 		if n != from:
 			return n
 	return ""
+
+
+## The two ends (floor points) of team line `l` (`{kind, from, to}`), or [] when one of the
+## blocks is gone.
+func _team_ends(l: Dictionary) -> Array:
+	var a = block_position(l["from"])
+	var b = block_position(l["to"])
+	if a == null or b == null:
+		return []
+	return [(a as Vector3) + Vector3(0, 0.09, 0), (b as Vector3) + Vector3(0, 0.09, 0)]
+
+
+## The team lines between two blocks, as `{kind, from, to}` with block names.
+func team_lines() -> Array:
+	var out := []
+	var c := cena()
+	if c == null:
+		return out
+	for l in _links:
+		var from := int(l["from"])
+		var to := int(l["to"])
+		if to < 0 or from >= c.blocks.size() or to >= c.blocks.size():
+			continue
+		out.append({"kind": String(l["kind"]), "from": String(c.blocks[from]["name"]),
+			"to": String(c.blocks[to]["name"])})
+	return out
+
+
+## The team line under screen point `p` (within PICK_PIXELS), or {}.
+func team_line_at(p: Vector2) -> Dictionary:
+	var best := PICK_PIXELS
+	var hit := {}
+	var hidden: Array = main.links_hidden
+	for l in team_lines():
+		if hidden.has(l["kind"]):
+			continue
+		var ends := _team_ends(l)
+		if ends.is_empty() or camera().is_position_behind(ends[0]) or camera().is_position_behind(ends[1]):
+			continue
+		var d := _segment_distance(p, camera().unproject_position(ends[0]), camera().unproject_position(ends[1]))
+		if d < best:
+			best = d
+			hit = l
+	return hit
+
+
+## The middle of team line `l` on screen (the roteiros' target), or null.
+func team_line_screen(kind: String, from: String, to: String) -> Variant:
+	var ends := _team_ends({"kind": kind, "from": from, "to": to})
+	if ends.is_empty():
+		return null
+	var m: Vector3 = (ends[0] as Vector3).lerp(ends[1], 0.5)
+	return null if camera().is_position_behind(m) else camera().unproject_position(m)
+
+
+## Whether line `kind` from `from` to `to` exists.
+func has_team_line(kind: String, from: String, to: String) -> bool:
+	for l in team_lines():
+		if l["kind"] == kind and l["from"] == from and l["to"] == to:
+			return true
+	return false
+
+
+## What team line `l` means, in words ("operador opera processo").
+func _team_said(l: Dictionary) -> String:
+	match String(l["kind"]):
+		"operadores":
+			return "%s opera %s" % [l["to"], l["from"]]
+		"transporte":
+			return "%s leva os itens de %s" % [l["to"], l["from"]]
+		"equipe":
+			return "%s está na equipe de %s" % [l["to"], l["from"]]
+	return "Ligação de %s: %s → %s" % [TEAM_NAMES.get(l["kind"], l["kind"]), l["from"], l["to"]]
+
+
+const TEAM_NAMES := {"equipe": "equipe", "transporte": "transporte", "operadores": "operação",
+	"manutencao": "reparo", "casa": "casa", "pausa": "pausa"}
 
 
 ## The block a connection dragged back from the input node of `to` starts at: an output
@@ -674,6 +820,7 @@ func _place(id: String, p: Vector2, keep: bool) -> void:
 	selected_link = []
 	main.after_edit()
 	main.set_status("%s colocado." % name)
+	_service_hint(name)
 
 
 func _on_press(p: Vector2, shift: bool) -> void:
@@ -686,6 +833,12 @@ func _on_press(p: Vector2, shift: bool) -> void:
 		return
 	if remove_point() != null and _near(remove_point(), p):
 		_remove_selected_link()
+		return
+	var res := service_at(p) if connect_from == "" else ""
+	if res != "":
+		_press = {"pos": p, "shift": shift, "kind": "serve", "name": res}
+		serve_from = res
+		main.set_status("Solte sobre a máquina que %s vai operar (ou sobre um objeto, para levar os itens dele). Esc cancela." % res)
 		return
 	var port := port_at(p) if connect_from == "" else ""
 	if port != "":
@@ -706,12 +859,21 @@ func _on_press(p: Vector2, shift: bool) -> void:
 	_press = {"pos": p, "shift": shift, "kind": "floor", "name": ""}
 	if hits.is_empty():
 		var link := link_at(p)
+		var team := team_line_at(p) if link.is_empty() else {}
 		if not link.is_empty():
-			_press["kind"] = "link"
+			_press["kind"] = "pick"
 			selected = []
+			selected_team = {}
 			selected_link = link
 			main.on_selection_changed()
-			main.set_status("Ligação %s → %s selecionada (Del remove)." % link)
+			main.set_status("Ligação %s → %s selecionada. Clique no × ou Del remove." % link)
+		elif not team.is_empty():
+			_press["kind"] = "pick"
+			selected = []
+			selected_link = []
+			selected_team = team
+			main.on_selection_changed()
+			main.set_status("%s. Clique no × ou Del remove." % _team_said(team))
 		_last_hits = []
 		return
 	# Clicking again at the same point walks through the overlapping blocks.
@@ -728,6 +890,8 @@ func _on_press(p: Vector2, shift: bool) -> void:
 		main.set_status("%s (%d de %d blocos neste ponto: clique de novo para o próximo)." % [name, index + 1, hits.size()])
 	if not shift and (not selected.has(name) or index > 0):
 		select_only(name)
+	elif hits.size() == 1:
+		_service_hint(name)
 
 
 ## A connection begun at block `from` (its output port, or the block itself with the Ligar
@@ -758,6 +922,9 @@ func _select_node_links(name: String, side: String) -> bool:
 
 
 func _remove_selected_link() -> void:
+	if not selected_team.is_empty():
+		_remove_team(selected_team)
+		return
 	var link := selected_link
 	if doc().disconnect_objects(link[0], link[1]):
 		selected_link = []
@@ -765,6 +932,65 @@ func _remove_selected_link() -> void:
 		main.set_status("Ligação %s → %s removida (Ctrl+Z desfaz)." % link)
 	else:
 		main.set_status("Não removeu: %s" % doc().last_error())
+
+
+## Removes team line `l` (the same `team_link` that made it, which undoes it).
+func _remove_team(l: Dictionary) -> void:
+	var k: String = l["kind"]
+	if not ["equipe", "transporte", "operadores"].has(k):
+		main.set_status("Esta ligação (%s) se muda no painel de propriedades de %s." % [TEAM_NAMES.get(k, k), l["from"]])
+		return
+	var r: Dictionary = doc().team_link(l["from"], l["to"], k == "operadores")
+	if r["ok"]:
+		selected_team = {}
+		main.after_edit()
+		main.set_status("Removida: " + String(r["message"]) + " (Ctrl+Z desfaz)")
+	else:
+		main.set_status("Não removeu: " + String(r["message"]))
+
+
+## The end of a drag (or a click) begun at a service node: who the resource serves.
+func _finish_serve(p: Vector2, press: Dictionary) -> void:
+	var res: String = press["name"]
+	serve_from = ""
+	if not press.get("moved", false):
+		select_only(res)
+		return
+	var to := ""
+	for n in hits_at(p):
+		if n != res:
+			to = n
+			break
+	if to == "":
+		main.set_status("Nada mudou: solte sobre a máquina (ou o objeto) que %s vai atender." % res)
+		return
+	var i := cena().block_index(to)
+	var kind := _kind_of(i)
+	var res_kind := _kind_of(cena().block_index(res))
+	var line := ""
+	var from := to
+	var operators := false
+	if kind == "Processor" and not press["shift"]:
+		line = "operadores"
+		operators = true
+	elif kind == "Dispatcher" and res_kind == "Transporter":
+		line = "equipe"
+		from = to
+	elif SERVICE.has(kind):
+		main.set_status("Solte sobre uma máquina ou um objeto (um transportador só entra na equipe de um despachante).")
+		return
+	else:
+		line = "transporte"
+	var target := res
+	if has_team_line(line, from, target):
+		main.set_status("Já está ligado: %s → %s. Para desfazer, clique na linha e no ×." % [from, target])
+		return
+	var r: Dictionary = doc().team_link(from, target, operators)
+	if r["ok"]:
+		main.after_edit()
+		main.set_status("Ligado: %s. Ctrl+Z desfaz." % _team_said({"kind": line, "from": from, "to": target}))
+	else:
+		main.set_status("Não ligou: " + String(r["message"]))
 
 
 ## The end of a drag (or a click) begun at an input node.
@@ -792,9 +1018,12 @@ func _finish_link(p: Vector2, press: Dictionary) -> void:
 		connect_from = ""
 		return
 	if not press.get("moved", false):
-		# A click: wait for the destination with the Ligar tool.
-		if tool != "ligar":
-			set_tool("ligar")
+		if not press["tool"]:
+			# A click on a node with no connection: show how to connect (the tool stays).
+			connect_from = ""
+			main.set_status("%s: arraste deste nó verde até o destino para ligar." % from)
+			return
+		# A click with the Ligar tool: wait for the destination.
 		connect_from = from
 		main.set_status("Ligar: %s → clique no destino (Esc cancela)." % from)
 		return
@@ -861,7 +1090,7 @@ func _on_drag(p: Vector2) -> void:
 	if not _dragging and not _box and p.distance_to(start) < DRAG_PIXELS:
 		return
 	match _press["kind"]:
-		"link", "link_in", "team":
+		"link", "link_in", "team", "serve":
 			_press["moved"] = true
 		"block":
 			if _press["shift"]:
@@ -927,6 +1156,11 @@ func _on_release(p: Vector2) -> void:
 	if press["kind"] == "link_in":
 		_finish_link_in(p, press)
 		return
+	if press["kind"] == "serve":
+		_finish_serve(p, press)
+		return
+	if press["kind"] == "pick":
+		return
 	if press["kind"] == "team":
 		if not press.get("moved", false):
 			# A click: the next click is the destination.
@@ -983,9 +1217,10 @@ func cancel() -> void:
 		main.set_status("Equipe: cancelado.")
 	elif tool == "equipe":
 		set_tool("selecionar")
-	elif connect_from != "" or connect_to != "":
+	elif connect_from != "" or connect_to != "" or serve_from != "":
 		connect_from = ""
 		connect_to = ""
+		serve_from = ""
 		_press = {}
 		main.set_status("Ligação cancelada.")
 	elif tool == "ligar":
@@ -1012,7 +1247,7 @@ func delete_selected() -> void:
 		if not corredores.delete_selected():
 			main.set_status("Nenhum corredor selecionado para excluir.")
 		return
-	if not selected_link.is_empty():
+	if not selected_link.is_empty() or not selected_team.is_empty():
 		_remove_selected_link()
 		return
 	if selected.is_empty():
@@ -1129,7 +1364,7 @@ func _redraw() -> void:
 			var name: String = c.blocks[i]["name"]
 			var box := _box_of(i)
 			if selected.has(name):
-				_corners(box.grow(0.08), PRIMARY if selected[0] == name else OTHERS, 0.05)
+				_corners(box.grow(0.1), PRIMARY if selected[0] == name else OTHERS, 0.09)
 			if problems.has(name):
 				_corners(box.grow(0.04), PROBLEM, 0.04)
 			if critical.has(name):
@@ -1158,6 +1393,8 @@ func _redraw() -> void:
 			var in_lit: bool = n == connect_to or _hover_port == [n, "in"]
 			_port_mark(port_out(n), PORT_OUT, out_lit, box.end.x)
 			_port_mark(port_in(n), PORT_IN, in_lit, box.position.x)
+			var sv_lit: bool = n == serve_from or _hover_port == [n, "service"]
+			_port_mark(port_service(n), PORT_SERVICE, sv_lit, box.end.x)
 		_draw_remove()
 		if connect_to != "" and _press.get("moved", false):
 			var tb = port_in(connect_to)
@@ -1217,6 +1454,8 @@ func _draw_team() -> void:
 		var style: Array = TEAM_LINES.get(kind, [Color.WHITE, 0.3, 0.2])
 		var color: Color = style[0]
 		var lit := focus.has(from) or focus.has(to)
+		if editing and not selected_team.is_empty() and to >= 0 and String(c.blocks[from]["name"]) == selected_team["from"] and String(c.blocks[to]["name"]) == selected_team["to"] and kind == selected_team["kind"]:
+			lit = true
 		if editing:
 			color.a = 1.0 if lit or focus.is_empty() else 0.55
 		else:
@@ -1236,6 +1475,11 @@ func _draw_team() -> void:
 				if not is_nan(t.x):
 					var a: Vector3 = (c.rigs[i]["root"] as Node3D).global_position
 					_dashed(a + Vector3(0, 0.12, 0), t + Vector3(0, 0.12, 0), TASK_LINE, 0.07, 0.35, 0.2)
+	elif serve_from != "" and _press.get("moved", false):
+		var a = port_service(serve_from)
+		var b = floor_at(mouse)
+		if a != null and b != null:
+			_dashed((a as Vector3) + Vector3(0, 0.1, 0), (b as Vector3) + Vector3(0, 0.1, 0), PORT_SERVICE, 0.08, 0.14, 0.12)
 	elif team_from != "":
 		var a = block_position(team_from)
 		var b = floor_at(mouse)
@@ -1314,7 +1558,7 @@ func _draw_remove() -> void:
 			_remove_label.visible = false
 		return
 	var lit := _near(at, mouse)
-	for seg in _segments():
+	for seg in (_segments() if selected_team.is_empty() else []):
 		if seg["from"] == selected_link[0] and seg["to"] == selected_link[1]:
 			var m: Vector3 = (seg["a"] as Vector3).lerp(seg["b"], 0.5)
 			if m.distance_to(at) > 0.05:
@@ -1340,7 +1584,7 @@ func _draw_remove() -> void:
 ## The selection: L marks at the four corners of the footprint (no frame over the nodes).
 func _corners(box: AABB, color: Color, width: float) -> void:
 	var y := 0.03
-	var arm := clampf(minf(box.size.x, box.size.z) * 0.25, 0.15, 0.5)
+	var arm := clampf(minf(box.size.x, box.size.z) * 0.3, 0.25, 0.8)
 	var x0 := box.position.x
 	var x1 := box.end.x
 	var z0 := box.position.z
