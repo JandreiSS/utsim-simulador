@@ -520,6 +520,53 @@ de resposta e as características críticas sem controle. Cada bloco tem uma not
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
 
+## Dados e análises
+
+A tela **Dados e análises** do projeto guarda os conjuntos de dados e as análises
+estatísticas, sobre as mesmas funções do `utsim estatistica` e do `utsim qualidade`.
+
+### Conjuntos de dados
+
+Importe um CSV (vírgula ou ponto e vírgula, vírgula ou ponto decimal, com cabeçalho) e diga
+a origem: **Real** (coleta) ou **Gêmeo** (gravações do gêmeo digital). O arquivo vai para
+`dados/<sha256>.csv` e o projeto guarda o nome, as colunas, o número de linhas e o hash. Os
+conjuntos **Simulados** vêm da tela Modelo UTSim. A origem aparece sempre ao lado do nome, e
+uma análise sobre dado que não é Real avisa que não serve de linha de base real.
+
+### Análises
+
+Escolha o conjunto, a análise e as colunas:
+
+| Análise | O que pede |
+|---|---|
+| Estatística descritiva, normalidade (Anderson-Darling) | uma coluna |
+| Capacidade (Cp, Cpk, Pp, Ppk, PPM, nível sigma com o deslocamento de 1,5 explícito) | coluna, LIE e LSE, subgrupo (1 para valores individuais) |
+| Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u) com Western Electric ou Nelson | coluna, subgrupo ou coluna dos tamanhos |
+| Testes t (uma amostra, duas amostras de Welch ou variância combinada, pareado) | colunas e μ0 |
+| ANOVA de um fator com Tukey | coluna dos valores e coluna dos grupos |
+| Qui-quadrado de independência | duas colunas de categorias |
+| Uma e duas proporções | x e n |
+| Mann-Whitney e Wilcoxon pareado | duas colunas |
+| MSA: Gage R&R (ANOVA ou médias e amplitudes) | peça, operador, medida e a tolerância opcional |
+| MSA: estudo do tipo 1 | coluna, valor de referência e tolerância |
+
+"Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
+pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
+conjunto com o hash e a origem, o resultado e a versão do app. "Refazer" roda a receita de
+novo sobre o mesmo arquivo e confere se os números são os mesmos.
+
+O estudo do tipo 1 usa Cg = 0,2·T / (6·s) e Cgk = (0,1·T − |média − referência|) / (3·s),
+com T a tolerância; o instrumento é capaz com Cg e Cgk ≥ 1,33.
+
+### Checklist do Medir
+
+Dois itens do tollgate do Medir passam a ser conferidos pelo app:
+
+- **MSA aprovado**: há um Gage R&R guardado com %VE do GRR total ≤ 30 %, ou um acima disso
+  com a justificativa registrada (botão "Justificar" na lista das análises);
+- **Linha de base com dado de origem Real**: há uma capacidade ou uma carta de controle
+  guardada sobre um conjunto de origem Real (simulado ou do gêmeo não vale).
+
 ## Modelo UTSim
 
 A tela **Modelo UTSim** do projeto usa o modelo de simulação do processo como instrumento:
@@ -969,8 +1016,7 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 ## O que vem depois
 
-Pela ordem do plano: as
-telas de estatística (sobre o `utsim-quality` e o `utsim-stats`) com o MSA. O modo de ensino
+Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com P1). O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
 UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. Do
 programa ficam para depois a lista de papéis assinada e a exportação dos painéis. Da gestão do projeto ficam para
