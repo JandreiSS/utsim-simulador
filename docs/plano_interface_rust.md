@@ -123,6 +123,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | **feito** (5a) |
 | 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | **feito** (C7 em parte) |
+| 6 | Editor 3D em Rust: escolha de objetos pelo raio da câmera, nós de entrada, saída e atendimento, ligações de fluxo e de equipe (com o ×), seleção, mover e caixa de seleção, num módulo puro com testes de unidade; o `editor.gd` fica com os eventos, as ferramentas Rede, Corredor, Colocar e Equipe e o desenho a partir do que o Rust descreve | 12–18 h | em andamento |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
@@ -483,6 +484,34 @@ vez e ter a explicação de cada método.
 - Na janela "Valores reais…", a tabela de comparação virou duas grades com a mesma altura de
   linha (`ROW`): a coluna da família (com o ⓘ) fica parada à esquerda e as medidas rolam de
   lado ao lado dela; as duas rolam juntas na vertical.
+
+### Passo 6: o editor 3D em Rust (plano, 2026-11-07)
+
+Pedido do dono ("Sim, editor 3D"; "depois vamos aprimorando"): levar para Rust a interação do
+Editar que hoje está no `editor.gd`, com testes de unidade, mantendo os roteiros.
+
+- Módulo puro `crates/utsim-godot/src/editor3d.rs`:
+  - câmera: a mesma projeção em perspectiva do `Camera3D` (posição, base, campo de visão
+    vertical, tamanho da tela): `project` (mundo → tela) e `ray` (tela → raio), `floor_at`
+    (raio × chão);
+  - cena: blocos (nome, tipo, caixa), ligações de fluxo (com porta e lógica) e linhas de
+    equipe;
+  - escolha: blocos pelo raio na caixa (e a até 18 px do centro), ciclo entre sobrepostos,
+    nós de saída, entrada e atendimento, ligação de fluxo e linha de equipe pela distância na
+    tela, o × da ligação escolhida;
+  - estado e máquina de cliques do Selecionar e do Ligar: selecionar, Shift, ciclo, arrastar
+    para mover (o deslocamento no chão), caixa de seleção, ligar e desligar pelos nós (nos
+    dois sentidos), nó laranja (operação, transporte, equipe), clique no nó seleciona a
+    ligação, × e Del removem, Esc;
+  - saída: efeitos (`ligar`, `desligar`, `equipe`, `mover_inicio`/`mover`/`mover_fim`,
+    `selecao`, `status`, `ferramenta`) e a descrição do que desenhar (nós com destaque, cantos
+    da seleção e dos problemas, ×, seta de prévia, caixa).
+- Classe `UtsimEditor` (gdext) com essas funções; o `editor.gd` passa os eventos e a câmera,
+  aplica os efeitos no documento e desenha a descrição. Rede, Corredor, Colocar, a ferramenta
+  Equipe e as linhas de equipe do Simular continuam no GDScript por enquanto.
+- Testes de unidade no módulo (projeção ida e volta, escolha, cada gesto); os roteiros `g2_*`,
+  `g3_*` e `g4_*` continuam passando sem janela, e a conferência com janela é feita a 1600×900
+  e 1280×720.
 
 ### Plano original do passo 2b
 
