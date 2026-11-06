@@ -50,3 +50,9 @@ Para cada elemento de trabalho de cada operador, marque a postura do tronco, dos
 ## Relatório
 
 Escolha todos os postos ou só alguns e use "Gravar HTML do inventário". O arquivo vai para a pasta `relatorios/` da unidade e pode ser impresso pelo navegador. O relatório não é o documento legal do programa de gerenciamento de riscos. O PDF virá em uma etapa futura.
+
+## Dados pessoais e pasta restrita
+
+A unidade guarda as pessoas só por código (`P-1a2b3c`). Nome, setor e anotações de saúde ficam numa pasta restrita, separada da unidade, por causa da LGPD. O melhor é criar essa pasta numa pasta do Drive compartilhada só com quem pode ver os dados. O caminho dela fica gravado em `unidade.json`, e quem abre a unidade sem acesso à pasta restrita simplesmente não vê os nomes. Além do compartilhamento do Drive, o arquivo `acesso.json` da pasta restrita lista quem pode gravar nela.
+
+Anonimizar uma pessoa reescreve o registro só com o código e apaga da pasta restrita os arquivos de operação antigos que tinham o nome e os dados de saúde. Os relatórios da unidade usam sempre o código, e um teste confere que nenhum nome da pasta restrita aparece nos arquivos da unidade.
