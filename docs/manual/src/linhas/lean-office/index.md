@@ -20,9 +20,9 @@ processos que a linha cobre:
 
 A linha traz:
 
-- uma **biblioteca** de 12 predefinições neutras quanto ao local (entrada de pedidos, caixa
+- uma **biblioteca** de 13 predefinições neutras quanto ao local (entrada de pedidos, caixa
   de entrada, posto de trabalho, aprovação, verificação, tramitação, espera por informação,
-  lote, reunião, equipe, pessoa e conclusão), em `linhas/lean_office/biblioteca.ron`. A caixa
+  lote, reunião, equipe, pessoa, interrupção e conclusão), em `linhas/lean_office/biblioteca.ron`. A caixa
   de entrada pode ser uma bandeja, uma caixa de e-mail ou a lista de trabalho de um sistema; a tramitação
   pode ser malote, e-mail ou sistema;
 - um **vocabulário** que troca os termos gerais do UTSim pelos do processo administrativo (o
@@ -30,6 +30,8 @@ A linha traz:
   `linhas/lean_office/vocabulario.ron`;
 - a **multitarefa** das pessoas: vários casos abertos ao mesmo tempo, com tempo perdido a cada
   troca;
+- as **interrupções**: telefone, chat ou urgência que tira a pessoa do caso no meio do
+  trabalho, e o caso volta a esperar a equipe com o tempo que faltava;
 - os **indicadores** do Lean Office (lead time, touch time, razão de atividade, %C&A, FPY, WIP
   de casos, SLA, ocupação das pessoas, esperas por causa) com intervalo de confiança;
 - o **relatório da linha** em HTML, com o **mapa do fluxo de valor do processo
@@ -44,6 +46,7 @@ Os capítulos da linha:
 - [Biblioteca](biblioteca.md): as predefinições, como colocá-las num modelo e a caixa de
   entrada por prioridade ou por prazo;
 - [Multitarefa](multitarefa.md): a pessoa com vários casos abertos;
+- [Interrupções](interrupcoes.md): telefone, chat e urgência que tiram a pessoa do caso;
 - [Indicadores e relatório](indicadores.md): as definições e o que o relatório mostra;
 - [Modelos prontos](modelos-prontos.md): aprovação de compras, contas a pagar, central de
   solicitações, admissão de funcionário e pedido ao faturamento;
@@ -54,7 +57,7 @@ Os capítulos da linha:
 ## Na interface
 
 - **Biblioteca.** Em Editar, a Biblioteca tem uma categoria "Lean Office (processos
-  administrativos)" com as 12 predefinições. Clique e clique no chão, ou arraste até o chão:
+  administrativos)" com as 13 predefinições. Clique e clique no chão, ou arraste até o chão:
   a predefinição entra inteira (a reunião com a pauta, a equipe com as duas pessoas) como um
   só passo de desfazer, e o modelo ganha `line: "lean_office"`. Num modelo da linha, a lista
   de objetos usa o vocabulário dela ("Posto de trabalho", "Caixa de entrada", "Pessoa").
@@ -125,11 +128,6 @@ da linha.
 
 ## O que ainda não está na linha
 
-- **Interrupções** (telefone, chat, urgência que tira a pessoa do caso no meio do trabalho):
-  dependem da preempção da pessoa que já está trabalhando (`Preempt::Full`, passo 16 do plano
-  de chegadas), que ainda não existe; hoje o núcleo só tem `Preempt::Empty`, que tira o
-  trabalho de quem ainda vai buscá-lo. Até lá, a [multitarefa](multitarefa.md) com fatias
-  curtas aproxima o atendimento por vários canais.
 - **Zonas por departamento** pintadas no chão (em 3D e na planta) e a **altura da pilha de
   pastas** acompanhando os casos parados: o modelo `pilha_papeis` já tem o nó `papeis` para
   isso, falta a interface Godot desenhar.

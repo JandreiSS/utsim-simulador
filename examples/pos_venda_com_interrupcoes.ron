@@ -1,0 +1,114 @@
+// Pós-venda com interrupções (linha Lean Office): modelo pronto da linha, montado só com
+// as predefinições de linhas/lean_office/biblioteca.ron. Área: atendimento e pós-venda.
+//
+// Os pedidos de troca e garantia chegam pelo portal no horário comercial, com prazo de 5 dias
+// corridos. Os analistas abrem até dois casos ao mesmo tempo (multitarefa: cerca de 20
+// minutos em cada um, 3 perdidos a cada troca): analisam o pedido (10 % com dado faltando),
+// pedem fotos ou nota ao cliente quando falta algo, e o supervisor aprova a troca (10 % voltam
+// para nova análise). Enquanto isso, o telefone toca: a cada 15 minutos, em média, um cliente
+// liga, e a ligação tira um analista do caso que ele está trabalhando (equipe com
+// interrupções Full). O caso deixado volta para a fila com o tempo que faltava. As
+// ligações não contam como casos nos indicadores, mas ocupam os analistas. Compare com a
+// equipe sem interrupções trocando `preempt: Full` por `preempt: Never` (as ligações esperam
+// um analista ficar livre).
+//
+// Tempo em minutos; a semana começa na segunda às 0h (calendário "expediente": das 8h às
+// 18h com almoço das 12h às 13h, de segunda a sexta). Rode com:
+//   utsim linha lean_office relatorio examples/pos_venda_com_interrupcoes.ron --html relatorio.html
+//
+//   pedidos -> caixa_pos_venda -> analise -> caixa_supervisor -> aprovacao -> troca_aprovada
+//                  ^      ^          |                             |
+//                  |      +- fotos_do_cliente <-+ (porta 2)        |
+//                  +---------------- devolução --------------------+
+//   telefone_chegadas -> telefone -> telefone_fim (interrompe os analistas)
+Model(
+    name: "Pós-venda com interrupções",
+    description: "Lean Office: trocas e garantias com analistas em multitarefa, espera pelo cliente, aprovação do supervisor e ligações que interrompem o trabalho",
+    line: "lean_office",
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 59, replications: 5),
+    calendars: {
+        "expediente": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3240.0),
+        ]),
+    },
+    objects: [
+        // Cliente.
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 20.0),
+            labels: {
+                "prioridade": Discrete([(1.0, 0.85), (2.0, 0.15)]),
+                "sla": Const(7200.0),
+            }),
+            shifts: Calendar("expediente"), position: (0.0, 0.0, 0.0),
+            preset: "lean_office/entrada", department: "Cliente", symbol: "inicio"),
+        (name: "fotos_do_cliente", kind: Processor(capacity: 100000, process: Exp(mean: 1440.0)), position: (3.0, 0.0, 0.0),
+            preset: "lean_office/espera_informacao", department: "Cliente", symbol: "espera"),
+        // Pós-venda.
+        (name: "caixa_pos_venda", kind: Queue(order: Desc("prioridade")), position: (0.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Pós-venda", symbol: "espera"),
+        (name: "analise", kind: Processor(capacity: 6, process: Triangular(min: 15.0, mode: 25.0, max: 50.0),
+            operators: Some(OperatorUse(team: "analistas"))), position: (2.0, 2.0, 0.0),
+            output: ByLabel("rota"),
+            on_entry: "item.rota = 1.0; if random() < 0.1 { item.rota = 2.0; }",
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/verificacao", department: "Pós-venda", symbol: "inspecao"),
+        (name: "telefone", kind: Processor(capacity: 100, process: Exp(mean: 6.0),
+            operators: Some(OperatorUse(team: "analistas", priority: Some(10)))), position: (3.0, 4.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/interrupcao", department: "Pós-venda", symbol: "operacao"),
+        (name: "telefone_chegadas", kind: Source(interarrival: Exp(mean: 15.0)), shifts: Calendar("expediente"),
+            position: (1.5, 4.0, 0.0), preset: "lean_office/interrupcao", department: "Pós-venda", symbol: "inicio"),
+        (name: "telefone_fim", kind: Sink, position: (4.5, 4.0, 0.0),
+            preset: "lean_office/interrupcao", department: "Pós-venda", symbol: "fim"),
+        // Supervisão.
+        (name: "caixa_supervisor", kind: Queue(order: Asc("prazo")), position: (5.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Supervisão", symbol: "espera"),
+        (name: "aprovacao", kind: Processor(process: Triangular(min: 3.0, mode: 5.0, max: 10.0),
+            operators: Some(OperatorUse(team: "supervisao"))), position: (6.0, 2.0, 0.0),
+            output: Weighted([0.9, 0.1]),
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/aprovacao", department: "Supervisão", symbol: "inspecao"),
+        (name: "troca_aprovada", kind: Sink, position: (7.0, 2.0, 0.0),
+            preset: "lean_office/conclusao", department: "Supervisão", symbol: "fim"),
+        // Pessoas e equipes.
+        (name: "analistas", kind: Dispatcher(preempt: Full, metrics: true, team: ["analista_1", "analista_2", "analista_3"]), position: (2.5, 5.5, 0.0),
+            preset: "lean_office/equipe", department: "Pós-venda"),
+        (name: "analista_1", kind: Transporter(speed: 72.0,
+            multitask: Some((max_open: 2, slice: Exp(mean: 20.0), switch: Const(3.0)))), position: (2.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Pós-venda"),
+        (name: "analista_2", kind: Transporter(speed: 72.0,
+            multitask: Some((max_open: 2, slice: Exp(mean: 20.0), switch: Const(3.0)))), position: (2.5, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Pós-venda"),
+        (name: "analista_3", kind: Transporter(speed: 72.0,
+            multitask: Some((max_open: 2, slice: Exp(mean: 20.0), switch: Const(3.0)))), position: (3.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Pós-venda"),
+        (name: "supervisao", kind: Dispatcher(team: ["supervisor"]), position: (6.5, 3.0, 0.0),
+            preset: "lean_office/equipe", department: "Supervisão"),
+        (name: "supervisor", kind: Transporter(speed: 72.0), position: (6.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Supervisão"),
+    ],
+    connections: [
+        ("pedidos", "caixa_pos_venda"),
+        ("caixa_pos_venda", "analise"),
+        ("analise", "caixa_supervisor"),   // porta 1: pedido completo
+        ("analise", "fotos_do_cliente"),   // porta 2: falta foto ou nota
+        ("fotos_do_cliente", "caixa_pos_venda"),
+        ("caixa_supervisor", "aprovacao"),
+        ("aprovacao", "troca_aprovada"),   // aprova
+        ("aprovacao", "caixa_pos_venda"),   // devolve
+        ("telefone_chegadas", "telefone"),
+        ("telefone", "telefone_fim"),
+    ],
+)
