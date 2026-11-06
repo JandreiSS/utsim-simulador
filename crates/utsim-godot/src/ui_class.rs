@@ -1059,9 +1059,19 @@ impl UtsimUi {
                     icon: self.icons.get(p.id).copied(),
                 })
                 .collect();
+            // The presets of the specialised lines, with the icon of their core kind.
+            self.edit_state
+                .library
+                .extend(crate::linha::entries().into_iter().map(|e| Entry {
+                    icon: self.icons.get(e.base_kind).copied(),
+                    id: e.id,
+                    label: e.label,
+                    category: e.category,
+                }));
             self.edit_state.categories = utsim_edit::CATEGORIES
                 .iter()
                 .map(|c| c.to_string())
+                .chain(crate::linha::categories())
                 .collect();
             self.edit_state.objects = match &self.doc {
                 Some(d) => d
@@ -1070,8 +1080,10 @@ impl UtsimUi {
                     .objects()
                     .into_iter()
                     .map(|o| ObjectItem {
+                        // A model of a line shows the line's words for the kinds.
+                        kind_label: crate::linha::kind_label(d.bind().editor.model(), o.kind)
+                            .unwrap_or_else(|| o.kind_label.to_owned()),
                         name: o.name,
-                        kind_label: o.kind_label.to_owned(),
                         problems: o.problems,
                         warnings: o.warnings,
                     })

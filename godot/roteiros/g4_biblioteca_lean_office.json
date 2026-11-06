@@ -1,0 +1,15 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Lean Office, passo 12: as predefinições da linha na Biblioteca (categoria própria); colocar uma grava a linha no modelo, e a lista de objetos usa o vocabulário da linha."},
+		{"novo": true},
+		{"camera": {"alvo": [0, 0], "distancia": 22.0, "giro": 0.0, "inclinacao": 0.85}},
+		{"clicar": {"controle": "Biblioteca_lean_office/posto"}},
+		{"conferir": {"ferramenta": "colocar"}},
+		{"clicar": {"chao": [2.0, 0.0]}},
+		{"conferir": {"objetos": 1, "existe": ["posto"], "modelo_contem": ["line: \"lean_office\"", "preset: \"lean_office/posto\"", "asset: \"mesa\""]}},
+		{"arrastar": {"de": {"controle": "Biblioteca_lean_office/equipe"}, "para": {"chao": [2.0, 3.0]}}},
+		{"conferir": {"objetos": 4, "existe": ["equipe", "equipe_1", "equipe_2"]}},
+		{"capturar": "g4_biblioteca_lean_office"}
+	]
+}

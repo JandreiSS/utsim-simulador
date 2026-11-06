@@ -1,7 +1,7 @@
 # Modelos prontos
 
-Os cinco modelos prontos, de áreas diferentes (compras, financeiro, atendimento e TI, RH,
-comercial), foram montados só com as predefinições da [biblioteca](biblioteca.md), com o
+Os oito modelos prontos, de áreas diferentes (compras, financeiro, atendimento e TI, RH,
+comercial, jurídico, serviço público, secretaria acadêmica), foram montados só com as predefinições da [biblioteca](biblioteca.md), com o
 horário comercial de segunda a sexta. `utsim linha lean_office modelos` lista todos. Para
 cada um:
 
@@ -74,6 +74,45 @@ conferência fiscal manda as notas com erro para uma caixa de correção.
 
 Experimentos típicos: faturar sem lote, conferir o cadastro na entrada do pedido (%C&A maior
 no comercial), análise de crédito automática para clientes com limite aprovado.
+
+## Revisão de contratos
+
+`examples/revisao_de_contratos.ron`. Jurídico e contratos. As áreas da empresa pedem contratos
+com valor, prioridade, complexidade e prazo de 10 dias corridos. O jurídico faz a triagem; os
+contratos padrão (70 %) saem de uma minuta pronta, feita pelo assistente, e os específicos são
+redigidos pelos advogados, que tocam até três contratos ao mesmo tempo
+([multitarefa](multitarefa.md)). A minuta vai à contraparte, que demora a responder; a revisão
+final do advogado sênior devolve as minutas com erro, a diretoria aprova e a assinatura
+eletrônica fecha o caso.
+
+A espera pela contraparte domina o lead time. Experimentos típicos: mais contratos com minuta
+padrão (cláusulas pré-aprovadas), limitar a multitarefa dos advogados, alçada maior para
+contratos de valor baixo sem passar pela diretoria.
+
+## Licença de funcionamento
+
+`examples/licenca_de_funcionamento.ron`. Serviço público: protocolo, processo e licença. Os
+requerimentos chegam ao protocolo com prazo legal de 30 dias corridos. O protocolo recebe o
+pedido (15 % com documento faltando); a análise documental percebe as faltas e emite uma
+exigência ao requerente; as vistorias são agendadas em lote (8 por rota, ou o que houver em
+5 dias úteis) e feitas por dois fiscais; o engenheiro dá o parecer e o secretário decide (90 %
+deferidos e publicados no diário oficial, 10 % indeferidos, com uma conclusão para cada
+desfecho).
+
+Experimentos típicos: lista de documentos conferida no protocolo (menos exigências), rotas de
+vistoria menores, publicação eletrônica no mesmo dia.
+
+## Secretaria acadêmica
+
+`examples/secretaria_academica.ron`. Pedidos de alunos com pico nas duas primeiras semanas do
+semestre (taxa de chegada por período, num ciclo de 8 semanas; o modelo não tem aquecimento,
+para o pico entrar na janela). O atendimento encaminha pelo tipo: declarações vão direto à
+emissão; históricos passam pela conferência das notas, que espera o professor lançar a nota
+que falta; ajustes de matrícula vão à coordenação, que defere ou pede um documento ao aluno, e
+depois ao registro no sistema. Os documentos emitidos são assinados digitalmente.
+
+Experimentos típicos: emissão automática das declarações, um atendente a mais só no pico,
+prazo para os professores lançarem as notas.
 
 ## Reembolso de despesas (tutorial)
 

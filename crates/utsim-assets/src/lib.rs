@@ -35,6 +35,11 @@
 //! | `bancada` | 1.50 × 0.75 × 1.50 | `estrutura` |
 //! | `operador_simples` | 0.30 × 0.64 × 1.76 | `tronco` (hips); `cabeca` (neck, child of `tronco`); `braco_e`, `braco_d` (shoulders, children of `tronco`); `perna_e`, `perna_d` (hips) |
 //! | `area` | length × width × 0.008 | `piso` |
+//! | `mesa` | 0.70 × 1.40 × 1.17 (top at 0.75) | `estrutura` |
+//! | `armario` | 0.46 × 0.90 × 1.80 | `estrutura` |
+//! | `bandeja` | 0.35 × 0.27 × 0.15 | `estrutura` |
+//! | `pilha_papeis` | 0.34 × 0.24 × 0.25 | `base`; `papeis` (pivot on the floor; scale it along the vertical to follow the cases waiting) |
+//! | `divisoria` | 0.40 × 1.20 × 1.20 | `estrutura` |
 //!
 //! Limbs of `operador_simples` and wheels turn about the lateral axis, glTF `Z`: a
 //! positive angle swings a limb forward; a wheel rolling forward turns by
@@ -43,6 +48,7 @@
 pub mod builder;
 pub mod glb;
 pub mod loads;
+pub mod office;
 pub mod people;
 pub mod structures;
 pub mod vehicles;
@@ -80,6 +86,11 @@ pub enum Spec {
     Bancada,
     OperadorSimples,
     Area(AreaSpec),
+    Mesa,
+    Armario,
+    Bandeja,
+    PilhaPapeis,
+    Divisoria,
 }
 
 impl Spec {
@@ -98,6 +109,11 @@ impl Spec {
             Spec::Bancada => "bancada",
             Spec::OperadorSimples => "operador_simples",
             Spec::Area(_) => "area",
+            Spec::Mesa => "mesa",
+            Spec::Armario => "armario",
+            Spec::Bandeja => "bandeja",
+            Spec::PilhaPapeis => "pilha_papeis",
+            Spec::Divisoria => "divisoria",
         }
     }
 
@@ -116,6 +132,11 @@ impl Spec {
             Spec::Bancada,
             Spec::OperadorSimples,
             Spec::Area(AreaSpec::default()),
+            Spec::Mesa,
+            Spec::Armario,
+            Spec::Bandeja,
+            Spec::PilhaPapeis,
+            Spec::Divisoria,
         ]
     }
 
@@ -130,6 +151,10 @@ impl Spec {
             "conveyor" => "esteira",
             "tank" => "tanque",
             "machine" => "maquina",
+            "desk" | "mesa_computador" => "mesa",
+            "armario_pastas" => "armario",
+            "bandeja_entrada" => "bandeja",
+            "papeis" | "pilha_casos" => "pilha_papeis",
             other => other,
         };
         Spec::defaults().into_iter().find(|s| s.name() == alias)
@@ -170,6 +195,11 @@ impl Spec {
             Spec::Bancada => structures::bancada(),
             Spec::OperadorSimples => people::operador_simples(),
             Spec::Area(a) => structures::area(a),
+            Spec::Mesa => office::mesa(),
+            Spec::Armario => office::armario(),
+            Spec::Bandeja => office::bandeja(),
+            Spec::PilhaPapeis => office::pilha_papeis(),
+            Spec::Divisoria => office::divisoria(),
         }
     }
 

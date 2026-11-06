@@ -40,8 +40,9 @@ pub const DRAG_START: f32 = 8.0;
 /// The bottleneck line of the summary (the orange of the Godot panel).
 pub const BOTTLENECK: Color32 = Color32::from_rgb(255, 154, 61);
 /// The cameras of Simular: id and label.
-pub const CAMERAS: [(&str, &str); 4] = [
+pub const CAMERAS: [(&str, &str); 5] = [
     ("orbita", "Órbita"),
+    ("planta", "Planta (2D)"),
     ("seguir", "Seguir"),
     ("primeira_pessoa", "Primeira pessoa"),
     ("recurso", "Do recurso"),

@@ -142,6 +142,11 @@ fn every_model_has_its_nodes_and_real_dimensions() {
             [0.3, 0.64, 1.76],
         ),
         ("area", &["piso"], [4.0, 1.4, 0.008]),
+        ("mesa", &["estrutura"], [0.70, 1.40, 1.17]),
+        ("armario", &["estrutura"], [0.46, 0.90, 1.80]),
+        ("bandeja", &["estrutura"], [0.35, 0.27, 0.15]),
+        ("pilha_papeis", &["base", "papeis"], [0.34, 0.24, 0.25]),
+        ("divisoria", &["estrutura"], [0.40, 1.20, 1.20]),
     ];
     assert_eq!(table.len(), Spec::defaults().len());
     for &(name, nodes, size) in table {

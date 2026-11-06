@@ -318,6 +318,11 @@ impl Editor {
     /// Adds an object of palette entry `id` at `position` (model coordinates) with a free
     /// name; returns the name.
     pub fn add(&mut self, id: &str, position: [f64; 3]) -> Result<String, String> {
+        if let Some(placed) = crate::linha::add_command(&self.doc, id, position) {
+            let (name, command) = placed?;
+            self.apply(command)?;
+            return Ok(name);
+        }
         let entry = palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
         let name = self.doc.unique_name(entry.name_base);
         let command =
@@ -830,6 +835,9 @@ pub fn look_model(model: &Model, name: &str, asset: &str) -> Option<Model> {
 
 /// A model with only palette entry `id` at the origin (the ghost shown while placing).
 pub fn palette_model(id: &str) -> Option<Model> {
+    if id.contains('/') {
+        return crate::linha::preset_model(id);
+    }
     let mut doc = Document::new("fantasma");
     let base = palette_entry(id)?.name_base;
     doc.apply(add_command(id, base, [0.0; 3])?).ok()?;

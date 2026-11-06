@@ -1,7 +1,9 @@
 ## Orbit camera with the conventions of the Bevy viewer (`crates/utsim-viewer/src/camera.rs`):
 ## the eye is `target + Basis.from_euler((-pitch, yaw, 0), YXZ) * (0, 0, dist)`, looking at
 ## the target; `yaw` 0 looks along -Z. Right or middle drag orbits, Shift + drag (or the
-## middle button with Shift) pans, the wheel zooms.
+## middle button with Shift) pans, the wheel zooms. In plan view (`set_plan`) the camera
+## looks straight down without perspective, the 2D plan of the layout: a drag pans and the
+## wheel zooms; it never orbits.
 class_name CameraOrbita
 extends Camera3D
 
@@ -12,6 +14,8 @@ var target := Vector3.ZERO
 var yaw := 0.0
 var pitch := 0.75
 var dist := 20.0
+## Plan view: orthographic, from straight above (see `set_plan`).
+var plan := false
 var _dragging := false
 ## `func(screen_point) -> bool`: whether a panel covers that point (the main scene's
 ## `over_ui`), for events the GUI let go of.
@@ -71,7 +75,24 @@ func focus(at: Vector3, distance: float, new_yaw: Variant = null, new_pitch: Var
 	update()
 
 
+## Turns the plan view on or off. The orbit angles are kept, so leaving the plan view
+## returns to the same 3D view.
+func set_plan(on: bool) -> void:
+	plan = on
+	projection = PROJECTION_ORTHOGONAL if on else PROJECTION_PERSPECTIVE
+	update()
+
+
 func update() -> void:
+	if plan:
+		# From straight above, with the screen's up along the orbit's forward direction,
+		# so the plan has the same orientation as the 3D view. The visible height is the
+		# one the perspective view has at the target.
+		var up := Vector3(-sin(yaw), 0.0, -cos(yaw))
+		var eye := target + Vector3(0, dist, 0)
+		transform = Transform3D(Basis.IDENTITY, eye).looking_at(target, up)
+		size = 2.0 * dist * tan(deg_to_rad(fov) * 0.5)
+		return
 	var rot := Basis.from_euler(Vector3(-pitch, yaw, 0.0), EULER_ORDER_YXZ)
 	var eye := target + rot * Vector3(0, 0, dist)
 	transform = Transform3D(Basis.IDENTITY, eye).looking_at(target, Vector3.UP)
@@ -106,7 +127,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dragging = mb.pressed
 	elif event is InputEventMouseMotion and _dragging:
 		var mm := event as InputEventMouseMotion
-		if mm.shift_pressed or (mm.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
+		if plan or mm.shift_pressed or (mm.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
 			var right := global_basis.x
 			var fwd := Vector3(-sin(yaw), 0, -cos(yaw))
 			var k := dist * 0.0015
