@@ -896,6 +896,12 @@ dos dados.
   (ganho validado, projetos encerrados, belts certificados, cobertura, oportunidades no funil e
   tollgates vencidos), sem dados pessoais de formação ou mentoria.
 
+Os dois painéis têm "Exportar PDF" e "Exportar planilha (.xlsx)", com o filtro de unidade e o
+ano escolhidos. O PDF traz cada indicador em tabela, com a regra dele, o instante dos dados e os
+gráficos (funil, tempo de ciclo contra o alvo, ganho validado por unidade), no modelo de
+relatório da empresa; a planilha tem uma aba por indicador. Os arquivos vão para a pasta
+`relatorios/` do programa. O PDF do painel da liderança, como a tela, não leva dados pessoais.
+
 ### Perfis e permissões
 
 | Perfil | Vê | Faz |
@@ -1154,7 +1160,11 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com P1). O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
-UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. Do
-programa ficam para depois a lista de papéis assinada e a exportação dos painéis. Da gestão do projeto ficam para
+UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
+trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
+experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
+exportação dos painéis. Ficam para depois Plackett-Burman, superfície de resposta e
+desejabilidade no DOE, o espaguete desenhado sem modelo e, do programa, a lista de papéis
+assinada. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
