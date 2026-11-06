@@ -109,6 +109,8 @@ A navegação à esquerda tem a **Carteira** e as telas do projeto.
 - **Termo de abertura**, **Equipe e RACI**, **Fases e tollgates**, **Ações**, **Riscos**,
   **Reuniões**, **Cronograma**, **Ganhos** e **Encerramento e lições**: descritas abaixo.
 - **Ferramentas**: os entregáveis das fases, descritos em [Ferramentas](#ferramentas).
+- **Roteiro DMAIC**, **Dados e análises**, **Experimentos**, **Modelo UTSim** e **Relatórios**:
+  descritas nos capítulos de mesmo nome.
 - **Dados** (etapa L3) mostra o que vai trazer; já está lá a exportação `.lssz`.
 
 Em todas as telas, cada campo é gravado quando você sai dele, datas são `DD/MM/AAAA` e números
@@ -568,6 +570,7 @@ Escolha o conjunto, a análise e as colunas:
 | MSA: viés | coluna, valor de referência e a tolerância opcional |
 | MSA: linearidade | coluna da referência e coluna da medida, a variação do processo opcional |
 | MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
+| Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
 
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
@@ -602,6 +605,49 @@ Dois itens do tollgate do Medir passam a ser conferidos pelo app:
   limite com a justificativa registrada (botão "Justificar" na lista das análises);
 - **Linha de base com dado de origem Real**: há uma capacidade ou uma carta de controle
   guardada sobre um conjunto de origem Real (simulado ou do gêmeo não vale).
+
+## Planejamento de experimentos
+
+A tela **Experimentos** do projeto planeja um experimento de dois níveis, para descobrir quais
+fatores mexem no Y e se eles agem juntos.
+
+- **Fatores**: dê a cada um o nome, o nível baixo (−1) e o alto (+1). Os níveis podem ser
+  números (temperatura 180 e 200) ou qualquer texto (fornecedor X e Y). O centro é o ponto do
+  meio, usado pelos pontos centrais: para níveis numéricos o app usa a média dos dois; para
+  texto, escreva-o (ou não use pontos centrais).
+- **Plano**: o fatorial completo roda as 2^k combinações. Com muitos fatores, uma fração (1/2,
+  1/4, 1/8, 1/16) roda só uma parte delas. O preço é que alguns efeitos ficam **confundidos**:
+  o app mostra a relação de definição (por exemplo I = ABCD), a resolução e a tabela do que
+  se confunde com o quê. Em resolução III um efeito principal se confunde com uma interação de
+  dois fatores; em resolução IV os principais ficam limpos e as interações de dois fatores se
+  confundem entre si; em resolução V ou mais os principais e as interações de dois fatores
+  ficam limpos. As frações oferecidas vão de 3 a 8 fatores.
+- **Réplicas** repetem cada corrida (dão o erro puro); **pontos centrais** são corridas com
+  todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
+- **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma
+  ordem; rode na ordem sorteada para não confundir um fator com o que muda ao longo do dia.
+
+"Gravar a planilha de coleta" grava em `dados/` um CSV na ordem de execução, com a ordem
+padrão, as colunas codificadas `A`, `B`, `C`..., os níveis reais e a coluna da resposta vazia;
+a primeira linha guarda o planejamento inteiro. Preencha a resposta na planilha e importe-a em
+**Dados e análises** como um conjunto de origem Real.
+
+**No modelo UTSim.** Se o projeto tem um modelo ligado e cada fator diz o parâmetro que muda
+(`objeto.campo`, com os níveis escritos como no `.ron`, por exemplo `Exp(mean: 0.5)`), "Rodar
+no modelo UTSim" roda um cenário por ponto do plano, com as mesmas sementes em todos (números
+aleatórios comuns) e as replicações do modelo como réplicas, num fio de trabalho. O resultado
+vira um conjunto de dados de origem **Simulado**, com uma coluna por indicador. O erro dessa
+análise é a variabilidade da simulação, não a da fábrica.
+
+**Análise.** Em Dados e análises, "Experimento fatorial 2^k" acha sozinho as colunas `A`, `B`...
+da planilha (ou escolha as colunas dos fatores; níveis reais são codificados pelo app), a
+resposta e a ordem máxima das interações (2 por padrão). O resultado traz o efeito de cada
+termo (média no alto menos média no baixo), os valores-p, o R², a curvatura pelos pontos
+centrais e os termos confundidos. O erro vem das réplicas, dos pontos centrais e dos termos
+deixados fora do modelo; sem nenhum grau de liberdade para o erro, os valores-p vêm do pseudo
+erro padrão de Lenth. Os gráficos são o Pareto dos efeitos, os efeitos principais e um gráfico
+de interação para cada interação de dois fatores do modelo (linhas que se cruzam ou se abrem
+indicam interação). Como as outras análises, fica guardado como receita.
 
 ## Modelo UTSim
 
