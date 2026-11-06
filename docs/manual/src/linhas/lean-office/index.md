@@ -51,6 +51,22 @@ Os capítulos da linha:
   futuro;
 - [Pacote da linha](pacote.md): o formato dos arquivos, para quem cria uma linha nova.
 
+## Na interface
+
+- **Biblioteca.** Em Editar, a Biblioteca tem uma categoria "Lean Office (processos
+  administrativos)" com as 12 predefinições. Clique e clique no chão, ou arraste até o chão:
+  a predefinição entra inteira (a reunião com a pauta, a equipe com as duas pessoas) como um
+  só passo de desfazer, e o modelo ganha `line: "lean_office"`. Num modelo da linha, a lista
+  de objetos usa o vocabulário dela ("Posto de trabalho", "Caixa de entrada", "Pessoa").
+- **Aparência.** Os postos, aprovações, verificações e reuniões são mesas com computador; a
+  caixa de entrada é uma pilha de pastas; o lote é uma bandeja de entrada. Os modelos são
+  gerados por código (veja [3D realista e aparência](../../visual-3d.md)).
+- **Planta (2D).** Em Simular, o menu **Câmera** tem a **Planta (2D)**: a mesma cena vista de
+  cima, sem perspectiva, como uma planta baixa do processo. Serve para todas as linhas.
+- **UTSim Seis Sigma.** Os modelos de projeto "Kaizen administrativo" e "DMAIC transacional"
+  trazem os entregáveis da linha nos checklists dos tollgates (veja [UTSim Seis
+  Sigma](../../seis-sigma.md)).
+
 ## Primeiro contato
 
 ```bash
@@ -109,12 +125,13 @@ da linha.
 
 ## O que ainda não está na linha
 
-- **Interrupções** (telefone, chat, urgência que tira a pessoa do caso): dependem da
-  preempção da pessoa que já está trabalhando, no plano de chegadas.
-- **Vocabulário e biblioteca na interface** e a **vista 2D de planta** com zonas por
-  departamento, para os processos com lugar físico (escritório, balcão, protocolo): depois da
-  migração da interface.
-- **Ativos 3D** de ambiente administrativo (mesa, armário, bandeja, balcão): primeiro os
-  gerados por código e os livres CC0.
-- **Modelos de projeto no UTSim Seis Sigma** ("Kaizen administrativo" e "DMAIC
-  transacional").
+- **Interrupções** (telefone, chat, urgência que tira a pessoa do caso no meio do trabalho):
+  dependem da preempção da pessoa que já está trabalhando (`Preempt::Full`, passo 16 do plano
+  de chegadas), que ainda não existe; hoje o núcleo só tem `Preempt::Empty`, que tira o
+  trabalho de quem ainda vai buscá-lo. Até lá, a [multitarefa](multitarefa.md) com fatias
+  curtas aproxima o atendimento por vários canais.
+- **Zonas por departamento** pintadas no chão (em 3D e na planta) e a **altura da pilha de
+  pastas** acompanhando os casos parados: o modelo `pilha_papeis` já tem o nó `papeis` para
+  isso, falta a interface Godot desenhar.
+- **Cadeira, computador e impressora** livres (CC0) e as peças geradas no Tripo 3D, que
+  esperam a aprovação do gasto.

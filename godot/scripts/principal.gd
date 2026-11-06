@@ -36,7 +36,7 @@ const TOP_HEIGHT := 46
 const BOTTOM_HEIGHT := 40
 const RED := Color(1.0, 0.45, 0.42)
 const YELLOW := Color(0.98, 0.80, 0.35)
-const CAMERAS := [["orbita", "Órbita"], ["seguir", "Seguir"], ["primeira_pessoa", "Primeira pessoa"], ["recurso", "Do recurso"]]
+const CAMERAS := [["orbita", "Órbita"], ["planta", "Planta (2D)"], ["seguir", "Seguir"], ["primeira_pessoa", "Primeira pessoa"], ["recurso", "Do recurso"]]
 
 var doc: Object
 var model: Object
@@ -1696,6 +1696,7 @@ func set_camera_mode(which: String) -> void:
 	camera_mode = which
 	if which not in ["primeira_pessoa", "recurso"]:
 		cena.restore_view()
+	camera.set_plan(which == "planta")
 	var label := which
 	for c in CAMERAS:
 		if c[0] == which:
@@ -1704,6 +1705,8 @@ func set_camera_mode(which: String) -> void:
 	if which == "orbita":
 		camera.update()
 		set_status("Câmera de órbita.")
+	elif which == "planta":
+		set_status("Planta (2D): vista de cima, sem perspectiva; arraste com o botão direito para mover.")
 	elif follow_name == "":
 		set_status("Escolha na lista o bloco que a câmera acompanha.")
 	else:
@@ -1712,7 +1715,7 @@ func set_camera_mode(which: String) -> void:
 
 ## Places the camera for the modes that follow a block (called every frame in Simular).
 func _drive_camera() -> void:
-	if camera_mode == "orbita" or follow_name == "":
+	if camera_mode in ["orbita", "planta"] or follow_name == "":
 		return
 	var i := cena.block_index(follow_name)
 	if i < 0:

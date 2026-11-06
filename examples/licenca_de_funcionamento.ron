@@ -1,0 +1,149 @@
+// Licença de funcionamento (linha Lean Office): modelo pronto da linha, montado só com as
+// predefinições de linhas/lean_office/biblioteca.ron. Área: serviço público (protocolo,
+// processo administrativo e licença).
+//
+// Os requerimentos chegam ao protocolo da prefeitura no horário de atendimento, com prazo
+// legal de 30 dias corridos. O protocolo recebe o pedido (15 % entram com documento
+// faltando); a análise documental percebe 90 % das faltas e emite uma exigência, que o
+// requerente demora a cumprir. As vistorias são agendadas em lote (8 por rota, ou o que
+// houver em 5 dias úteis de espera) e feitas pelos fiscais; o engenheiro dá o parecer
+// técnico e o secretário decide: 90 % deferidos, publicados no diário oficial; 10 %
+// indeferidos.
+//
+// Tempo em minutos; a semana começa na segunda às 0h (calendário "expediente": das 8h às
+// 18h com almoço das 12h às 13h, de segunda a sexta). Rode com:
+//   utsim linha lean_office relatorio examples/licenca_de_funcionamento.ron --html relatorio.html
+//
+//   requerimentos -> caixa_protocolo -> protocolo -> caixa_analise -> analise -> lote_vistoria -> vistoria -> caixa_parecer -> parecer -> caixa_gabinete -> despacho -+-> publicacao -> licenca_emitida
+//                                                       ^                |                                                                                        +-> indeferido
+//                                                       +-- exigencia <--+
+Model(
+    name: "Licença de funcionamento",
+    description: "Lean Office: protocolo, análise com exigência ao requerente, vistoria em lote, parecer técnico, despacho e publicação, com prazo legal",
+    line: "lean_office",
+    run: (stop_time: 80640.0, warmup: 10080.0, seed: 47, replications: 5),
+    calendars: {
+        "expediente": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3240.0),
+        ]),
+    },
+    objects: [
+        // Requerente.
+        (name: "requerimentos", kind: Source(interarrival: Exp(mean: 90.0),
+            labels: {
+                "prioridade": Discrete([(1.0, 0.9), (2.0, 0.1)]),
+                "sla": Const(43200.0),
+            }),
+            shifts: Calendar("expediente"), position: (0.0, 0.0, 0.0),
+            preset: "lean_office/entrada", department: "Requerente", symbol: "inicio"),
+        (name: "exigencia", kind: Processor(capacity: 100000, process: Exp(mean: 7200.0)), position: (3.0, 0.0, 0.0),
+            preset: "lean_office/espera_informacao", department: "Requerente", symbol: "espera"),
+        // Protocolo.
+        (name: "caixa_protocolo", kind: Queue(), position: (0.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Protocolo", symbol: "espera"),
+        (name: "protocolo", kind: Processor(capacity: 2, process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "atendimento"))), position: (1.0, 2.0, 0.0),
+            on_entry: "if random() > 0.85 { item.erro = 1.0; item.erros_protocolo = label(item, \"erros_protocolo\", 0.0) + 1.0; }",
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/posto", department: "Protocolo", symbol: "operacao"),
+        // Análise.
+        (name: "caixa_analise", kind: Queue(order: Asc("prazo")), position: (2.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Análise", symbol: "espera"),
+        (name: "analise", kind: Processor(process: Triangular(min: 15.0, mode: 30.0, max: 60.0),
+            operators: Some(OperatorUse(team: "analistas"))), position: (3.0, 2.0, 0.0),
+            output: ByLabel("rota"),
+            on_entry: "item.rota = 1.0; if label(item, \"erro\", 0.0) >= 1.0 && random() < 0.9 { item.erro = 0.0; item.rota = 2.0; }",
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/verificacao", department: "Análise", symbol: "inspecao"),
+        // Fiscalização.
+        (name: "lote_vistoria", kind: Queue(batch: Some(Batch(size: 8, max_wait: 2700.0))), position: (4.0, 3.0, 0.0),
+            visual: Some((asset: Some("bandeja"))), preset: "lean_office/lote", department: "Fiscalização", symbol: "espera"),
+        (name: "vistoria", kind: Processor(capacity: 8, process: Triangular(min: 60.0, mode: 120.0, max: 240.0),
+            operators: Some(OperatorUse(team: "fiscais"))), position: (5.0, 3.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_vistoria = label(item, \"erros_vistoria\", 0.0) + 1.0; }",
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/posto", department: "Fiscalização", symbol: "operacao"),
+        (name: "caixa_parecer", kind: Queue(order: Asc("prazo")), position: (6.0, 3.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Fiscalização", symbol: "espera"),
+        (name: "parecer", kind: Processor(process: Triangular(min: 20.0, mode: 45.0, max: 90.0),
+            operators: Some(OperatorUse(team: "engenharia"))), position: (7.0, 3.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_parecer = label(item, \"erros_parecer\", 0.0) + 1.0; }",
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/posto", department: "Fiscalização", symbol: "operacao"),
+        // Gabinete.
+        (name: "caixa_gabinete", kind: Queue(order: Asc("prazo")), position: (8.0, 4.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Gabinete", symbol: "espera"),
+        (name: "despacho", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "gabinete"))), position: (9.0, 4.0, 0.0),
+            output: Weighted([0.9, 0.1]),
+            visual: Some((asset: Some("mesa"))), preset: "lean_office/aprovacao", department: "Gabinete", symbol: "inspecao"),
+        (name: "publicacao", kind: Processor(capacity: 100000, process: Uniform(min: 1440.0, max: 4320.0)), position: (10.0, 4.0, 0.0),
+            preset: "lean_office/tramitacao", department: "Gabinete", symbol: "transporte"),
+        (name: "licenca_emitida", kind: Sink, position: (11.0, 4.0, 0.0),
+            preset: "lean_office/conclusao", department: "Gabinete", symbol: "fim"),
+        (name: "indeferido", kind: Sink, position: (10.0, 5.0, 0.0),
+            preset: "lean_office/conclusao", department: "Gabinete", symbol: "fim"),
+        // Pessoas e equipes.
+        (name: "atendimento", kind: Dispatcher(team: ["atendente_1", "atendente_2"]), position: (1.5, 1.0, 0.0),
+            preset: "lean_office/equipe", department: "Protocolo"),
+        (name: "atendente_1", kind: Transporter(speed: 72.0), position: (1.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Protocolo"),
+        (name: "atendente_2", kind: Transporter(speed: 72.0), position: (1.5, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Protocolo"),
+        (name: "analistas", kind: Dispatcher(team: ["analista_1", "analista_2"]), position: (3.5, 1.0, 0.0),
+            preset: "lean_office/equipe", department: "Análise"),
+        (name: "analista_1", kind: Transporter(speed: 72.0), position: (3.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Análise"),
+        (name: "analista_2", kind: Transporter(speed: 72.0), position: (3.5, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Análise"),
+        (name: "fiscais", kind: Dispatcher(team: ["fiscal_1", "fiscal_2"]), position: (5.5, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Fiscalização"),
+        (name: "fiscal_1", kind: Transporter(speed: 72.0), position: (5.0, 4.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Fiscalização"),
+        (name: "fiscal_2", kind: Transporter(speed: 72.0), position: (5.5, 4.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Fiscalização"),
+        (name: "engenharia", kind: Dispatcher(team: ["engenheiro"]), position: (7.5, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Fiscalização"),
+        (name: "engenheiro", kind: Transporter(speed: 72.0), position: (7.0, 4.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Fiscalização"),
+        (name: "gabinete", kind: Dispatcher(team: ["secretario"]), position: (9.5, 3.0, 0.0),
+            preset: "lean_office/equipe", department: "Gabinete"),
+        (name: "secretario", kind: Transporter(speed: 72.0), position: (9.0, 5.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Gabinete"),
+    ],
+    connections: [
+        ("requerimentos", "caixa_protocolo"),
+        ("caixa_protocolo", "protocolo"),
+        ("protocolo", "caixa_analise"),
+        ("caixa_analise", "analise"),
+        ("analise", "lote_vistoria"),   // porta 1: documentação completa
+        ("analise", "exigencia"),   // porta 2: exigência ao requerente
+        ("exigencia", "caixa_analise"),
+        ("lote_vistoria", "vistoria"),
+        ("vistoria", "caixa_parecer"),
+        ("caixa_parecer", "parecer"),
+        ("parecer", "caixa_gabinete"),
+        ("caixa_gabinete", "despacho"),
+        ("despacho", "publicacao"),   // defere
+        ("despacho", "indeferido"),   // indefere
+        ("publicacao", "licenca_emitida"),
+    ],
+)
