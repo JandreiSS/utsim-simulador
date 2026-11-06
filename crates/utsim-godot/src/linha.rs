@@ -85,7 +85,10 @@ pub fn preset_model(id: &str) -> Option<Model> {
     let mut doc = Document::new("fantasma");
     let (_, command) = add_command(&doc, id, [0.0; 3])?.ok()?;
     doc.apply(command).ok()?;
-    debug_assert_eq!(doc.model().line.as_deref(), Some(line));
+    // A line sets `line`; a cross-cutting pack (quality, safety) goes into `packs`.
+    debug_assert!(
+        doc.model().line.as_deref() == Some(line) || doc.model().packs.iter().any(|p| p == line)
+    );
     Some(doc.model().clone())
 }
 
@@ -106,8 +109,8 @@ mod tests {
     #[test]
     fn every_preset_is_an_entry_with_a_core_icon() {
         let list = entries();
-        let lean = utsim_linhas::find("lean_office").unwrap();
-        assert_eq!(list.len(), lean.library.presets.len());
+        let total: usize = builtin().iter().map(|p| p.library.presets.len()).sum();
+        assert_eq!(list.len(), total);
         let posto = list.iter().find(|e| e.id == "lean_office/posto").unwrap();
         assert_eq!(posto.label, "Posto de trabalho");
         assert_eq!(posto.base_kind, "Processor");
@@ -122,7 +125,9 @@ mod tests {
                 e.base_kind
             );
         }
-        assert_eq!(categories(), vec![posto.category.clone()]);
+        // The lines and the cross-cutting packs (quality, safety), one category each.
+        assert_eq!(categories().len(), builtin().len());
+        assert_eq!(categories()[0], posto.category);
     }
 
     #[test]
