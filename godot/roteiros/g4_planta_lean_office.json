@@ -1,0 +1,16 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Lean Office, passo 11: um processo administrativo com mesas, pilhas de casos e bandeja de lote, visto em 3D e na planta (2D, de cima, sem perspectiva)."},
+		{"abrir": "../../examples/reembolso_atual.ron"},
+		{"modo": "simular"},
+		{"conferir": {"texto": {"controle": "Status", "contem": "Reproduzindo"}}},
+		{"tempo": 600.0},
+		{"capturar": "g4_planta_01_3d"},
+		{"escolher": {"controle": "Simular_Camera", "item": "Planta (2D)"}},
+		{"conferir": {"camera": "planta", "texto": {"controle": "Status", "contem": "Planta (2D)"}}},
+		{"capturar": "g4_planta_02_planta"},
+		{"escolher": {"controle": "Simular_Camera", "item": "Órbita"}},
+		{"conferir": {"camera": "orbita"}}
+	]
+}
