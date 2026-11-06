@@ -121,16 +121,15 @@ pub fn remove(model: &Model, name: &str) -> Result<Command, String> {
     })
 }
 
-/// The colour of a zone by its level (1 lowest), as `[r, g, b]` in 0..1: green to red.
+/// The colour of a zone by its level (the same as the safety layer of Simular,
+/// [`crate::seguranca::level_color`]).
 pub fn level_color(level: Option<u8>) -> [f32; 3] {
-    match level.unwrap_or(0) {
-        1 => [0.30, 0.69, 0.31],
-        2 => [0.80, 0.86, 0.22],
-        3 => [1.00, 0.76, 0.03],
-        4 => [1.00, 0.44, 0.26],
-        5 => [0.90, 0.22, 0.21],
-        _ => [0.62, 0.66, 0.72],
-    }
+    crate::seguranca::level_color(level)
+}
+
+/// The name of a kind of zone, as the safety layer shows it.
+pub fn kind_label(kind: ZoneKind) -> &'static str {
+    crate::seguranca::kind_name(kind)
 }
 
 /// Whether `p` is inside the polygon (even-odd rule), both on the same plane axes.

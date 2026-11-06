@@ -144,9 +144,6 @@ var ed: Object
 var _zone_mesh: ImmediateMesh
 var _zone_fill: MeshInstance3D
 var _zone_labels: Array[Label3D] = []
-## The colour of a risk zone by its level (0 = none), as `zone_edit::level_color`.
-const ZONE_LEVELS := [Color(0.62, 0.66, 0.72), Color(0.30, 0.69, 0.31), Color(0.80, 0.86, 0.22),
-	Color(1.00, 0.76, 0.03), Color(1.00, 0.44, 0.26), Color(0.90, 0.22, 0.21)]
 var _scene_dirty := true
 var _fed_playback: Object
 var _fed_hidden: Array = []
@@ -1036,7 +1033,7 @@ func _draw_zones(o: Dictionary) -> void:
 		var pts: PackedVector3Array = z["points"]
 		if pts.size() < 3:
 			continue
-		var col: Color = ZONE_LEVELS[clampi(int(z["level"]), 0, 5)]
+		var col: Color = z["color"]
 		var sel: bool = z["selected"]
 		var flat := PackedVector2Array()
 		var centre := Vector3.ZERO

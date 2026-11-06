@@ -767,11 +767,10 @@ impl UtsimDocument {
             d.set("name", &GString::from(z.name.as_str()));
             let key = crate::zone_edit::kind_key(z.kind);
             d.set("kind", &GString::from(key));
-            let label = crate::zone_edit::KINDS
-                .iter()
-                .find(|k| k.1 == key)
-                .map_or(key, |k| k.2);
-            d.set("kind_label", &GString::from(label));
+            d.set(
+                "kind_label",
+                &GString::from(crate::zone_edit::kind_label(z.kind)),
+            );
             d.set("level", z.level.map_or(0, i64::from));
             let ppe: PackedStringArray = z.ppe.iter().map(|p| GString::from(p.as_str())).collect();
             d.set("ppe", &ppe);
@@ -787,9 +786,9 @@ impl UtsimDocument {
     #[func]
     fn zone_kinds(&self) -> VarArray {
         let mut out = VarArray::new();
-        for (_, key, label) in crate::zone_edit::KINDS {
+        for (kind, key, _) in crate::zone_edit::KINDS {
             let mut a = VarArray::new();
-            a.push(&GString::from(label).to_variant());
+            a.push(&GString::from(crate::zone_edit::kind_label(kind)).to_variant());
             a.push(&GString::from(key).to_variant());
             out.push(&a.to_variant());
         }

@@ -570,6 +570,8 @@ impl UtsimEditor {
             a.set("points", &pts(&z.points));
             a.set("level", z.level.map_or(0, i64::from));
             a.set("selected", *sel);
+            let c = crate::zone_edit::level_color(z.level);
+            a.set("color", Color::from_rgb(c[0], c[1], c[2]));
             zones.push(&a.to_variant());
         }
         d.set("zones", &zones);

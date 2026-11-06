@@ -538,7 +538,8 @@ de Qualidade e Segurança: editar `Model.zones` no 3D.
 - `utsim-edit`: `Command::SetZone { name, zone }` (troca a zona inteira, inclusive o nome) e
   `Command::RemoveZone`, ao lado do `AddZone` da outra sessão; um passo de desfazer cada.
 - `zone_edit.rs` (puro, testes): nome livre `zona_N`, polígono, tipo, nível e EPI (alterna
-  o item), cores por nível, ponto dentro do polígono, lista de EPI (os conhecidos e os já
+  o item), cores e nomes dos tipos os da camada de segurança (`seguranca::level_color`,
+  `kind_name`, combinado com a outra sessão), ponto dentro do polígono, lista de EPI (os conhecidos e os já
   usados no modelo).
 - `editor3d.rs`: a ferramenta `zona` (desenhar com encaixe, fechar pelo primeiro ponto, Enter
   ou duplo clique, Backspace, Esc; selecionar, mover a zona inteira ou um vértice, Del) com
