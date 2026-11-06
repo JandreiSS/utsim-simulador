@@ -14,11 +14,13 @@ Em computadores compartilhados, o perfil pode ficar numa pasta escolhida (um pen
 
 A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida libera a próxima. A primeira missão de um ato abre quando todas as do ato anterior estão resolvidas.
 
-| Ato | Tema |
-|---|---|
-| 1 | Gargalo e fluxo |
-| 2 | Filas e atendimento |
-| 3 | Capacidade, turnos e estoque intermediário |
+| Ato | Tema | Missões |
+|---|---|---|
+| 1 | Gargalo e fluxo | 1.1 A furadeira que segura a linha · 1.2 Reforçar o lugar errado · 1.3 Quanto tem no chão (lei de Little) · 1.4 O gargalo que muda |
+| 2 | Filas e atendimento | 2.1 Balcão da ferramentaria · 2.2 Quem desiste vai embora · 2.3 Urgente na frente · 2.4 Mesma média, outra fila · 2.5 A central de atendimento |
+| 3 | Capacidade, turnos e estoque intermediário | 3.1 A demanda dobrou · 3.2 Pulmão certo · 3.3 Corretiva ou preventiva · 3.4 Lote e setup · 3.5 A expansão da linha de eixos |
+
+A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
 Os atos de balanceamento, arranjo físico, tempos e métodos, problemas integrados e o caso final de Lean Seis Sigma vêm nas próximas versões.
 
@@ -108,7 +110,7 @@ O resultado é a **matriz aluno por missão**, com nota, estrelas, tentativas e 
 
 "Exportar notas" grava `correcao/notas.csv` e `correcao/notas.xlsx`.
 
-Uma turma de 60 alunos é corrigida em segundos num notebook comum.
+Uma turma de 60 alunos com as 14 missões e duas tentativas por missão (1.680 tentativas) foi corrigida em cerca de 13 segundos no notebook de desenvolvimento.
 
 ### Limites
 
@@ -120,4 +122,4 @@ Nome, registro e notas são dados pessoais. A finalidade fica registrada na turm
 
 As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas, cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
 
-A campanha embutida passa por uma conferência automática a cada versão: a busca exaustiva confirma que a referência guardada é a melhor combinação, que ela difere do estado inicial com significância, que alguma combinação bate as metas e que o estado inicial não bate. Os números da referência ficam guardados e um teste acusa qualquer mudança do núcleo que os altere.
+A campanha embutida passa por uma conferência automática a cada versão (`cargo test -p utsim-ensino-core --test conteudo`): a busca exaustiva confirma que a referência guardada é a melhor combinação, que ela difere do estado inicial com significância, que alguma combinação bate as metas e que o estado inicial não bate. Os números da referência ficam guardados e um teste acusa qualquer mudança do núcleo que os altere.
