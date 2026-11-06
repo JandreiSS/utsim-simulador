@@ -101,6 +101,8 @@ pub enum PropAction {
         path: String,
         draft: serde_json::Value,
     },
+    /// "Ver as primeiras chegadas" of the object shown: run its source alone.
+    ArrivalsPreview,
     /// The miniature should show this asset (the one chosen, or the one under the mouse).
     Miniature(String),
 }

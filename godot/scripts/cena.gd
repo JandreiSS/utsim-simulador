@@ -197,6 +197,11 @@ func build(pb: Object, keep_templates := false) -> void:
 			item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			root.add_child(item)
 			rig["preview"] = item
+			rig["preview_material"] = m
+			rig["preview_color"] = m.albedo_color
+			var mix: Array = b.get("type_mix", [])
+			if mix.size() > 0:
+				root.add_child(_type_ring(mix, Vector3(0, top + 0.12, 0)))
 		rig["label"] = label
 		rig["top"] = top
 		rigs.append(rig)
@@ -533,6 +538,13 @@ func apply(t: float, dt: float, snap := false) -> void:
 		if rig.has("driver"):
 			(rig["driver"] as Pessoa).drive(clip[i], clip_time[i], dt, snap)
 	task_target = f.get("task_target", PackedVector3Array())
+	# C7: a source that just lost an item blinks red.
+	var flash: PackedFloat32Array = f.get("flash", PackedFloat32Array())
+	for i in mini(flash.size(), rigs.size()):
+		if rigs[i].has("preview_material"):
+			var m: StandardMaterial3D = rigs[i]["preview_material"]
+			var on := flash[i] > 0.0 and fmod(flash[i] * 6.0, 1.0) > 0.5
+			m.albedo_color = Color(1.0, 0.25, 0.2) if on else rigs[i]["preview_color"]
 	var color: PackedColorArray = f["color"]
 	var label: PackedStringArray = f["label"]
 	for i in rigs.size():
@@ -595,6 +607,41 @@ func _apply_items(f: Dictionary) -> void:
 			n.visible = false
 			items.erase(id)
 			n.queue_free()
+
+
+## The ring of a source's item types (C7): a flat ring around `at`, one slice per type
+## in its colour, as wide as its share.
+func _type_ring(mix: Array, at: Vector3) -> MeshInstance3D:
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	var r0 := 0.2
+	var r1 := 0.3
+	var a := 0.0
+	for pair in mix:
+		var col: Color = pair[0]
+		var span := TAU * float(pair[1])
+		var steps := maxi(2, int(ceil(span / 0.2)))
+		for k in steps:
+			var t0 := a + span * k / steps
+			var t1 := a + span * (k + 1) / steps
+			var p := [Vector3(cos(t0) * r0, 0, sin(t0) * r0), Vector3(cos(t0) * r1, 0, sin(t0) * r1),
+				Vector3(cos(t1) * r1, 0, sin(t1) * r1), Vector3(cos(t1) * r0, 0, sin(t1) * r0)]
+			for j in [0, 1, 2, 0, 2, 3]:
+				im.surface_set_color(col)
+				im.surface_add_vertex(p[j])
+		a += span
+	im.surface_end()
+	var mi := MeshInstance3D.new()
+	mi.name = "AnelTipos"
+	mi.mesh = im
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.position = at
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
 
 
 ## An item: a pallet with 2 x 2 x 2 boxes in a scene with pallet loads, else one box,

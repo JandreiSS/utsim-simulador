@@ -69,6 +69,46 @@ pub struct BlockView {
     /// A source's arrival mode, for the badge of its label (`horário`, `tabela`,
     /// `sequência`, `taxa`, with `lote` for batches); empty for the plain interval.
     pub badge: String,
+    /// The item types a source creates, with their colours and shares (C7: the ring over
+    /// it); empty when it does not name types.
+    pub type_mix: Vec<([f32; 3], f64)>,
+}
+
+/// The item types `name` creates (`item_type`, or the weights of `item_type_mix`) with the
+/// colour of each type (`item_types[..].color`, else the palette by type order).
+pub fn source_types(model: Option<&Model>, name: &str) -> Vec<([f32; 3], f64)> {
+    let Some(m) = model else {
+        return Vec::new();
+    };
+    let Some(obj) = m.objects.iter().find(|o| o.name == name) else {
+        return Vec::new();
+    };
+    let utsim_model::ObjectKind::Source {
+        item_type,
+        item_type_mix,
+        ..
+    } = &obj.kind
+    else {
+        return Vec::new();
+    };
+    let color = |t: &str| {
+        let k = m.item_types.iter().position(|d| d.name == t);
+        k.and_then(|k| m.item_types[k].color.as_deref())
+            .and_then(looks::parse_color)
+            .unwrap_or_else(|| style::origin_color(k.unwrap_or(0) + 1))
+    };
+    let total: f64 = item_type_mix.iter().map(|(_, w)| w.max(0.0)).sum();
+    if !item_type_mix.is_empty() && total > 0.0 {
+        item_type_mix
+            .iter()
+            .filter(|(_, w)| *w > 0.0)
+            .map(|(t, w)| (color(t), w / total))
+            .collect()
+    } else if let Some(t) = item_type {
+        vec![(color(t), 1.0)]
+    } else {
+        Vec::new()
+    }
 }
 
 /// The badge of a source's label: how it creates items (`docs/plano_chegadas_e_equipes_3d.md`,
@@ -186,6 +226,27 @@ pub struct FrameData {
     /// Where each mobile resource is going for its current task (Godot coordinates), or
     /// NaN when it has none (the line of the selected member, E8b).
     pub task_target: Vec<[f32; 3]>,
+    /// A source that just lost an item (`on_blocked: Drop`): 1 at the loss, falling to 0
+    /// over [`FLASH_SECONDS`] of simulated time; 0 for everything else (C7).
+    pub flash: Vec<f32>,
+}
+
+/// How long (simulated seconds) a source blinks after losing an item.
+pub const FLASH_SECONDS: f64 = 1.0;
+/// Gap between the items a source holds at its output, side by side (a batch waiting).
+const PORT_GAP: f32 = 0.06;
+
+/// Where item `k` of `n` held by a source waits: at the mouth of its output port (the `+x`
+/// side of the footprint), side by side across it, on the floor. `half` is the source's
+/// half size (x, height, z), Godot axes.
+pub fn port_slot(half: [f32; 3], k: usize, n: usize) -> [f32; 3] {
+    let step = ITEM_SIZE + PORT_GAP;
+    let across = (k as f32 - (n.max(1) - 1) as f32 / 2.0) * step;
+    [
+        half[0] + ITEM_SIZE / 2.0 + 0.12,
+        ITEM_SIZE / 2.0 + 0.01,
+        across,
+    ]
 }
 
 /// A team or request line (`utsim_scene::team_links`) between drawn blocks: kind name
@@ -254,6 +315,8 @@ pub struct Playback {
     teams: Vec<(usize, Vec<usize>)>,
     /// The instants each source created its items, by replay block (empty for others).
     created: Vec<Vec<f64>>,
+    /// The instants each source lost an item (created and destroyed without leaving).
+    dropped: Vec<Vec<f64>>,
 }
 
 impl Playback {
@@ -311,10 +374,16 @@ impl Playback {
             } else {
                 String::new()
             };
+            let type_mix = if kind == "Source" {
+                source_types(model, &name)
+            } else {
+                Vec::new()
+            };
             blocks.push(BlockView {
                 b,
                 stack,
                 badge,
+                type_mix,
                 name,
                 kind,
                 role,
@@ -351,11 +420,29 @@ impl Playback {
             .filter(|&b| matches!(replay.blocks[b].kind.as_str(), "Processor" | "Combiner"))
             .collect();
         let mut created = vec![Vec::new(); n];
+        let mut dropped = vec![Vec::new(); n];
+        // Items still at the block that created them: destroyed there, they were lost.
+        let mut at_birth: HashMap<u64, usize> = HashMap::new();
         for r in &replay.records {
-            if let utsim_core::TraceEvent::Created { block, .. } = r.event
-                && let Some(v) = created.get_mut(block)
-            {
-                v.push(r.t);
+            match r.event {
+                utsim_core::TraceEvent::Created { item, block } => {
+                    if let Some(v) = created.get_mut(block) {
+                        v.push(r.t);
+                    }
+                    at_birth.insert(item, block);
+                }
+                utsim_core::TraceEvent::Moved { item, .. }
+                | utsim_core::TraceEvent::Packed { item, .. } => {
+                    at_birth.remove(&item);
+                }
+                utsim_core::TraceEvent::Destroyed { item } => {
+                    if let Some(b) = at_birth.remove(&item)
+                        && replay.blocks.get(b).is_some_and(|x| x.kind == "Source")
+                    {
+                        dropped[b].push(r.t);
+                    }
+                }
+                _ => {}
             }
         }
         let links = model.map_or_else(Vec::new, |m| {
@@ -383,6 +470,7 @@ impl Playback {
             links,
             teams,
             created,
+            dropped,
         }
     }
 
@@ -508,6 +596,12 @@ impl Playback {
                 (None, Some(_)) => s.mobile_at(b, t),
                 _ => None,
             };
+            let lost = self.dropped[b].partition_point(|&d| d <= t);
+            f.flash
+                .push(match lost.checked_sub(1).map(|k| t - self.dropped[b][k]) {
+                    Some(dt) if dt < FLASH_SECONDS => (1.0 - dt / FLASH_SECONDS) as f32,
+                    _ => 0.0,
+                });
             f.task_target.push(
                 pose.and_then(|_| s.timeline.travel_target(b, t))
                     .map_or([f32::NAN; 3], |p| to_godot(p.map(|v| v as f32))),
@@ -629,8 +723,40 @@ impl Playback {
                 Some((self.static_pose(i).0, belt))
             })
             .collect();
-        for p in s.items_at(t).into_iter().filter(|p| p.drawn) {
+        let items = s.items_at(t);
+        // Items held by a source (it is blocked, or a batch waits to leave): how many each.
+        let mut held: HashMap<usize, usize> = HashMap::new();
+        for p in items.iter().filter(|p| p.drawn) {
+            if let Some(EntityId::Block(b)) = p.parent
+                && let Some(i) = self.index_of.get(b as usize).copied().flatten()
+                && self.blocks[i].kind == "Source"
+            {
+                *held.entry(i).or_default() += 1;
+            }
+        }
+        let mut at_port: HashMap<usize, usize> = HashMap::new();
+        for p in items.into_iter().filter(|p| p.drawn) {
             let mut center = p.center;
+            if let Some(EntityId::Block(b)) = p.parent
+                && let Some(i) = self.index_of.get(b as usize).copied().flatten()
+                && let Some(&n) = held.get(&i)
+            {
+                // C7: at the mouth of the output port, side by side.
+                let k = at_port.entry(i).or_default();
+                let (base, size) = self.static_pose(i);
+                let o = port_slot([size[0] / 2.0, size[1], size[2] / 2.0], *k, n);
+                *k += 1;
+                center = [base[0] + o[0], base[1] + o[1], base[2] + o[2]];
+                let origin = s.timeline.item_origin(p.item).unwrap_or(0);
+                f.item_id.push(p.id as i64);
+                f.item_position.push(layout_to_godot(center));
+                f.item_yaw.push(0.0);
+                f.item_scale.push(1.0);
+                f.item_color.push(style::origin_color(origin));
+                f.item_carrier.push(-1);
+                f.item_stack.push(0);
+                continue;
+            }
             let mut scale = p.scale;
             let mut carrier = -1;
             let mut stack = 0;
@@ -731,6 +857,37 @@ mod tests {
         let (model, path) = example(name);
         let replay = model.replay(0).expect("replay");
         Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    #[test]
+    fn a_source_shows_its_types_its_losses_and_what_it_holds() {
+        // The ring of the types: shares that add up to one, in the types' colours.
+        let pb = playback("chegadas_por_tabela.ron", false);
+        let avulsos = pb.blocks.iter().find(|v| v.name == "avulsos").unwrap();
+        let shares: f64 = avulsos.type_mix.iter().map(|m| m.1).sum();
+        assert_eq!(avulsos.type_mix.len(), 2);
+        assert!((shares - 1.0).abs() < 1e-9 && (avulsos.type_mix[0].1 - 0.8).abs() < 1e-9);
+        assert_eq!(
+            avulsos.type_mix[0].0,
+            looks::parse_color("#3b82f6").unwrap()
+        );
+        // A source that drops items blinks right after a loss, and not long after.
+        let pb = playback("atendimento_com_perda.ron", false);
+        let i = pb.blocks.iter().position(|v| v.name == "chegada").unwrap();
+        let b = pb.blocks[i].b;
+        let first = *pb.dropped[b].first().expect("a lost item");
+        assert!(pb.frame(first).flash[i] > 0.9);
+        let quiet = pb.dropped[b]
+            .windows(2)
+            .find(|w| w[1] - w[0] > 2.0 * FLASH_SECONDS)
+            .map(|w| w[0] + 1.5 * FLASH_SECONDS)
+            .expect("a pause between losses");
+        assert_eq!(pb.frame(quiet).flash[i], 0.0);
+        // Items a source holds wait at its output port, side by side, outside its footprint.
+        let a = port_slot([0.8, 1.0, 0.8], 0, 3);
+        let c = port_slot([0.8, 1.0, 0.8], 2, 3);
+        assert!(a[0] - ITEM_SIZE / 2.0 > 0.8);
+        assert!((a[2] + c[2]).abs() < 1e-6 && c[2] - a[2] >= 2.0 * ITEM_SIZE);
     }
 
     #[test]

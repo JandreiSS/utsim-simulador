@@ -328,8 +328,15 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - No rótulo da fonte, o selo do modo (`tabela`, `sequência`, `horário`, `lote`) e, numa
   rodada, os itens criados até o instante (dos eventos `Created` do replay). Teste
   `a_source_label_says_how_it_creates_and_how_many`.
-- Ficaram para depois: o anel com as proporções dos tipos, o item preso na boca da porta com
-  `on_blocked: Wait` e os perdidos piscando, e os itens de um lote lado a lado.
+- Depois (2026-11-05): um anel sobre a fonte com uma fatia por tipo de item, na cor do tipo
+  e do tamanho da sua parte (`source_types`, de `item_type` ou `item_type_mix`); os itens que
+  a fonte segura (bloqueada com `on_blocked: Wait`, ou um lote esperando para sair) ficam na
+  boca da porta de saída, lado a lado (`port_slot`); a prévia pisca em vermelho por um
+  segundo de simulação a cada item perdido com `Drop` (`flash` no quadro, dos itens criados e
+  destruídos sem sair). Teste `a_source_shows_its_types_its_losses_and_what_it_holds`.
+- Os itens de um lote em voo continuam um sobre o outro (a cena não diz quais são do mesmo
+  lote).
+
 ### Passo 5b, C6 (editores de tabela e horário da fonte), como foi feito
 
 - **Campo novo**: `table` da fonte entra no esquema (`schema.rs`) como RON opcional, como
@@ -364,6 +371,21 @@ Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteir
 - Roteiro `godot/roteiros/g4_chegadas.json` (sem janela): edita uma célula, cola linhas,
   confere a mensagem fora de ordem, ordena e desfaz. Fica para depois: arrastar as bordas dos
   blocos na faixa e uma prévia que rode de fato só a fonte.
+
+### Passo 5b, C6: arrastar os blocos e rodar a fonte (2026-11-05)
+
+- Os blocos da faixa do horário se arrastam: perto de uma borda move o início ou o fim (nunca
+  passa da outra borda), no meio move o período inteiro com o mesmo tamanho; tudo encaixa em
+  15 minutos num ciclo de um dia ou de uma semana (1/96 do ciclo nos outros) e fica dentro do
+  ciclo. Enquanto arrasta, a faixa mostra o horário arrastado; ao soltar vai um `Set` (um
+  passo de desfazer). Funções puras `grab_at`, `drag_period`, `snap_step`, testadas.
+- "Ver as primeiras chegadas" roda a fonte sozinha (`run_preview`): uma cópia do modelo só com
+  a fonte ligada a uma saída, pelo ciclo da tabela, com o lote, a liberação, os turnos e os
+  sorteios; a ponte roda quando o painel pede (`PropAction::ArrivalsPreview`) e guarda o
+  resultado pela tabela com que rodou. Até chegar, ou se a fonte sozinha não rodar, o painel
+  mostra a estimativa lida da tabela e diz qual das duas é. Teste
+  `the_preview_runs_the_source_alone` (a rodada cria o que a tabela diz).
+- Conferência com janela pendente (tela não liberada).
 
 ### Plano original do passo 2b
 
