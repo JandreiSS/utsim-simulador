@@ -21,10 +21,12 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 3 | Capacidade, turnos e estoque intermediário | 3.1 A demanda dobrou · 3.2 Pulmão certo · 3.3 Corretiva ou preventiva · 3.4 Lote e setup · 3.5 A expansão da linha de eixos |
 | 4 | Balanceamento de linha | 4.1 Montagem do ventilador · 4.2 O balanceamento no papel e no chão · 4.3 A demanda subiu |
 | 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
+| 6 | Tempos e métodos | 6.1 Quantas máquinas por operador · 6.2 Trabalho externo · 6.3 Célula com operadores · 6.4 Cronometragem |
+| 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Do enunciado ao modelo |
 
 A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
-Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. Os atos de tempos e métodos, problemas integrados e o caso final de Lean Seis Sigma vêm nas próximas versões.
+Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O caso final de Lean Seis Sigma vem numa próxima versão.
 
 ## Uma missão
 
@@ -53,6 +55,22 @@ A grade mostra as células do galpão. Arraste cada máquina para uma célula, o
 No modelo, cada família de peças tem a sua cadeia de objetos na posição das máquinas, e as peças andam em linha reta entre elas. Por isso a matriz de-para da rodada (a mesma do fluxograma do UTSim) mostra exatamente as distâncias da grade, o que a verificação confere.
 
 Para abrir uma missão direto, por exemplo numa demonstração em aula, use `utsim-ensino --missao ato4/ventilador`.
+
+### Tempos e métodos (ato 6)
+
+Algumas perguntas pedem um número calculado a partir dos dados do enunciado, pela receita de tempos e métodos que o UTSim usa no comando `utsim tempos`: o número de máquinas por operador `n' = (a + t)/(a + b)`, o tempo normal (média dos tempos observados vezes o ritmo), o tempo padrão (tempo normal vezes um mais as tolerâncias) e o número de ciclos a cronometrar para um erro relativo com 95 % de confiança. A missão 6.4 é só de cálculo e fica resolvida quando todas as respostas estão certas.
+
+Na missão 6.1, o custo por peça é o custo por hora da operadora e das máquinas dividido pelas peças por hora da simulação.
+
+### Modelagem (ato 7)
+
+Nas missões de modelagem o aluno monta ou completa o modelo no UTSim. O botão "Gravar modelo inicial" grava o ponto de partida. Depois de montar o modelo, o aluno indica o arquivo `.ron`, clica em "Ler o modelo" e simula. A correção:
+
+1. confere se o modelo carrega e é válido;
+2. confere a estrutura pedida (um combinador na montagem, quebras, um caminho de volta para o retrabalho, uma estação com capacidade em paralelo, operadores);
+3. roda o modelo do aluno e o modelo de referência e compara as medidas pedidas: cada uma passa quando o intervalo de 95 % do aluno encontra a faixa de tolerância em volta do valor de referência.
+
+O enunciado diz os nomes de objeto que a correção procura (por exemplo `expedicao` para as peças aprovadas). Quando um nome falta, o critério diz qual. A lista de critérios mostra "OK" ou "Falta" e o que foi encontrado. O modelo vai dentro da tentativa assinada, e o professor corrige de novo na correção em lote. O modelo de referência da missão 7.1 é o gabarito do estudo de caso 1 do manual.
 
 ### Resultados
 
