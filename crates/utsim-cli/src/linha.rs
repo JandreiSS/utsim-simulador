@@ -10,6 +10,7 @@ use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
 use utsim_linhas::{Pack, Placement, builtin, find};
 use utsim_model::Model;
+use utsim_model::quality::{ZoneDef, ZoneKind};
 
 /// The `linha` command line, parsed on its own (as `qualidade` and `tempos`, to keep the
 /// main parser small).
@@ -73,6 +74,25 @@ enum Acao {
         #[arg(long)]
         saida: Option<PathBuf>,
     },
+    /// Põe uma zona de risco no modelo (campo `zones`, que as predefinições não criam)
+    Zona {
+        /// Modelo (.ron)
+        model: PathBuf,
+        /// Nome da zona
+        nome: String,
+        /// Tipo: veiculo, maquina, carga_suspensa, ruido, calor ou outro
+        #[arg(long, default_value = "veiculo")]
+        tipo: String,
+        /// Nível da matriz de risco (1 em diante)
+        #[arg(long)]
+        nivel: Option<u8>,
+        /// EPI exigido para entrar (repetível)
+        #[arg(long = "epi")]
+        epi: Vec<String>,
+        /// Vértices do polígono em metros: x1 y1 x2 y2 x3 y3 ...
+        #[arg(long, num_args = 6.., value_names = ["X", "Y"], allow_negative_numbers = true, required = true)]
+        poligono: Vec<f64>,
+    },
 }
 
 /// Parses the arguments after `utsim linha` and runs the action.
@@ -96,8 +116,13 @@ pub fn pack(id: &str) -> Result<Pack, String> {
 fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
     if a.linha == "lista" {
         for p in builtin() {
+            let tipo = if p.is_cross_cutting() {
+                " [soma-se à linha pelo campo packs]"
+            } else {
+                ""
+            };
             println!(
-                "{}  {}: {}",
+                "{}  {}{tipo}: {}",
                 p.id(),
                 p.library.title(),
                 p.library.description
@@ -161,6 +186,30 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             comparar,
             json,
         }) => relatorio_cmd(&p, &model, reps, html, comparar, json)?,
+        Some(Acao::Zona {
+            model,
+            nome,
+            tipo,
+            nivel,
+            epi,
+            poligono,
+        }) => {
+            if !p.is_cross_cutting() {
+                return Err(format!("'{}' não é um pacote transversal", p.id()).into());
+            }
+            let mut doc = Document::open(&model)?;
+            let zone = zona(&nome, &tipo, nivel, epi, &poligono)?;
+            let mut packs = doc.model().packs.clone();
+            if !packs.iter().any(|x| x == p.id()) {
+                packs.push(p.id().to_string());
+            }
+            doc.apply(Command::Batch(vec![
+                Command::SetPacks(packs),
+                Command::AddZone(zone),
+            ]))?;
+            doc.save()?;
+            println!("{}: zona '{nome}' criada", model.display());
+        }
         Some(Acao::Colocar {
             model,
             predefinicao,
@@ -178,7 +227,7 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
                     .map_or("modelo".into(), |s| s.to_string_lossy().to_string());
                 Document::new(&stem)
             };
-            if doc.model().line.is_none() {
+            if doc.model().line.is_none() && !p.is_cross_cutting() {
                 doc.apply(Command::SetLine(Some(p.id().to_string())))?;
             }
             let values = valores(&campos)?;
@@ -206,6 +255,35 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// A risk zone from the `zona` options.
+fn zona(
+    nome: &str,
+    tipo: &str,
+    nivel: Option<u8>,
+    ppe: Vec<String>,
+    poligono: &[f64],
+) -> Result<ZoneDef, String> {
+    if poligono.len() % 2 != 0 {
+        return Err("--poligono espera pares x y".into());
+    }
+    let kind = match tipo {
+        "veiculo" => ZoneKind::Vehicle,
+        "maquina" => ZoneKind::Machine,
+        "carga_suspensa" => ZoneKind::SuspendedLoad,
+        "ruido" => ZoneKind::Noise,
+        "calor" => ZoneKind::Heat,
+        "outro" => ZoneKind::Other,
+        t => return Err(format!("tipo de zona desconhecido: '{t}'")),
+    };
+    Ok(ZoneDef {
+        name: nome.to_string(),
+        kind,
+        polygon: poligono.chunks(2).map(|c| [c[0], c[1]]).collect(),
+        level: nivel,
+        ppe,
+    })
 }
 
 /// The `--campo chave=valor` options as a map (the value is kept as RON text).
