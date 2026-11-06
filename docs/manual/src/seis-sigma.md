@@ -520,6 +520,22 @@ de resposta e as características críticas sem controle. Cada bloco tem uma not
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
 
+## Roteiro DMAIC
+
+A tela **Roteiro DMAIC** do projeto mostra o método como um fluxograma vertical: as cinco
+fases (Definir, Medir, Analisar, Melhorar e Controlar), os passos de cada uma com o que o passo
+pede, e ao lado as ferramentas indicadas.
+
+- Clique numa ferramenta para abrir a tela dela neste projeto: o entregável na tela
+  Ferramentas, a análise na tela Dados e análises, ou a tela do termo, da equipe, do
+  cronograma, dos riscos, das ações, dos ganhos, do modelo, dos relatórios ou do
+  encerramento. As ferramentas em cinza, com "em breve", ainda não estão no app.
+- Dois losangos marcam as decisões: "a causa raiz foi confirmada com dados?" volta para o
+  Analisar, e "a meta foi atingida no piloto?" volta para o Melhorar.
+- O verde marca o que o projeto já tem: um entregável com conteúdo, uma análise guardada ou
+  um item verificado do tollgate da fase.
+- O zoom muda o tamanho do desenho; as barras de rolagem levam ao resto.
+
 ## Dados e análises
 
 A tela **Dados e análises** do projeto guarda os conjuntos de dados e as análises
