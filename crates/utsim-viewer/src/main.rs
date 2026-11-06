@@ -1,3 +1,4 @@
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 //! `utsim-view`: 3D model editor (`Editar`, RF-60/RF-61) and replay viewer (`Simular`,
 //! RF-50/RF-51). The simulation is never driven from the 3D view (RNF-13): a run
 //! produces a `Replay` that the viewer only reads.
