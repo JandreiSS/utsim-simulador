@@ -16,8 +16,8 @@ use utsim_model::Model;
 #[derive(Parser)]
 #[command(
     name = "utsim linha",
-    about = "Linhas especializadas (Lean Office): predefinições, vocabulário, modelos \
-             prontos, indicadores e relatório da linha"
+    about = "Linhas especializadas (Lean Office, processos administrativos): predefinições, \
+             vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
     /// Linha (por exemplo lean_office), ou "lista" para ver as linhas instaladas
@@ -41,7 +41,7 @@ enum Acao {
         /// Número de replicações (sobrescreve run.replications)
         #[arg(short = 'n', long)]
         reps: Option<u32>,
-        /// Grava o relatório completo (indicadores, gráficos, VSM de escritório, raias)
+        /// Grava o relatório completo (indicadores, gráficos, VSM administrativo, raias)
         #[arg(long)]
         html: Option<PathBuf>,
         /// Cenário do estado futuro (outro .ron): VSM e indicadores lado a lado
@@ -96,14 +96,19 @@ pub fn pack(id: &str) -> Result<Pack, String> {
 fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
     if a.linha == "lista" {
         for p in builtin() {
-            println!("{}  {}: {}", p.id(), p.library.name, p.library.description);
+            println!(
+                "{}  {}: {}",
+                p.id(),
+                p.library.title(),
+                p.library.description
+            );
         }
         return Ok(());
     }
     let p = pack(&a.linha)?;
     match a.acao {
         None => {
-            println!("{} ({})", p.library.name, p.id());
+            println!("{} [{}]", p.library.title(), p.id());
             println!("{}", p.library.description);
             println!(
                 "{} predefinições, {} termos de vocabulário, {} modelo(s) pronto(s)",

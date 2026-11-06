@@ -1,0 +1,64 @@
+// Reembolso de despesas, estado atual (linha Lean Office): o modelo do tutorial "Do mapa ao
+// modelo" do manual (docs/manual/src/linhas/lean-office/tutorial.md), montado com
+// `utsim linha lean_office colocar`; o tutorial mostra cada comando.
+//
+// Cinco etapas: lançamento (10 % saem com erro), lote de 10 pedidos (ou o que houver em 8
+// h), aprovação do gestor (10 % voltam), malote até a tesouraria e pagamento. Tempo em
+// minutos corridos, sem horário de trabalho. O estado futuro está em reembolso_futuro.ron.
+// Rode com:
+//   utsim linha lean_office relatorio examples/reembolso_atual.ron --comparar examples/reembolso_futuro.ron --html relatorio.html
+//
+//   pedidos -> caixa -> lancamento -> lote -> aprovacao -> malote -> pagamento -> concluido
+//                ^                                |
+//                +----------- devolução ----------+
+Model(
+    name: "Reembolso de despesas (atual)",
+    line: "lean_office",
+    run: (stop_time: 43200.0, warmup: 4320.0, seed: 5, replications: 5),
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 45.0), labels: {"sla": Const(2880.0)}),
+            position: (0.0, 0.0, 0.0), preset: "lean_office/entrada", department: "Solicitante", symbol: "inicio"),
+        (name: "caixa", kind: Queue(), position: (2.0, 0.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Financeiro", symbol: "espera"),
+        (name: "lancamento", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "equipe"))), position: (4.0, 0.0, 0.0),
+            on_entry: "if random() > 0.9 { item.erro = 1.0; item.erros_lancamento = label(item, \"erros_lancamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Financeiro", symbol: "operacao"),
+        (name: "lote", kind: Queue(batch: Some(Batch(size: 10, max_wait: 480.0))), position: (6.0, 0.0, 0.0),
+            preset: "lean_office/lote", department: "Financeiro", symbol: "espera"),
+        (name: "aprovacao", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "gestores"))), output: Weighted([0.9, 0.1]),
+            position: (8.0, 0.0, 0.0), preset: "lean_office/aprovacao", department: "Gerência", symbol: "inspecao"),
+        (name: "malote", kind: Processor(capacity: 100000, process: Uniform(min: 60.0, max: 480.0)),
+            position: (10.0, 0.0, 0.0), preset: "lean_office/tramitacao", department: "Financeiro", symbol: "transporte"),
+        (name: "pagamento", kind: Processor(process: Triangular(min: 3.0, mode: 5.0, max: 10.0),
+            operators: Some(OperatorUse(team: "equipe"))), position: (12.0, 0.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_pagamento = label(item, \"erros_pagamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Tesouraria", symbol: "operacao"),
+        (name: "concluido", kind: Sink, position: (14.0, 0.0, 0.0),
+            preset: "lean_office/conclusao", department: "Tesouraria", symbol: "fim"),
+        (name: "equipe", kind: Dispatcher(team: ["equipe_1", "equipe_2"]), position: (4.0, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Financeiro"),
+        (name: "equipe_1", kind: Transporter(speed: 72.0), position: (4.0, 3.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "equipe_2", kind: Transporter(speed: 72.0), position: (4.0, 0.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "gestores", kind: Dispatcher(team: ["gestores_1", "gestores_2"]), position: (8.0, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Gerência"),
+        (name: "gestores_1", kind: Transporter(speed: 72.0), position: (8.0, 3.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Gerência"),
+        (name: "gestores_2", kind: Transporter(speed: 72.0), position: (8.0, 0.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Gerência"),
+    ],
+    connections: [
+        ("pedidos", "caixa"),
+        ("caixa", "lancamento"),
+        ("lancamento", "lote"),
+        ("lote", "aprovacao"),
+        ("aprovacao", "malote"),   // aprova
+        ("aprovacao", "caixa"),    // devolve
+        ("malote", "pagamento"),
+        ("pagamento", "concluido"),
+    ],
+)

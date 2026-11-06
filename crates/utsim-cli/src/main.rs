@@ -449,8 +449,8 @@ enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
-    /// Linhas especializadas (Lean Office): predefinições, vocabulário, modelos prontos,
-    /// indicadores e relatório da linha
+    /// Linhas especializadas (Lean Office, processos administrativos): predefinições,
+    /// vocabulário, modelos prontos, indicadores e relatório da linha
     #[command(disable_help_flag = true)]
     Linha {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

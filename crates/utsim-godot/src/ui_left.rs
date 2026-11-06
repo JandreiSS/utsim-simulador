@@ -196,6 +196,7 @@ fn named_area(ui: &Ui, reg: &mut Registry, name: &str, rect: Rect) {
             enabled: true,
             checked: None,
             choices: Vec::new(),
+            count: None,
         },
     );
 }

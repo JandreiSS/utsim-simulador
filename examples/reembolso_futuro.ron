@@ -1,0 +1,58 @@
+// Reembolso de despesas, estado futuro (linha Lean Office): o estado futuro do tutorial "Do
+// mapa ao modelo" (docs/manual/src/linhas/lean-office/tutorial.md). Três mudanças sobre
+// reembolso_atual.ron: lista de conferência no lançamento (%C&A de 90 % para 98 %), fluxo
+// unitário (sem o lote) e pedido pelo sistema em vez do malote (5 a 15 min).
+// Rode com:
+//   utsim linha lean_office relatorio examples/reembolso_atual.ron --comparar examples/reembolso_futuro.ron --html relatorio.html
+//
+//   pedidos -> caixa -> lancamento -> aprovacao -> malote -> pagamento -> concluido
+//                ^                        |
+//                +------- devolução ------+
+Model(
+    name: "Reembolso de despesas (futuro)",
+    line: "lean_office",
+    run: (stop_time: 43200.0, warmup: 4320.0, seed: 5, replications: 5),
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 45.0), labels: {"sla": Const(2880.0)}),
+            position: (0.0, 0.0, 0.0), preset: "lean_office/entrada", department: "Solicitante", symbol: "inicio"),
+        (name: "caixa", kind: Queue(), position: (2.0, 0.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Financeiro", symbol: "espera"),
+        (name: "lancamento", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "equipe"))), position: (4.0, 0.0, 0.0),
+            on_entry: "if random() > 0.98 { item.erro = 1.0; item.erros_lancamento = label(item, \"erros_lancamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Financeiro", symbol: "operacao"),
+        (name: "aprovacao", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "gestores"))), output: Weighted([0.9, 0.1]),
+            position: (8.0, 0.0, 0.0), preset: "lean_office/aprovacao", department: "Gerência", symbol: "inspecao"),
+        (name: "malote", kind: Processor(capacity: 100000, process: Uniform(min: 5.0, max: 15.0)),
+            position: (10.0, 0.0, 0.0), preset: "lean_office/tramitacao", department: "Financeiro", symbol: "transporte"),
+        (name: "pagamento", kind: Processor(process: Triangular(min: 3.0, mode: 5.0, max: 10.0),
+            operators: Some(OperatorUse(team: "equipe"))), position: (12.0, 0.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_pagamento = label(item, \"erros_pagamento\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Tesouraria", symbol: "operacao"),
+        (name: "concluido", kind: Sink, position: (14.0, 0.0, 0.0),
+            preset: "lean_office/conclusao", department: "Tesouraria", symbol: "fim"),
+        (name: "equipe", kind: Dispatcher(team: ["equipe_1", "equipe_2"]), position: (4.0, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Financeiro"),
+        (name: "equipe_1", kind: Transporter(speed: 72.0), position: (4.0, 3.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "equipe_2", kind: Transporter(speed: 72.0), position: (4.0, 0.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "gestores", kind: Dispatcher(team: ["gestores_1", "gestores_2"]), position: (8.0, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "Gerência"),
+        (name: "gestores_1", kind: Transporter(speed: 72.0), position: (8.0, 3.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Gerência"),
+        (name: "gestores_2", kind: Transporter(speed: 72.0), position: (8.0, 0.5, 0.0),
+            visual: Some((asset: Some("pessoa"))), person: Some(()), preset: "lean_office/pessoa", department: "Gerência"),
+    ],
+    connections: [
+        ("pedidos", "caixa"),
+        ("caixa", "lancamento"),
+        ("lancamento", "aprovacao"),
+        ("aprovacao", "malote"),   // aprova
+        ("aprovacao", "caixa"),    // devolve
+        ("malote", "pagamento"),
+        ("pagamento", "concluido"),
+    ],
+)

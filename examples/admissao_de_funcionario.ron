@@ -1,0 +1,142 @@
+// Admissão de funcionário (linha Lean Office): modelo pronto da linha, montado só com as
+// predefinições de linhas/lean_office/biblioteca.ron.
+//
+// Cada admissão aprovada chega ao RH (cerca de uma por dia útil, prazo de 10 dias corridos).
+// O RH cadastra o candidato e pede os documentos, que o candidato demora a mandar; a
+// conferência devolve 10 % dos casos ao candidato por documento faltando ou errado. Depois
+// o caso passa por e-mail para a TI, que libera os acessos em lote (5 pedidos, ou o que
+// houver depois de 2 dias), para o financeiro, que cadastra na folha, e para o gestor, que
+// confirma a data de início (10 % voltam ao RH com alguma pendência).
+//
+// Tempo em minutos; a semana começa na segunda às 0h (calendário "expediente": das 8h às
+// 18h com almoço das 12h às 13h, de segunda a sexta). Rode com:
+//   utsim linha lean_office relatorio examples/admissao_de_funcionario.ron --html relatorio.html
+//
+//   admissoes -> caixa_rh -> cadastro -> espera_documentos -> conferencia -> email_ti -> lote_ti -> acessos -> email_financeiro
+//                   ^                         ^                    |
+//                   |                         +--------------------+
+//   -> caixa_financeiro -> folha -> email_gestor -> caixa_gestor -> confirmacao -> admitido
+//                   +------------------------- devolução ------------+
+Model(
+    name: "Admissão de funcionário",
+    description: "Lean Office: passagens entre RH, TI, financeiro e gestor, espera pelos documentos do candidato e lote de acessos",
+    line: "lean_office",
+    run: (stop_time: 80640.0, warmup: 10080.0, seed: 37, replications: 5),
+    calendars: {
+        "expediente": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3240.0),
+        ]),
+    },
+    objects: [
+        // RH.
+        (name: "admissoes", kind: Source(interarrival: Exp(mean: 540.0),
+            labels: {
+                "prioridade": Discrete([(1.0, 0.8), (2.0, 0.2)]),
+                "sla": Const(14400.0),
+            }),
+            shifts: Calendar("expediente"), position: (0.0, 0.0, 0.0),
+            preset: "lean_office/entrada", department: "RH", symbol: "inicio"),
+        (name: "caixa_rh", kind: Queue(order: Desc("prioridade")), position: (0.0, 1.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "RH", symbol: "espera"),
+        (name: "cadastro", kind: Processor(capacity: 2, process: Triangular(min: 30.0, mode: 60.0, max: 120.0),
+            operators: Some(OperatorUse(team: "rh"))), position: (1.0, 1.0, 0.0),
+            on_entry: "if random() > 0.9 { item.erro = 1.0; item.erros_cadastro = label(item, \"erros_cadastro\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "RH", symbol: "operacao"),
+        (name: "conferencia", kind: Processor(process: Triangular(min: 10.0, mode: 20.0, max: 40.0),
+            operators: Some(OperatorUse(team: "rh"))), position: (3.0, 1.0, 0.0),
+            output: ByLabel("rota"),
+            on_entry: "item.rota = 1.0; if random() < 0.1 || (label(item, \"erro\", 0.0) >= 1.0 && random() < 0.9) { item.erro = 0.0; item.rota = 2.0; }",
+            preset: "lean_office/verificacao", department: "RH", symbol: "inspecao"),
+        // Candidato.
+        (name: "espera_documentos", kind: Processor(capacity: 100000, process: Exp(mean: 2880.0)),
+            position: (2.0, 0.0, 0.0),
+            preset: "lean_office/espera_informacao", department: "Candidato", symbol: "espera"),
+        // TI.
+        (name: "email_ti", kind: Processor(capacity: 100000, process: Uniform(min: 30.0, max: 480.0)),
+            position: (4.0, 1.0, 0.0),
+            preset: "lean_office/tramitacao", department: "TI", symbol: "transporte"),
+        (name: "lote_ti", kind: Queue(batch: Some(Batch(size: 5, max_wait: 2880.0))), position: (4.0, 2.0, 0.0),
+            preset: "lean_office/lote", department: "TI", symbol: "espera"),
+        (name: "acessos", kind: Processor(capacity: 5, process: Triangular(min: 20.0, mode: 45.0, max: 90.0),
+            operators: Some(OperatorUse(team: "ti"))), position: (5.0, 2.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_acessos = label(item, \"erros_acessos\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "TI", symbol: "operacao"),
+        // Financeiro.
+        (name: "email_financeiro", kind: Processor(capacity: 100000, process: Uniform(min: 30.0, max: 480.0)),
+            position: (6.0, 2.0, 0.0),
+            preset: "lean_office/tramitacao", department: "Financeiro", symbol: "transporte"),
+        (name: "caixa_financeiro", kind: Queue(order: Asc("prazo")), position: (6.0, 3.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Financeiro", symbol: "espera"),
+        (name: "folha", kind: Processor(process: Triangular(min: 15.0, mode: 30.0, max: 60.0),
+            operators: Some(OperatorUse(team: "financeiro"))), position: (7.0, 3.0, 0.0),
+            on_entry: "if random() > 0.95 { item.erro = 1.0; item.erros_folha = label(item, \"erros_folha\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Financeiro", symbol: "operacao"),
+        // Gestor.
+        (name: "email_gestor", kind: Processor(capacity: 100000, process: Uniform(min: 30.0, max: 480.0)),
+            position: (8.0, 3.0, 0.0),
+            preset: "lean_office/tramitacao", department: "Gestor", symbol: "transporte"),
+        (name: "caixa_gestor", kind: Queue(), position: (8.0, 4.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Gestor", symbol: "espera"),
+        (name: "confirmacao", kind: Processor(process: Triangular(min: 10.0, mode: 15.0, max: 30.0),
+            operators: Some(OperatorUse(team: "gestores"))), position: (9.0, 4.0, 0.0),
+            output: Weighted([0.9, 0.1]),
+            preset: "lean_office/aprovacao", department: "Gestor", symbol: "inspecao"),
+        (name: "admitido", kind: Sink, position: (10.0, 4.0, 0.0),
+            preset: "lean_office/conclusao", department: "Gestor", symbol: "fim"),
+        // Pessoas e equipes.
+        (name: "rh", kind: Dispatcher(team: ["analista_rh_1", "analista_rh_2"]),
+            position: (1.5, 1.8, 0.0), preset: "lean_office/equipe", department: "RH"),
+        (name: "analista_rh_1", kind: Transporter(speed: 72.0), position: (1.0, 1.5, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "RH"),
+        (name: "analista_rh_2", kind: Transporter(speed: 72.0), position: (1.5, 1.5, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "RH"),
+        (name: "ti", kind: Dispatcher(team: ["tecnico_ti"]), position: (5.5, 2.8, 0.0),
+            preset: "lean_office/equipe", department: "TI"),
+        (name: "tecnico_ti", kind: Transporter(speed: 72.0), position: (5.0, 2.5, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "TI"),
+        (name: "financeiro", kind: Dispatcher(team: ["analista_folha"]), position: (7.5, 3.8, 0.0),
+            preset: "lean_office/equipe", department: "Financeiro"),
+        (name: "analista_folha", kind: Transporter(speed: 72.0), position: (7.0, 3.5, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "gestores", kind: Dispatcher(team: ["gestor"]), position: (9.5, 4.8, 0.0),
+            preset: "lean_office/equipe", department: "Gestor"),
+        (name: "gestor", kind: Transporter(speed: 72.0), position: (9.0, 4.5, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Gestor"),
+    ],
+    connections: [
+        ("admissoes", "caixa_rh"),
+        ("caixa_rh", "cadastro"),
+        ("cadastro", "espera_documentos"),
+        ("espera_documentos", "conferencia"),
+        ("conferencia", "email_ti"),              // porta 1: documentos em ordem
+        ("conferencia", "espera_documentos"),     // porta 2: falta documento
+        ("email_ti", "lote_ti"),
+        ("lote_ti", "acessos"),
+        ("acessos", "email_financeiro"),
+        ("email_financeiro", "caixa_financeiro"),
+        ("caixa_financeiro", "folha"),
+        ("folha", "email_gestor"),
+        ("email_gestor", "caixa_gestor"),
+        ("caixa_gestor", "confirmacao"),
+        ("confirmacao", "admitido"),              // confirma
+        ("confirmacao", "caixa_rh"),              // devolve
+    ],
+)

@@ -16,7 +16,7 @@ use utsim_core::RunReport;
 use utsim_edit::arrange::{self, Align, Axis, Clipboard};
 use utsim_edit::{Command, Document, FieldSource, Issue, PaletteEntry};
 use utsim_model::replay::{Replay, ReplayBlock, kind_name};
-use utsim_model::{Model, VisualDef, is_mobile};
+use utsim_model::{Model, ObjectKind, VisualDef, is_mobile};
 
 use crate::schema::{self, Field, Value};
 
@@ -195,6 +195,77 @@ impl Editor {
 
     pub fn apply(&mut self, command: Command) -> Result<(), String> {
         self.doc.apply(command)
+    }
+
+    /// The drag of the Equipe tool from `from` to `to` (`docs/plano_chegadas_e_equipes_3d.md`,
+    /// E1b), one undo step; returns what changed, in a sentence:
+    /// - dispatcher → transporter: the member joins the team, or leaves it;
+    /// - object → transporter or dispatcher: who carries its items out (`transport`), or,
+    ///   with `operators` and a processor, where its operators come from; the same drag
+    ///   again clears it.
+    pub fn team_link(&mut self, from: &str, to: &str, operators: bool) -> Result<String, String> {
+        use utsim_edit::teams;
+        let model = self.model();
+        let find = |n: &str| {
+            model
+                .objects
+                .iter()
+                .find(|o| o.name == n)
+                .ok_or_else(|| format!("objeto '{n}' não existe"))
+        };
+        let (a, b) = (find(from)?, find(to)?);
+        if from == to {
+            return Err("arraste de um objeto até outro".into());
+        }
+        let (command, said) = match (&a.kind, &b.kind) {
+            (ObjectKind::Dispatcher { team, .. }, ObjectKind::Transporter { .. }) => {
+                let leaving = team.iter().any(|m| m == to);
+                (
+                    teams::team_toggle(model, from, to)?,
+                    if leaving {
+                        format!("{to} saiu da equipe de {from}.")
+                    } else {
+                        format!("{to} entrou na equipe de {from}.")
+                    },
+                )
+            }
+            (ObjectKind::Processor { operators: op, .. }, _) if operators => {
+                let same = op.as_ref().is_some_and(|o| o.team == to);
+                let new = (!same).then(|| {
+                    // A new request: one operator for setup and process (the defaults).
+                    let mut o = match op.clone() {
+                        Some(o) => o,
+                        None => ron::from_str(r#"(team: "")"#).expect("default operators"),
+                    };
+                    o.team = to.to_owned();
+                    o
+                });
+                (
+                    teams::set_operators(model, from, new.as_ref())?,
+                    if same {
+                        format!("{from} não pede mais operadores de {to}.")
+                    } else {
+                        format!("{from} pede operadores de {to}.")
+                    },
+                )
+            }
+            (_, ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. }) => {
+                let same = a.transport.as_deref() == Some(to);
+                (
+                    teams::set_transport(model, from, (!same).then_some(to))?,
+                    if same {
+                        format!("{from} não pede mais transporte a {to}.")
+                    } else {
+                        format!("{from} pede transporte a {to}.")
+                    },
+                )
+            }
+            _ => {
+                return Err("arraste do despachante a um transportador, ou de um objeto ao transportador ou despachante que o atende".into());
+            }
+        };
+        self.apply(command)?;
+        Ok(said)
     }
 
     /// Switches on the content series (`run.sample_interval`, from the simulated time)
@@ -762,7 +833,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 32] = [
+pub const SHORTCUTS: [(&str, &str); 33] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -799,6 +870,10 @@ pub const SHORTCUTS: [(&str, &str); 32] = [
     (
         "C",
         "ferramenta Corredor: clique pontos no chão, Enter ou duplo clique termina",
+    ),
+    (
+        "E (ou Alt com Ligar)",
+        "ferramenta Equipe: arraste do despachante ao transportador, ou do objeto a quem leva os itens (Shift: operadores do processo)",
     ),
     (
         "Esc",

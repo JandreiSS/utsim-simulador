@@ -1,0 +1,134 @@
+// Pedido ao faturamento (linha Lean Office): modelo pronto da linha, montado só com as
+// predefinições de linhas/lean_office/biblioteca.ron. Processo comercial e fiscal feito no
+// sistema: cada pessoa fica no seu posto (não anda), como no trabalho remoto ou em sistema.
+//
+// Os pedidos dos clientes chegam no horário comercial, com valor, prioridade e prazo de
+// faturamento de 2 dias corridos. O comercial cadastra o pedido (10 % saem com algum dado
+// errado); o financeiro analisa o crédito e pede garantia ou cadastro atualizado em 15 % dos
+// casos, que esperam a resposta do cliente; o PCP confirma o estoque e a data; o faturamento
+// emite as notas em lote (15 pedidos, ou o que houver em 4 horas) e a conferência fiscal
+// devolve 90 % das notas com erro para correção.
+//
+// Tempo em minutos; a semana começa na segunda às 0h (calendário "expediente": das 8h às
+// 18h com almoço das 12h às 13h, de segunda a sexta). Rode com:
+//   utsim linha lean_office relatorio examples/pedido_ao_faturamento.ron --html relatorio.html
+//
+//   pedidos -> caixa_comercial -> cadastro -> caixa_credito -> credito -> caixa_pcp -> estoque -> lote_faturamento -> emissao -> conferencia_fiscal -> faturado
+//                                                  ^             |                                                     ^               |
+//                                                  +- espera_cliente <-+                                                +- caixa_correcao <-+
+Model(
+    name: "Pedido ao faturamento",
+    description: "Lean Office: comercial, crédito, PCP e faturamento em sistema, espera pelo cliente, faturamento em lote e conferência fiscal",
+    line: "lean_office",
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 41, replications: 5),
+    calendars: {
+        "expediente": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 720.0, duration: 60.0),
+            (start: 1080.0, duration: 840.0),
+            (start: 2160.0, duration: 60.0),
+            (start: 2520.0, duration: 840.0),
+            (start: 3600.0, duration: 60.0),
+            (start: 3960.0, duration: 840.0),
+            (start: 5040.0, duration: 60.0),
+            (start: 5400.0, duration: 840.0),
+            (start: 6480.0, duration: 60.0),
+            (start: 6840.0, duration: 3240.0),
+        ]),
+    },
+    objects: [
+        // Cliente.
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 25.0),
+            labels: {
+                "valor": LogNormal(mean: 12000.0, sd: 20000.0),
+                "prioridade": Discrete([(1.0, 0.85), (2.0, 0.15)]),
+                "sla": Const(2880.0),
+            }),
+            shifts: Calendar("expediente"), position: (0.0, 0.0, 0.0),
+            preset: "lean_office/entrada", department: "Cliente", symbol: "inicio"),
+        (name: "espera_cliente", kind: Processor(capacity: 100000, process: Exp(mean: 720.0)),
+            position: (3.0, 0.0, 0.0),
+            preset: "lean_office/espera_informacao", department: "Cliente", symbol: "espera"),
+        // Comercial.
+        (name: "caixa_comercial", kind: Queue(order: Desc("prioridade")), position: (0.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Comercial", symbol: "espera"),
+        (name: "cadastro", kind: Processor(capacity: 2, process: Triangular(min: 5.0, mode: 12.0, max: 30.0),
+            operators: Some(OperatorUse(team: "comercial"))), position: (1.0, 2.0, 0.0),
+            on_entry: "if random() > 0.9 { item.erro = 1.0; item.erros_cadastro = label(item, \"erros_cadastro\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Comercial", symbol: "operacao"),
+        // Financeiro.
+        (name: "caixa_credito", kind: Queue(order: Asc("prazo")), position: (3.0, 2.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Financeiro", symbol: "espera"),
+        (name: "credito", kind: Processor(process: Triangular(min: 3.0, mode: 8.0, max: 20.0),
+            operators: Some(OperatorUse(team: "financeiro"))), position: (4.0, 2.0, 0.0),
+            output: Weighted([0.85, 0.15]),
+            preset: "lean_office/aprovacao", department: "Financeiro", symbol: "inspecao"),
+        // PCP.
+        (name: "caixa_pcp", kind: Queue(order: Asc("prazo")), position: (5.0, 3.0, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "PCP", symbol: "espera"),
+        (name: "estoque", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 25.0),
+            operators: Some(OperatorUse(team: "pcp"))), position: (6.0, 3.0, 0.0),
+            on_entry: "if random() > 1.0 { item.erro = 1.0; item.erros_estoque = label(item, \"erros_estoque\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "PCP", symbol: "operacao"),
+        // Faturamento.
+        (name: "lote_faturamento", kind: Queue(batch: Some(Batch(size: 15, max_wait: 240.0))), position: (7.0, 4.0, 0.0),
+            preset: "lean_office/lote", department: "Faturamento", symbol: "espera"),
+        (name: "emissao", kind: Processor(capacity: 3, process: Triangular(min: 2.0, mode: 4.0, max: 8.0),
+            operators: Some(OperatorUse(team: "faturamento"))), position: (8.0, 4.0, 0.0),
+            on_entry: "if random() > 0.97 { item.erro = 1.0; item.erros_emissao = label(item, \"erros_emissao\", 0.0) + 1.0; }",
+            preset: "lean_office/posto", department: "Faturamento", symbol: "operacao"),
+        (name: "conferencia_fiscal", kind: Processor(process: Triangular(min: 1.0, mode: 2.0, max: 4.0),
+            operators: Some(OperatorUse(team: "faturamento"))), position: (9.0, 4.0, 0.0),
+            output: ByLabel("rota"),
+            on_entry: "item.rota = 1.0; if label(item, \"erro\", 0.0) >= 1.0 && random() < 0.9 { item.erro = 0.0; item.rota = 2.0; }",
+            preset: "lean_office/verificacao", department: "Faturamento", symbol: "inspecao"),
+        (name: "caixa_correcao", kind: Queue(), position: (8.5, 5.5, 0.0),
+            on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
+            preset: "lean_office/caixa_entrada", department: "Faturamento", symbol: "espera"),
+        (name: "faturado", kind: Sink, position: (10.0, 4.0, 0.0),
+            preset: "lean_office/conclusao", department: "Faturamento", symbol: "fim"),
+        // Pessoas e equipes: cada pessoa no seu posto (trabalho no sistema).
+        (name: "comercial", kind: Dispatcher(team: ["vendedor_1", "vendedor_2"]), position: (1.0, 3.0, 0.0),
+            preset: "lean_office/equipe", department: "Comercial"),
+        (name: "vendedor_1", kind: Transporter(speed: 72.0), position: (1.0, 2.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Comercial"),
+        (name: "vendedor_2", kind: Transporter(speed: 72.0), position: (1.0, 2.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Comercial"),
+        (name: "financeiro", kind: Dispatcher(team: ["analista_credito"]), position: (4.0, 1.0, 0.0),
+            preset: "lean_office/equipe", department: "Financeiro"),
+        (name: "analista_credito", kind: Transporter(speed: 72.0), position: (4.0, 2.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Financeiro"),
+        (name: "pcp", kind: Dispatcher(team: ["planejador"]), position: (6.0, 2.0, 0.0),
+            preset: "lean_office/equipe", department: "PCP"),
+        (name: "planejador", kind: Transporter(speed: 72.0), position: (6.0, 3.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "PCP"),
+        (name: "faturamento", kind: Dispatcher(team: ["faturista"]), position: (9.5, 5.0, 0.0),
+            preset: "lean_office/equipe", department: "Faturamento"),
+        (name: "faturista", kind: Transporter(speed: 72.0), position: (8.5, 4.0, 0.0),
+            shifts: Calendar("expediente"), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "lean_office/pessoa", department: "Faturamento"),
+    ],
+    connections: [
+        ("pedidos", "caixa_comercial"),
+        ("caixa_comercial", "cadastro"),
+        ("cadastro", "caixa_credito"),
+        ("caixa_credito", "credito"),
+        ("credito", "caixa_pcp"),                // aprova
+        ("credito", "espera_cliente"),           // pede garantia ou cadastro
+        ("espera_cliente", "caixa_credito"),
+        ("caixa_pcp", "estoque"),
+        ("estoque", "lote_faturamento"),
+        ("lote_faturamento", "emissao"),
+        ("emissao", "conferencia_fiscal"),
+        ("conferencia_fiscal", "faturado"),      // porta 1: nota certa
+        ("conferencia_fiscal", "caixa_correcao"), // porta 2: nota com erro
+        ("caixa_correcao", "emissao"),
+    ],
+)

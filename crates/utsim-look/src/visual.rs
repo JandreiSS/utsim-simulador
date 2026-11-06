@@ -618,6 +618,80 @@ pub fn keep_outside(
     [position[0] + bx * t, position[1], position[2] + bz * t]
 }
 
+/// A queue drawn with the conveyor (`visual.asset: "esteira"`): its resting items ride
+/// on top of the rollers, in one line along the belt, the oldest at the `+x` end; a full
+/// line starts a second layer on top, and what does not fit in [`style::MAX_LAYERS`]
+/// layers is only counted (the label shows "+N").
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct QueueBelt {
+    /// Length and outside width of the conveyor, and the height of the rollers' top.
+    pub length: f32,
+    pub width: f32,
+    pub top: f32,
+    /// Heading of the conveyor (the look's yaw).
+    pub yaw: f32,
+}
+
+/// Gap between two items in the line, as a fraction of the item size.
+const QUEUE_GAP: f32 = 0.1;
+
+/// The belt of a queue whose look is the conveyor, or `None` (other kinds or looks).
+pub fn queue_belt(kind: &str, look: &Look) -> Option<QueueBelt> {
+    match (&look.source, kind) {
+        (Source::Library(Spec::Esteira(c)), "Queue") => Some(QueueBelt {
+            length: c.length.max(0.2) * look.scale,
+            width: c.width.max(0.2) * look.scale,
+            top: c.height.max(0.05) * look.scale,
+            yaw: look.yaw,
+        }),
+        _ => None,
+    }
+}
+
+impl QueueBelt {
+    /// Items of `size` in one line along the belt.
+    pub fn per_layer(&self, size: f32) -> usize {
+        ((self.length / (size * (1.0 + QUEUE_GAP))).floor() as usize).max(1)
+    }
+
+    /// Centre of resting item `i` (0: the oldest) relative to the block base, or `None`
+    /// when it is past the layers drawn.
+    pub fn slot(&self, i: usize, size: f32) -> Option<[f32; 3]> {
+        let n = self.per_layer(size);
+        let layer = i / n;
+        if layer >= style::MAX_LAYERS {
+            return None;
+        }
+        let pitch = self.length / n as f32;
+        let along = self.length / 2.0 - pitch * ((i % n) as f32 + 0.5);
+        let (s, c) = self.yaw.sin_cos();
+        Some([
+            along * c,
+            self.rest_height(size) + layer as f32 * size,
+            -along * s,
+        ])
+    }
+
+    /// Height of the centre of an item of `size` lying on the rollers.
+    pub fn rest_height(&self, size: f32) -> f32 {
+        self.top + 0.01 + size / 2.0
+    }
+
+    /// Whether an item of `size` centred at `d` (relative to the block base) is over the
+    /// belt (it would sink into it below [`Self::rest_height`]).
+    pub fn covers(&self, d: [f32; 3], size: f32) -> bool {
+        let (s, c) = self.yaw.sin_cos();
+        let along = d[0] * c - d[2] * s;
+        let across = d[0] * s + d[2] * c;
+        along.abs() < self.length / 2.0 + size / 2.0 && across.abs() < self.width / 2.0 + size / 2.0
+    }
+
+    /// Resting items not drawn.
+    pub fn hidden(&self, resting: usize, size: f32) -> usize {
+        resting.saturating_sub(self.per_layer(size) * style::MAX_LAYERS)
+    }
+}
+
 /// Height the simple shapes lift a queue's items to (the realistic queue is a floor
 /// area: its items rest on the floor instead).
 pub fn queue_drop() -> f32 {
@@ -631,6 +705,59 @@ mod tests {
 
     fn geom(kind: &str) -> Geom {
         Geom::new(kind, None, None)
+    }
+
+    #[test]
+    fn a_queue_drawn_as_a_conveyor_lines_its_items_on_the_belt() {
+        let ctx = Context::default();
+        let visual = VisualDef {
+            asset: Some("esteira".into()),
+            ..VisualDef::default()
+        };
+        let look = look_of("Queue", None, Some(&visual), &geom("Queue"), ctx, None).unwrap();
+        let belt = queue_belt("Queue", &look).expect("a queue with the conveyor look");
+        let Source::Library(Spec::Esteira(c)) = look.source else {
+            panic!("the conveyor asset");
+        };
+        // The numbers come from the conveyor drawn.
+        assert_eq!(
+            (belt.length, belt.width, belt.top),
+            (c.length, c.width, c.height)
+        );
+        let size = utsim_scene::compose::ITEM_SIZE;
+        let n = belt.per_layer(size);
+        assert!(n >= 5, "{n}");
+        for i in 0..n * style::MAX_LAYERS {
+            let p = belt.slot(i, size).unwrap();
+            // Inside the footprint, along the length and within the side frames.
+            assert!(
+                p[0].abs() + size / 2.0 <= belt.length / 2.0 + 1e-5,
+                "slot {i}: {p:?}"
+            );
+            assert!(
+                p[2].abs() + size / 2.0 <= belt.width / 2.0 + 1e-5,
+                "slot {i}: {p:?}"
+            );
+            // Resting on the rollers (first layer) or on the item below.
+            let layer = i / n;
+            let bottom = p[1] - size / 2.0;
+            assert!(bottom >= belt.top - 1e-5, "slot {i} under the belt top");
+            assert!(
+                (bottom - belt.top - layer as f32 * size).abs() < 0.02,
+                "slot {i}"
+            );
+        }
+        // One line: the first layer is all at the same height and side.
+        let a = belt.slot(0, size).unwrap();
+        let b = belt.slot(1, size).unwrap();
+        assert_eq!((a[1], a[2]), (b[1], b[2]));
+        assert!(a[0] > b[0], "the oldest at the +x end");
+        // Past the layers drawn: counted, not drawn.
+        assert_eq!(belt.slot(n * style::MAX_LAYERS, size), None);
+        assert_eq!(belt.hidden(n * style::MAX_LAYERS + 7, size), 7);
+        // Other queues keep the floor area.
+        let plain = look_of("Queue", None, None, &geom("Queue"), ctx, None).unwrap();
+        assert_eq!(queue_belt("Queue", &plain), None);
     }
 
     #[test]

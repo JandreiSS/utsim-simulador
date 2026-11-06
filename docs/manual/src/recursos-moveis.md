@@ -216,7 +216,17 @@ Além das conexões de itens, um modelo com equipes tem ligações "de referênc
 | reparo | objeto → equipe de manutenção | `downtime.repair_crew` |
 | casa e pausa | membro → casa ou local de pausa | `home_at`, `home_object`, `break_at`, `break_object` |
 
-A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`links`, com o tipo, os dois blocos e o ponto final), para o editor desenhar as linhas de equipe e de pedido com cores e traços próprios. A biblioteca de edição (`utsim-edit`, módulo `teams`) tem as operações que o editor usa ao arrastar uma ligação: pôr ou tirar um membro da equipe (um transportador sai da equipe antiga no mesmo passo, porque só pode estar em uma), definir ou limpar o `transport` de um objeto e os `operators` de um processo. Cada operação é um passo de desfazer. O desenho e o arrasto no editor 3D vêm depois, na interface em Rust.
+A cena 3D (`utsim cena` e a cena ao vivo) manda essas linhas no cabeçalho (`links`, com o tipo, os dois blocos e o ponto final), para o editor desenhar as linhas de equipe e de pedido com cores e traços próprios. A biblioteca de edição (`utsim-edit`, módulo `teams`) tem as operações que o editor usa ao arrastar uma ligação: pôr ou tirar um membro da equipe (um transportador sai da equipe antiga no mesmo passo, porque só pode estar em uma), definir ou limpar o `transport` de um objeto e os `operators` de um processo. Cada operação é um passo de desfazer.
+
+Na interface 3D essas linhas aparecem nos dois modos, cada tipo com a sua cor e o seu traço (equipe em lilás tracejado, transporte e operadores pontilhados, manutenção em vermelho, casa e pausa em verde e azul). No **Editar** ficam acesas, mais fortes as do objeto selecionado; no **Simular** ficam apagadas, e acendem as do bloco seguido (clique nele na lista de blocos). No Simular cada membro de uma equipe tem um anel no chão na cor do estado, o membro seguido mostra uma linha até aonde a tarefa atual o leva, e o rótulo do despachante diz quantos membros estão livres (`operadores · 1/2 livres`). O menu ▼ ao lado de **PERT/CPM** liga ou desliga cada tipo de linha.
+
+A ferramenta **Equipe** (botão na barra, tecla `E`, ou `Alt` segurado com a ferramenta Ligar) edita as ligações arrastando de um objeto a outro:
+
+- do despachante a um transportador: o transportador entra na equipe (de novo: sai);
+- de um objeto a um transportador ou despachante: esse passa a levar os itens do objeto (`transport`; de novo: limpa);
+- com `Shift`, de um processo a um transportador ou despachante: o processo passa a pedir operadores a ele (`operators`, um operador na preparação e no processamento; de novo: limpa).
+
+Clicar na origem e depois no destino também liga. Cada mudança é um passo de desfazer e a linha de status diz o que mudou.
 
 ## Rede de caminhos
 

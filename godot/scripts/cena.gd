@@ -37,6 +37,8 @@ var _item_spare: Array[Node3D] = []
 var _templates := {}
 var _materials := {}
 var _last_color: Array = []
+## Where each mobile resource goes for its current task, at the last frame (NaN: none).
+var task_target := PackedVector3Array()
 var _last_label: Array = []
 var _pallets := false
 var _clips2: AnimationLibrary
@@ -181,6 +183,20 @@ func build(pb: Object, keep_templates := false) -> void:
 			top = minf(top, 2.2)
 		label.position = Vector3(0, top + 0.3, 0)
 		root.add_child(label)
+		if b.has("preview_color"):
+			# C7: a small item of the colour the source's items get, over it.
+			var item := MeshInstance3D.new()
+			item.name = "PreviaItem"
+			var box := BoxMesh.new()
+			box.size = Vector3.ONE * 0.22
+			item.mesh = box
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color("b8875a").lerp(b["preview_color"], 0.55)
+			item.material_override = m
+			item.position = Vector3(0, top + 0.12, 0)
+			item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(item)
+			rig["preview"] = item
 		rig["label"] = label
 		rig["top"] = top
 		rigs.append(rig)
@@ -516,6 +532,7 @@ func apply(t: float, dt: float, snap := false) -> void:
 			(rig["person"] as Pessoa).drive(clip[i], clip_time[i], dt, snap)
 		if rig.has("driver"):
 			(rig["driver"] as Pessoa).drive(clip[i], clip_time[i], dt, snap)
+	task_target = f.get("task_target", PackedVector3Array())
 	var color: PackedColorArray = f["color"]
 	var label: PackedStringArray = f["label"]
 	for i in rigs.size():

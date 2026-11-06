@@ -82,7 +82,7 @@ fn report_of_the_ready_model_with_every_output() {
     }
     let page = std::fs::read_to_string(&html).unwrap();
     for want in [
-        "Mapa do fluxo de valor do escritório",
+        "Mapa do fluxo de valor do processo administrativo",
         "Estado futuro",
         "Fluxograma de raias por departamento",
         "Gerência",
@@ -140,4 +140,71 @@ fn place_presets_and_run_with_the_line() {
     assert!(out.contains("Lead time (L/T)"), "{out}");
     let (ok, _, err) = utsim(&["run", &m, "--linha", "nada"]);
     assert!(!ok && err.contains("linhas instaladas"), "{err}");
+}
+
+/// Splits a shell command line on spaces, keeping text in single quotes together.
+fn shell_words(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut quoted = false;
+    for c in line.chars() {
+        match c {
+            '\'' => quoted = !quoted,
+            ' ' if !quoted => {
+                if !word.is_empty() {
+                    words.push(std::mem::take(&mut word));
+                }
+            }
+            _ => word.push(c),
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
+#[test]
+fn tutorial_commands_build_the_example_model() {
+    let doc = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/manual/src/linhas/lean-office/tutorial.md"),
+    )
+    .unwrap();
+    let dir = temp_dir().join("tutorial");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let model = dir.join("reembolso.ron");
+    let m = model.to_string_lossy().into_owned();
+    let commands: Vec<&str> = doc
+        .lines()
+        .filter(|l| l.starts_with("utsim linha lean_office colocar reembolso.ron "))
+        .collect();
+    assert_eq!(commands.len(), 10);
+    for line in commands {
+        let args: Vec<String> = shell_words(line)
+            .into_iter()
+            .skip(1)
+            .map(|w| if w == "reembolso.ron" { m.clone() } else { w })
+            .collect();
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let (ok, _, err) = utsim(&args);
+        assert!(ok, "{line}: {err}");
+    }
+    // The connections and run settings of the tutorial's step 3, as in the example.
+    let want = utsim_model::Model::load(example("reembolso_atual.ron")).unwrap();
+    let example_text = std::fs::read_to_string(example("reembolso_atual.ron")).unwrap();
+    let run = "run: (stop_time: 43200.0, warmup: 4320.0, seed: 5, replications: 5)";
+    assert!(doc.contains(run) && example_text.contains(run));
+    for (a, b) in &want.connections {
+        let pair = format!("(\"{a}\", \"{b}\")");
+        assert!(doc.contains(&pair), "{pair} fora do tutorial");
+    }
+    let mut made = utsim_model::Model::load(&model).unwrap();
+    made.connections = want.connections.clone();
+    made.run = want.run.clone();
+    made.name = want.name.clone();
+    made.description = want.description.clone();
+    made.format = want.format;
+    assert_eq!(made, want);
 }

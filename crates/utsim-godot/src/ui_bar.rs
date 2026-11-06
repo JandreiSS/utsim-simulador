@@ -37,7 +37,19 @@ pub struct BarState {
     pub title: String,
     /// The title's tooltip: name and file.
     pub title_tip: String,
+    /// The kinds of team and request lines hidden (`equipe`, `transporte`...).
+    pub links_hidden: Vec<String>,
 }
+
+/// The team and request lines the "Ligações" menu shows or hides: kind and label.
+pub const LINK_KINDS: [(&str, &str); 6] = [
+    ("equipe", "Equipe (despachante → membro)"),
+    ("transporte", "Transporte pedido"),
+    ("operadores", "Operadores pedidos"),
+    ("manutencao", "Equipe de manutenção"),
+    ("casa", "Casa"),
+    ("pausa", "Local de pausa"),
+];
 
 impl Default for BarState {
     fn default() -> Self {
@@ -50,6 +62,7 @@ impl Default for BarState {
             can_redo: false,
             title: String::new(),
             title_tip: String::new(),
+            links_hidden: Vec::new(),
         }
     }
 }
@@ -412,8 +425,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 ui,
                 reg,
                 "Botao_Atalhos",
-                "Atalhos",
-                "F1: a lista dos atalhos de teclado e mouse",
+                "?",
+                "Atalhos (F1): a lista dos atalhos de teclado e mouse",
                 true,
             ) {
                 act("atalhos");
@@ -460,10 +473,13 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                             ui.close();
                         }
                     }
+                    ui.separator();
+                    links_menu(ui, s, reg, &mut |a: String| act(&a));
                 });
                 reg.put("Menu_Analisar", &r.response, "Analisar");
-                r.response
-                    .on_hover_text("Outras análises: PERT/CPM de… até…, fluxos de tokens");
+                r.response.on_hover_text(
+                    "Outras análises: PERT/CPM de… até…, fluxos de tokens; as ligações de equipe e de pedido na vista 3D",
+                );
             });
         }
     }
@@ -520,11 +536,18 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
             "corredor",
             "Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)",
         ),
+        (
+            "Ferramenta_Equipe",
+            "Equipe",
+            "equipe",
+            "Equipe: arraste do despachante a um transportador (entra ou sai da equipe), ou de um objeto ao transportador ou despachante que leva os itens; com Shift, de um processo a quem fornece os operadores (E; Alt com Ligar)",
+        ),
     ];
     let current = match s.tool.as_str() {
         "ligar" => 1,
         "rede" => 2,
         "corredor" => 3,
+        "equipe" => 4,
         _ => 0,
     };
     let labels: Vec<&str> = tools.iter().map(|t| t.1).collect();
@@ -535,6 +558,23 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
             out.push(format!("ferramenta:{tool}"));
         }
         r[k].clone().on_hover_text(*tip);
+    }
+}
+
+/// The toggles of the team and request lines (ligações) the 3D view draws, inside the
+/// "Analisar" menu (present in both modes; the bar has no room for a menu of its own).
+fn links_menu(ui: &mut Ui, s: &BarState, reg: &mut Registry, act: &mut dyn FnMut(String)) {
+    ui.label(RichText::new("Ligações na vista 3D").strong());
+    for (kind, label) in LINK_KINDS {
+        let mut on = !s.links_hidden.iter().any(|h| h == kind);
+        let c = ui.checkbox(&mut on, label);
+        reg.put_toggle(&format!("Ligacoes_{kind}"), &c, label, on);
+        if c.changed() {
+            act(format!(
+                "ligacoes:{kind}:{}",
+                if on { "ligar" } else { "desligar" }
+            ));
+        }
     }
 }
 

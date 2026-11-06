@@ -4,9 +4,9 @@
 ##
 ## G3: the path network is drawn and edited with the Rede tool (`rede.gd`); runs go to a
 ## thread of the bridge (`UtsimJob`, polled every frame, with progress and Cancelar), the
-## "Resultados" panel (`resultados.gd`) shows the table, the charts, the output analyses,
-## scenarios and optimisation; the PERT/CPM window of the selection (`pert.gd`); the
-## token flows in 2D (`fluxos.gd`); tanks with their levels (`cena.gd`); the cameras
+## "Resultados" window (egui, `ui_results.rs` in the bridge) shows the table, the charts, the output analyses,
+## scenarios and optimisation; the PERT/CPM window of the selection (egui, `ui_pert.rs`); the
+## token flows in 2D (egui, `ui_flows.rs`); tanks with their levels (`cena.gd`); the cameras
 ## Seguir, Primeira pessoa and Do recurso; and recorded replays (`.json`) can be opened.
 ##
 ## The model being edited is a `UtsimDocument` (the bridge over `utsim_edit::Document`):
@@ -32,7 +32,6 @@ extends Node3D
 ## them (`ui_left::WIDTH`, `ui_props::WIDTH`, the bar, `ui_bottom::STATUS_HEIGHT`): the
 ## Godot panels that remain are placed by them.
 const LEFT_WIDTH := 290
-const RIGHT_WIDTH := 420
 const TOP_HEIGHT := 46
 const BOTTOM_HEIGHT := 40
 const RED := Color(1.0, 0.45, 0.42)
@@ -59,9 +58,6 @@ var _ui: CanvasLayer
 ## The interface around the 3D view drawn in Rust with egui (`UtsimUi`, the bridge): the
 ## top bar for now; the other panels move to it in the next steps (plano_interface_rust.md).
 var ui: Object
-## The properties panel: the egui one (Rust) unless a subpanel still in Godot is needed
-## (Rede, Corredor, a link, the real-data form), then the Godot one (`_props`).
-var _props_godot := true
 ## Whether the right panel may show at all (Editar, no window covering it).
 var _right_allowed := true
 ## The asset the egui panel's miniature shows (`miniatura` of the scripted checks).
@@ -69,9 +65,6 @@ var mini_asset := "-"
 var _mini_view: SubViewport
 var _mini_scene: CenaUtsim
 var _mini_camera: Camera3D
-var _right: PanelContainer
-var _props: PainelPropriedades
-var _props_scroll: ScrollContainer
 ## The status line (the egui status bar shows it; the scripted runs read it).
 var status_text := ""
 ## The status line of the Simular panel ("Simulando..." while the run goes).
@@ -84,10 +77,9 @@ var _block_labels := PackedStringArray()
 var labels_on := true
 var _open_dialog: FileDialog
 var _save_dialog: FileDialog
-var _discard: ConfirmationDialog
-var _shortcuts: AcceptDialog
 var _grid: MeshInstance3D
-var _fps: Label
+## The performance line over the 3D view (F3), drawn by egui.
+var _perf_on := false
 var _revision := -1
 var _pending := Callable()
 ## The replications of Simular (the field of the Simular panel).
@@ -96,9 +88,9 @@ var _run_reps := 5
 var results: Object
 var job: Object
 var _job_done := Callable()
-var _results_panel: PainelResultados
-var _pert_panel: PainelPert
-var _flows_panel: PainelFluxos
+## The selection of the PERT/CPM window (the first name is the start of "de A até B").
+var _pert_names := PackedStringArray()
+var _pert_between := false
 ## `orbita`, `seguir`, `primeira_pessoa` or `recurso`.
 var camera_mode := "orbita"
 ## Point the following cameras look at (scripted checks: nothing may stand between).
@@ -114,6 +106,8 @@ var _data_pick_path := ""
 var last_report := {}
 ## A recorded replay (`.json`) is being played instead of the document.
 var playing_replay := false
+## The kinds of team and request lines hidden (the "Ligações" toggles of the bar).
+var links_hidden: Array = []
 
 
 func _ready() -> void:
@@ -133,9 +127,6 @@ func _ready() -> void:
 	editor.name = "Editor"
 	add_child(editor)
 	editor.setup(self, _ui)
-	_props.families = doc.families()
-	_props.data_families = doc.data_families()
-	_fill_shortcuts()
 	set_mode("editar")
 	camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
 	set_status("Arraste um objeto da Biblioteca para o chão, ou abra um modelo (Ctrl+O).")
@@ -194,77 +185,10 @@ func _build_world() -> void:
 # ---------------------------------------------------------------------------
 
 
-func _panel(name: String) -> PanelContainer:
-	var p := PanelContainer.new()
-	p.name = name
-	p.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ui.add_child(p)
-	return p
-
-
 func _build_ui() -> void:
 	_ui = CanvasLayer.new()
 	_ui.name = "Interface"
 	add_child(_ui)
-
-	_right = _panel("PainelPropriedades")
-	_right.anchor_left = 1.0
-	_right.anchor_right = 1.0
-	_right.anchor_bottom = 1.0
-	_right.offset_left = -RIGHT_WIDTH
-	_right.offset_top = TOP_HEIGHT
-	_right.offset_bottom = -BOTTOM_HEIGHT
-	_props_scroll = ScrollContainer.new()
-	_props_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_right.add_child(_props_scroll)
-	_props = PainelPropriedades.new()
-	_props.name = "Propriedades"
-	_props.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_props.edited.connect(_on_property_edited)
-	_props.issue_clicked.connect(func(m): editor.corredores.highlight_issue(m))
-	_props.look_provider = func(asset: String) -> Object:
-		if doc == null or editor == null or editor.selected.is_empty():
-			return null
-		return doc.look_scene(editor.selected[0], asset, CenaUtsim.skeletal_available())
-	_props.driver_provider = func(object: String) -> int:
-		if cena == null or not cena.has_driver(object):
-			return -1
-		return 1 if cena.driver_visible(object) else 0
-	_props.driver_toggled.connect(func(object: String, on: bool): cena.set_driver_visible(object, on))
-	_props.action.connect(func(what): arrange_action(what))
-	_props.columns_provider = func(file: String) -> Array:
-		if doc == null:
-			return []
-		var r: Dictionary = doc.data_columns(file)
-		return Array(r["columns"]) if r["ok"] else []
-	_props.data_apply.connect(_on_data_apply)
-	_props.data_analyze.connect(_on_data_analyze)
-	_props.data_to_dist.connect(_on_data_to_dist)
-	_props.data_report.connect(func(): _report_dialog.popup_centered_ratio(0.6))
-	_props.data_pick_file.connect(func(path):
-		_data_pick_path = path
-		_data_dialog.popup_centered_ratio(0.7))
-	_props.gesture_ended.connect(func():
-		doc.end_gesture()
-		after_edit.call_deferred())
-	_props.reorder.connect(func(k, delta):
-		if doc.move_connection(editor.selected[0], k, delta):
-			after_edit.call_deferred())
-	_props.disconnect_output.connect(func(to):
-		if doc.disconnect_objects(editor.selected[0], to):
-			after_edit.call_deferred())
-	_props_scroll.add_child(_props)
-
-	_fps = Label.new()
-	_fps.offset_left = LEFT_WIDTH + 10
-	_fps.offset_right = LEFT_WIDTH + 330
-	_fps.offset_top = TOP_HEIGHT + 6
-	_fps.theme_type_variation = &"Ajuda"
-	_fps.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fps.name = "Desempenho"
-	# Measurement for development, not for the user: hidden until F3.
-	_fps.visible = false
-	_ui.add_child(_fps)
 
 	_open_dialog = FileDialog.new()
 	_open_dialog.name = "Dialogo_Abrir"
@@ -282,39 +206,6 @@ func _build_ui() -> void:
 	_save_dialog.title = "Salvar modelo como"
 	_save_dialog.file_selected.connect(func(p): save_as(p))
 	_ui.add_child(_save_dialog)
-	_discard = ConfirmationDialog.new()
-	_discard.name = "Dialogo_Descartar"
-	_discard.title = "Descartar mudanças?"
-	_discard.dialog_text = "O modelo tem mudanças que não foram salvas. Descartar?"
-	_discard.ok_button_text = "Descartar"
-	_discard.cancel_button_text = "Voltar"
-	_discard.confirmed.connect(func():
-		if _pending.is_valid():
-			_pending.call()
-		_pending = Callable())
-	_ui.add_child(_discard)
-	_results_panel = PainelResultados.new()
-	_ui.add_child(_results_panel)
-	_results_panel.build(self)
-	_pert_panel = PainelPert.new()
-	_ui.add_child(_pert_panel)
-	_pert_panel.build(self)
-	_flows_panel = PainelFluxos.new()
-	_ui.add_child(_flows_panel)
-	_flows_panel.build(self)
-	for panel in [_results_panel, _pert_panel, _flows_panel]:
-		panel.anchor_right = 1.0
-		panel.anchor_bottom = 1.0
-		panel.offset_left = LEFT_WIDTH + 12
-		panel.offset_top = TOP_HEIGHT + 30
-		panel.offset_right = -12
-		panel.offset_bottom = -BOTTOM_HEIGHT - 60
-		panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		panel.visible = false
-	_flows_panel.offset_left = -560
-	_flows_panel.anchor_left = 1.0
-	for panel in [_results_panel, _pert_panel]:
-		panel.visibility_changed.connect(_sync_panels)
 	_data_dialog = FileDialog.new()
 	_data_dialog.name = "Dialogo_Dados"
 	_data_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -338,11 +229,12 @@ func _build_ui() -> void:
 	_replay_dialog.title = "Gravar replay"
 	_replay_dialog.file_selected.connect(func(p): save_replay(p))
 	_ui.add_child(_replay_dialog)
-	_shortcuts = AcceptDialog.new()
-	_shortcuts.name = "Janela_Atalhos"
-	_shortcuts.title = "Atalhos"
-	_shortcuts.ok_button_text = "Fechar"
-	_ui.add_child(_shortcuts)
+	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
+	# answers them itself, so it keeps the Godot ones.
+	var scripted := Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	if DisplayServer.get_name() != "headless" and not scripted:
+		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
+			d.use_native_dialog = true
 	if ClassDB.class_exists(&"UtsimUi"):
 		ui = ClassDB.instantiate(&"UtsimUi")
 		ui.name = "InterfaceRust"
@@ -370,45 +262,33 @@ func _library_icons() -> Dictionary:
 	return icons
 
 
-func _fill_shortcuts() -> void:
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(640, 520)
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 18)
-	var pairs: Array = Array(doc.shortcuts())
-	pairs.append(["F3", "Mostra ou oculta as medidas de desempenho sobre a vista 3D"])
-	for pair in pairs:
-		var k := Label.new()
-		k.text = pair[0]
-		k.add_theme_color_override("font_color", Color(0.62, 0.76, 0.98))
-		grid.add_child(k)
-		var v := Label.new()
-		v.text = pair[1]
-		grid.add_child(v)
-	scroll.add_child(grid)
-	_shortcuts.add_child(scroll)
-
-
 ## The performance line over the 3D view (frames per second, bridge and scene times):
 ## hidden by default, F3 shows and hides it.
 func toggle_performance() -> void:
-	_fps.visible = not _fps.visible
-	set_status("Medidas de desempenho %s (F3)." % ("visíveis" if _fps.visible else "ocultas"))
+	_perf_on = not _perf_on
+	if ui != null and not _perf_on:
+		ui.set_performance("")
+	set_status("Medidas de desempenho %s (F3)." % ("visíveis" if _perf_on else "ocultas"))
 
 
+## The shortcuts window (F1): an egui dialog with the list of the bridge.
 func toggle_shortcuts() -> void:
-	if _shortcuts.visible:
-		_shortcuts.hide()
-	else:
-		_shortcuts.popup_centered()
+	if ui == null:
+		return
+	if ui.dialog_open():
+		ui.show_dialog("")
+		return
+	var pairs: Array = Array(doc.shortcuts())
+	pairs.append(["F3", "Mostra ou oculta as medidas de desempenho sobre a vista 3D"])
+	ui.show_dialog(JSON.stringify({"name": "Janela_Atalhos", "title": "Atalhos", "lines": pairs,
+		"buttons": [["Atalhos_Fechar", "Fechar", "fechar"]]}))
 
 
 ## Left and right x of the 3D view not covered by the side panels (`CameraOrbita.free_span`).
 func free_span() -> Vector2:
 	var w := get_viewport().get_visible_rect().size.x
 	var lo := 0.0
-	var hi := w - float(RIGHT_WIDTH) if _right != null and _right.visible else w
+	var hi := w
 	if ui != null:
 		# The free area egui leaves (the library or the run on the left, the properties).
 		var free: Rect2 = ui.central_rect()
@@ -422,9 +302,6 @@ func free_span() -> Vector2:
 func over_ui(p: Vector2) -> bool:
 	if ui != null and ui.is_over(p):
 		return true
-	for c in [_right, _results_panel, _pert_panel, _flows_panel]:
-		if c != null and c.visible and c.get_global_rect().has_point(p):
-			return true
 	return false
 
 
@@ -432,23 +309,20 @@ func over_ui(p: Vector2) -> bool:
 ## Simular and down to the status line in Editar (no bar there); while one is open in
 ## Editar, the properties panel, which they would half cover, is hidden.
 func _sync_panels() -> void:
-	var covering: bool = _results_panel.visible or _pert_panel.visible
-	for panel in [_results_panel, _pert_panel]:
-		panel.offset_bottom = -BOTTOM_HEIGHT - (60 if mode == "simular" else 12)
+	var covering: bool = ui != null and (ui.pert_open() or ui.results_open())
 	if mode == "editar":
 		_set_right(not covering)
 
 
-## Shows or hides the right panel (the egui one or the Godot one, see `_props_godot`).
+## Shows or hides the right panel (properties, or the panel of a tool).
 func _set_right(on: bool) -> void:
 	_right_allowed = on
 	_apply_right()
 
 
 func _apply_right() -> void:
-	_right.visible = _right_allowed and (_props_godot or ui == null)
 	if ui != null:
-		ui.set_properties_visible(_right_allowed and not _props_godot)
+		ui.set_properties_visible(_right_allowed)
 
 
 func is_editing() -> bool:
@@ -523,6 +397,7 @@ func _sync_bar() -> void:
 		"can_redo": doc.can_redo(),
 		"title": "%s%s" % [doc.name(), dirty],
 		"title_tip": "%s%s\n%s" % [doc.name(), dirty, file],
+		"links_hidden": PackedStringArray(links_hidden),
 	})
 
 
@@ -549,6 +424,11 @@ func bar_action(what: String) -> void:
 			undo()
 		"refazer":
 			redo()
+		"ligacoes":
+			var kind := arg.get_slice(":", 0)
+			links_hidden.erase(kind)
+			if arg.get_slice(":", 1) == "desligar":
+				links_hidden.append(kind)
 		"ferramenta":
 			if arg == "selecionar" or arg == "ligar":
 				editor.set_tool(arg)
@@ -562,6 +442,21 @@ func bar_action(what: String) -> void:
 			set_snap(snap_on, float(arg))
 		"analisar":
 			analysis_action(arg)
+		"resultados":
+			results_action(what.substr("resultados:".length()))
+		"pert":
+			pert_action(what.substr("pert:".length()))
+		"form":
+			_form_action(what.substr("form:".length()))
+		"fluxos":
+			ui.flows_time(t)
+		"dialogo":
+			if arg == "descartar" and _pending.is_valid():
+				var go := _pending
+				_pending = Callable()
+				go.call()
+			else:
+				_pending = Callable()
 		"atalhos":
 			toggle_shortcuts()
 		# The left panel of Editar.
@@ -686,10 +581,22 @@ func _panel_action(a: PackedStringArray) -> void:
 		"motorista":
 			cena.set_driver_visible(a[1], a[2] == "true")
 			_show_properties()
-		"dados_reais":
-			if not editor.selected.is_empty():
-				_props._data_mode["%s|%s" % [editor.selected[0], a[1]]] = true
-			_show_properties()
+		"dados":
+			# a: dados, what, path, draft (JSON)
+			var draft = JSON.parse_string(a[3]) if a.size() > 3 else null
+			var d: Dictionary = draft if draft is Dictionary else {}
+			match a[1]:
+				"aplicar":
+					_on_data_apply(a[2], d)
+				"analisar":
+					_on_data_analyze(a[2], d)
+				"para_dist":
+					_on_data_to_dist(a[2])
+				"relatorio":
+					_report_dialog.popup_centered_ratio(0.6)
+				"escolher_arquivo":
+					_data_pick_path = a[2]
+					_data_dialog.popup_centered_ratio(0.7)
 		"miniatura":
 			show_miniature(a[1])
 
@@ -702,7 +609,10 @@ func _panel_action(a: PackedStringArray) -> void:
 func _confirm_discard(then: Callable) -> void:
 	if doc != null and doc.is_dirty():
 		_pending = then
-		_discard.popup_centered()
+		if ui != null:
+			ui.show_dialog(JSON.stringify({"name": "Dialogo_Descartar", "title": "Descartar mudanças?",
+				"text": "O modelo tem mudanças que não foram salvas. Descartar?",
+				"buttons": [["Dialogo_Descartar_Ok", "Descartar", "descartar"], ["Dialogo_Descartar_Voltar", "Voltar", "voltar"]]}))
 	else:
 		then.call()
 
@@ -841,58 +751,27 @@ func _update_title() -> void:
 
 
 func _show_properties() -> void:
-	if doc == null or mode != "editar":
-		return
-	var scroll := _props_scroll.scroll_vertical
-	var godot := ui == null or not editor.selected_link.is_empty() or editor.tool == "rede" or editor.tool == "corredor"
-	var sel: Array = editor.selected
-	var name: String = sel[0] if not sel.is_empty() else "run"
-	if not godot and _needs_data_form(name):
-		godot = true
-	if _props_godot != godot:
-		_props_godot = godot
-		_apply_right()
-	if not godot:
-		# The egui panel (Rust) reads the schema from the document itself.
-		_props.clear()
-		var others := PackedStringArray()
-		for k in range(1, sel.size()):
-			others.append(sel[k])
-		var extra_line := ""
-		if sel.size() > 1:
-			extra_line = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
-		ui.show_properties(name, others, extra_line, _driver_state(name))
+	if doc == null or mode != "editar" or ui == null:
 		return
 	if not editor.selected_link.is_empty():
 		_show_link(editor.selected_link)
 		return
 	if editor.tool == "rede":
 		_show_network()
-		_props_scroll.scroll_vertical = scroll
 		return
 	if editor.tool == "corredor":
 		_show_aisles()
-		_props_scroll.scroll_vertical = scroll
 		return
-	var props: Dictionary = doc.properties(name)
-	var extra := ""
+	ui.show_form("")
+	var sel: Array = editor.selected
+	var name: String = sel[0] if not sel.is_empty() else "run"
+	var others := PackedStringArray()
+	for k in range(1, sel.size()):
+		others.append(sel[k])
+	var extra_line := ""
 	if sel.size() > 1:
-		extra = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
-	_props.show_properties(props, extra)
-	_props_scroll.scroll_vertical = scroll
-
-
-## Whether the object's panel needs the real-data form (still in Godot): a field fed by
-## data, or one switched to "Dados reais" and not applied yet.
-func _needs_data_form(name: String) -> bool:
-	for k in _props._data_mode:
-		if String(k).begins_with(name + "|"):
-			return true
-	var data: Dictionary = doc.properties(name).get("data", {})
-	for v in data.values():
-		if String((v as Dictionary).get("source", "")) == "dados":
-			return true
-	return false
+		extra_line = "%d objetos selecionados: as mudanças valem para todos do mesmo tipo." % sel.size()
+	ui.show_properties(name, others, extra_line, _driver_state(name))
 
 
 ## The seated driver of a forklift: -1 none, 0 hidden, 1 shown.
@@ -958,40 +837,6 @@ func show_miniature(asset: String) -> void:
 	_mini_camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(center, Vector3.UP)
 
 
-func _show_link(link: Array) -> void:
-	_props.clear()
-	var title := Label.new()
-	title.text = "Ligação"
-	title.theme_type_variation = &"TituloPainel"
-	_props.add_child(title)
-	var l := Label.new()
-	l.text = "%s → %s" % link
-	_props.add_child(l)
-	var rm := Button.new()
-	rm.name = "Ligacao_Remover"
-	rm.text = "Remover ligação (Del)"
-	rm.pressed.connect(func(): editor.delete_selected())
-	_props.add_child(rm)
-
-
-func _on_property_edited(path: String, value: Variant) -> void:
-	var sel: Array = editor.selected
-	var name: String = sel[0] if not sel.is_empty() else "run"
-	var others := PackedStringArray()
-	for k in range(1, sel.size()):
-		others.append(sel[k])
-	if doc.set_property(name, path, value, others):
-		if path == "name":
-			editor.selected[0] = String(value).strip_edges()
-		if not path.begins_with("visual.color"):
-			doc.end_gesture()
-		after_edit.call_deferred()
-		set_status("%s: %s alterado." % [name, path])
-	else:
-		set_status("Não alterou %s: %s" % [path, doc.last_error()])
-		_show_properties.call_deferred()
-
-
 # ---------------------------------------------------------------------------
 # Real data in the distribution fields (G3)
 # ---------------------------------------------------------------------------
@@ -1040,8 +885,6 @@ func _on_data_apply(path: String, draft: Dictionary) -> void:
 	start_job(j, func(_j):
 		if doc.data_apply(field, config):
 			doc.end_gesture()
-			_props.drafts_seen.erase(_props.draft_key(path))
-			_props.clear_requests()
 			after_edit.call_deferred()
 			set_status("%s agora usa dados reais (Ctrl+Z desfaz)." % field)
 		else:
@@ -1052,7 +895,6 @@ func _on_data_apply(path: String, draft: Dictionary) -> void:
 func _on_data_analyze(path: String, draft: Dictionary) -> void:
 	var field := _selected_field(path)
 	var config := _data_config(draft)
-	_props.clear_requests()
 	if field == "" or config.is_empty() or busy():
 		return
 	var j: Object = doc.data_fit(field, config)
@@ -1068,7 +910,6 @@ func _on_data_to_dist(path: String) -> void:
 		return
 	if doc.data_to_dist(field):
 		doc.end_gesture()
-		_props.clear_requests()
 		after_edit.call_deferred()
 		set_status("%s volta a usar uma distribuição (Ctrl+Z desfaz)." % field)
 	else:
@@ -1077,7 +918,8 @@ func _on_data_to_dist(path: String) -> void:
 
 
 func _on_data_file(file: String) -> void:
-	_props.set_data_file(_data_pick_path, file)
+	if ui != null:
+		ui.set_data_file(_data_pick_path, doc.data_relative(file))
 
 
 ## Writes the HTML reports of the fields with data into `dir` (on the bridge's thread)
@@ -1245,7 +1087,8 @@ func _show_playback() -> void:
 	_block_labels = PackedStringArray()
 	for b in cena.blocks:
 		_block_labels.append("%s (%s)" % [b["name"], b["kind"]])
-	_flows_panel.set_playback(playback)
+	if ui != null:
+		ui.set_flows_playback(playback)
 	if follow_name == "" or cena.block_index(follow_name) < 0:
 		follow_name = ""
 		for b in cena.blocks:
@@ -1262,14 +1105,16 @@ func on_results(res: Object) -> void:
 		return
 	results = res
 	_show_summary()
-	_results_panel.show_results(res)
+	if ui != null:
+		var base := model_path.get_basename() if model_path != "" else OS.get_user_data_dir().path_join("resultados")
+		ui.set_results(res, not playing_replay, base + "_resultados")
 
 
 func _show_summary() -> void:
 	var s: Dictionary = results.summary()
 	var lines := PackedStringArray()
 	for r in results.table():
-		lines.append("%s: %s saídas" % [r["name"], PainelResultados.mh(r["output"])])
+		lines.append("%s: %s saídas" % [r["name"], _mh(r["output"])])
 	var b = s.get("bottleneck")
 	_summary = {
 		"title": "Resultados (%d replicações)" % s["replications"],
@@ -1277,6 +1122,16 @@ func _show_summary() -> void:
 		"lines": lines,
 	}
 	_sync_sim()
+
+
+## `mean ± half_width` with about four significant digits.
+static func _mh(s: Variant) -> String:
+	if s == null or not (s is Dictionary) or s.get("mean") == null:
+		return "-"
+	var h = s.get("half_width")
+	if h == null:
+		return _num(float(s["mean"]))
+	return "%s ± %s" % [_num(float(s["mean"])), _num(float(h))]
 
 
 ## A number with about four significant digits.
@@ -1379,7 +1234,8 @@ func seek(time: float, snap := false) -> void:
 	t = clampf(time, 0.0, playback.end())
 	cena.apply(t, 0.0, snap)
 	_show_time()
-	_flows_panel.show_time(t)
+	if ui != null:
+		ui.flows_time(t)
 
 
 func step_event(direction: int) -> void:
@@ -1404,15 +1260,16 @@ func _process(dt: float) -> void:
 			set_playing(false)
 		cena.apply(t, dt)
 		_show_time()
-		_flows_panel.show_time(t)
+		if ui != null:
+			ui.flows_time(t)
 	_frames += 1
 	if mode == "simular" and playback != null:
 		_drive_camera()
 		if _frames % 10 == 0:
 			cena.limit_labels(camera)
-	if _fps.visible:
-		_fps.text = "%d qps | ponte %.2f ms | cena %.2f ms" % [
-			Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0]
+	if _perf_on and ui != null and _frames % 15 == 0:
+		ui.set_performance("%d qps | ponte %.2f ms | cena %.2f ms" % [
+			Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0])
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1495,6 +1352,8 @@ func _edit_key(k: InputEventKey) -> bool:
 			editor.set_tool("selecionar" if editor.tool == "rede" else "rede")
 		KEY_C:
 			editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor")
+		KEY_E:
+			editor.set_tool("selecionar" if editor.tool == "equipe" else "equipe")
 		KEY_ENTER, KEY_KP_ENTER:
 			if editor.tool != "corredor" or not editor.corredores.finish():
 				return false
@@ -1596,16 +1455,13 @@ func analysis_action(what: String) -> void:
 			if results == null:
 				set_status("Simule o modelo para ver os resultados (Tab ou o botão Simular).")
 				return
-			_results_panel.visible = not _results_panel.visible
-			if _results_panel.visible:
-				_pert_panel.visible = false
+			show_results(not ui.results_open())
 		"fluxos":
 			if mode != "simular" or playback == null:
 				set_status("Os fluxos de tokens aparecem no Simular.")
 				return
-			_flows_panel.visible = not _flows_panel.visible
-			if _flows_panel.visible:
-				_flows_panel.set_playback(playback)
+			ui.set_flows_open(not ui.flows_open())
+			ui.flows_time(t)
 		"pert", "pert_trecho", "pert_auto":
 			open_pert(what == "pert_trecho" or (what == "pert_auto" and editor.selected.size() == 2))
 
@@ -1628,8 +1484,93 @@ func open_pert(between: bool) -> void:
 	if document_model() == null:
 		set_status("O modelo tem problemas e não roda: o PERT/CPM precisa de um modelo válido.")
 		return
-	_results_panel.visible = false
-	_pert_panel.open(names, between)
+	show_results(false)
+	_pert_names = names
+	_pert_between = between
+	var what := ("de %s até %s" % [names[0], names[1]]) if between and names.size() >= 2 else ", ".join(names)
+	ui.open_pert("PERT/CPM: %s" % what)
+	_sync_panels()
+	pert_calculate("simulado")
+
+
+## Calculates the PERT/CPM of the selection in `mode` (`simulado`, `classico`,
+## `montecarlo`) with the deadline and samples of the window, on the bridge's thread.
+func pert_calculate(mode_id: String) -> void:
+	var m: Object = document_model()
+	if m == null:
+		ui.set_pert_info("O modelo tem problemas e não roda: corrija no Editar.", true)
+		return
+	var f: Dictionary = ui.pert_form()
+	var j: Object = m.start_pert(_pert_names, _pert_between, mode_id, float(f["deadline"]), int(f["samples"]))
+	if j == null:
+		ui.set_pert_info(m.last_error(), true)
+		return
+	if job != null:
+		set_status("Aguarde: %s." % job.what())
+		return
+	ui.set_pert_info("Calculando (%s)..." % mode_id, false)
+	start_job(j, func(done):
+		var p: Object = done.pert()
+		if p == null:
+			ui.set_pert_info("Não calculou: %s" % done.error(), true)
+			return
+		var base := model_path.get_basename() if model_path != "" else OS.get_user_data_dir().path_join("pert")
+		ui.set_pert(p, base + "_pert.html")
+		editor.critical = Array(ui.pert_critical())
+		set_status(ui.pert_status()))
+
+
+## The actions of the PERT/CPM window (`pert:<what>`).
+func pert_action(what: String) -> void:
+	match what.get_slice(":", 0):
+		"calcular":
+			pert_calculate(what.get_slice(":", 1))
+		"fechar":
+			editor.critical = []
+			_sync_panels()
+		"exportar_html":
+			set_status(ui.pert_export(true))
+		"exportar_csv":
+			set_status(ui.pert_export(false))
+
+
+## Opens or closes the "Resultados" window (egui, over the free area of the view).
+func show_results(on: bool) -> void:
+	if ui == null:
+		return
+	ui.set_results_open(on)
+	if ui.results_open():
+		ui.close_pert()
+		editor.critical = []
+	_sync_panels()
+
+
+## The actions of the "Resultados" window (`resultados:<what>`).
+func results_action(what: String) -> void:
+	var arg := what.substr(what.find(":") + 1) if what.contains(":") else ""
+	match what.get_slice(":", 0):
+		"fechar":
+			_sync_panels()
+		"exportar":
+			set_status(ui.results_export())
+		"ligar_amostras":
+			enable_samples_and_rerun()
+		"aplicar_aquecimento":
+			apply_warmup(float(arg))
+		"trabalho":
+			if job != null:
+				set_status("Aguarde: %s." % job.what())
+				return
+			var j: Object = ui.results_job(arg)
+			if j == null:
+				set_status("Não começou: %s" % ui.results_error())
+				return
+			start_job(j, func(done):
+				if done.kind() == "replicacoes":
+					on_results(done.results())
+				var line: String = ui.results_done(done)
+				if line != "":
+					set_status(line))
 
 
 ## Writes `warmup` to `run.warmup` of the document ("Aplicar" of the warm-up analysis).
@@ -1777,263 +1718,135 @@ func _drive_camera() -> void:
 # ---------------------------------------------------------------------------
 
 
-func _show_aisles() -> void:
-	_props.clear()
+## The right panel of a selected link (egui, `ui_form.rs`).
+func _show_link(link: Array) -> void:
+	_show_form([
+		{"kind": "title", "text": "Ligação"},
+		{"kind": "info", "name": "Ligacao_Texto", "text": "%s → %s" % link},
+		{"kind": "button", "name": "Ligacao_Remover", "text": "Remover ligação (Del)", "action": "ligacao_remover"},
+	])
+
+
+## Shows `rows` (see `ui_form.rs`) as the right panel; the edits come back in `_form_action`.
+func _show_form(rows: Array) -> void:
+	if ui != null:
+		ui.show_form(JSON.stringify(rows))
+
+
+## What the tool panels (`form:<action>:<value>`) asked.
+func _form_action(what: String) -> void:
+	var action := what.get_slice(":", 0)
+	var value := what.substr(action.length() + 1)
+	var rede: EditorRede = editor.rede
 	var ai: EditorCorredores = editor.corredores
-	var title := Label.new()
-	title.text = "Corredores de circulação"
-	title.theme_type_variation = &"TituloPainel"
-	_props.add_child(title)
-	var c := ai.counts()
-	var info := Label.new()
-	info.name = "Corredor_Resumo"
-	info.text = "%d corredor(es): %d de pedestres, %d de empilhadeiras, %d mistos; %d cruzamento(s)." % [c["total"], c["pedestre"], c["empilhadeira"], c["misto"], c["cruzamentos"]]
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-	_props.add_child(info)
-	var help := Label.new()
-	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-	help.theme_type_variation = &"Ajuda"
-	help.text = "Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso."
-	_props.add_child(help)
-	var a := ai._aisle(ai.selected)
-	if a.is_empty():
-		var head := Label.new()
-		head.text = "Novos corredores"
-		head.theme_type_variation = &"RotuloSecao"
-		_props.add_child(head)
-		_aisle_kind_row("Corredor_NovoTipo", ai.new_kind, func(k): ai.set_kind.call_deferred(k); _show_properties.call_deferred())
-		_aisle_width_row("Corredor_NovaLargura", ai.new_width, func(v): ai.set_width.call_deferred(v))
-		_aisle_check("Corredor_NovosMaoDupla", "Mão dupla", ai.new_two_way, func(on): ai.set_two_way.call_deferred(on))
-	else:
-		var head := Label.new()
-		head.text = "Corredor %s" % a["name"]
-		head.theme_type_variation = &"RotuloSecao"
-		_props.add_child(head)
-		var row := HBoxContainer.new()
-		var l := Label.new()
-		l.text = "Nome"
-		row.add_child(l)
-		var e := LineEdit.new()
-		e.name = "Corredor_Nome"
-		e.text = a["name"]
-		e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		e.text_submitted.connect(func(tx): ai.rename.call_deferred(tx))
-		row.add_child(e)
-		_props.add_child(row)
-		var len_label := Label.new()
-		len_label.name = "Corredor_Comprimento"
-		len_label.text = "%d ponto(s), %s m de comprimento" % [(a["points"] as PackedVector3Array).size(), _num(float(a["length"]))]
-		_props.add_child(len_label)
-		_aisle_kind_row("Corredor_Tipo", a["kind"], func(k): ai.set_kind.call_deferred(k))
-		_aisle_width_row("Corredor_Largura", float(a["width"]), func(v): ai.set_width.call_deferred(v))
-		_aisle_check("Corredor_MaoDupla", "Mão dupla", a["two_way"], func(on): ai.set_two_way.call_deferred(on))
-		if a["kind"] != "forklift":
-			_aisle_check("Corredor_Secundaria", "Passagem secundária de pedestres (mínimo menor)", a["secondary"], func(on): ai.set_secondary.call_deferred(on))
-		var prow := HBoxContainer.new()
-		var pl := Label.new()
-		pl.text = "Perfil"
-		prow.add_child(pl)
-		var pick := OptionButton.new()
-		pick.name = "Corredor_Perfil"
-		pick.focus_mode = Control.FOCUS_NONE
-		for item in [["Padrão do modelo", ""], ["Brasil (amarelo)", "Brasil"], ["Branco", "Branco"]]:
-			pick.add_item(item[0])
-			pick.set_item_metadata(pick.item_count - 1, item[1])
-			if a["profile"] == item[1]:
-				pick.select(pick.item_count - 1)
-		pick.item_selected.connect(func(k): ai.set_profile.call_deferred(String(pick.get_item_metadata(k))))
-		prow.add_child(pick)
-		_props.add_child(prow)
-		if ai.selected_vertex >= 0:
-			var v := Label.new()
-			v.name = "Corredor_Vertice"
-			v.text = "Vértice %d selecionado" % (ai.selected_vertex + 1)
-			_props.add_child(v)
-			var rv := Button.new()
-			rv.name = "Corredor_VerticeRemover"
-			rv.text = "Remover vértice"
-			rv.disabled = (a["points"] as PackedVector3Array).size() <= 2
-			rv.pressed.connect(func(): ai.remove_vertex.call_deferred())
-			_props.add_child(rv)
-		var rev := Button.new()
-		rev.name = "Corredor_Inverter"
-		rev.text = "Inverter sentido"
-		rev.disabled = a["two_way"]
-		rev.pressed.connect(func(): ai.reverse.call_deferred())
-		_props.add_child(rev)
-		var del := Button.new()
-		del.name = "Corredor_Excluir"
-		del.text = "Excluir corredor (Del)"
-		del.pressed.connect(func(): ai.delete_selected.call_deferred())
-		_props.add_child(del)
-		for w in doc.warnings():
-			if String(w["message"]).contains("'%s'" % a["name"]):
-				var wl := Label.new()
-				wl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				wl.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-				wl.text = "• " + String(w["message"])
-				wl.add_theme_color_override("font_color", YELLOW)
-				wl.name = "Corredor_Aviso"
-				_props.add_child(wl)
+	match action:
+		"ligacao_remover":
+			editor.delete_selected()
+		"rede_novos_mao_dupla":
+			rede.two_way = value == "1"
+		"rede_no_nome":
+			rede.rename(value)
+		"rede_excluir", "corredor_excluir":
+			(rede if action == "rede_excluir" else ai).delete_selected()
+		"rede_mao_dupla":
+			rede.set_two_way(value == "1")
+		"rede_capacidade":
+			rede.set_capacity(int(float(value)))
+		"rede_inverter":
+			rede.reverse()
+		"corredor_tipo":
+			ai.set_kind(value)
+		"corredor_largura":
+			ai.set_width(float(value))
+		"corredor_mao_dupla":
+			ai.set_two_way(value == "1")
+		"corredor_secundaria":
+			ai.set_secondary(value == "1")
+		"corredor_nome":
+			ai.rename(value)
+		"corredor_perfil":
+			ai.set_profile(value)
+		"corredor_vertice_remover":
+			ai.remove_vertex()
+		"corredor_inverter":
+			ai.reverse()
+	_show_properties.call_deferred()
+
+
+func _issue_rows(rows: Array, words: Array) -> void:
 	for i in doc.issues():
 		var m: String = i["message"]
-		if m.contains("corredor") or m.contains("Aisles"):
-			var w := Label.new()
-			w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			w.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-			w.text = m
-			w.add_theme_color_override("font_color", RED)
-			_props.add_child(w)
+		for w in words:
+			if m.contains(w):
+				rows.append({"kind": "error", "text": m})
+				break
 
 
-func _aisle_kind_row(node_name: String, kind: String, on_pick: Callable) -> void:
-	var row := HBoxContainer.new()
-	var l := Label.new()
-	l.text = "Tipo"
-	row.add_child(l)
-	var pick := OptionButton.new()
-	pick.name = node_name
-	pick.focus_mode = Control.FOCUS_NONE
+func _show_aisles() -> void:
+	var ai: EditorCorredores = editor.corredores
+	var c := ai.counts()
+	var kinds := []
 	for k in EditorCorredores.KINDS.size():
-		pick.add_item(EditorCorredores.KIND_LABELS[k])
-	pick.select(EditorCorredores.KINDS.find(kind))
-	pick.item_selected.connect(func(k): on_pick.call(EditorCorredores.KINDS[k]))
-	row.add_child(pick)
-	_props.add_child(row)
-
-
-func _aisle_width_row(node_name: String, width: float, on_change: Callable) -> void:
-	var row := HBoxContainer.new()
-	var l := Label.new()
-	l.text = "Largura (m)"
-	row.add_child(l)
-	var spin := SpinBox.new()
-	spin.name = node_name
-	spin.min_value = 0.3
-	spin.max_value = 20.0
-	spin.step = 0.05
-	spin.value = width
-	spin.value_changed.connect(func(v): on_change.call(v))
-	row.add_child(spin)
-	_props.add_child(row)
-
-
-func _aisle_check(node_name: String, text: String, on: bool, on_toggle: Callable) -> void:
-	var box := CheckBox.new()
-	box.name = node_name
-	box.text = text
-	box.button_pressed = on
-	box.toggled.connect(func(v): on_toggle.call(v))
-	_props.add_child(box)
-
-
-# ---------------------------------------------------------------------------
-# The Rede panel (G3)
-# ---------------------------------------------------------------------------
+		kinds.append([EditorCorredores.KIND_LABELS[k], EditorCorredores.KINDS[k]])
+	var rows := [
+		{"kind": "title", "text": "Corredores de circulação"},
+		{"kind": "info", "name": "Corredor_Resumo", "text": "%d corredor(es): %d de pedestres, %d de empilhadeiras, %d mistos; %d cruzamento(s)." % [c["total"], c["pedestre"], c["empilhadeira"], c["misto"], c["cruzamentos"]]},
+		{"kind": "help", "text": "Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso."},
+	]
+	var a := ai._aisle(ai.selected)
+	if a.is_empty():
+		rows.append({"kind": "section", "text": "Novos corredores"})
+		rows.append({"kind": "choice", "name": "Corredor_NovoTipo", "label": "Tipo", "items": kinds, "value": ai.new_kind, "action": "corredor_tipo"})
+		rows.append({"kind": "number", "name": "Corredor_NovaLargura", "label": "Largura (m)", "value": ai.new_width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"})
+		rows.append({"kind": "check", "name": "Corredor_NovosMaoDupla", "text": "Mão dupla", "on": ai.new_two_way, "action": "corredor_mao_dupla"})
+	else:
+		rows.append({"kind": "section", "text": "Corredor %s" % a["name"]})
+		rows.append({"kind": "line", "name": "Corredor_Nome", "label": "Nome", "value": a["name"], "action": "corredor_nome"})
+		rows.append({"kind": "info", "name": "Corredor_Comprimento", "text": "%d ponto(s), %s m de comprimento" % [(a["points"] as PackedVector3Array).size(), _num(float(a["length"]))]})
+		rows.append({"kind": "choice", "name": "Corredor_Tipo", "label": "Tipo", "items": kinds, "value": a["kind"], "action": "corredor_tipo"})
+		rows.append({"kind": "number", "name": "Corredor_Largura", "label": "Largura (m)", "value": float(a["width"]), "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"})
+		rows.append({"kind": "check", "name": "Corredor_MaoDupla", "text": "Mão dupla", "on": a["two_way"], "action": "corredor_mao_dupla"})
+		if a["kind"] != "forklift":
+			rows.append({"kind": "check", "name": "Corredor_Secundaria", "text": "Passagem secundária de pedestres (mínimo menor)", "on": a["secondary"], "action": "corredor_secundaria"})
+		rows.append({"kind": "choice", "name": "Corredor_Perfil", "label": "Perfil", "items": [["Padrão do modelo", ""], ["Brasil (amarelo)", "Brasil"], ["Branco", "Branco"]], "value": a["profile"], "action": "corredor_perfil"})
+		if ai.selected_vertex >= 0:
+			rows.append({"kind": "info", "name": "Corredor_Vertice", "text": "Vértice %d selecionado" % (ai.selected_vertex + 1)})
+			rows.append({"kind": "button", "name": "Corredor_VerticeRemover", "text": "Remover vértice", "enabled": (a["points"] as PackedVector3Array).size() > 2, "action": "corredor_vertice_remover"})
+		rows.append({"kind": "button", "name": "Corredor_Inverter", "text": "Inverter sentido", "enabled": not a["two_way"], "action": "corredor_inverter"})
+		rows.append({"kind": "button", "name": "Corredor_Excluir", "text": "Excluir corredor (Del)", "action": "corredor_excluir"})
+		for w in doc.warnings():
+			if String(w["message"]).contains("'%s'" % a["name"]):
+				rows.append({"kind": "warning", "name": "Corredor_Aviso", "text": "• " + String(w["message"])})
+	_issue_rows(rows, ["corredor", "Aisles"])
+	_show_form(rows)
 
 
 func _show_network() -> void:
-	_props.clear()
 	var rede: EditorRede = editor.rede
-	var title := Label.new()
-	title.text = "Rede de caminhos"
-	title.theme_type_variation = &"TituloPainel"
-	_props.add_child(title)
 	var c := rede.counts()
-	var info := Label.new()
-	info.name = "Rede_Resumo"
-	info.text = "%d nó(s), %d trecho(s), %d pista(s) controlada(s)." % [c["nos"], c["trechos"], c["controlados"]]
-	_props.add_child(info)
-	var help := Label.new()
-	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-	help.theme_type_variation = &"Ajuda"
-	help.text = "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."
-	_props.add_child(help)
-	var both := CheckBox.new()
-	both.name = "Rede_NovosMaoDupla"
-	both.text = "Novos trechos em mão dupla"
-	both.button_pressed = rede.two_way
-	both.toggled.connect(func(on): rede.two_way = on)
-	_props.add_child(both)
+	var rows := [
+		{"kind": "title", "text": "Rede de caminhos"},
+		{"kind": "info", "name": "Rede_Resumo", "text": "%d nó(s), %d trecho(s), %d pista(s) controlada(s)." % [c["nos"], c["trechos"], c["controlados"]]},
+		{"kind": "help", "text": "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."},
+		{"kind": "check", "name": "Rede_NovosMaoDupla", "text": "Novos trechos em mão dupla", "on": rede.two_way, "action": "rede_novos_mao_dupla"},
+	]
 	if rede.selected_node != "":
-		var head := Label.new()
-		head.text = "Nó %s" % rede.selected_node
-		head.theme_type_variation = &"RotuloSecao"
-		_props.add_child(head)
-		var row := HBoxContainer.new()
-		var l := Label.new()
-		l.text = "Nome"
-		row.add_child(l)
-		var e := LineEdit.new()
-		e.name = "Rede_NoNome"
-		e.text = rede.selected_node
-		e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		e.text_submitted.connect(func(tx): rede.rename.call_deferred(tx))
-		row.add_child(e)
-		_props.add_child(row)
+		rows.append({"kind": "section", "text": "Nó %s" % rede.selected_node})
+		rows.append({"kind": "line", "name": "Rede_NoNome", "label": "Nome", "value": rede.selected_node, "action": "rede_no_nome"})
 		for n in rede.net["nodes"]:
 			if n["name"] == rede.selected_node:
 				var mp: Vector3 = n["model_position"]
-				var pl := Label.new()
-				pl.text = "Posição (%s, %s) m" % [_num(mp.x), _num(mp.y)]
-				_props.add_child(pl)
-		var del := Button.new()
-		del.name = "Rede_NoExcluir"
-		del.text = "Excluir nó (Del)"
-		del.pressed.connect(func(): rede.delete_selected.call_deferred())
-		_props.add_child(del)
+				rows.append({"kind": "info", "text": "Posição (%s, %s) m" % [_num(mp.x), _num(mp.y)]})
+		rows.append({"kind": "button", "name": "Rede_NoExcluir", "text": "Excluir nó (Del)", "action": "rede_excluir"})
 	if rede.selected_edge.size() == 2:
 		var e: Dictionary = rede._edge(rede.selected_edge[0], rede.selected_edge[1])
-		var head := Label.new()
-		head.text = "Trecho %s → %s" % [e["from"], e["to"]]
-		head.theme_type_variation = &"RotuloSecao"
-		_props.add_child(head)
-		var len_label := Label.new()
-		len_label.text = "Comprimento %s m" % _num(float(e["length"]))
-		_props.add_child(len_label)
-		var two := CheckBox.new()
-		two.name = "Rede_TrechoMaoDupla"
-		two.text = "Mão dupla"
-		two.button_pressed = e["two_way"]
-		two.toggled.connect(func(on): rede.set_two_way.call_deferred(on))
-		_props.add_child(two)
-		var row := HBoxContainer.new()
-		var l := Label.new()
-		l.text = "Capacidade (veículos; 0 = sem controle)"
-		row.add_child(l)
-		var cap := SpinBox.new()
-		cap.name = "Rede_TrechoCapacidade"
-		cap.min_value = 0
-		cap.max_value = 100
-		cap.value = int(e["capacity"])
-		cap.value_changed.connect(func(v): rede.set_capacity.call_deferred(int(v)))
-		row.add_child(cap)
-		_props.add_child(row)
+		rows.append({"kind": "section", "text": "Trecho %s → %s" % [e["from"], e["to"]]})
+		rows.append({"kind": "info", "text": "Comprimento %s m" % _num(float(e["length"]))})
+		rows.append({"kind": "check", "name": "Rede_TrechoMaoDupla", "text": "Mão dupla", "on": e["two_way"], "action": "rede_mao_dupla"})
+		rows.append({"kind": "number", "name": "Rede_TrechoCapacidade", "label": "Capacidade (veículos; 0 = sem controle)", "value": int(e["capacity"]), "min": 0, "max": 100, "step": 1, "action": "rede_capacidade"})
 		if e["controlled"]:
-			var red := Label.new()
-			red.text = "Pista controlada: no máximo %d veículo(s) ao mesmo tempo." % int(e["capacity"])
-			red.add_theme_color_override("font_color", RED)
-			_props.add_child(red)
-		var rev := Button.new()
-		rev.name = "Rede_TrechoInverter"
-		rev.text = "Inverter sentido"
-		rev.disabled = e["two_way"]
-		rev.pressed.connect(func(): rede.reverse.call_deferred())
-		_props.add_child(rev)
-		var del := Button.new()
-		del.name = "Rede_TrechoExcluir"
-		del.text = "Excluir trecho (Del)"
-		del.pressed.connect(func(): rede.delete_selected.call_deferred())
-		_props.add_child(del)
-	for i in doc.issues():
-		var m: String = i["message"]
-		if m.contains("network") or m.contains("rede") or m.contains("nó"):
-			var w := Label.new()
-			w.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			w.custom_minimum_size = Vector2(RIGHT_WIDTH - 40, 0)
-			w.text = m
-			w.add_theme_color_override("font_color", RED)
-			_props.add_child(w)
+			rows.append({"kind": "error", "text": "Pista controlada: no máximo %d veículo(s) ao mesmo tempo." % int(e["capacity"])})
+		rows.append({"kind": "button", "name": "Rede_TrechoInverter", "text": "Inverter sentido", "enabled": not e["two_way"], "action": "rede_inverter"})
+		rows.append({"kind": "button", "name": "Rede_TrechoExcluir", "text": "Excluir trecho (Del)", "action": "rede_excluir"})
+	_issue_rows(rows, ["network", "rede", "nó"])
+	_show_form(rows)
