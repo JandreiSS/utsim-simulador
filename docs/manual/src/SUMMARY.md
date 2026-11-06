@@ -6,6 +6,7 @@
 - [Primeiros passos](primeiros-passos.md)
 - [Launcher (para testadores)](launcher.md)
 - [UTSim Seis Sigma (projetos Lean Seis Sigma)](seis-sigma.md)
+- [UTSim Ensino (o jogo e a sala de aula)](ensino.md)
 - [UTSim Qualidade](qualidade-app.md)
 - [UTSim Segurança do Trabalho](seguranca-app.md)
 
