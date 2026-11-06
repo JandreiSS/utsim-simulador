@@ -222,7 +222,7 @@ Sem campos. Escreva `kind: Sink`.
 | `team` | obrigatório (lista de nomes de `Transporter`; não vazia; um transportador só em uma equipe) |
 | `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`, `LeastBusy`, `LongestIdle`, `Random`) |
 | `pick` | `Priority` (ou `Nearest`, `NearestAny`): qual serviço da fila o membro que fica livre pega |
-| `preempt` | `Never` (ou `Empty`: um pedido de prioridade maior tira o serviço de um membro que vai vazio buscá-lo) |
+| `preempt` | `Never` (ou `Empty`: um pedido de prioridade maior tira o serviço de um membro que vai vazio buscá-lo; `Full`: também tira um membro que está trabalhando num posto, e o posto guarda o tempo que faltava e espera outro operador, veja [Interrupções](linhas/lean-office/interrupcoes.md)) |
 | `metrics` | `false` (com `true`: `request_wait`, `requests.count`, `member.<nome>.requests` e `.busy` no relatório) |
 
 ### `Conveyor`

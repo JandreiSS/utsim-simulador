@@ -1,6 +1,6 @@
 # Biblioteca
 
-As 12 predefinições do Lean Office. Cada uma monta um ou mais objetos comuns do UTSim; a
+As 13 predefinições do Lean Office. Cada uma monta um ou mais objetos comuns do UTSim; a
 coluna "Base no núcleo" diz quais, para quem quiser editar o `.ron` à mão. Nenhuma supõe um
 lugar: a caixa de entrada pode ser uma bandeja, uma caixa de e-mail ou a lista de trabalho de um sistema, o
 posto de trabalho pode ser uma mesa ou uma tela, e a pessoa só anda quando o posto fica longe
@@ -17,7 +17,8 @@ dela.
 | `espera_informacao` (Espera por informação) | `Processor` de capacidade ilimitada | tempo de resposta | espera por informação |
 | `lote` (Agrupamento em lote) | `Queue` com `batch` | tamanho, espera máxima | lote |
 | `reuniao` (Reunião ou comitê) | `Queue` (pauta) e `Processor` com horário | tempo por caso, horário, pesos | reunião |
-| `equipe` (Equipe) | `Dispatcher` e duas pessoas | regra, horário, multitarefa | equipe |
+| `equipe` (Equipe) | `Dispatcher` e duas pessoas | regra, horário, multitarefa, interrupções | equipe |
+| `interrupcao` (Interrupção) | `Source`, `Processor` com prioridade e `Sink` | intervalo, duração, equipe, prioridade, horário | interrupção (não é caso; veja [Interrupções](interrupcoes.md)) |
 | `pessoa` (Pessoa) | `Transporter` com perfil de pessoa | habilidades, horário, multitarefa | pessoa |
 | `conclusao` (Conclusão) | `Sink` | | conclusão |
 

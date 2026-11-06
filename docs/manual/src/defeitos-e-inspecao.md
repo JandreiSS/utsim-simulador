@@ -62,3 +62,20 @@ utsim qualidade simulado examples/inspecao_e_retrabalho.ron --html qualidade.htm
 O comando roda as replicações e mostra, com intervalo de 95 %, o rendimento de primeira passagem, o rendimento acumulado, o refugo, o retrabalho, os defeitos por unidade, o DPMO, o escape para o cliente e a eficácia da inspeção. O HTML traz ainda o Pareto por tipo de defeito e por posto, a capacidade de cada característica e a carta de valores individuais da primeira replicação. O CSV tem a saída longa (replicação, item, objeto, característica, instante e valor), que `utsim qualidade carta` e `utsim qualidade capacidade` leem.
 
 Os números são de origem **Simulado**. Eles servem para estudar onde o defeito nasce, onde é detectado e o efeito de mudar a inspeção, o método ou a máquina.
+
+## Custo da qualidade
+
+Os blocos aceitam custos unitários, que a simulação nunca lê e que o relatório de custos multiplica pelas contagens de cada replicação:
+
+| Campo | Categoria | Como entra |
+|---|---|---|
+| `inspection.cost` | avaliação | por peça inspecionada |
+| `rework.cost` | falha interna | por passagem pelo retrabalho |
+| `quality.unit_cost` | falha interna | valor que o processo agrega, perdido por peça refugada que passou por ele |
+| `quality.escape_cost` | falha externa | por defeito do processo que chega ao cliente |
+
+```bash
+utsim qualidade custos examples/inspecao_e_retrabalho.ron --lancamentos lancamentos.csv --comparar outro_cenario.ron --html custos.html
+```
+
+Os lançamentos digitados (treinamento, calibração, garantia, devoluções) ficam num CSV `categoria;descricao;valor`, com as categorias `prevencao`, `avaliacao`, `falha_interna` e `falha_externa`. O relatório mostra o total por categoria (média e intervalo de 95 % do que vem do modelo, mais os lançamentos), por posto e por tipo de defeito. Com `--comparar`, o outro cenário roda com as mesmas sementes e a diferença do total é calculada replicação a replicação.
