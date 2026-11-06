@@ -35,3 +35,16 @@ utsim exposicao examples/cruzamento_empilhadeira.ron --limiar 1.5 --html exposic
 ```
 
 Quase-conflitos simulados servem para comparar layouts e regras de circulação do mesmo modelo. Eles não estimam a probabilidade de um acidente real. A NR-11 (transporte e movimentação de materiais) e a NR-6 (EPI) são citadas só como tema, sem conferência automática de conformidade.
+
+## No 3D
+
+Na aba Simular do cliente 3D, o painel da esquerda tem as chaves **Segurança** e **Calor**. Ligadas, elas mostram a camada de segurança e qualidade da replicação 0, calculada na ponte em Rust com as mesmas contas deste capítulo. Nenhum dado novo é preciso no modelo.
+
+- **Zonas no piso.** Cada zona vira um polígono semitransparente com contorno e nome. A cor segue o `level`: verde no nível 1, passando por verde-amarelado, amarelo e laranja, até vermelho no nível 5. Sem `level`, a zona sai azul.
+- **EPI na pessoa.** A pessoa veste as peças do EPI que ela usa naquele instante, que são o `ppe` dela mais o do posto que está atendendo. Ao chegar a outro posto, as peças trocam. As peças são geradas por código, uma para cada nome da lista acima.
+- **Pessoa sem o EPI pedido.** Quem está dentro de uma zona sem todo o EPI que a zona pede ganha um anel vermelho no chão e um aviso com o nome da zona e do que falta.
+- **Quase-conflitos.** Cada quase-conflito simulado ganha um marcador no local, que cresce enquanto ele acontece. A lista fica no painel e cada linha salta a reprodução até dois segundos antes do instante. Valem os avisos do parágrafo acima: são simulados e servem para comparar layouts.
+- **Qualidade.** O item que termina com `defeitos` maior que zero ganha uma marca vermelha enquanto está na cena, e os postos com `inspection` ganham uma lupa girando sobre eles.
+- **Calor.** A chave **Calor** põe no piso uma textura com a presença das pessoas e as células de quase-conflito, do transparente ao vermelho.
+
+Limites desta primeira versão: a posição da pessoa para a conta das zonas segue o trajeto da exposição (velocidade constante em cada viagem), e o item é marcado como defeituoso por inteiro, desde que aparece, pelo rótulo que tem no fim da replicação.

@@ -46,7 +46,7 @@ for a in "$@"; do
     esac
 done
 if [ "$#" -eq 0 ]; then
-    MODELOS=(examples/centro_de_distribuicao.ron examples/agvs.ron examples/pessoas_carregando.ron)
+    MODELOS=(examples/centro_de_distribuicao.ron examples/agvs.ron examples/pessoas_carregando.ron examples/cruzamento_empilhadeira.ron)
     for r in godot/roteiros/g2_*.json godot/roteiros/g3_*.json godot/roteiros/g4_*.json; do
         [ -f "$r" ] && ROTEIROS+=("$r")
     done
