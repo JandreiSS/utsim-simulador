@@ -1,0 +1,123 @@
+# UTSim Ensino
+
+O UTSim Ensino é o app de ensino da família UTSim. O aluno aprende engenharia de produção resolvendo problemas de uma fábrica simulada: lê a situação, faz uma previsão, decide dentro do orçamento e manda simular. A nota vem da própria simulação, com replicações e intervalo de confiança. Ninguém digita gabarito.
+
+O app é instalado pelo launcher, como o UTSim e o UTSim Seis Sigma. Ele abre em computadores de laboratório sem placa de vídeo.
+
+## Primeiro uso
+
+Na primeira abertura o app pede o nome e o registro acadêmico. O registro identifica as entregas e gera a **variante** do aluno: os parâmetros de cada missão mudam um pouco de um aluno para outro, sempre os mesmos para o mesmo registro. Use o mesmo registro da lista do professor.
+
+Em computadores compartilhados, o perfil pode ficar numa pasta escolhida (um pen drive, por exemplo). Para isso, abra o app com a variável `UTSIM_ENSINO_PERFIL` apontando para a pasta.
+
+## A campanha
+
+A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida libera a próxima. A primeira missão de um ato abre quando todas as do ato anterior estão resolvidas.
+
+| Ato | Tema |
+|---|---|
+| 1 | Gargalo e fluxo |
+| 2 | Filas e atendimento |
+| 3 | Capacidade, turnos e estoque intermediário |
+
+Os atos de balanceamento, arranjo físico, tempos e métodos, problemas integrados e o caso final de Lean Seis Sigma vêm nas próximas versões.
+
+## Uma missão
+
+A tela da missão tem, de cima para baixo:
+
+1. **Enunciado**, com os conceitos da missão (o glossário explica cada um).
+2. **Medições do estado atual**, em algumas missões. O botão roda a fábrica como está e mostra as medidas pedidas, com intervalo.
+3. **Previsão**. Antes de simular, o aluno responde (qual é o gargalo, quanto vai dar a fila). A previsão vale pontos e fica travada depois da primeira rodada.
+4. **Decisões**, as alavancas da missão, com o custo de cada uma e o orçamento.
+5. **Justificativa**, perguntas objetivas sobre o porquê.
+6. **Dicas**, em três níveis: uma pergunta que orienta, a ferramenta a olhar e o caminho da solução. Os níveis 2 e 3 descontam pontos.
+7. **Simular**. O app roda as replicações com os mesmos números aleatórios para o estado inicial, para a tentativa e para a solução de referência, e mostra os resultados.
+
+### Resultados
+
+A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo de 95 %, a meta e a situação:
+
+- **meta atingida**: o intervalo todo está do lado certo da meta.
+- **dentro da tolerância**: o intervalo contém a meta e a média está dentro da faixa de tolerância da missão.
+- **meta não atingida**.
+
+Abaixo vêm a vista 2D, com uma replicação da fábrica animada (estações coloridas e com o estado escrito, filas como pilhas, peças andando nas setas), e as dicas automáticas, que explicam o que aconteceu e não descontam pontos.
+
+### Nota
+
+A nota vai de 0 a 100 e tem quatro partes.
+
+| Parte | Pontos | Como é calculada |
+|---|---|---|
+| Portão | | orçamento e outros limites. Quem passa do limite fica com a missão "não resolvida" e sem pontos de desempenho |
+| Desempenho | 70 | para cada indicador, a fração do caminho entre o estado inicial e a solução de referência, limitada a 0 e 1, com a média ponderada pelos pesos da missão |
+| Previsão | 20 | escolha certa, ou número dentro da tolerância do valor simulado no estado inicial |
+| Justificativa | 10 | acertos nas perguntas objetivas |
+
+Quando a missão não tem previsão ou justificativa, a nota é proporcional às partes que ela tem. Os descontos são os das dicas (0, 3 e 8 pontos pelo nível mais alto aberto) e o das rodadas acima do orçamento de rodadas, quando a missão tem um.
+
+As estrelas são uma para a missão resolvida (portão e todas as metas), duas com desempenho de pelo menos 0,8 e três com pelo menos 0,95. Uma solução melhor que a referência ganha um selo.
+
+Quando a referência piora um indicador para ganhar em outro (um custo que ela paga), esse indicador conta inteiro para quem fica pelo menos tão bem quanto a referência nele, e zero para quem fica pior.
+
+### Caixa de areia
+
+Depois de resolver uma missão, a caixa de areia abre a mesma fábrica sem meta e sem orçamento. Dois cenários ficam lado a lado e o app mostra a diferença pareada com intervalo, dizendo se é diferença significativa ou empate estatístico. Nada ali conta nota. O botão "Gravar .ron" grava o modelo do cenário A com as decisões aplicadas, para abrir no UTSim.
+
+## Turma (aluno)
+
+O professor envia um convite (`.utsc`). Na aba **Turma**, o aluno indica o convite e, se a turma usa uma pasta compartilhada no Google Drive, a pasta sincronizada no computador. Com a pasta, cada tentativa é gravada nela assim que termina. Sem a pasta, o botão "Gravar entrega" grava um arquivo `.utsr` com todas as tentativas, para enviar ao professor pelo ambiente da disciplina, por e-mail ou pen drive.
+
+Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo.
+
+## Modo professor
+
+Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do professor. O mesmo app serve para aluno e professor.
+
+### Criar a turma
+
+Informe a pasta da turma (local ou dentro do Google Drive para computador), o nome, o período, a finalidade dos dados e, se quiser, a lista de alunos em CSV:
+
+```text
+nome;registro;apelido
+Ana Lima;2027001;ana
+Beto Souza;2027002;beto
+```
+
+O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome.
+
+O app cria esta estrutura:
+
+```text
+turma.ron              manifesto da turma
+alunos.csv             lista de alunos (só professor)
+convite.utsc           convite para os alunos
+pacotes/campanha.utse  a campanha publicada
+entregas/<registro>/   uma pasta por aluno, com as tentativas assinadas
+correcao/              notas exportadas (só professor)
+```
+
+No Drive, compartilhe a pasta da turma com os alunos. A pasta `entregas/<registro>` de cada aluno deve ficar compartilhada só com ele e o professor. O app não usa a API do Drive, só lê e grava arquivos na pasta sincronizada.
+
+### Corrigir
+
+"Corrigir todas as entregas" lê as pastas dos alunos e, se indicada, uma pasta com arquivos `.utsr`. Para cada aluno, o app confere as assinaturas e a cadeia das tentativas e simula de novo cada tentativa, com a variante do aluno. A nota registrada é a melhor ou a última tentativa, conforme a opção da turma.
+
+O resultado é a **matriz aluno por missão**, com nota, estrelas, tentativas e dicas, a média de cada aluno e os avisos (tentativa alterada, cadeia quebrada, aluno fora da lista, versão diferente do pacote ou do núcleo). Abaixo vêm os **erros mais comuns** de cada missão: as decisões mais frequentes entre os que não resolveram e as previsões mais erradas.
+
+"Exportar notas" grava `correcao/notas.csv` e `correcao/notas.xlsx`.
+
+Uma turma de 60 alunos é corrigida em segundos num notebook comum.
+
+### Limites
+
+Sem servidor, nada impede a consulta. O que o app faz é tornar a cópia pouco útil e visível. A variante muda os números de cada aluno. A nota não viaja, porque o professor simula de novo, e por isso editar o arquivo de entrega não muda a nota. Uma tentativa editada perde a assinatura e aparece nos avisos. Quem tem acesso aos arquivos pode tentar forjá-los: a assinatura revela a alteração, mas não a impede.
+
+Nome, registro e notas são dados pessoais. A finalidade fica registrada na turma, o placar usa o apelido e a pasta de cada aluno fica compartilhada só com ele e o professor.
+
+## Pacotes de missões
+
+As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas, cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
+
+A campanha embutida passa por uma conferência automática a cada versão: a busca exaustiva confirma que a referência guardada é a melhor combinação, que ela difere do estado inicial com significância, que alguma combinação bate as metas e que o estado inicial não bate. Os números da referência ficam guardados e um teste acusa qualquer mudança do núcleo que os altere.
