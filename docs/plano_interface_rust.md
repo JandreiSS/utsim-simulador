@@ -123,7 +123,7 @@ migração, e um roteiro novo não precisa saber o que é egui. Nomes novos da b
 | 4 | Resultados: tabela, gráficos (egui_plot da mesma versão do egui), análises, cenários, otimização | 8–12 h | **feito** |
 | 5 | PERT/CPM, dados reais (formulário e mini-histograma), rede, corredores, ligação, janelas de arquivo (seletor próprio em egui ou o `FileDialog` nativo pela ponte), atalhos, confirmação de descarte; remoção do tema Godot | 10–14 h | **feito** (5a) |
 | 5b | Editores de tabela de chegadas e de horário (C6 de `docs/plano_chegadas_e_equipes_3d.md`), fonte no 3D (C7), ligações de equipe e pedido no editor 3D (E1b) e equipe ao vivo (E8b) | 30–45 h | **feito** (C7 em parte) |
-| 6 | Editor 3D em Rust: escolha de objetos pelo raio da câmera, nós de entrada, saída e atendimento, ligações de fluxo e de equipe (com o ×), seleção, mover e caixa de seleção, num módulo puro com testes de unidade; o `editor.gd` fica com os eventos, as ferramentas Rede, Corredor, Colocar e Equipe e o desenho a partir do que o Rust descreve | 12–18 h | em andamento |
+| 6 | Editor 3D em Rust: escolha de objetos pelo raio da câmera, nós de entrada, saída e atendimento, ligações de fluxo e de equipe (com o ×), seleção, mover e caixa de seleção, num módulo puro com testes de unidade; o `editor.gd` fica com os eventos, as ferramentas Rede, Corredor, Colocar e Equipe e o desenho a partir do que o Rust descreve | 12–18 h | **feito** (primeira versão; conferência com janela pendente) |
 
 Total: 37 a 53 h. Cada passo remove o GDScript que substitui e mantém os roteiros
 `g2_*`, `g3_*` e `g4_*` passando sem janela (`UTSIM_GODOT=1 bash scripts/verificar.sh`).
@@ -512,6 +512,23 @@ Editar que hoje está no `editor.gd`, com testes de unidade, mantendo os roteiro
 - Testes de unidade no módulo (projeção ida e volta, escolha, cada gesto); os roteiros `g2_*`,
   `g3_*` e `g4_*` continuam passando sem janela, e a conferência com janela é feita a 1600×900
   e 1280×720.
+
+Como ficou (primeira versão, 2026-11-07):
+
+- `editor3d.rs` (puro, 7 testes): `Camera` com as matrizes do `Camera3D` (`from_columns`,
+  `look_at`, `project`, `ray`, `floor_at`), `Block` com a caixa de escolha e os nós,
+  `Editor3d` com `hits_at`, `node_at`, `segments`, `link_at`, `team_line_at`, `remove_point`,
+  `press`/`drag`/`release`/`hover`, `delete`, `cancel` e `overlay`; os gestos devolvem
+  `Effect`s.
+- `editor_class.rs`: `UtsimEditor` (RefCounted) converte câmera, cena, efeitos e a descrição
+  do desenho para o GDScript.
+- `editor.gd` (de 1616 para cerca de 1070 linhas): `_feed` passa a câmera a cada evento e a
+  cena quando ela muda, `_apply` aplica os efeitos no documento, `_pull` lê de volta a seleção
+  e o gesto (as variáveis que os painéis e os roteiros leem continuam as mesmas), e o desenho
+  sai de `overlay()`. A seleção é do script (ele a filtra pelos objetos do documento): o Rust
+  não a apaga ao receber uma cena antiga, de antes de a vista 3D ser refeita.
+- Fica para depois: Rede, Corredor, Colocar e a ferramenta Equipe em Rust; a conferência com
+  janela (a tela estava ocupada).
 
 ### Plano original do passo 2b
 
