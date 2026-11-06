@@ -455,6 +455,26 @@ Pedido do dono depois da dev.5: o Selecionar tem de ser o padrão e melhor, e li
   prioridade aparece "Rótulo da prioridade". O rótulo da cena diz `· LIFO`. O tutorial g2
   renomeia a espera para `fila` (o exemplo comparado chama assim) e escolhe LIFO pelo painel.
 
+### Janela "Valores reais…" com todas as medidas (2026-11-06, dev.7)
+
+Pedido do dono: trabalhar os valores lidos numa janela grande, comparar todas as medidas de uma
+vez e ter a explicação de cada método.
+
+- `utsim-fit`, módulo novo `compare`: `Measure` (AIC, BIC, log-verossimilhança, K-S, A-D, χ²),
+  `Comparison::of` (posição de cada candidata em cada medida e a escolhida por cada uma, entre
+  as aceitas pelos testes quando há alguma), pontos do P-P e do Q-Q, curva de densidade em
+  escala de histograma, `EXPLANATIONS` (o que é, como ler, quando usar, cuidados) para as seis
+  medidas, os dois gráficos e as vinte famílias, e `comparison_html`, acrescentada ao relatório
+  de cada campo (`AutoFit::to_html`). Testes de unidade.
+- Ponte, `ui_fitwin.rs`: janela egui redimensionável sobre um fundo escuro que segura os
+  cliques; tabela de valores (digitar, colar com vírgula decimal, importar CSV pelo diálogo do
+  Godot, editar, apagar), instantes, estatísticas; "Comparar todas" roda `auto_fit` numa thread
+  própria; tabela ordenável com posições e "escolhida por"; histograma com curvas e P-P/Q-Q com
+  `egui_plot`; ⓘ desenhado (a fonte não tem o caractere); "Usar esta distribuição" manda o
+  `dados\taplicar` de sempre com os valores e a família; "Gerar relatório" grava o HTML.
+- Roteiro `godot/roteiros/g4_valores_reais.json` (passo `esperar_valores`, conferência
+  `janela_valores`).
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do

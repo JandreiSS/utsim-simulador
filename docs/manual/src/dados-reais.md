@@ -153,6 +153,40 @@ No painel de propriedades do modo Editar, **todo campo de distribuição de todo
   intervalos entre eles) ou durações, a *escolha* (melhor automática, empírica ou uma família
   fixa) e o *critério* (AIC, BIC, Kolmogorov-Smirnov ou Anderson-Darling).
 
+### A janela "Valores reais…"
+
+O botão **Valores reais…**, logo abaixo da Fonte, abre uma janela grande (pode ser
+redimensionada) para trabalhar com os valores com espaço e comparar todas as distribuições ao
+mesmo tempo:
+
+1. **Os valores**, na coluna da esquerda: digite na tabela, cole da planilha na caixa de cima
+   (várias linhas, vírgula ou ponto decimal; cabeçalhos e textos são ignorados) e clique
+   **Adicionar**, ou **Importar CSV…**. Cada valor pode ser corrigido na própria tabela, e o
+   **×** apaga a linha. Marque **São instantes crescentes** quando os valores forem horários
+   de chegada: a comparação usa os intervalos. Abaixo ficam as estatísticas (n, média, desvio,
+   CV, mínimo, quartis, mediana e máximo).
+2. **Comparar todas** ajusta todas as famílias candidatas de uma vez, numa thread, e monta a
+   tabela de comparação, uma linha por distribuição, com os parâmetros, o AIC, o BIC, a
+   log-verossimilhança e os testes de Kolmogorov-Smirnov, Anderson-Darling e qui-quadrado
+   (estatística e valor-p). Ao lado de cada valor, entre parênteses, a posição da distribuição
+   naquele critério; em negrito, a melhor de cada critério; a coluna **escolhida por** diz
+   quais critérios a escolheriam. Valores-p abaixo de 0,05 aparecem em laranja.
+3. A tabela vem ordenada pelo AIC; clique no nome de outra medida para ordenar por ela. A linha
+   marcada no começo é só a **sugestão inicial** (AIC com a regra de parcimônia do UTSim):
+   clique em qualquer outra para escolhê-la.
+4. Embaixo, o **histograma** dos dados com as curvas das candidatas aceitas (a escolhida em
+   destaque) e o gráfico **P-P** ou **Q-Q** da linha escolhida.
+5. Cada medida, cada gráfico e cada família tem um **ⓘ**: o clique mostra o que é, como ler,
+   quando usar e os cuidados (amostra pequena, valores repetidos, caudas).
+6. **Usar esta distribuição** passa a usar a linha escolhida no campo, ajustada a esses valores
+   (um passo de desfazer); **Usar a empírica** usa os próprios valores. **Gerar relatório** pede
+   uma pasta e grava `ajuste_<objeto>_<campo>.html`, com os dados, o diagnóstico, a tabela de
+   comparação completa (todas as medidas e as posições), os gráficos, a escolha feita e as
+   explicações de cada medida e família, para guardar e comparar depois.
+
+O relatório do modelo (botão **Relatório** do painel e `utsim dados --relatorio`) também ganhou
+a seção "Comparação de todas as medidas" em cada campo.
+
 **Aplicar** roda o ajuste numa thread, com o indicador de progresso e sem travar a janela, e o
 resultado aparece no próprio painel, abaixo do formulário:
 

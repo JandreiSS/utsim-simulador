@@ -29,6 +29,19 @@ pub struct WidgetInfo {
     pub count: Option<usize>,
 }
 
+impl Default for WidgetInfo {
+    fn default() -> Self {
+        WidgetInfo {
+            rect: Rect::NOTHING,
+            text: String::new(),
+            enabled: true,
+            checked: None,
+            choices: Vec::new(),
+            count: None,
+        }
+    }
+}
+
 /// The named widgets of the last frame drawn, and the pending scripted requests.
 #[derive(Default, Debug)]
 pub struct Registry {

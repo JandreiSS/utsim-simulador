@@ -63,6 +63,10 @@ pub struct Host {
     pub form_mem: FormMemory,
     /// The modal dialog shown over everything (discard changes, shortcuts), if any.
     pub dialog: Option<ui_form::Dialog>,
+    /// The "Valores reais…" window of a distribution field, if open.
+    pub fitwin: Option<crate::ui_fitwin::FitWin>,
+    /// The window just closed by a choice, for the bridge to read the values from.
+    pub fitwin_done: Option<crate::ui_fitwin::FitWin>,
     /// The token flows window (Simular).
     pub flows: Option<FlowsView>,
     pub flows_open: bool,
@@ -119,6 +123,8 @@ impl Host {
             form: None,
             form_mem: FormMemory::default(),
             dialog: None,
+            fitwin: None,
+            fitwin_done: None,
             perf: String::new(),
             flows: None,
             flows_open: false,
@@ -374,6 +380,7 @@ impl Host {
         let (pert_open, pert, pmem) = (self.pert_open, self.pert.as_ref(), &mut self.pert_mem);
         let (form, fmem) = (self.form.as_ref(), &mut self.form_mem);
         let (dialog, perf) = (self.dialog.as_ref(), self.perf.as_str());
+        let fitwin = &mut self.fitwin;
         let (flows, flmem) = (
             self.flows.as_ref().filter(|_| self.flows_open),
             &mut self.flows_mem,
@@ -465,6 +472,11 @@ impl Host {
                     panels.push(rect);
                 }
             }
+            if let Some(fw) = fitwin.as_mut() {
+                // Over the panels, under a dialog; its backdrop takes the clicks.
+                crate::ui_fitwin::show(ui.ctx(), fw, reg, &mut actions);
+                panels.push(screen);
+            }
             if let Some(d) = dialog {
                 // Over everything; egui's modal keeps the panels under it from clicks.
                 if let Some(a) = ui_form::show_dialog(ui.ctx(), d, reg) {
@@ -478,6 +490,17 @@ impl Host {
         }
         if actions.iter().any(|a| a.starts_with("dialogo:")) {
             self.dialog = None;
+            self.dirty = true;
+        }
+        if actions.iter().any(|a| {
+            a == "valores:fechar" || a.starts_with("valores:usar") || a == "valores:empirica"
+        }) {
+            // Closed, or a distribution chosen (the action still goes to the bridge).
+            if !actions.iter().any(|a| a == "valores:fechar") {
+                self.fitwin_done = self.fitwin.take();
+            } else {
+                self.fitwin = None;
+            }
             self.dirty = true;
         }
         if actions.iter().any(|a| a == "fluxos:fechar") {

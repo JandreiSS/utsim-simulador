@@ -1173,6 +1173,16 @@ fn data_form(
             String::new(),
         ),
     ];
+    ui.horizontal(|ui| {
+        ui.add_space(INDENT * depth as f32);
+        let r = ui.add(widgets::primary("Valores reais…")).on_hover_text(
+            "Abre a janela grande para digitar, colar ou importar os valores e comparar todas as distribuições de uma vez",
+        );
+        named(ui, reg, &format!("{name}_janela"), &r, "Valores reais…");
+        if r.clicked() {
+            send(out, "janela", &draft);
+        }
+    });
     if let Some(o) = row_label(ui, "Origem", "", depth, |ui, w| {
         combo(
             ui,

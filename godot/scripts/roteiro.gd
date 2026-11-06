@@ -49,6 +49,7 @@
 ##    - `{"abrir": "../../examples/agvs.ron"}`, `{"novo": true}`, `{"modo": "simular"}`
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
+##    - `{"esperar_valores": true}`: waits for the comparison of the "Valores reais…" window
 ##    - `{"esperar_trabalho": 120}` (G3): waits until the run on the bridge's thread ends
 ##      (at most that many seconds; a failure if it does not). `modo` and the captures of
 ##      models wait by themselves.
@@ -404,6 +405,11 @@ func _step(s: Dictionary, k: int) -> void:
 		if not await _wait_idle(300.0):
 			_fail("passo %d: a simulação não terminou" % k)
 		await _frames(5)
+	elif s.has("esperar_valores"):
+		# The comparison of the "Valores reais…" window runs on its own thread.
+		if _egui() == null or not _egui().fitwin_wait():
+			_fail("passo %d: a comparação dos valores reais não terminou" % k)
+		await _frames(4)
 	elif s.has("esperar_trabalho"):
 		if not await _wait_idle(float(s["esperar_trabalho"])):
 			_fail("passo %d: o trabalho não terminou em %s s" % [k, s["esperar_trabalho"]])
@@ -723,7 +729,9 @@ func _accept_dialog(path: String, k: int) -> void:
 ## the reference, comments and formatting aside; each difference is a failure),
 ## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
 ## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
-## `ligacao_selecionada` (`[de, para]`, or []), `no_destacado` (the node under the mouse,
+## `ligacao_selecionada` (`[de, para]`, or []), `janela_valores` ({aberta, linhas,
+## linhas_maior_que, comparado, escolhida, ordem, candidatas_maior_que}: the "Valores
+## reais…" window), `no_destacado` (the node under the mouse,
 ## `[bloco, "out"|"in"|"service"]`, or []), `linha_equipe` / `sem_linha_equipe`
 ## (`[tipo, de, para]`: a team line exists or not), `linha_equipe_selecionada`,
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
@@ -838,6 +846,18 @@ func _check(c: Dictionary, k: int) -> void:
 			"ligacao_selecionada":
 				var sel: Array = _main.editor.selected_link
 				report.call("ligação selecionada", sel == Array(want), str(sel))
+			"janela_valores":
+				var info: Dictionary = _egui().fitwin_info() if _egui() != null else {}
+				for wk in want:
+					var w = want[wk]
+					if wk == "linhas_maior_que":
+						report.call("valores: linhas > %s" % w, int(info.get("linhas", 0)) > int(w), str(info))
+					elif wk == "candidatas_maior_que":
+						report.call("valores: candidatas > %s" % w, int(info.get("candidatas", 0)) > int(w), str(info))
+					else:
+						var got = info.get(wk, "")
+						var same: bool = (float(got) == float(w)) if typeof(w) in [TYPE_INT, TYPE_FLOAT] else str(got) == str(w)
+						report.call("valores: %s = %s" % [wk, w], same, str(info))
 			"linha_equipe":
 				var l: Array = want
 				report.call("linha %s" % str(l), _main.editor.has_team_line(l[0], l[1], l[2]), "")

@@ -102,6 +102,10 @@ var _replay_dialog: FileDialog
 var _data_dialog: FileDialog
 var _report_dialog: FileDialog
 var _data_pick_path := ""
+## Where the data file and report dialogs answer: the panel's form or the "Valores
+## reais…" window (`painel`/`janela`, `modelo`/`janela`).
+var _data_target := "painel"
+var _report_target := "modelo"
 ## The last report of the real data written: `{index, files, failed}`.
 var last_report := {}
 ## A recorded replay (`.json`) is being played instead of the document.
@@ -221,7 +225,11 @@ func _build_ui() -> void:
 	_report_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	_report_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
 	_report_dialog.title = "Pasta para o relatório dos dados"
-	_report_dialog.dir_selected.connect(func(p): write_data_report(p))
+	_report_dialog.dir_selected.connect(func(p):
+		if _report_target == "janela":
+			write_fit_report(p)
+		else:
+			write_data_report(p))
 	_ui.add_child(_report_dialog)
 	_replay_dialog = FileDialog.new()
 	_replay_dialog.name = "Dialogo_Replay"
@@ -595,10 +603,18 @@ func _panel_action(a: PackedStringArray) -> void:
 				"para_dist":
 					_on_data_to_dist(a[2])
 				"relatorio":
+					_report_target = "modelo"
 					_report_dialog.popup_centered_ratio(0.6)
 				"escolher_arquivo":
 					_data_pick_path = a[2]
+					_data_target = "painel"
 					_data_dialog.popup_centered_ratio(0.7)
+				"janela_csv":
+					_data_target = "janela"
+					_data_dialog.popup_centered_ratio(0.7)
+				"janela_relatorio":
+					_report_target = "janela"
+					_report_dialog.popup_centered_ratio(0.6)
 		"miniatura":
 			show_miniature(a[1])
 
@@ -922,8 +938,25 @@ func _on_data_to_dist(path: String) -> void:
 
 
 func _on_data_file(file: String) -> void:
+	if ui != null and _data_target == "janela":
+		var err := String(ui.fitwin_csv(file))
+		set_status("Valores lidos de %s." % file.get_file() if err == "" else "Não leu %s: %s" % [file.get_file(), err])
+		return
 	if ui != null:
 		ui.set_data_file(_data_pick_path, doc.data_relative(file))
+
+
+## Writes the report of the "Valores reais…" window (all the measures and the choice)
+## into `dir` and opens it in the system browser.
+func write_fit_report(dir: String) -> void:
+	var r: Dictionary = ui.fitwin_report(dir)
+	if not r["ok"]:
+		set_status("Sem relatório: %s" % r["error"])
+		return
+	last_report = {"index": r["file"], "files": 1}
+	set_status("Relatório gravado em %s." % r["file"])
+	if DisplayServer.get_name() != "headless" and not scripted:
+		OS.shell_open(String(r["file"]))
 
 
 ## Writes the HTML reports of the fields with data into `dir` (on the bridge's thread)

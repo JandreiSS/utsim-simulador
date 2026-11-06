@@ -672,6 +672,97 @@ impl UtsimUi {
         self.host.flows_open
     }
 
+    /// Values read from a CSV or text file into the "Valores reais…" window. Returns the
+    /// error, or "" when they were added.
+    #[func]
+    fn fitwin_csv(&mut self, file: GString) -> GString {
+        let Some(w) = self.host.fitwin.as_mut() else {
+            return "a janela de valores não está aberta".into();
+        };
+        let r = utsim_fit::data::load(
+            std::path::Path::new(&file.to_string()),
+            &utsim_fit::data::DataOptions::default(),
+        );
+        let msg = match r {
+            Ok(l) => {
+                let n = l.values.len();
+                w.rows
+                    .extend(l.values.iter().map(|x| crate::ui_props::num_text(*x)));
+                w.note = format!("{n} valor(es) lidos de {} (coluna {}).", file, l.column);
+                String::new()
+            }
+            Err(e) => {
+                w.note = format!("Não leu o arquivo: {e}");
+                e
+            }
+        };
+        self.host.invalidate();
+        GString::from(msg.as_str())
+    }
+
+    /// Writes the report of the "Valores reais…" window into `dir`: `{ok, file, error}`.
+    #[func]
+    fn fitwin_report(&mut self, dir: GString) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        let r = match self.host.fitwin.as_ref() {
+            Some(w) => w.write_report(std::path::Path::new(&dir.to_string())),
+            None => Err("a janela de valores não está aberta".into()),
+        };
+        match r {
+            Ok(f) => {
+                d.set("ok", true);
+                d.set("file", &GString::from(f.to_string_lossy().as_ref()));
+                if let Some(w) = self.host.fitwin.as_mut() {
+                    w.note = format!("Relatório gravado em {}.", f.display());
+                }
+            }
+            Err(e) => {
+                d.set("ok", false);
+                d.set("error", &GString::from(e.as_str()));
+            }
+        }
+        self.host.invalidate();
+        d
+    }
+
+    /// Waits for the comparison of the "Valores reais…" window (scripted runs). True
+    /// when it is open and has a result.
+    #[func]
+    fn fitwin_wait(&mut self) -> bool {
+        let Some(w) = self.host.fitwin.as_mut() else {
+            return false;
+        };
+        w.wait();
+        let ok = w.fit.is_some();
+        self.host.invalidate();
+        ok
+    }
+
+    #[func]
+    fn fitwin_open(&self) -> bool {
+        self.host.fitwin.is_some()
+    }
+
+    /// The state of the "Valores reais…" window for the scripted checks: `{aberta, linhas,
+    /// comparado, escolhida, ordem, candidatas}`.
+    #[func]
+    fn fitwin_info(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        d.set("aberta", self.host.fitwin.is_some());
+        if let Some(w) = &self.host.fitwin {
+            d.set("linhas", w.rows.len() as i64);
+            d.set("comparado", w.fit.is_some());
+            d.set("escolhida", &GString::from(w.selected_family().as_str()));
+            d.set("ordem", &GString::from(w.sort.key()));
+            let n = w
+                .fit
+                .as_ref()
+                .map_or(0, |(_, f)| f.report.ranking.candidates.len());
+            d.set("candidatas", n as i64);
+        }
+        d
+    }
+
     /// The file chosen in the dialog for the real-data form of the field `path`.
     #[func]
     fn set_data_file(&mut self, path: GString, file: GString) {
@@ -868,10 +959,79 @@ impl UtsimUi {
         // Applied above (egui checks that every delta was handled).
         textures.clear();
         for a in frame.actions {
+            if let Some(rest) = a.strip_prefix("valores:") {
+                self.fitwin_action(rest);
+                continue;
+            }
             self.emit(&a);
         }
         for a in frame.props {
             self.prop_action(a);
+        }
+    }
+
+    /// Opens "Valores reais…" for the field `path` of the object shown, with the values of
+    /// the draft (typed, or read from its file).
+    fn open_fitwin(&mut self, path: &str, draft: &serde_json::Value) {
+        let text = draft["text"].as_str().unwrap_or_default();
+        let source = draft["source"]
+            .as_str()
+            .unwrap_or_default()
+            .trim()
+            .to_owned();
+        let mut rows: Vec<String> = Vec::new();
+        if draft["origem"] == "arquivo" && !source.is_empty() {
+            let p = std::path::PathBuf::from(&source);
+            let base = self.host.props.as_ref().and_then(|v| v.base_dir.clone());
+            let p = match base {
+                Some(b) if p.is_relative() => b.join(p),
+                _ => p,
+            };
+            let column = draft["column"].as_str().unwrap_or_default();
+            let options = utsim_fit::data::DataOptions {
+                column: (!column.is_empty()).then(|| column.to_owned()),
+                timestamps: false,
+            };
+            if let Ok(l) = utsim_fit::data::load(&p, &options) {
+                rows = l
+                    .values
+                    .iter()
+                    .map(|x| crate::ui_props::num_text(*x))
+                    .collect();
+            }
+        } else {
+            let mut w = crate::ui_fitwin::FitWin::new("", "", Vec::new(), false);
+            w.add_text(text);
+            rows = w.rows;
+        }
+        let timestamps = draft["timestamps"].as_bool().unwrap_or(false);
+        self.host.fitwin = Some(crate::ui_fitwin::FitWin::new(
+            &self.object,
+            path,
+            rows,
+            timestamps,
+        ));
+        self.host.invalidate();
+    }
+
+    /// An action of the "Valores reais…" window (after `valores:`).
+    fn fitwin_action(&mut self, a: &str) {
+        let (what, arg) = a.split_once('\t').unwrap_or((a, ""));
+        let window = self.host.fitwin.as_ref().or(self.host.fitwin_done.as_ref());
+        let Some(w) = window else {
+            return;
+        };
+        let path = w.path.clone();
+        match what {
+            "usar" | "empirica" => {
+                let choose = if what == "usar" { arg } else { "Empirical" };
+                let draft = w.draft(choose);
+                self.host.fitwin_done = None;
+                self.emit(&format!("dados\taplicar\t{path}\t{draft}"));
+            }
+            "csv" => self.emit(&format!("dados\tjanela_csv\t{path}")),
+            "relatorio" => self.emit(&format!("dados\tjanela_relatorio\t{path}")),
+            _ => {}
         }
     }
 
@@ -1026,6 +1186,9 @@ impl UtsimUi {
             PropAction::Driver(on) => {
                 let o = self.object.clone();
                 self.emit(&format!("motorista\t{o}\t{on}"));
+            }
+            PropAction::Data { what, path, draft } if what == "janela" => {
+                self.open_fitwin(&path, &draft);
             }
             PropAction::Data { what, path, draft } => {
                 self.emit(&format!("dados\t{what}\t{path}\t{draft}"))
