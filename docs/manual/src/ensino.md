@@ -66,8 +66,8 @@ Na missão 6.1, o custo por peça é o custo por hora da operadora e das máquin
 
 Nas missões de modelagem o aluno monta ou completa o modelo no UTSim. O botão "Gravar modelo inicial" grava o ponto de partida. Depois de montar o modelo, o aluno indica o arquivo `.ron`, clica em "Ler o modelo" e simula. A correção:
 
-1. confere se o modelo carrega e é válido;
-2. confere a estrutura pedida (um combinador na montagem, quebras, um caminho de volta para o retrabalho, uma estação com capacidade em paralelo, operadores);
+1. confere se o modelo carrega e é válido.
+2. confere a estrutura pedida (um combinador na montagem, quebras, um caminho de volta para o retrabalho, uma estação com capacidade em paralelo, operadores).
 3. roda o modelo do aluno e o modelo de referência e compara as medidas pedidas: cada uma passa quando o intervalo de 95 % do aluno encontra a faixa de tolerância em volta do valor de referência.
 
 O enunciado diz os nomes de objeto que a correção procura (por exemplo `expedicao` para as peças aprovadas). Quando um nome falta, o critério diz qual. A lista de critérios mostra "OK" ou "Falta" e o que foi encontrado. O modelo vai dentro da tentativa assinada, e o professor corrige de novo na correção em lote. O modelo de referência da missão 7.1 é o gabarito do estudo de caso 1 do manual.
