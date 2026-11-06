@@ -48,3 +48,15 @@ Na aba Simular do cliente 3D, o painel da esquerda tem as chaves **Segurança** 
 - **Calor.** A chave **Calor** põe no piso uma textura com a presença das pessoas e as células de quase-conflito, do transparente ao vermelho.
 
 Limites desta primeira versão: a posição da pessoa para a conta das zonas segue o trajeto da exposição (velocidade constante em cada viagem), e o item é marcado como defeituoso por inteiro, desde que aparece, pelo rótulo que tem no fim da replicação.
+
+## Desenhar e editar zonas no editor 3D
+
+No Editar, a ferramenta **Zona** (botão na barra, tecla `Z`) desenha e muda as zonas de risco sem escrever o `.ron`:
+
+1. Clique no chão para pôr os cantos da zona; os pontos encaixam na grade (`G` liga e desliga o encaixe).
+2. Feche a zona clicando de novo no primeiro ponto, com `Enter` ou com um duplo clique. São pelo menos 3 cantos; `Backspace` volta o último ponto e `Esc` cancela.
+3. A zona nova se chama `zona_1`, `zona_2`... e começa como tráfego de veículos, nível 3, sem EPI. No painel da direita mude o **nome**, o **tipo** (tráfego de veículos, alcance de máquina, carga suspensa, ruído, calor ou outro), o **nível de risco** (1 a 5, que dá a cor) e marque o **EPI exigido para entrar**.
+4. Clique numa zona para editá-la: arraste o meio para mover a zona inteira e arraste um canto para mudar a forma. `Del` exclui a zona selecionada.
+
+Cada mudança é um passo de desfazer (`Ctrl+Z`, `Ctrl+Y`) e vai para a lista `zones` do modelo ao salvar. No Editar as zonas aparecem no piso com uma cor translúcida pelo nível (verde no 1, amarelo, laranja, vermelho no 5; cinza sem nível), a borda e o nome.
+

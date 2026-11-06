@@ -7,7 +7,7 @@
 use godot::prelude::*;
 
 use crate::editor3d::{
-    Block, Camera, Conn, Editor3d, Effect, Mark, PreviewKind, Side, TeamLine, V2, V3,
+    Block, Camera, Conn, Editor3d, Effect, Mark, PreviewKind, Side, TeamLine, V2, V3, ZoneView,
 };
 
 fn v2(p: Vector2) -> V2 {
@@ -48,6 +48,10 @@ fn team_dict(t: &TeamLine) -> VarDictionary {
 }
 fn names(v: &[String]) -> PackedStringArray {
     v.iter().map(|n| GString::from(n.as_str())).collect()
+}
+
+fn pts(v: &[V3]) -> PackedVector3Array {
+    v.iter().map(|p| g3(*p)).collect()
 }
 
 fn effects(list: Vec<Effect>) -> VarArray {
@@ -97,6 +101,19 @@ fn effects(list: Vec<Effect>) -> VarArray {
             Effect::Remove(n) => {
                 d.set("op", &GString::from("remover"));
                 d.set("names", &names(&n));
+            }
+            Effect::ZoneAdd(points) => {
+                d.set("op", &GString::from("zona_nova"));
+                d.set("points", &pts(&points));
+            }
+            Effect::ZoneSet { name, points } => {
+                d.set("op", &GString::from("zona_forma"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("points", &pts(&points));
+            }
+            Effect::ZoneRemove(name) => {
+                d.set("op", &GString::from("zona_excluir"));
+                d.set("name", &GString::from(name.as_str()));
             }
         }
         out.push(&d.to_variant());
@@ -207,6 +224,79 @@ impl UtsimEditor {
             .collect();
         self.ed.hidden = hidden.as_slice().iter().map(|g| g.to_string()).collect();
         self.ed.set_scene(blocks, conns, teams);
+    }
+
+    /// The risk zones: {name, points (floor, Godot), level (0 = none)}.
+    #[func]
+    fn set_zones(&mut self, zones: VarArray) {
+        let list = zones
+            .iter_shared()
+            .filter_map(|v| v.try_to::<VarDictionary>().ok())
+            .map(|d| ZoneView {
+                name: s(&d, "name"),
+                points: d
+                    .get("points")
+                    .and_then(|v| v.try_to::<PackedVector3Array>().ok())
+                    .map(|a| a.as_slice().iter().map(|p| v3(*p)).collect())
+                    .unwrap_or_default(),
+                level: d
+                    .get("level")
+                    .and_then(|v| v.try_to::<i64>().ok())
+                    .filter(|l| *l > 0)
+                    .map(|l| l as u8),
+            })
+            .collect();
+        self.ed.set_zones(list);
+    }
+
+    /// The grid step new points snap to (0: none).
+    #[func]
+    fn set_snap(&mut self, step: f64) {
+        self.ed.snap = step;
+    }
+
+    /// The next press is a double click.
+    #[func]
+    fn set_double(&mut self, on: bool) {
+        self.ed.double = on;
+    }
+
+    #[func]
+    fn zone_finish(&mut self) -> VarArray {
+        effects(self.ed.zone_finish())
+    }
+
+    #[func]
+    fn zone_back(&mut self) {
+        self.ed.zone_back();
+    }
+
+    #[func]
+    fn selected_zone(&self) -> GString {
+        self.ed.selected_zone.as_str().into()
+    }
+
+    #[func]
+    fn select_zone(&mut self, name: GString) {
+        self.ed.selected_zone = name.to_string();
+    }
+
+    #[func]
+    fn zone_drawing_count(&self) -> i64 {
+        self.ed.zone_points.len() as i64
+    }
+
+    #[func]
+    fn zone_vertex_screen(&self, name: GString, k: i64) -> Variant {
+        opt2(
+            self.ed
+                .zone_vertex_screen(&name.to_string(), k.max(0) as usize),
+        )
+    }
+
+    #[func]
+    fn zone_screen(&self, name: GString) -> Variant {
+        opt2(self.ed.zone_screen(&name.to_string()))
     }
 
     /// Where block `name` is drawn now (during a move).
@@ -473,6 +563,17 @@ impl UtsimEditor {
             preview.push(&GString::from(k).to_variant());
         }
         d.set("preview", &preview);
+        let mut zones = VarArray::new();
+        for (z, sel) in &o.zones {
+            let mut a = VarDictionary::new();
+            a.set("name", &GString::from(z.name.as_str()));
+            a.set("points", &pts(&z.points));
+            a.set("level", z.level.map_or(0, i64::from));
+            a.set("selected", *sel);
+            zones.push(&a.to_variant());
+        }
+        d.set("zones", &zones);
+        d.set("zone_drawing", &pts(&o.zone_drawing));
         d.set(
             "box",
             &o.boxing.map_or(Variant::nil(), |(a, b)| {

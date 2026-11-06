@@ -530,6 +530,26 @@ Como ficou (primeira versão, 2026-11-07):
 - Fica para depois: Rede, Corredor, Colocar e a ferramenta Equipe em Rust; a conferência com
   janela (a tela estava ocupada).
 
+### Zonas de risco no editor 3D (2026-11-07)
+
+Pedido da frente de Segurança (os arquivos do editor são desta frente), combinado com a sessão
+de Qualidade e Segurança: editar `Model.zones` no 3D.
+
+- `utsim-edit`: `Command::SetZone { name, zone }` (troca a zona inteira, inclusive o nome) e
+  `Command::RemoveZone`, ao lado do `AddZone` da outra sessão; um passo de desfazer cada.
+- `zone_edit.rs` (puro, testes): nome livre `zona_N`, polígono, tipo, nível e EPI (alterna
+  o item), cores por nível, ponto dentro do polígono, lista de EPI (os conhecidos e os já
+  usados no modelo).
+- `editor3d.rs`: a ferramenta `zona` (desenhar com encaixe, fechar pelo primeiro ponto, Enter
+  ou duplo clique, Backspace, Esc; selecionar, mover a zona inteira ou um vértice, Del) com
+  efeitos `ZoneAdd`, `ZoneSet`, `ZoneRemove` e a descrição do desenho; teste do gesto inteiro.
+- Ponte: `UtsimDocument.zones/add_zone/set_zone_points/set_zone_field/remove_zone`,
+  `UtsimEditor.set_zones/zone_finish/zone_back/...`; `editor.gd` desenha as zonas (enchimento
+  translúcido triangulado pelo `Geometry2D`, borda, nome, cantos da selecionada) e
+  `principal.gd` tem o painel (nome, tipo, nível, EPI) e a tecla `Z`. A barra ganhou o botão
+  Zona; para caber a 1600 px os botões da barra perderam 1 px de margem de cada lado.
+- Roteiro `godot/roteiros/g4_zonas.json`; manual em `zonas-e-exposicao.md`.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do

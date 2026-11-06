@@ -438,6 +438,33 @@ pub enum Effect {
     MoveEnd,
     /// Remove the selected objects.
     Remove(Vec<String>),
+    /// A new risk zone along these floor points (the Zona tool).
+    ZoneAdd(Vec<V3>),
+    /// Zone `name` with a new polygon.
+    ZoneSet {
+        name: String,
+        points: Vec<V3>,
+    },
+    ZoneRemove(String),
+}
+
+/// A risk zone as the editor sees it: its floor polygon and its level (the colour).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ZoneView {
+    pub name: String,
+    pub points: Vec<V3>,
+    pub level: Option<u8>,
+}
+
+/// A zone being reshaped: a vertex, or the whole polygon (`vertex` `None`).
+#[derive(Clone, Debug, PartialEq)]
+struct ZoneDrag {
+    name: String,
+    vertex: Option<usize>,
+    start: V3,
+    original: Vec<V3>,
+    moved: bool,
+    press: V2,
 }
 
 /// What a press began.
@@ -493,6 +520,14 @@ pub struct Editor3d {
     last_click: V2,
     last_hits: Vec<String>,
     last_index: usize,
+    /// The risk zones (`Model.zones`), the one selected and the one being drawn.
+    pub zones: Vec<ZoneView>,
+    pub selected_zone: String,
+    pub zone_points: Vec<V3>,
+    zone_drag: Option<ZoneDrag>,
+    /// The grid step points snap to (0: none) and whether the press is a double click.
+    pub snap: f64,
+    pub double: bool,
 }
 
 impl Editor3d {
@@ -856,6 +891,17 @@ impl Editor3d {
     /// Del: the selected connection or line, else the selected objects.
     pub fn delete(&mut self) -> Vec<Effect> {
         let mut out = Vec::new();
+        if self.tool == "zona" {
+            if self.selected_zone.is_empty() {
+                out.push(Effect::Status(
+                    "Nenhuma zona selecionada para excluir.".into(),
+                ));
+            } else {
+                out.push(Effect::ZoneRemove(std::mem::take(&mut self.selected_zone)));
+                out.push(Effect::Selection);
+            }
+            return out;
+        }
         if self.selected_link.is_some() || self.selected_team.is_some() {
             self.remove_selected(&mut out);
         } else if self.selected.is_empty() {
@@ -870,6 +916,19 @@ impl Editor3d {
     /// selection.
     pub fn cancel(&mut self) -> (bool, Vec<Effect>) {
         let mut out = Vec::new();
+        if self.tool == "zona" {
+            if !self.zone_points.is_empty() {
+                self.zone_points.clear();
+                out.push(Effect::Status("Zona cancelada.".into()));
+                return (false, out);
+            }
+            if !self.selected_zone.is_empty() {
+                self.selected_zone.clear();
+                out.push(Effect::Selection);
+                return (false, out);
+            }
+            return (true, out);
+        }
         if !self.connect_from.is_empty()
             || !self.connect_to.is_empty()
             || !self.serve_from.is_empty()
@@ -891,6 +950,8 @@ impl Editor3d {
 
     pub fn set_tool(&mut self, tool: &str) {
         self.tool = tool.to_owned();
+        self.zone_points.clear();
+        self.zone_drag = None;
         self.connect_from.clear();
         self.connect_to.clear();
         self.serve_from.clear();
@@ -914,6 +975,9 @@ impl Editor3d {
     }
 
     pub fn press(&mut self, p: V2, shift: bool) -> Vec<Effect> {
+        if self.tool == "zona" {
+            return self.zone_press(p);
+        }
         let mut out = Vec::new();
         self.mouse = p;
         let hits = self.hits_at(p);
@@ -1029,6 +1093,10 @@ impl Editor3d {
     }
 
     pub fn drag(&mut self, p: V2) -> Vec<Effect> {
+        if self.tool == "zona" {
+            self.zone_drag_to(p);
+            return Vec::new();
+        }
         let mut out = Vec::new();
         self.mouse = p;
         let Some(press) = self.press.as_mut() else {
@@ -1072,6 +1140,9 @@ impl Editor3d {
     }
 
     pub fn release(&mut self, p: V2) -> Vec<Effect> {
+        if self.tool == "zona" {
+            return self.zone_release();
+        }
         let mut out = Vec::new();
         self.mouse = p;
         let Some(press) = self.press.take() else {
@@ -1305,7 +1376,217 @@ impl Editor3d {
             }
         }
         o.boxing = self.boxing;
+        o.zones = self
+            .zones
+            .iter()
+            .map(|z| (z.clone(), z.name == self.selected_zone))
+            .collect();
+        if !self.zone_points.is_empty() {
+            let mut pts = self.zone_points.clone();
+            if let Some(f) = self.camera.floor_at(self.mouse) {
+                pts.push(self.snapped(f));
+            }
+            o.zone_drawing = pts;
+        }
         o
+    }
+
+    // ----- risk zones (the Zona tool) ---------------------------------------------------
+
+    /// The zones of the model (floor polygons). The one selected stays if it still exists.
+    pub fn set_zones(&mut self, zones: Vec<ZoneView>) {
+        if !zones.iter().any(|z| z.name == self.selected_zone) {
+            self.selected_zone.clear();
+        }
+        if self.zone_drag.is_none() {
+            self.zones = zones;
+        }
+    }
+
+    fn snapped(&self, f: V3) -> V3 {
+        if self.snap <= 0.0 {
+            return [f[0], 0.0, f[2]];
+        }
+        let s = self.snap;
+        [(f[0] / s).round() * s, 0.0, (f[2] / s).round() * s]
+    }
+
+    /// The zone under the floor point of `p` (the last drawn wins).
+    pub fn zone_at(&self, p: V2) -> Option<String> {
+        let f = self.camera.floor_at(p)?;
+        self.zones
+            .iter()
+            .rev()
+            .find(|z| {
+                let poly: Vec<[f64; 2]> = z.points.iter().map(|v| [v[0], v[2]]).collect();
+                crate::zone_edit::contains(&poly, [f[0], f[2]])
+            })
+            .map(|z| z.name.clone())
+    }
+
+    /// The vertex of the selected zone near `p`.
+    fn zone_vertex_at(&self, p: V2) -> Option<usize> {
+        let z = self.zones.iter().find(|z| z.name == self.selected_zone)?;
+        z.points
+            .iter()
+            .position(|v| self.camera.near(*v, p, PORT_PIXELS))
+    }
+
+    /// Screen point of vertex `k` of zone `name` (the roteiros' target).
+    pub fn zone_vertex_screen(&self, name: &str, k: usize) -> Option<V2> {
+        let z = self.zones.iter().find(|z| z.name == name)?;
+        self.camera.project(*z.points.get(k)?)
+    }
+
+    /// Screen point of the middle of zone `name`.
+    pub fn zone_screen(&self, name: &str) -> Option<V2> {
+        let z = self.zones.iter().find(|z| z.name == name)?;
+        let n = z.points.len().max(1) as f64;
+        let c = z.points.iter().fold([0.0; 3], |a, v| add(a, *v));
+        self.camera.project(scale(c, 1.0 / n))
+    }
+
+    fn zone_press(&mut self, p: V2) -> Vec<Effect> {
+        let mut out = Vec::new();
+        self.mouse = p;
+        let double = std::mem::take(&mut self.double);
+        let floor = self.camera.floor_at(p).map(|f| self.snapped(f));
+        if !self.zone_points.is_empty() {
+            let closes = self.zone_points.len() >= 3
+                && (double || self.camera.near(self.zone_points[0], p, PORT_PIXELS));
+            if closes {
+                return self.zone_finish();
+            }
+            if let Some(f) = floor
+                && self.zone_points.last() != Some(&f)
+            {
+                self.zone_points.push(f);
+            }
+            out.push(Effect::Status(format!(
+                "Zona: {} ponto(s). Clique no primeiro ponto, Enter ou duplo clique fecha; Backspace volta; Esc cancela.",
+                self.zone_points.len()
+            )));
+            return out;
+        }
+        if let Some(k) = self.zone_vertex_at(p) {
+            self.begin_zone_drag(Some(k), p, floor);
+            return out;
+        }
+        if let Some(name) = self.zone_at(p) {
+            if name != self.selected_zone {
+                self.selected_zone = name.clone();
+                out.push(Effect::Selection);
+                out.push(Effect::Status(format!(
+                    "Zona {name}: arraste para mover, arraste um vértice para mudar a forma; Del exclui."
+                )));
+            }
+            self.begin_zone_drag(None, p, floor);
+            return out;
+        }
+        if !self.selected_zone.is_empty() {
+            self.selected_zone.clear();
+            out.push(Effect::Selection);
+        }
+        if let Some(f) = floor {
+            self.zone_points.push(f);
+            out.push(Effect::Status(
+                "Zona: clique para pôr os outros pontos; Enter, duplo clique ou o primeiro ponto fecha.".into(),
+            ));
+        }
+        out
+    }
+
+    fn begin_zone_drag(&mut self, vertex: Option<usize>, p: V2, floor: Option<V3>) {
+        let Some(z) = self.zones.iter().find(|z| z.name == self.selected_zone) else {
+            return;
+        };
+        let start = self.camera.floor_at(p).or(floor).unwrap_or([0.0; 3]);
+        self.zone_drag = Some(ZoneDrag {
+            name: z.name.clone(),
+            vertex,
+            start,
+            original: z.points.clone(),
+            moved: false,
+            press: p,
+        });
+    }
+
+    fn zone_drag_to(&mut self, p: V2) {
+        self.mouse = p;
+        let Some(f) = self.camera.floor_at(p) else {
+            return;
+        };
+        let snapped = self.snapped(f);
+        let step = self.snap;
+        let Some(d) = self.zone_drag.as_mut() else {
+            return;
+        };
+        if !d.moved && dist2(p, d.press) < DRAG_PIXELS {
+            return;
+        }
+        d.moved = true;
+        let pts = match d.vertex {
+            Some(k) => {
+                let mut v = d.original.clone();
+                if let Some(x) = v.get_mut(k) {
+                    *x = snapped;
+                }
+                v
+            }
+            None => {
+                let mut delta = sub(f, d.start);
+                if step > 0.0 {
+                    delta = [
+                        (delta[0] / step).round() * step,
+                        0.0,
+                        (delta[2] / step).round() * step,
+                    ];
+                }
+                delta[1] = 0.0;
+                d.original.iter().map(|v| add(*v, delta)).collect()
+            }
+        };
+        let name = d.name.clone();
+        if let Some(z) = self.zones.iter_mut().find(|z| z.name == name) {
+            z.points = pts;
+        }
+    }
+
+    fn zone_release(&mut self) -> Vec<Effect> {
+        let Some(d) = self.zone_drag.take() else {
+            return Vec::new();
+        };
+        if !d.moved {
+            return Vec::new();
+        }
+        let points = self
+            .zones
+            .iter()
+            .find(|z| z.name == d.name)
+            .map(|z| z.points.clone())
+            .unwrap_or_default();
+        vec![
+            Effect::ZoneSet {
+                name: d.name,
+                points,
+            },
+            Effect::Status("Zona alterada (Ctrl+Z desfaz).".into()),
+        ]
+    }
+
+    /// Enter or a double click: closes the zone being drawn.
+    pub fn zone_finish(&mut self) -> Vec<Effect> {
+        if self.zone_points.len() < 3 {
+            return vec![Effect::Status(
+                "Uma zona precisa de pelo menos 3 pontos.".into(),
+            )];
+        }
+        vec![Effect::ZoneAdd(std::mem::take(&mut self.zone_points))]
+    }
+
+    /// Backspace: takes the last point back.
+    pub fn zone_back(&mut self) {
+        self.zone_points.pop();
     }
 }
 
@@ -1339,6 +1620,10 @@ pub struct Overlay {
     pub remove: Option<V3>,
     pub preview: Option<(V3, V3, PreviewKind)>,
     pub boxing: Option<(V2, V2)>,
+    /// The risk zones (and whether each is selected), and the one being drawn (with the
+    /// point under the mouse last).
+    pub zones: Vec<(ZoneView, bool)>,
+    pub zone_drawing: Vec<V3>,
 }
 
 #[cfg(test)]
@@ -1601,6 +1886,91 @@ mod tests {
                 ..
             }]
         ));
+    }
+
+    #[test]
+    fn the_zone_tool_draws_selects_reshapes_moves_and_deletes_a_zone() {
+        let mut e = editor();
+        e.set_tool("zona");
+        e.snap = 1.0;
+        // Four clicks and a click on the first point: one zone, snapped to the grid.
+        let corners = [
+            [1.1, 0.0, 2.0],
+            [3.0, 0.0, 2.2],
+            [3.0, 0.0, 4.0],
+            [1.0, 0.0, 4.0],
+        ];
+        for c in corners {
+            let q = screen(&e, c);
+            e.press(q, false);
+            e.release(q);
+        }
+        assert_eq!(e.zone_points.len(), 4);
+        assert_eq!(e.zone_points[0], [1.0, 0.0, 2.0]);
+        let q = screen(&e, corners[0]);
+        let out = e.press(q, false);
+        let pts = match &out[..] {
+            [Effect::ZoneAdd(p)] => p.clone(),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(pts.len(), 4);
+        assert!(e.zone_points.is_empty());
+        e.set_zones(vec![ZoneView {
+            name: "zona_1".into(),
+            points: pts.clone(),
+            level: Some(3),
+        }]);
+        // A click inside selects it; dragging the middle moves it by whole steps.
+        let inside = screen(&e, [2.0, 0.0, 3.0]);
+        let out = click(&mut e, inside, false);
+        assert_eq!(e.selected_zone, "zona_1");
+        assert!(out.contains(&Effect::Selection));
+        let q = screen(&e, [4.0, 0.0, 3.0]);
+        let out = drag(&mut e, inside, q);
+        let moved = match &out[..] {
+            [Effect::ZoneSet { name, points }, Effect::Status(_)] if name == "zona_1" => {
+                points.clone()
+            }
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(moved[0], [3.0, 0.0, 2.0]);
+        // A vertex is dragged on its own.
+        e.set_zones(vec![ZoneView {
+            name: "zona_1".into(),
+            points: moved.clone(),
+            level: Some(3),
+        }]);
+        let v = screen(&e, moved[2]);
+        let q = screen(&e, [6.0, 0.0, 6.0]);
+        let out = drag(&mut e, v, q);
+        assert!(
+            matches!(&out[..], [Effect::ZoneSet { points, .. }, _] if points[2] == [6.0, 0.0, 6.0] && points[0] == moved[0])
+        );
+        // Fewer than three points do not close; Backspace takes one back; Esc cancels.
+        let a = screen(&e, [10.0, 0.0, -3.0]);
+        e.press(a, false);
+        e.release(a);
+        assert!(
+            e.selected_zone.is_empty(),
+            "a click outside deselects and starts a zone"
+        );
+        assert!(matches!(&e.zone_finish()[..], [Effect::Status(_)]));
+        e.zone_back();
+        assert!(e.zone_points.is_empty());
+        // Del removes the selected zone; Esc deselects, then leaves the tool.
+        let q = inside_of(&e, &moved);
+        click(&mut e, q, false);
+        assert_eq!(
+            e.delete(),
+            vec![Effect::ZoneRemove("zona_1".into()), Effect::Selection]
+        );
+        assert!(e.cancel().0);
+    }
+
+    fn inside_of(e: &Editor3d, pts: &[V3]) -> V2 {
+        let n = pts.len() as f64;
+        let c = pts.iter().fold([0.0; 3], |a, v| add(a, *v));
+        screen(e, scale(c, 1.0 / n))
     }
 
     #[test]
