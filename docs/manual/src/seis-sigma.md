@@ -565,6 +565,9 @@ Escolha o conjunto, a análise e as colunas:
 | Mann-Whitney e Wilcoxon pareado | duas colunas |
 | MSA: Gage R&R (ANOVA ou médias e amplitudes) | peça, operador, medida e a tolerância opcional |
 | MSA: estudo do tipo 1 | coluna, valor de referência e tolerância |
+| MSA: viés | coluna, valor de referência e a tolerância opcional |
+| MSA: linearidade | coluna da referência e coluna da medida, a variação do processo opcional |
+| MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
 
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
@@ -574,12 +577,29 @@ novo sobre o mesmo arquivo e confere se os números são os mesmos.
 O estudo do tipo 1 usa Cg = 0,2·T / (6·s) e Cgk = (0,1·T − |média − referência|) / (3·s),
 com T a tolerância; o instrumento é capaz com Cg e Cgk ≥ 1,33.
 
+O **viés** compara a média de medições repetidas de uma peça de referência com o valor dela
+pelo teste t (viés = 0) e dá o intervalo de 95 % do viés; com a tolerância, mostra o viés em
+porcentagem dela. A **linearidade** usa várias peças de referência espalhadas pela faixa de
+uso, medidas algumas vezes cada: o app faz a reta do viés contra a referência. Inclinação
+significativa quer dizer que o viés muda ao longo da faixa; só o intercepto significativo quer
+dizer um deslocamento constante, que se corrige com um ajuste. A tabela mostra também o viés em
+cada referência.
+
+A **concordância de atributos** é para características julgadas por pessoas (bom ou ruim, tipo
+de defeito). Cada linha do CSV é uma avaliação: o item, quem avaliou e a resposta, e o padrão
+conhecido do item quando existe. Cada avaliador avalia todos os itens o mesmo número de vezes,
+em ordem aleatória e sem saber qual é o item. O app dá a porcentagem de itens em que cada
+avaliador concorda consigo mesmo, com o padrão, entre todos os avaliadores e de todos com o
+padrão, e o kappa de Fleiss de todas as avaliações: 0,75 ou mais é concordância boa, de 0,40 a
+0,75 é razoável e pede critério mais claro, abaixo de 0,40 é fraca.
+
 ### Checklist do Medir
 
 Dois itens do tollgate do Medir passam a ser conferidos pelo app:
 
-- **MSA aprovado**: há um Gage R&R guardado com %VE do GRR total ≤ 30 %, ou um acima disso
-  com a justificativa registrada (botão "Justificar" na lista das análises);
+- **MSA aprovado**: há um Gage R&R guardado com %VE do GRR total ≤ 30 %, ou uma concordância
+  de atributos com kappa ≥ 0,75 (quando o Y é julgado por pessoas), ou um dos dois fora do
+  limite com a justificativa registrada (botão "Justificar" na lista das análises);
 - **Linha de base com dado de origem Real**: há uma capacidade ou uma carta de controle
   guardada sobre um conjunto de origem Real (simulado ou do gêmeo não vale).
 
@@ -639,6 +659,17 @@ com intervalo de 95 %. A decisão é:
 "Guardar o estudo" grava o pacote `estudo.json` em `dados/`, com o nome e o hash do modelo, os
 cenários, a semente, as replicações, a versão do app, os resultados de cada replicação e as
 diferenças: qualquer pessoa reproduz o número. O projeto registra o estudo com a conclusão.
+
+"Lançar ganho estimado", ao lado de um estudo guardado, transforma uma diferença significativa
+em ganho. Informe a descrição, quanto vale uma unidade do indicador (por exemplo o lucro de uma
+peça a mais) e quantas vezes por ano o horizonte simulado acontece (uma semana simulada: 52), e
+diga se o aumento do indicador é melhora (vazão) ou se é a redução (lead time, fila). O modo
+conservador, marcado de início, usa a ponta do intervalo mais próxima de zero em vez da média.
+A conta é melhora × valor por unidade × períodos por ano. O ganho entra em **Ganhos** como
+estimado, origem simulação, ligado ao estudo, com a memória de cálculo completa (estudo, hash do
+arquivo e do modelo, semente, replicações, diferença com o intervalo e a conta). O app relê o
+`estudo.json` e confere o hash antes de lançar: um arquivo mudado depois de guardado é recusado.
+Como todo ganho por simulação, ele só passa a validado com lançamentos reais.
 
 ### Caminho crítico observado
 
