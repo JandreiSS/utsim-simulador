@@ -19,10 +19,12 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 1 | Gargalo e fluxo | 1.1 A furadeira que segura a linha · 1.2 Reforçar o lugar errado · 1.3 Quanto tem no chão (lei de Little) · 1.4 O gargalo que muda |
 | 2 | Filas e atendimento | 2.1 Balcão da ferramentaria · 2.2 Quem desiste vai embora · 2.3 Urgente na frente · 2.4 Mesma média, outra fila · 2.5 A central de atendimento |
 | 3 | Capacidade, turnos e estoque intermediário | 3.1 A demanda dobrou · 3.2 Pulmão certo · 3.3 Corretiva ou preventiva · 3.4 Lote e setup · 3.5 A expansão da linha de eixos |
+| 4 | Balanceamento de linha | 4.1 Montagem do ventilador · 4.2 O balanceamento no papel e no chão · 4.3 A demanda subiu |
+| 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
 
 A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
-Os atos de balanceamento, arranjo físico, tempos e métodos, problemas integrados e o caso final de Lean Seis Sigma vêm nas próximas versões.
+Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. Os atos de tempos e métodos, problemas integrados e o caso final de Lean Seis Sigma vêm nas próximas versões.
 
 ## Uma missão
 
@@ -35,6 +37,22 @@ A tela da missão tem, de cima para baixo:
 5. **Justificativa**, perguntas objetivas sobre o porquê.
 6. **Dicas**, em três níveis: uma pergunta que orienta, a ferramenta a olhar e o caminho da solução. Os níveis 2 e 3 descontam pontos.
 7. **Simular**. O app roda as replicações com os mesmos números aleatórios para o estado inicial, para a tentativa e para a solução de referência, e mostra os resultados.
+
+### Balanceamento (ato 4)
+
+O quadro mostra uma coluna por estação, com a carga em segundos, a barra até o takt e as tarefas da estação. Arraste uma tarefa para outra estação, ou clique na tarefa e depois no título da estação. A tabela "Tarefas e precedências" lista o tempo e as tarefas que precisam vir antes de cada uma.
+
+Uma atribuição que põe uma tarefa numa estação anterior à de uma tarefa que precisa vir primeiro, ou que passa do takt, é recusada com a razão escrita (por exemplo, "precedência: Embalar (estação 1) vem antes de Testar o funcionamento (estação 7), que precisa ser feita primeiro"). A eficiência é a soma dos tempos dividida pelo número de estações usadas vezes o takt. O mínimo teórico de estações é a soma dos tempos dividida pelo takt, arredondada para cima. Nem sempre ele é possível por causa das precedências.
+
+As estações viram processadores do modelo, com o tempo da soma das tarefas. Na missão 4.2 os tempos variam (coeficiente de variação 0,3) e a simulação mostra a vazão real da linha balanceada.
+
+### Arranjo físico (ato 5)
+
+A grade mostra as células do galpão. Arraste cada máquina para uma célula, ou clique na máquina e depois na célula vazia. Soltar sobre outra máquina troca as duas de lugar, e a doca é fixa. O momento de transporte (viagens por dia vezes metros) é recalculado a cada mudança, e a matriz de-para mostra as viagens e a distância de cada par de máquinas.
+
+No modelo, cada família de peças tem a sua cadeia de objetos na posição das máquinas, e as peças andam em linha reta entre elas. Por isso a matriz de-para da rodada (a mesma do fluxograma do UTSim) mostra exatamente as distâncias da grade, o que a verificação confere.
+
+Para abrir uma missão direto, por exemplo numa demonstração em aula, use `utsim-ensino --missao ato4/ventilador`.
 
 ### Resultados
 
@@ -120,6 +138,6 @@ Nome, registro e notas são dados pessoais. A finalidade fica registrada na turm
 
 ## Pacotes de missões
 
-As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas, cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
+As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas (ou um `balanceamento`, com as tarefas, o takt e as estações, ou um `arranjo`, com a grade, as máquinas e os fluxos), cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
 
-A campanha embutida passa por uma conferência automática a cada versão (`cargo test -p utsim-ensino-core --test conteudo`): a busca exaustiva confirma que a referência guardada é a melhor combinação, que ela difere do estado inicial com significância, que alguma combinação bate as metas e que o estado inicial não bate. Os números da referência ficam guardados e um teste acusa qualquer mudança do núcleo que os altere.
+Nas missões de peças, o conferidor compara a referência guardada com o ótimo de uma busca exata (o menor número de estações dentro do takt, e o menor momento de transporte). A campanha embutida passa por uma conferência automática a cada versão (`cargo test -p utsim-ensino-core --test conteudo`): a busca exaustiva confirma que a referência guardada é a melhor combinação, que ela difere do estado inicial com significância, que alguma combinação bate as metas e que o estado inicial não bate. Os números da referência ficam guardados e um teste acusa qualquer mudança do núcleo que os altere.
