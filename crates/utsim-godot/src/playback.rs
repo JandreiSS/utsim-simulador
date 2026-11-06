@@ -236,6 +236,22 @@ pub const FLASH_SECONDS: f64 = 1.0;
 /// Gap between the items a source holds at its output, side by side (a batch waiting).
 const PORT_GAP: f32 = 0.06;
 
+/// Where item `k` of `n` flying together (in the same place: a batch released at once)
+/// goes, as an offset across the floor (x, z): a small square grid centred on the place.
+pub fn flight_slot(k: usize, n: usize) -> [f32; 2] {
+    if n <= 1 {
+        return [0.0, 0.0];
+    }
+    let cols = (n as f32).sqrt().ceil() as usize;
+    let rows = n.div_ceil(cols);
+    let step = ITEM_SIZE + PORT_GAP;
+    let (r, c) = (k / cols, k % cols);
+    [
+        (c as f32 - (cols - 1) as f32 / 2.0) * step,
+        (r as f32 - (rows - 1) as f32 / 2.0) * step,
+    ]
+}
+
 /// Where item `k` of `n` held by a source waits: at the mouth of its output port (the `+x`
 /// side of the footprint), side by side across it, on the floor. `half` is the source's
 /// half size (x, height, z), Godot axes.
@@ -735,8 +751,26 @@ impl Playback {
             }
         }
         let mut at_port: HashMap<usize, usize> = HashMap::new();
+        // Items flying in the same place (a batch that left together): how many there.
+        let place = |c: [f32; 3]| c.map(|v| (v * 1000.0).round() as i64);
+        let mut flying: HashMap<[i64; 3], usize> = HashMap::new();
+        for p in items.iter().filter(|p| p.drawn && p.parent.is_none()) {
+            *flying.entry(place(p.center)).or_default() += 1;
+        }
+        let mut in_flight: HashMap<[i64; 3], usize> = HashMap::new();
         for p in items.into_iter().filter(|p| p.drawn) {
             let mut center = p.center;
+            if p.parent.is_none()
+                && let Some(&n) = flying.get(&place(center))
+                && n > 1
+            {
+                // Side by side instead of one inside the other.
+                let k = in_flight.entry(place(center)).or_default();
+                let o = flight_slot(*k, n);
+                *k += 1;
+                center[0] += o[0];
+                center[2] += o[1];
+            }
             if let Some(EntityId::Block(b)) = p.parent
                 && let Some(i) = self.index_of.get(b as usize).copied().flatten()
                 && let Some(&n) = held.get(&i)
@@ -888,6 +922,45 @@ mod tests {
         let c = port_slot([0.8, 1.0, 0.8], 2, 3);
         assert!(a[0] - ITEM_SIZE / 2.0 > 0.8);
         assert!((a[2] + c[2]).abs() < 1e-6 && c[2] - a[2] >= 2.0 * ITEM_SIZE);
+    }
+
+    #[test]
+    fn a_batch_in_flight_travels_side_by_side() {
+        // The slots: distinct, centred, at least an item apart.
+        for n in 1..10 {
+            let slots: Vec<[f32; 2]> = (0..n).map(|k| flight_slot(k, n)).collect();
+            let mean = slots
+                .iter()
+                .fold([0.0, 0.0], |a, s| [a[0] + s[0], a[1] + s[1]]);
+            assert!(
+                mean[0].abs() / n as f32 <= ITEM_SIZE && mean[1].abs() / n as f32 <= ITEM_SIZE,
+                "{n}: centrado"
+            );
+            for i in 0..n {
+                for j in i + 1..n {
+                    let d = ((slots[i][0] - slots[j][0]).powi(2)
+                        + (slots[i][1] - slots[j][1]).powi(2))
+                    .sqrt();
+                    assert!(d >= ITEM_SIZE, "{n}: {i} e {j}");
+                }
+            }
+        }
+        // In a run with batches, no two items ever share a place in a frame.
+        let pb = playback("chegadas_por_tabela.ron", false);
+        let end = pb.end().min(3000.0);
+        let mut t = 0.0;
+        while t <= end {
+            let f = pb.frame(t);
+            let mut seen = std::collections::HashSet::new();
+            for (k, at) in f.item_position.iter().enumerate() {
+                if f.item_carrier[k] >= 0 {
+                    continue;
+                }
+                let key = at.map(|v| (v * 1000.0).round() as i64);
+                assert!(seen.insert(key), "t = {t}: dois itens em {at:?}");
+            }
+            t += 7.0;
+        }
     }
 
     #[test]
