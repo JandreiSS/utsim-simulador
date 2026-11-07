@@ -527,7 +527,55 @@ Como ficou (primeira versão, 2026-11-07):
   e o gesto (as variáveis que os painéis e os roteiros leem continuam as mesmas), e o desenho
   sai de `overlay()`. A seleção é do script (ele a filtra pelos objetos do documento): o Rust
   não a apaga ao receber uma cena antiga, de antes de a vista 3D ser refeita.
-- Fica para depois: Corredor, Colocar e a ferramenta Equipe em Rust.
+- Corredor, Colocar e Equipe (2026-11-07): também no `editor3d.rs`, com testes. Colocar
+  devolve `Place` (o ponto no chão); Equipe faz o arrasto e os dois cliques (e o Alt com
+  Ligar) e devolve o `team_link`; Corredor escolhe vértice e linha, desenha, fecha, arrasta
+  vértice, acrescenta dobra (Shift), Esc e Del, com efeitos `AisleAdd`, `AisleMoveVertex`,
+  `AisleInsert`, `AisleRemove`. O encaixe dos pontos nos outros corredores continua no
+  `UtsimDocument.aisle_snap` (Rust, sobre o modelo): o `corredores.gd` manda o ponto já
+  encaixado. Os pontos de acesso (arrastados com Selecionar e os obstáculos à mostra)
+  ficaram no `corredores.gd`.
+- Com isso, toda a decisão de clique e arrasto do Editar está em Rust; o GDScript do editor
+  (`editor.gd`, `rede.gd`, `corredores.gd`) passa os eventos, aplica os efeitos no documento
+  e desenha.
+
+### O que resta em GDScript e o passo 7 (2026-11-07)
+
+| Arquivo | Linhas | O que faz |
+|---|---|---|
+| `principal.gd` | 1965 | orquestra: documento, modos, trabalhos, reprodução, câmeras do Simular, painéis das ferramentas montados em JSON (Rede, Corredor, Zona, ligação), diálogos de arquivo, atalhos |
+| `roteiro.gd` | 1168 | os roteiros de teste (fica em GDScript: dirige a interface por eventos) |
+| `editor.gd` | 1161 | eventos do Editar, aplicar os efeitos, desenho da sobreposição (nós, cantos, ligações, zonas, equipe), fantasma da Biblioteca |
+| `cena.gd` | 1083 | a cena 3D: modelos, itens, animação por quadro, rótulos, piso |
+| `corredores.gd` | 599 | painel e desenho dos corredores, obstáculos, pontos de acesso |
+| `camada_seguranca.gd` | 494 | camada de segurança do Simular (da sessão de Qualidade e Segurança) |
+| `rede.gd` | 328 | painel e desenho da rede |
+| `pessoa.gd` | 284 | animação das pessoas |
+| `camera_orbita.gd` | 138 | câmera em órbita |
+
+Recomendação para o passo 7, nesta ordem:
+
+1. Os painéis das ferramentas (Rede, Corredor, Zona, ligação e os novos objetos) em egui no
+   Rust, como o painel de propriedades, lendo o documento direto em vez do JSON que o
+   `principal.gd` monta: tira umas 300 linhas do `principal.gd` e dá testes de desenho aos
+   painéis.
+2. A sobreposição do Editar descrita como malha pelo Rust (triângulos com cor: nós, cantos,
+   setas, zonas, corredores, rede), com o GDScript só copiando para a `ImmediateMesh`: o
+   desenho ganha testes e os três scripts do editor encolhem para eventos e rótulos.
+3. Depois, a orquestração do `principal.gd` (modos, trabalhos, reprodução) num nó em Rust.
+
+`cena.gd`, `pessoa.gd`, `camera_orbita.gd` e `roteiro.gd` são próprios do Godot (cena,
+animação, câmera, testes por eventos) e podem ficar em GDScript.
+
+### Passo 7, parte 1: os painéis das ferramentas em Rust (2026-11-07)
+
+- `tool_panels.rs` (testes): os painéis de Rede, Corredor, Zona e da ligação selecionada
+  montados a partir do modelo (com os problemas e os avisos que falam deles), nas linhas do
+  `ui_form` que o egui já desenhava. `UtsimDocument.tool_panel(ferramenta, estado)` devolve
+  as linhas; o `principal.gd` só passa o estado da ferramenta (`_tool_panel`), e as ações
+  continuam voltando como `form:<ação>:<valor>`.
+- `principal.gd`: de 1965 para 1871 linhas (saíram `_show_aisles`, `_show_network`,
+  `_show_zones`, `_show_link` e `_issue_rows` como montadores).
 - Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
   encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto

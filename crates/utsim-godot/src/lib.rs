@@ -50,6 +50,7 @@ pub mod results;
 pub mod schema;
 pub mod seguranca;
 mod seguranca_class;
+pub mod tool_panels;
 pub mod ui_arrivals;
 pub mod ui_bar;
 pub mod ui_bottom;

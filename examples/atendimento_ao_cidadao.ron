@@ -1,0 +1,100 @@
+// Atendimento ao cidadão (linha Serviços e atendimento): modelo pronto da linha, montado só
+// com as predefinições de linhas/servicos/biblioteca.ron.
+//
+// O posto recebe das 8h às 17h, de segunda a sexta, e a equipe fica até as 17h30. O cidadão tira senha normal (70 %),
+// preferencial (15 %) ou agendada (15 %); as filas chamam primeiro a agendada, depois a
+// preferencial. A recepção faz a triagem e encaminha pelo serviço: documentos (60 %) ou
+// benefícios (40 %), cada um com a sua fila e a sua equipe. Quem espera demais (cerca de 45
+// minutos, em média) desiste. A meta de espera do posto é de 30 minutos: rode o relatório
+// com --meta 30.
+//
+// Tempo em minutos; a semana começa na segunda às 0h. Rode com:
+//   utsim linha servicos relatorio examples/atendimento_ao_cidadao.ron --meta 30 --html relatorio.html
+//
+//   cidadaos -> fila_triagem -> triagem -> encaminhamento -+-> fila_documentos -> documentos -> saida
+//                                                          +-> fila_beneficios -> beneficios -> saida
+Model(
+    name: "Atendimento ao cidadão",
+    description: "Serviços e atendimento: triagem, serviços por tipo de senha, agendados com prioridade e meta de espera",
+    line: "servicos",
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 71, replications: 5),
+    calendars: {
+        "posto": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1020.0, duration: 900.0),
+            (start: 2460.0, duration: 900.0),
+            (start: 3900.0, duration: 900.0),
+            (start: 5340.0, duration: 900.0),
+            (start: 6780.0, duration: 3300.0),
+        ]),
+        "equipe": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1050.0, duration: 870.0),
+            (start: 2490.0, duration: 870.0),
+            (start: 3930.0, duration: 870.0),
+            (start: 5370.0, duration: 870.0),
+            (start: 6810.0, duration: 3270.0),
+        ]),
+    },
+    objects: [
+        (name: "cidadaos", kind: Source(interarrival: Exp(mean: 3.0),
+            labels: {"tipo": Discrete([(1.0, 0.7), (2.0, 0.15), (3.0, 0.15)]),
+                      "servico": Discrete([(1.0, 0.6), (2.0, 0.4)])}),
+            shifts: Calendar("posto"), position: (0.0, 0.0, 0.0),
+            preset: "servicos/chegada", department: "Recepção", symbol: "inicio"),
+        (name: "fila_triagem", kind: Queue(order: Some(Desc("tipo")), patience: Some(Exp(mean: 45.0))), position: (1.5, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/fila", department: "Recepção", symbol: "espera"),
+        (name: "triagem", kind: Processor(process: Triangular(min: 0.5, mode: 1.0, max: 3.0),
+            operators: Some(OperatorUse(team: "recepcao"))), position: (2.5, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/guiche", department: "Recepção", symbol: "operacao"),
+        (name: "encaminhamento", kind: Queue(), position: (3.5, 0.0, 0.0), output: ByLabel("servico"),
+            preset: "servicos/fila", department: "Recepção", symbol: "espera"),
+        (name: "fila_documentos", kind: Queue(order: Some(Desc("tipo")), patience: Some(Exp(mean: 45.0))), position: (4.5, 1.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/fila", department: "Documentos", symbol: "espera"),
+        (name: "documentos", kind: Processor(capacity: 3, process: Exp(mean: 7.0),
+            operators: Some(OperatorUse(team: "equipe_documentos"))), position: (6.0, 1.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/guiche", department: "Documentos", symbol: "operacao"),
+        (name: "fila_beneficios", kind: Queue(order: Some(Desc("tipo")), patience: Some(Exp(mean: 45.0))), position: (4.5, -1.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/fila", department: "Benefícios", symbol: "espera"),
+        (name: "beneficios", kind: Processor(capacity: 2, process: Exp(mean: 9.0),
+            operators: Some(OperatorUse(team: "equipe_beneficios"))), position: (6.0, -1.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/guiche", department: "Benefícios", symbol: "operacao"),
+        (name: "saida", kind: Sink, position: (7.5, 0.0, 0.0),
+            preset: "servicos/saida", department: "Recepção", symbol: "fim"),
+        (name: "recepcao", kind: Dispatcher(team: ["recepcionista"]), position: (2.0, 1.5, 0.0),
+            preset: "servicos/equipe", department: "Recepção"),
+        (name: "equipe_documentos", kind: Dispatcher(team: ["documentos_1", "documentos_2", "documentos_3"]), position: (6.5, 2.5, 0.0),
+            preset: "servicos/equipe", department: "Documentos"),
+        (name: "equipe_beneficios", kind: Dispatcher(team: ["beneficios_1", "beneficios_2"]), position: (6.5, -3.5, 0.0),
+            preset: "servicos/equipe", department: "Benefícios"),
+        (name: "recepcionista", kind: Transporter(speed: 72.0), position: (1.5, 1.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Recepção"),
+        (name: "documentos_1", kind: Transporter(speed: 72.0), position: (5.0, 1.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Documentos"),
+        (name: "documentos_2", kind: Transporter(speed: 72.0), position: (5.6, 1.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Documentos"),
+        (name: "documentos_3", kind: Transporter(speed: 72.0), position: (6.2, 1.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Documentos"),
+        (name: "beneficios_1", kind: Transporter(speed: 72.0), position: (5.0, -2.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Benefícios"),
+        (name: "beneficios_2", kind: Transporter(speed: 72.0), position: (5.6, -2.5, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Benefícios"),
+    ],
+    connections: [
+        ("cidadaos", "fila_triagem"),
+        ("fila_triagem", "triagem"),
+        ("triagem", "encaminhamento"),
+        ("encaminhamento", "fila_documentos"),   // porta 1: documentos
+        ("encaminhamento", "fila_beneficios"),   // porta 2: benefícios
+        ("fila_documentos", "documentos"),
+        ("documentos", "saida"),
+        ("fila_beneficios", "beneficios"),
+        ("beneficios", "saida"),
+    ],
+)

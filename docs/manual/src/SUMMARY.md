@@ -52,6 +52,7 @@
   - [Modelos prontos](linhas/lean-office/modelos-prontos.md)
   - [Tutorial: do mapa ao modelo](linhas/lean-office/tutorial.md)
   - [Pacote da linha](linhas/lean-office/pacote.md)
+- [Serviços e atendimento](linhas/servicos/index.md)
 - [Pacotes transversais](linhas/pacotes-transversais.md)
 
 # Recursos avançados
