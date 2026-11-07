@@ -141,6 +141,9 @@ var _links_of: Object
 var _alt := false
 ## The editor in Rust (`UtsimEditor`) and what it was last fed.
 var ed: Object
+var _zone_mesh: ImmediateMesh
+var _zone_fill: MeshInstance3D
+var _zone_labels: Array[Label3D] = []
 var _scene_dirty := true
 var _fed_playback: Object
 var _fed_hidden: Array = []
@@ -169,6 +172,21 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	_team_lines.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_team_lines.material_override = mat
 	add_child(_team_lines)
+	# Risk zones: a translucent fill on the floor (hidden by what stands on it).
+	_zone_mesh = ImmediateMesh.new()
+	var zones := MeshInstance3D.new()
+	zones.name = "ZonasRisco"
+	zones.mesh = _zone_mesh
+	zones.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var zm := StandardMaterial3D.new()
+	zm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	zm.vertex_color_use_as_albedo = true
+	zm.vertex_color_is_srgb = true
+	zm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	zm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	zones.material_override = zm
+	add_child(zones)
+	_zone_fill = zones
 	_box_rect = ColorRect.new()
 	_box_rect.name = "CaixaSelecao"
 	_box_rect.color = Color(0.35, 0.65, 1.0, 0.18)
@@ -221,7 +239,7 @@ func set_tool(name: String, id := "") -> void:
 	tool = name
 	place_id = id if name == "colocar" else ""
 	team_from = ""
-	ed.set_tool(name if name in ["selecionar", "ligar"] else "selecionar")
+	ed.set_tool(name if name in ["selecionar", "ligar", "zona"] else "selecionar")
 	_pull()
 	_show_ghost(place_id)
 	main.on_tool_changed()
@@ -234,6 +252,8 @@ func set_tool(name: String, id := "") -> void:
 			main.set_status("Clique no chão para colocar (Shift mantém a ferramenta, Esc cancela).")
 		"corredor":
 			main.set_status("Corredor: clique no chão para pôr os pontos do eixo (Enter ou duplo clique termina), clique num corredor para editá-lo, arraste um vértice para movê-lo; Esc cancela.")
+		"zona":
+			main.set_status("Zona: clique no chão para pôr os cantos da zona de risco; o primeiro ponto, Enter ou duplo clique fecha; clique numa zona para editá-la. Esc cancela.")
 		"rede":
 			main.set_status("Rede: clique no chão para pôr nós (cada clique continua o caminho), clique num trecho para editá-lo, arraste um nó para movê-lo; Esc encerra o caminho.")
 		_:
@@ -403,10 +423,40 @@ func _feed() -> void:
 			"pos": (c.rigs[i]["root"] as Node3D).global_position, "size": b["size"],
 			"skeletal": bool(b.get("skeletal", false)), "problems": problems.has(b["name"])})
 	ed.set_scene(blocks, _connections, team_lines(), PackedStringArray(hidden))
+	_feed_zones()
 	_scene_dirty = false
 	_fed_playback = c.playback
 	_fed_hidden = hidden.duplicate()
 	_pull()
+
+
+## The risk zones of the document for the Zona tool, and the grid step.
+func _feed_zones() -> void:
+	ed.set_snap(main.snap_step())
+	ed.set_zones(doc().zones())
+
+
+## The zone selected with the Zona tool, or "".
+func selected_zone() -> String:
+	return String(ed.selected_zone())
+
+
+## Enter with the Zona tool: closes the zone being drawn.
+func zone_finish() -> void:
+	_apply(ed.zone_finish())
+
+
+## A field of the zone selected (the panel): `name`, `kind`, `level` or `ppe`.
+func set_zone_field(field: String, value: String) -> void:
+	var name := selected_zone()
+	if name == "":
+		return
+	if doc().set_zone_field(name, field, value):
+		if field == "name":
+			ed.select_zone(value.strip_edges())
+		main.after_edit()
+	else:
+		main.set_status("Não mudou a zona: %s" % doc().last_error())
 
 
 ## Reads back what Rust keeps: the selection, the gesture under way and the node under the
@@ -477,6 +527,25 @@ func _apply(effects: Array) -> void:
 			"mover_fim":
 				doc().end_drag()
 				main.after_edit()
+			"zona_nova":
+				var name: String = doc().add_zone(e["points"])
+				if name == "":
+					main.set_status("Não criou a zona: %s" % doc().last_error())
+				else:
+					ed.select_zone(name)
+					main.after_edit()
+					main.set_status("Zona %s criada: escolha o tipo, o nível e o EPI no painel (Ctrl+Z desfaz)." % name)
+			"zona_forma":
+				if doc().set_zone_points(e["name"], e["points"]):
+					main.after_edit()
+				else:
+					main.set_status("Não mudou a zona: %s" % doc().last_error())
+			"zona_excluir":
+				if doc().remove_zone(e["name"]):
+					main.after_edit()
+					main.set_status("Zona %s excluída (Ctrl+Z desfaz)." % e["name"])
+				else:
+					main.set_status("Não excluiu a zona: %s" % doc().last_error())
 			"remover":
 				var names := PackedStringArray(e["names"])
 				if doc().remove(names):
@@ -596,6 +665,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if mb.pressed:
 		get_viewport().gui_release_focus()
+		ed.set_double(mb.double_click)
 		_on_press(mb.position, mb.shift_pressed)
 	else:
 		_on_release(mb.position)
@@ -727,6 +797,9 @@ func delete_selected() -> void:
 		if not corredores.delete_selected():
 			main.set_status("Nenhum corredor selecionado para excluir.")
 		return
+	if tool == "zona" and int(ed.zone_drawing_count()) > 0:
+		ed.zone_back()
+		return
 	_apply(ed.delete())
 
 
@@ -768,10 +841,14 @@ func _process(_dt: float) -> void:
 			l.visible = false
 		if _remove_label != null:
 			_remove_label.visible = false
+		_zone_fill.visible = false
+		for l in _zone_labels:
+			l.visible = false
 		if _ghost != null:
 			_ghost.visible = false
 		return
 	_lines.visible = true
+	_zone_fill.visible = true
 	if _ghost != null:
 		var at = floor_at(mouse)
 		_ghost.visible = at != null and not main.over_ui(mouse)
@@ -864,6 +941,7 @@ func _redraw() -> void:
 		var pv: Array = o["preview"]
 		if pv.size() == 3 and String(pv[2]) == "flow":
 			_arrow(pv[0], pv[1], CONNECTING, 0.07)
+		_draw_zones(o)
 		var bx = o["box"]
 		_box_rect.visible = bx != null
 		if bx != null:
@@ -940,6 +1018,68 @@ func _draw_team() -> void:
 		if a != null and b != null:
 			_dashed((a as Vector3) + Vector3(0, 0.1, 0), (b as Vector3) + Vector3(0, 0.1, 0), TEAM_LINES["equipe"][0], 0.08, 0.3, 0.15)
 	_team_mesh.surface_end()
+
+
+## The risk zones (fill, outline, name; the corners of the one selected with the Zona
+## tool) and the zone being drawn.
+func _draw_zones(o: Dictionary) -> void:
+	_zone_mesh.clear_surfaces()
+	_zone_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in 3:
+		_zone_mesh.surface_set_color(Color(0, 0, 0, 0))
+		_zone_mesh.surface_add_vertex(Vector3.ZERO)
+	var n := 0
+	for z in o["zones"]:
+		var pts: PackedVector3Array = z["points"]
+		if pts.size() < 3:
+			continue
+		var col: Color = z["color"]
+		var sel: bool = z["selected"]
+		var flat := PackedVector2Array()
+		var centre := Vector3.ZERO
+		for v in pts:
+			flat.append(Vector2(v.x, v.z))
+			centre += v
+		centre /= pts.size()
+		var fill := Color(col, 0.34 if sel else 0.22)
+		for i in Geometry2D.triangulate_polygon(flat):
+			_zone_mesh.surface_set_color(fill)
+			_zone_mesh.surface_add_vertex(Vector3(pts[i].x, 0.02, pts[i].z))
+		for k in pts.size():
+			var a := pts[k] + Vector3(0, 0.035, 0)
+			var b := pts[(k + 1) % pts.size()] + Vector3(0, 0.035, 0)
+			_ribbon(a, b, 0.1 if sel else 0.06, col)
+		if sel and tool == "zona":
+			for v in pts:
+				_disc(v + Vector3(0, 0.04, 0), 0.14, PORT_HOVER)
+				_disc(v + Vector3(0, 0.045, 0), 0.1, col)
+		while _zone_labels.size() <= n:
+			var l := Label3D.new()
+			l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			l.fixed_size = true
+			l.no_depth_test = true
+			l.pixel_size = 0.0006
+			l.font_size = 28
+			l.outline_size = 10
+			l.outline_modulate = Color(0.06, 0.07, 0.09, 0.95)
+			l.render_priority = 12
+			l.outline_render_priority = 11
+			add_child(l)
+			_zone_labels.append(l)
+		var lab := _zone_labels[n]
+		lab.visible = true
+		lab.text = String(z["name"])
+		lab.modulate = col.lightened(0.3)
+		lab.position = centre + Vector3(0, 0.3, 0)
+		n += 1
+	for j in range(n, _zone_labels.size()):
+		_zone_labels[j].visible = false
+	var drawing: PackedVector3Array = o["zone_drawing"]
+	for k in drawing.size() - 1:
+		_ribbon(drawing[k] + Vector3(0, 0.04, 0), drawing[k + 1] + Vector3(0, 0.04, 0), 0.07, CONNECTING)
+	for k in drawing.size() - 1:
+		_disc(drawing[k] + Vector3(0, 0.045, 0), 0.12, CONNECTING)
+	_zone_mesh.surface_end()
 
 
 ## A dashed ribbon from `a` to `b` (`on` metres drawn, `off` skipped).

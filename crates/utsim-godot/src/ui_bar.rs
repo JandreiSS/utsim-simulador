@@ -27,7 +27,7 @@ const TITLE_MIN: f32 = 120.0;
 pub struct BarState {
     /// Editar (true) or Simular.
     pub editing: bool,
-    /// The editor's tool: `selecionar`, `ligar`, `rede`, `corredor` or `colocar`.
+    /// The editor's tool: `selecionar`, `ligar`, `rede`, `corredor`, `zona` or `colocar`.
     pub tool: String,
     pub snap: bool,
     pub step: f64,
@@ -177,7 +177,7 @@ fn bar_contents(
     out: &mut Vec<String>,
 ) {
     ui.spacing_mut().item_spacing.x = 4.0;
-    ui.spacing_mut().button_padding = egui::vec2(7.0, 4.0);
+    ui.spacing_mut().button_padding = egui::vec2(6.0, 4.0);
     let avail = ui.available_width();
     let mut present_now = [false; 6];
     for (k, u) in UNITS.iter().enumerate() {
@@ -537,6 +537,12 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
             "Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)",
         ),
         (
+            "Ferramenta_Zona",
+            "Zona",
+            "zona",
+            "Zonas de risco no piso: clique os cantos, o primeiro ponto ou Enter fecha; clique numa zona para editar (Z)",
+        ),
+        (
             "Ferramenta_Equipe",
             "Equipe",
             "equipe",
@@ -547,7 +553,8 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
         "ligar" => 1,
         "rede" => 2,
         "corredor" => 3,
-        "equipe" => 4,
+        "zona" => 4,
+        "equipe" => 5,
         _ => 0,
     };
     let labels: Vec<&str> = tools.iter().map(|t| t.1).collect();

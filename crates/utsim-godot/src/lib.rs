@@ -61,6 +61,7 @@ pub mod ui_left;
 pub mod ui_pert;
 pub mod ui_props;
 pub mod ui_results;
+pub mod zone_edit;
 
 pub use utsim_edit::ron_text;
 pub use utsim_look::{catalogue, visual as looks};

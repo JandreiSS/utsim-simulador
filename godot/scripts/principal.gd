@@ -801,6 +801,9 @@ func _show_properties() -> void:
 	if editor.tool == "corredor":
 		_show_aisles()
 		return
+	if editor.tool == "zona":
+		_show_zones()
+		return
 	ui.show_form("")
 	var sel: Array = editor.selected
 	var name: String = sel[0] if not sel.is_empty() else "run"
@@ -1422,8 +1425,14 @@ func _edit_key(k: InputEventKey) -> bool:
 			editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor")
 		KEY_E:
 			editor.set_tool("selecionar" if editor.tool == "equipe" else "equipe")
+		KEY_Z:
+			if k.ctrl_pressed or k.meta_pressed:
+				return false
+			editor.set_tool("selecionar" if editor.tool == "zona" else "zona")
 		KEY_ENTER, KEY_KP_ENTER:
-			if editor.tool != "corredor" or not editor.corredores.finish():
+			if editor.tool == "zona":
+				editor.zone_finish()
+			elif editor.tool != "corredor" or not editor.corredores.finish():
 				return false
 		KEY_G:
 			set_snap(not snap_on, grid_step)
@@ -1841,6 +1850,12 @@ func _form_action(what: String) -> void:
 			ai.remove_vertex()
 		"corredor_inverter":
 			ai.reverse()
+		"zona_nome", "zona_tipo", "zona_nivel":
+			editor.set_zone_field(action.trim_prefix("zona_").replace("nome", "name").replace("tipo", "kind").replace("nivel", "level"), value)
+		"zona_excluir":
+			editor.delete_selected()
+		_ when action.begins_with("zona_epi_"):
+			editor.set_zone_field("ppe", action.trim_prefix("zona_epi_"))
 	_show_properties.call_deferred()
 
 
@@ -1889,6 +1904,33 @@ func _show_aisles() -> void:
 			if String(w["message"]).contains("'%s'" % a["name"]):
 				rows.append({"kind": "warning", "name": "Corredor_Aviso", "text": "• " + String(w["message"])})
 	_issue_rows(rows, ["corredor", "Aisles"])
+	_show_form(rows)
+
+
+## The right panel of the Zona tool: what it does, and the zone selected (name, kind,
+## level, protective equipment).
+func _show_zones() -> void:
+	var zones: Array = doc.zones()
+	var rows := [
+		{"kind": "title", "text": "Zonas de risco"},
+		{"kind": "info", "name": "Zona_Resumo", "text": "%d zona(s) de risco no piso." % zones.size()},
+		{"kind": "help", "text": "Clique no chão para pôr os cantos; o primeiro ponto, Enter ou duplo clique fecha a zona, Backspace volta um ponto, Esc cancela. Clique numa zona para editá-la: arraste o meio para mover, arraste um vértice para mudar a forma; Del exclui. Os pontos encaixam na grade."},
+	]
+	var name: String = editor.selected_zone()
+	for z in zones:
+		if z["name"] != name:
+			continue
+		rows.append({"kind": "section", "text": "Zona %s" % name})
+		rows.append({"kind": "line", "name": "Zona_Nome", "label": "Nome", "value": name, "action": "zona_nome"})
+		rows.append({"kind": "info", "name": "Zona_Pontos", "text": "%d canto(s)" % (z["points"] as PackedVector3Array).size()})
+		rows.append({"kind": "choice", "name": "Zona_Tipo", "label": "Tipo", "items": doc.zone_kinds(), "value": z["kind"], "action": "zona_tipo"})
+		rows.append({"kind": "number", "name": "Zona_Nivel", "label": "Nível de risco (1 a 5; 0 = sem nível)", "value": int(z["level"]), "min": 0, "max": 5, "step": 1, "action": "zona_nivel"})
+		rows.append({"kind": "section", "text": "EPI exigido para entrar"})
+		var have: PackedStringArray = z["ppe"]
+		for item in doc.ppe_choices():
+			rows.append({"kind": "check", "name": "Zona_EPI_%s" % item, "text": String(item).replace("_", " "), "on": have.has(item), "action": "zona_epi_%s" % item})
+		rows.append({"kind": "button", "name": "Zona_Excluir", "text": "Excluir zona (Del)", "action": "zona_excluir"})
+	_issue_rows(rows, ["zona", "zone"])
 	_show_form(rows)
 
 

@@ -755,6 +755,109 @@ impl UtsimDocument {
         self.done(r)
     }
 
+    // -- Risk zones (`Model.zones`), edited by the Zona tool -----------------------------
+
+    /// The risk zones: `{name, kind, kind_label, level (0 = none), ppe, points (floor,
+    /// Godot)}`.
+    #[func]
+    fn zones(&self) -> VarArray {
+        let mut out = VarArray::new();
+        for z in &self.editor.model().zones {
+            let mut d = VarDictionary::new();
+            d.set("name", &GString::from(z.name.as_str()));
+            let key = crate::zone_edit::kind_key(z.kind);
+            d.set("kind", &GString::from(key));
+            d.set(
+                "kind_label",
+                &GString::from(crate::zone_edit::kind_label(z.kind)),
+            );
+            d.set("level", z.level.map_or(0, i64::from));
+            let ppe: PackedStringArray = z.ppe.iter().map(|p| GString::from(p.as_str())).collect();
+            d.set("ppe", &ppe);
+            let pts: PackedVector3Array =
+                z.polygon.iter().map(|p| aisle_godot::point(*p)).collect();
+            d.set("points", &pts);
+            out.push(&d.to_variant());
+        }
+        out
+    }
+
+    /// The kinds of zone for the panel: `[label, key]` pairs.
+    #[func]
+    fn zone_kinds(&self) -> VarArray {
+        let mut out = VarArray::new();
+        for (kind, key, _) in crate::zone_edit::KINDS {
+            let mut a = VarArray::new();
+            a.push(&GString::from(crate::zone_edit::kind_label(kind)).to_variant());
+            a.push(&GString::from(key).to_variant());
+            out.push(&a.to_variant());
+        }
+        out
+    }
+
+    /// The protective equipment the panel offers.
+    #[func]
+    fn ppe_choices(&self) -> PackedStringArray {
+        crate::zone_edit::ppe_choices(self.editor.model())
+            .iter()
+            .map(|p| GString::from(p.as_str()))
+            .collect()
+    }
+
+    /// A new zone along `points` (Godot floor points): its name, or `""`.
+    #[func]
+    fn add_zone(&mut self, points: PackedVector3Array) -> GString {
+        let poly = points
+            .as_slice()
+            .iter()
+            .map(|v| aisle_godot::plan(*v))
+            .collect();
+        let r = crate::zone_edit::add(self.editor.model(), poly)
+            .and_then(|(name, c)| self.editor.apply(c).map(|_| name));
+        match r {
+            Ok(name) => {
+                self.last_error.clear();
+                GString::from(name.as_str())
+            }
+            Err(e) => {
+                self.last_error = e;
+                GString::new()
+            }
+        }
+    }
+
+    #[func]
+    fn set_zone_points(&mut self, name: GString, points: PackedVector3Array) -> bool {
+        let poly = points
+            .as_slice()
+            .iter()
+            .map(|v| aisle_godot::plan(*v))
+            .collect();
+        let r = crate::zone_edit::set_polygon(self.editor.model(), &name.to_string(), poly)
+            .and_then(|c| self.editor.apply(c));
+        self.done(r)
+    }
+
+    /// One field of zone `name`: `name`, `kind`, `level` or `ppe` (toggles the item).
+    #[func]
+    fn set_zone_field(&mut self, name: GString, field: GString, value: GString) -> bool {
+        let r = crate::zone_edit::set_field(
+            self.editor.model(),
+            &name.to_string(),
+            &field.to_string(),
+            &value.to_string(),
+        )
+        .and_then(|c| self.editor.apply(c));
+        self.done(r)
+    }
+
+    #[func]
+    fn remove_zone(&mut self, name: GString) -> bool {
+        let r = crate::zone_edit::remove(self.editor.model(), &name.to_string())
+            .and_then(|c| self.editor.apply(c));
+        self.done(r)
+    }
+
     #[func]
     fn remove_aisle(&mut self, name: GString) -> bool {
         let r = self.editor.remove_aisle(&name.to_string());

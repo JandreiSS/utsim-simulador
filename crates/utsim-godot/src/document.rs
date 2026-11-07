@@ -846,7 +846,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 33] = [
+pub const SHORTCUTS: [(&str, &str); 34] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -883,6 +883,10 @@ pub const SHORTCUTS: [(&str, &str); 33] = [
     (
         "C",
         "ferramenta Corredor: clique pontos no chão, Enter ou duplo clique termina",
+    ),
+    (
+        "Z",
+        "ferramenta Zona: zonas de risco no piso; clique os cantos, Enter ou o primeiro ponto fecha",
     ),
     (
         "E (ou Alt com Ligar)",
