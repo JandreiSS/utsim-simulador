@@ -246,6 +246,7 @@ func _build_ui() -> void:
 	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
 	# answers them itself, so it keeps the Godot ones.
 	scripted = Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	_open_from_args.call_deferred()
 	if DisplayServer.get_name() != "headless" and not scripted:
 		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
 			d.use_native_dialog = true
@@ -1687,6 +1688,18 @@ func apply_warmup(warmup: float) -> void:
 
 ## Opens a replay recorded by `utsim run --replay` or "Gravar replay": it plays in
 ## Simular (with the statistics of that replication); the document is not touched.
+## `--utsim-abrir=<arquivo>` (the Ensino's "Ver em 3D", or any caller): opens that model
+## (`.ron`) or replay (`.json`, `utsim_model::replay::Replay` as JSON) when the scene starts.
+func _open_from_args() -> void:
+	for a in OS.get_cmdline_user_args():
+		var arg := String(a)
+		if arg.begins_with("--utsim-abrir="):
+			var path := arg.trim_prefix("--utsim-abrir=")
+			if not open_model(path):
+				set_status("Não abriu %s (pedido na linha de comando)." % path.get_file())
+			return
+
+
 func open_replay(path: String) -> bool:
 	set_playing(false)
 	var m: Object = ClassDB.instantiate(&"UtsimModel")
@@ -1798,15 +1811,15 @@ func _drive_camera() -> void:
 # ---------------------------------------------------------------------------
 
 
-## The right panel of a selected link (egui, `ui_form.rs`).
+## The right panel of a selected link (built by `UtsimDocument.tool_panel`).
 func _show_link(link: Array) -> void:
-	_show_form([
-		{"kind": "title", "text": "Ligação"},
-		{"kind": "info", "name": "Ligacao_Texto", "text": "%s → %s" % link},
-		{"kind": "button", "name": "Ligacao_Remover", "text": "Remover ligação (Del)", "action": "ligacao_remover"},
-	])
+	_tool_panel("ligacao", {"from": link[0], "to": link[1]})
 
 
+## A tool's right panel, built in Rust from the document (`tool_panels.rs`).
+func _tool_panel(tool: String, state: Dictionary) -> void:
+	if ui != null:
+		ui.show_form(doc.tool_panel(tool, state))
 ## Shows `rows` (see `ui_form.rs`) as the right panel; the edits come back in `_form_action`.
 func _show_form(rows: Array) -> void:
 	if ui != null:
@@ -1859,107 +1872,14 @@ func _form_action(what: String) -> void:
 	_show_properties.call_deferred()
 
 
-func _issue_rows(rows: Array, words: Array) -> void:
-	for i in doc.issues():
-		var m: String = i["message"]
-		for w in words:
-			if m.contains(w):
-				rows.append({"kind": "error", "text": m})
-				break
-
 
 func _show_aisles() -> void:
 	var ai: EditorCorredores = editor.corredores
-	var c := ai.counts()
-	var kinds := []
-	for k in EditorCorredores.KINDS.size():
-		kinds.append([EditorCorredores.KIND_LABELS[k], EditorCorredores.KINDS[k]])
-	var rows := [
-		{"kind": "title", "text": "Corredores de circulação"},
-		{"kind": "info", "name": "Corredor_Resumo", "text": "%d corredor(es): %d de pedestres, %d de empilhadeiras, %d mistos; %d cruzamento(s)." % [c["total"], c["pedestre"], c["empilhadeira"], c["misto"], c["cruzamentos"]]},
-		{"kind": "help", "text": "Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso."},
-	]
-	var a := ai._aisle(ai.selected)
-	if a.is_empty():
-		rows.append({"kind": "section", "text": "Novos corredores"})
-		rows.append({"kind": "choice", "name": "Corredor_NovoTipo", "label": "Tipo", "items": kinds, "value": ai.new_kind, "action": "corredor_tipo"})
-		rows.append({"kind": "number", "name": "Corredor_NovaLargura", "label": "Largura (m)", "value": ai.new_width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"})
-		rows.append({"kind": "check", "name": "Corredor_NovosMaoDupla", "text": "Mão dupla", "on": ai.new_two_way, "action": "corredor_mao_dupla"})
-	else:
-		rows.append({"kind": "section", "text": "Corredor %s" % a["name"]})
-		rows.append({"kind": "line", "name": "Corredor_Nome", "label": "Nome", "value": a["name"], "action": "corredor_nome"})
-		rows.append({"kind": "info", "name": "Corredor_Comprimento", "text": "%d ponto(s), %s m de comprimento" % [(a["points"] as PackedVector3Array).size(), _num(float(a["length"]))]})
-		rows.append({"kind": "choice", "name": "Corredor_Tipo", "label": "Tipo", "items": kinds, "value": a["kind"], "action": "corredor_tipo"})
-		rows.append({"kind": "number", "name": "Corredor_Largura", "label": "Largura (m)", "value": float(a["width"]), "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"})
-		rows.append({"kind": "check", "name": "Corredor_MaoDupla", "text": "Mão dupla", "on": a["two_way"], "action": "corredor_mao_dupla"})
-		if a["kind"] != "forklift":
-			rows.append({"kind": "check", "name": "Corredor_Secundaria", "text": "Passagem secundária de pedestres (mínimo menor)", "on": a["secondary"], "action": "corredor_secundaria"})
-		rows.append({"kind": "choice", "name": "Corredor_Perfil", "label": "Perfil", "items": [["Padrão do modelo", ""], ["Brasil (amarelo)", "Brasil"], ["Branco", "Branco"]], "value": a["profile"], "action": "corredor_perfil"})
-		if ai.selected_vertex >= 0:
-			rows.append({"kind": "info", "name": "Corredor_Vertice", "text": "Vértice %d selecionado" % (ai.selected_vertex + 1)})
-			rows.append({"kind": "button", "name": "Corredor_VerticeRemover", "text": "Remover vértice", "enabled": (a["points"] as PackedVector3Array).size() > 2, "action": "corredor_vertice_remover"})
-		rows.append({"kind": "button", "name": "Corredor_Inverter", "text": "Inverter sentido", "enabled": not a["two_way"], "action": "corredor_inverter"})
-		rows.append({"kind": "button", "name": "Corredor_Excluir", "text": "Excluir corredor (Del)", "action": "corredor_excluir"})
-		for w in doc.warnings():
-			if String(w["message"]).contains("'%s'" % a["name"]):
-				rows.append({"kind": "warning", "name": "Corredor_Aviso", "text": "• " + String(w["message"])})
-	_issue_rows(rows, ["corredor", "Aisles"])
-	_show_form(rows)
-
-
-## The right panel of the Zona tool: what it does, and the zone selected (name, kind,
-## level, protective equipment).
+	_tool_panel("corredor", {"selected": ai.selected, "vertex": ai.selected_vertex,
+		"new_kind": ai.new_kind, "new_width": ai.new_width, "new_two_way": ai.new_two_way})
+## The right panel of the Zona tool.
 func _show_zones() -> void:
-	var zones: Array = doc.zones()
-	var rows := [
-		{"kind": "title", "text": "Zonas de risco"},
-		{"kind": "info", "name": "Zona_Resumo", "text": "%d zona(s) de risco no piso." % zones.size()},
-		{"kind": "help", "text": "Clique no chão para pôr os cantos; o primeiro ponto, Enter ou duplo clique fecha a zona, Backspace volta um ponto, Esc cancela. Clique numa zona para editá-la: arraste o meio para mover, arraste um vértice para mudar a forma; Del exclui. Os pontos encaixam na grade."},
-	]
-	var name: String = editor.selected_zone()
-	for z in zones:
-		if z["name"] != name:
-			continue
-		rows.append({"kind": "section", "text": "Zona %s" % name})
-		rows.append({"kind": "line", "name": "Zona_Nome", "label": "Nome", "value": name, "action": "zona_nome"})
-		rows.append({"kind": "info", "name": "Zona_Pontos", "text": "%d canto(s)" % (z["points"] as PackedVector3Array).size()})
-		rows.append({"kind": "choice", "name": "Zona_Tipo", "label": "Tipo", "items": doc.zone_kinds(), "value": z["kind"], "action": "zona_tipo"})
-		rows.append({"kind": "number", "name": "Zona_Nivel", "label": "Nível de risco (1 a 5; 0 = sem nível)", "value": int(z["level"]), "min": 0, "max": 5, "step": 1, "action": "zona_nivel"})
-		rows.append({"kind": "section", "text": "EPI exigido para entrar"})
-		var have: PackedStringArray = z["ppe"]
-		for item in doc.ppe_choices():
-			rows.append({"kind": "check", "name": "Zona_EPI_%s" % item, "text": String(item).replace("_", " "), "on": have.has(item), "action": "zona_epi_%s" % item})
-		rows.append({"kind": "button", "name": "Zona_Excluir", "text": "Excluir zona (Del)", "action": "zona_excluir"})
-	_issue_rows(rows, ["zona", "zone"])
-	_show_form(rows)
-
-
+	_tool_panel("zona", {"selected": editor.selected_zone()})
 func _show_network() -> void:
 	var rede: EditorRede = editor.rede
-	var c := rede.counts()
-	var rows := [
-		{"kind": "title", "text": "Rede de caminhos"},
-		{"kind": "info", "name": "Rede_Resumo", "text": "%d nó(s), %d trecho(s), %d pista(s) controlada(s)." % [c["nos"], c["trechos"], c["controlados"]]},
-		{"kind": "help", "text": "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."},
-		{"kind": "check", "name": "Rede_NovosMaoDupla", "text": "Novos trechos em mão dupla", "on": rede.two_way, "action": "rede_novos_mao_dupla"},
-	]
-	if rede.selected_node != "":
-		rows.append({"kind": "section", "text": "Nó %s" % rede.selected_node})
-		rows.append({"kind": "line", "name": "Rede_NoNome", "label": "Nome", "value": rede.selected_node, "action": "rede_no_nome"})
-		for n in rede.net["nodes"]:
-			if n["name"] == rede.selected_node:
-				var mp: Vector3 = n["model_position"]
-				rows.append({"kind": "info", "text": "Posição (%s, %s) m" % [_num(mp.x), _num(mp.y)]})
-		rows.append({"kind": "button", "name": "Rede_NoExcluir", "text": "Excluir nó (Del)", "action": "rede_excluir"})
-	if rede.selected_edge.size() == 2:
-		var e: Dictionary = rede._edge(rede.selected_edge[0], rede.selected_edge[1])
-		rows.append({"kind": "section", "text": "Trecho %s → %s" % [e["from"], e["to"]]})
-		rows.append({"kind": "info", "text": "Comprimento %s m" % _num(float(e["length"]))})
-		rows.append({"kind": "check", "name": "Rede_TrechoMaoDupla", "text": "Mão dupla", "on": e["two_way"], "action": "rede_mao_dupla"})
-		rows.append({"kind": "number", "name": "Rede_TrechoCapacidade", "label": "Capacidade (veículos; 0 = sem controle)", "value": int(e["capacity"]), "min": 0, "max": 100, "step": 1, "action": "rede_capacidade"})
-		if e["controlled"]:
-			rows.append({"kind": "error", "text": "Pista controlada: no máximo %d veículo(s) ao mesmo tempo." % int(e["capacity"])})
-		rows.append({"kind": "button", "name": "Rede_TrechoInverter", "text": "Inverter sentido", "enabled": not e["two_way"], "action": "rede_inverter"})
-		rows.append({"kind": "button", "name": "Rede_TrechoExcluir", "text": "Excluir trecho (Del)", "action": "rede_excluir"})
-	_issue_rows(rows, ["network", "rede", "nó"])
-	_show_form(rows)
+	_tool_panel("rede", {"node": rede.selected_node, "edge": rede.selected_edge, "two_way": rede.two_way})

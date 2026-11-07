@@ -755,6 +755,61 @@ impl UtsimDocument {
         self.done(r)
     }
 
+    /// The right panel of a tool of Editar as `ui_form` rows (JSON): `tool` is `rede`
+    /// ({node, edge, two_way}), `corredor` ({selected, vertex, new_kind, new_width,
+    /// new_two_way}), `zona` ({selected}) or `ligacao` ({from, to}).
+    #[func]
+    fn tool_panel(&self, tool: GString, state: VarDictionary) -> GString {
+        use crate::tool_panels as tp;
+        let model = self.editor.model();
+        let issues = self.editor.doc.issues();
+        let st = |k: &str| state.get(k).map(|v| v.to_string()).unwrap_or_default();
+        let int = |k: &str| state.get(k).and_then(|v| v.try_to::<i64>().ok());
+        let flag = |k: &str| {
+            state
+                .get(k)
+                .and_then(|v| v.try_to::<bool>().ok())
+                .unwrap_or(false)
+        };
+        let rows = match tool.to_string().as_str() {
+            "rede" => {
+                let edge: Vec<String> = state
+                    .get("edge")
+                    .and_then(|v| v.try_to::<VarArray>().ok())
+                    .map(|a| a.iter_shared().map(|v| v.to_string()).collect())
+                    .unwrap_or_default();
+                tp::network(
+                    model,
+                    &issues,
+                    &tp::NetSel {
+                        node: st("node"),
+                        edge: (edge.len() == 2).then(|| (edge[0].clone(), edge[1].clone())),
+                        two_way: flag("two_way"),
+                    },
+                )
+            }
+            "corredor" => tp::aisles(
+                model,
+                &issues,
+                &self.editor.doc.warnings(),
+                &tp::AisleSel {
+                    selected: st("selected"),
+                    vertex: int("vertex").filter(|v| *v >= 0).map(|v| v as usize),
+                    new_kind: st("new_kind"),
+                    new_width: state
+                        .get("new_width")
+                        .and_then(|v| v.try_to::<f64>().ok())
+                        .unwrap_or(1.2),
+                    new_two_way: flag("new_two_way"),
+                },
+            ),
+            "zona" => tp::zones(model, &issues, &st("selected")),
+            "ligacao" => tp::link(&st("from"), &st("to")),
+            _ => Vec::new(),
+        };
+        GString::from(serde_json::Value::Array(rows).to_string().as_str())
+    }
+
     // -- Risk zones (`Model.zones`), edited by the Zona tool -----------------------------
 
     /// The risk zones: `{name, kind, kind_label, level (0 = none), ppe, points (floor,
