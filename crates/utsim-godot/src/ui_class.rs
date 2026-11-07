@@ -16,19 +16,13 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use egui::TextureId;
-use godot::classes::input::CursorShape;
 use godot::classes::notify::CanvasItemNotification;
-use godot::classes::rendering_server::CanvasItemTextureFilter;
-use godot::classes::{
-    ClassDb, Engine, INode2D, Input as GdInput, InputEvent, Node2D, Object, Os, RenderingServer,
-    Resource, Viewport,
-};
+use godot::classes::{INode2D, InputEvent, Node2D, RenderingServer, Resource, Viewport};
 use godot::prelude::*;
 
 use crate::document_class::UtsimDocument;
 use crate::egui_host::Host;
-use crate::egui_input::{Input, Mods};
-use crate::egui_mesh::{self, Change, Textures};
+use crate::egui_input::Input;
 use crate::jobs_class::{UtsimJob, UtsimPert, UtsimResults, job_object, variant_of_json};
 use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
@@ -39,23 +33,18 @@ use crate::ui_props::{self, PropAction, PropsView};
 use crate::ui_results::{self, ResultsView};
 use crate::{put, strings};
 
-/// Godot's `Image.FORMAT_RGBA8`.
-const FORMAT_RGBA8: i64 = 5;
+use crate::egui_canvas::{clipboard_get, read_input};
 
 #[derive(GodotClass)]
 #[class(base = Node2D)]
 pub struct UtsimUi {
     host: Host,
     start: Instant,
-    textures: Textures,
+    canvas: crate::egui_canvas::EguiCanvas,
     /// The Godot texture of each egui texture.
-    gpu: HashMap<TextureId, Rid>,
-    /// Canvas items, one per mesh drawn (kept and reused between frames).
-    items: Vec<Rid>,
     /// Interface scale (pixels per point) over the window's content scale.
     #[var]
     ui_scale: f32,
-    cursor: Option<egui::CursorIcon>,
     /// The document the properties panel edits.
     doc: Option<Gd<UtsimDocument>>,
     /// The object shown in the properties panel (`run` for the model), the others
@@ -94,11 +83,8 @@ impl INode2D for UtsimUi {
         UtsimUi {
             host: Host::new(),
             start: Instant::now(),
-            textures: Textures::default(),
-            gpu: HashMap::new(),
-            items: Vec::new(),
+            canvas: crate::egui_canvas::EguiCanvas::new(),
             ui_scale: 1.0,
-            cursor: None,
             doc: None,
             object: String::new(),
             others: Vec::new(),
@@ -948,31 +934,16 @@ impl UtsimUi {
         self.refresh_props_view();
         self.refresh_edit();
         let frame = self.host.frame(now, size, ppp);
-        let mut output = frame.output;
-        let mut textures = std::mem::take(&mut output.textures_delta);
-        self.platform(&output.platform_output);
-        for (id, deltas) in &textures.set {
-            for d in deltas {
-                match self.textures.apply(*id, d) {
-                    Change::Created => self.upload(*id, true),
-                    Change::Updated => self.upload(*id, false),
-                    Change::Ignored => {}
+        let parent = self.base().get_canvas_item();
+        let (mini, user) = (self.miniature, &self.user);
+        self.canvas
+            .present(&self.host.ctx, frame.output, parent, size, |t| {
+                if t == ui_props::MINIATURE {
+                    mini
+                } else {
+                    user.get(&t).copied()
                 }
-            }
-        }
-        let prims = self
-            .host
-            .ctx
-            .tessellate(output.shapes, output.pixels_per_point);
-        self.paint(&prims, output.pixels_per_point, size);
-        for id in &textures.free {
-            self.textures.free(*id);
-            if let Some(rid) = self.gpu.remove(id) {
-                RenderingServer::singleton().free_rid(rid);
-            }
-        }
-        // Applied above (egui checks that every delta was handled).
-        textures.clear();
+            });
         for a in frame.actions {
             if let Some(rest) = a.strip_prefix("valores:") {
                 self.fitwin_action(rest);
@@ -1235,169 +1206,8 @@ impl UtsimUi {
         }
     }
 
-    /// Clipboard, cursor and links.
-    fn platform(&mut self, out: &egui::PlatformOutput) {
-        for c in &out.commands {
-            match c {
-                egui::OutputCommand::CopyText(text) => clipboard_set(text),
-                egui::OutputCommand::OpenUrl(u) => {
-                    Os::singleton().shell_open(u.url.as_str());
-                }
-                egui::OutputCommand::CopyImage(_) => {}
-            }
-        }
-        if self.cursor != Some(out.cursor_icon) {
-            self.cursor = Some(out.cursor_icon);
-            let shape = cursor_shape(out.cursor_icon);
-            GdInput::singleton()
-                .set_default_cursor_shape_ex()
-                .shape(shape)
-                .done();
-        }
-    }
-
-    /// Sends the CPU copy of texture `id` to Godot (a new texture when `create`).
-    fn upload(&mut self, id: TextureId, create: bool) {
-        let Some(img) = self.textures.images.get(&id) else {
-            return;
-        };
-        let mut image: Gd<Object> = match ClassDb::singleton().instantiate("Image").try_to() {
-            Ok(i) => i,
-            Err(_) => return,
-        };
-        let bytes = PackedByteArray::from(img.rgba.as_slice());
-        image.call(
-            "set_data",
-            &[
-                (img.size[0] as i64).to_variant(),
-                (img.size[1] as i64).to_variant(),
-                false.to_variant(),
-                FORMAT_RGBA8.to_variant(),
-                bytes.to_variant(),
-            ],
-        );
-        let mut rs = RenderingServer::singleton();
-        match self.gpu.get(&id).copied() {
-            Some(rid) if !create => {
-                rs.call(
-                    "texture_2d_update",
-                    &[rid.to_variant(), image.to_variant(), 0i64.to_variant()],
-                );
-            }
-            old => {
-                if let Some(rid) = old {
-                    rs.free_rid(rid);
-                }
-                let rid = rs
-                    .call("texture_2d_create", &[image.to_variant()])
-                    .try_to::<Rid>()
-                    .unwrap_or(Rid::Invalid);
-                self.gpu.insert(id, rid);
-            }
-        }
-    }
-
-    /// Draws the meshes, one canvas item each, clipped.
-    fn paint(&mut self, prims: &[egui::ClippedPrimitive], ppp: f32, size: [f32; 2]) {
-        let parent = self.base().get_canvas_item();
-        let mut rs = RenderingServer::singleton();
-        let mut used = 0;
-        for prim in prims {
-            let Some(m) = egui_mesh::convert(prim, ppp, size) else {
-                continue;
-            };
-            if used == self.items.len() {
-                let item = rs.canvas_item_create();
-                rs.canvas_item_set_parent(item, parent);
-                rs.canvas_item_set_default_texture_filter(item, CanvasItemTextureFilter::LINEAR);
-                rs.canvas_item_set_clip(item, true);
-                self.items.push(item);
-            }
-            let item = self.items[used];
-            rs.canvas_item_clear(item);
-            rs.canvas_item_set_draw_index(item, used as i32);
-            let [x, y, w, h] = m.clip;
-            rs.canvas_item_set_custom_rect_ex(item, true)
-                .rect(Rect2::new(Vector2::new(x, y), Vector2::new(w, h)))
-                .done();
-            let indices = PackedInt32Array::from(m.indices.as_slice());
-            let points: PackedVector2Array =
-                m.points.iter().map(|p| Vector2::new(p[0], p[1])).collect();
-            let colors: PackedColorArray = m
-                .colors
-                .iter()
-                .map(|c| Color::from_rgba(c[0], c[1], c[2], c[3]))
-                .collect();
-            let uvs: PackedVector2Array = m.uvs.iter().map(|p| Vector2::new(p[0], p[1])).collect();
-            let texture = m
-                .texture
-                .and_then(|t| {
-                    if t == ui_props::MINIATURE {
-                        self.miniature
-                    } else if let Some(rid) = self.user.get(&t) {
-                        Some(*rid)
-                    } else {
-                        self.gpu.get(&t).copied()
-                    }
-                })
-                .unwrap_or(Rid::Invalid);
-            rs.canvas_item_add_triangle_array_ex(item, &indices, &points, &colors)
-                .uvs(&uvs)
-                .texture(texture)
-                .done();
-            used += 1;
-        }
-        for item in &self.items[used..] {
-            rs.canvas_item_clear(*item);
-        }
-    }
-
     fn free_all(&mut self) {
-        let mut rs = RenderingServer::singleton();
-        for item in self.items.drain(..) {
-            rs.free_rid(item);
-        }
-        for (_, rid) in self.gpu.drain() {
-            rs.free_rid(rid);
-        }
-    }
-}
-
-/// The plain data of a Godot input event (dynamic reads: the event classes are not
-/// generated for the bridge).
-fn read_input(ev: &Gd<InputEvent>) -> Option<Input> {
-    let class = ev.get_class().to_string();
-    let b = |k: &str| ev.get(k).try_to::<bool>().unwrap_or(false);
-    let mods = || Mods {
-        shift: b("shift_pressed"),
-        ctrl: b("ctrl_pressed"),
-        alt: b("alt_pressed"),
-        meta: b("meta_pressed"),
-    };
-    let pos = || {
-        let p = ev.get("position").try_to::<Vector2>().unwrap_or_default();
-        [p.x, p.y]
-    };
-    match class.as_str() {
-        "InputEventMouseMotion" => Some(Input::Motion {
-            pos: pos(),
-            mods: mods(),
-        }),
-        "InputEventMouseButton" => Some(Input::Button {
-            pos: pos(),
-            button: ev.get("button_index").try_to::<i64>().unwrap_or(0),
-            pressed: b("pressed"),
-            factor: ev.get("factor").try_to::<f32>().unwrap_or(1.0),
-            mods: mods(),
-        }),
-        "InputEventKey" => Some(Input::Key {
-            keycode: ev.get("keycode").try_to::<i64>().unwrap_or(0),
-            unicode: ev.get("unicode").try_to::<i64>().unwrap_or(0).max(0) as u32,
-            pressed: b("pressed"),
-            echo: b("echo"),
-            mods: mods(),
-        }),
-        _ => None,
+        self.canvas.free_all();
     }
 }
 
@@ -1410,40 +1220,5 @@ fn value_string(v: &Value) -> String {
         Value::Float(x) => ui_props::num_text(*x),
         Value::Text(t) => t.clone(),
         Value::List(l) => l.join(", "),
-    }
-}
-
-fn display_server() -> Option<Gd<Object>> {
-    Engine::singleton().get_singleton("DisplayServer")
-}
-
-fn clipboard_get() -> String {
-    display_server()
-        .map(|mut d| d.call("clipboard_get", &[]).to_string())
-        .unwrap_or_default()
-}
-
-fn clipboard_set(text: &str) {
-    if let Some(mut d) = display_server() {
-        d.call("clipboard_set", &[GString::from(text).to_variant()]);
-    }
-}
-
-fn cursor_shape(c: egui::CursorIcon) -> CursorShape {
-    use egui::CursorIcon as C;
-    match c {
-        C::PointingHand => CursorShape::POINTING_HAND,
-        C::Text | C::VerticalText => CursorShape::IBEAM,
-        C::ResizeHorizontal | C::ResizeColumn | C::ResizeEast | C::ResizeWest => CursorShape::HSIZE,
-        C::ResizeVertical | C::ResizeRow | C::ResizeNorth | C::ResizeSouth => CursorShape::VSIZE,
-        C::ResizeNeSw | C::ResizeNorthEast | C::ResizeSouthWest => CursorShape::BDIAGSIZE,
-        C::ResizeNwSe | C::ResizeNorthWest | C::ResizeSouthEast => CursorShape::FDIAGSIZE,
-        C::Grab | C::Grabbing | C::Move | C::AllScroll => CursorShape::MOVE,
-        C::NotAllowed | C::NoDrop => CursorShape::FORBIDDEN,
-        C::Wait => CursorShape::WAIT,
-        C::Progress => CursorShape::BUSY,
-        C::Help => CursorShape::HELP,
-        C::Crosshair | C::Cell => CursorShape::CROSS,
-        _ => CursorShape::ARROW,
     }
 }
