@@ -31,6 +31,9 @@ serde_json.workspace = true
 serde.workspace = true
 ron.workspace = true
 utsim-ui-tema.workspace = true
+# The mission mode of UTSim Ensino (`ensino_class`): the same screens as its window.
+utsim-ensino-ui = { path = "../utsim-ensino-ui" }
+utsim-ensino-store = { path = "../utsim-ensino-store" }
 # The interface around the 3D view is egui, drawn by the bridge (`egui_*`, `ui_class`): the
 # workspace's single egui (the launcher's eframe 0.36.2, the viewer's bevy_egui 0.43).
 egui = { version = "=0.36.2", default-features = false, features = ["default_fonts"] }

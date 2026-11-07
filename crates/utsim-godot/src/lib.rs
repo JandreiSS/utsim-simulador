@@ -40,6 +40,7 @@ pub mod egui_host;
 pub mod egui_input;
 pub mod egui_mesh;
 pub mod egui_widgets;
+mod ensino_class;
 pub mod extras;
 pub mod grid;
 pub mod jobs;
