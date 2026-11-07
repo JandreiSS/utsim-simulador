@@ -475,6 +475,15 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     }
                     ui.separator();
                     links_menu(ui, s, reg, &mut |a: String| act(&a));
+                    ui.separator();
+                    let r = ui
+                        .button("Modo missão (UTSim Ensino)")
+                        .on_hover_text("Abre as missões do UTSim Ensino neste mesmo programa");
+                    reg.put("Ensino_Abrir", &r, "Modo missão (UTSim Ensino)");
+                    if r.clicked() {
+                        act("ensino:abrir");
+                        ui.close();
+                    }
                 });
                 reg.put("Menu_Analisar", &r.response, "Analisar");
                 r.response.on_hover_text(

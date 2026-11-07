@@ -457,6 +457,12 @@ func bar_action(what: String) -> void:
 			set_snap(snap_on, float(arg))
 		"analisar":
 			analysis_action(arg)
+		"ensino":
+			# The UTSim Ensino's mission mode, in its own scene (`ensino.tscn`).
+			if ResourceLoader.exists("res://cenas/ensino.tscn"):
+				get_tree().change_scene_to_file.call_deferred("res://cenas/ensino.tscn")
+			else:
+				set_status("O modo missão do UTSim Ensino não está nesta versão.")
 		"resultados":
 			results_action(what.substr("resultados:".length()))
 		"pert":
