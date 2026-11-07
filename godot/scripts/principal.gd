@@ -1223,63 +1223,37 @@ func _update_shadows(lo: Vector3, hi: Vector3) -> void:
 ## The floor grid of Editar: lines every snapping step around the model (at least 40 m
 ## across), a little darker than the floor.
 func _draw_edit_grid() -> void:
-	if mode != "editar":
+	if mode != "editar" or ui == null:
 		return
-	var lo := Vector3(-20, 0, -20)
-	var hi := Vector3(20, 0, 20)
+	var at := PackedVector3Array()
 	for o in doc.objects():
-		var p: Vector3 = o["position"]
-		lo = Vector3(minf(lo.x, p.x - 10), 0, minf(lo.z, p.z - 10))
-		hi = Vector3(maxf(hi.x, p.x + 10), 0, maxf(hi.z, p.z + 10))
-	var step := grid_step
-	while (hi.x - lo.x) / step > 400 or (hi.z - lo.z) / step > 400:
-		step *= 2.0
-	_grid_lines(lo, hi, step)
+		at.append(o["position"])
+	_grid_lines(ui.edit_grid(at, grid_step))
 
 
-## The floor grid of the Bevy viewer (`draw_world`) for Simular: about 40 cells across
-## the scene, the spacing rounded to 1, 2 or 5 x 10^k metres.
+## The floor grid of Simular: about 40 cells across the scene (`grid.rs`).
 func _draw_grid(info: Dictionary) -> void:
-	var lo: Vector3 = info["bounds_min"]
-	var hi: Vector3 = info["bounds_max"]
-	var span := maxf(maxf(hi.x - lo.x, hi.z - lo.z), 10.0) + 16.0
-	var raw := span / 40.0
-	var mag := pow(10.0, floor(log(raw) / log(10.0)))
-	var step := raw
-	for m in [1.0, 2.0, 5.0, 10.0]:
-		if m * mag >= raw:
-			step = m * mag
-			break
-	var c := (lo + hi) * 0.5
-	_grid_lines(c - Vector3(span, 0, span) * 0.5, c + Vector3(span, 0, span) * 0.5, step)
+	if ui != null:
+		_grid_lines(ui.sim_grid(info["bounds_min"], info["bounds_max"]))
 
 
-func _grid_lines(lo: Vector3, hi: Vector3, step: float) -> void:
+## The grid lines computed in Rust (`grid.rs`), as one mesh of lines.
+func _grid_lines(points: PackedVector3Array) -> void:
 	if _grid != null:
 		_grid.queue_free()
-	var x0 := floorf(lo.x / step) * step
-	var x1 := ceilf(hi.x / step) * step
-	var z0 := floorf(lo.z / step) * step
-	var z1 := ceilf(hi.z / step) * step
-	var c := Color(0.22, 0.24, 0.28)
-	var im := ImmediateMesh.new()
-	im.surface_begin(Mesh.PRIMITIVE_LINES)
-	var x := x0
-	while x <= x1 + 1e-6:
-		for v in [Vector3(x, 0.002, z0), Vector3(x, 0.002, z1)]:
-			im.surface_set_color(c)
-			im.surface_add_vertex(v)
-		x += step
-	var z := z0
-	while z <= z1 + 1e-6:
-		for v in [Vector3(x0, 0.002, z), Vector3(x1, 0.002, z)]:
-			im.surface_set_color(c)
-			im.surface_add_vertex(v)
-		z += step
-	im.surface_end()
+	var mesh := ArrayMesh.new()
+	if not points.is_empty():
+		var colors := PackedColorArray()
+		colors.resize(points.size())
+		colors.fill(Color(0.22, 0.24, 0.28))
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = points
+		arrays[Mesh.ARRAY_COLOR] = colors
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 	_grid = MeshInstance3D.new()
 	_grid.name = "Grade"
-	_grid.mesh = im
+	_grid.mesh = mesh
 	_grid.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -1346,96 +1320,61 @@ func _process(dt: float) -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
-	if k == null or not k.pressed or doc == null:
+	if k == null or not k.pressed or doc == null or ui == null:
 		return
-	var ctrl := k.ctrl_pressed or k.meta_pressed
-	var handled := true
-	if ctrl:
-		match k.keycode:
-			KEY_Z:
-				if mode == "editar" and k.shift_pressed:
-					redo()
-				elif mode == "editar":
-					undo()
-			KEY_Y:
-				if mode == "editar":
-					redo()
-			KEY_S:
-				if k.shift_pressed:
-					save_as_dialog()
-				else:
-					save()
-			KEY_O:
-				_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
-			KEY_N:
-				new_document()
-			KEY_C:
-				arrange_action("copiar")
-			KEY_X:
-				arrange_action("recortar")
-			KEY_V:
-				arrange_action("colar")
-			KEY_D:
-				arrange_action("duplicar")
-			KEY_A:
-				editor.select_all()
-			_:
-				handled = false
-	else:
-		match k.keycode:
-			KEY_F1:
-				toggle_shortcuts()
-			KEY_F3:
-				toggle_performance()
-			KEY_TAB:
-				set_mode("editar" if mode == "simular" else "simular")
-			KEY_F:
-				if mode == "simular" and cena.playback != null:
-					camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
-				else:
-					_frame_model()
-			KEY_SPACE:
-				if mode == "simular":
-					set_playing(not playing)
-			_:
-				handled = mode == "editar" and _edit_key(k)
-	if handled:
+	# Which action the key asks for is Rust's (`shortcuts.rs`, with tests).
+	var action := String(ui.key_action(k.keycode, k.ctrl_pressed or k.meta_pressed,
+		k.shift_pressed, mode == "editar", editor.tool))
+	if action != "" and run_key_action(action):
 		get_viewport().set_input_as_handled()
 
 
-## The keys of Editar alone: Del, Esc, arrows, L and G.
-func _edit_key(k: InputEventKey) -> bool:
-	match k.keycode:
-		KEY_DELETE, KEY_BACKSPACE:
+## Runs a keyboard action (see `shortcuts.rs`); false when it did nothing (the key goes on).
+func run_key_action(action: String) -> bool:
+	var arg := action.get_slice(":", 1)
+	match action.get_slice(":", 0):
+		"desfazer":
+			undo()
+		"refazer":
+			redo()
+		"salvar":
+			save()
+		"salvar_como":
+			save_as_dialog()
+		"abrir":
+			_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
+		"novo":
+			new_document()
+		"organizar":
+			arrange_action(arg)
+		"selecionar_tudo":
+			editor.select_all()
+		"atalhos":
+			toggle_shortcuts()
+		"desempenho":
+			toggle_performance()
+		"modo":
+			set_mode("editar" if mode == "simular" else "simular")
+		"enquadrar":
+			if mode == "simular" and cena.playback != null:
+				camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
+			else:
+				_frame_model()
+		"reproduzir":
+			set_playing(not playing)
+		"excluir":
 			editor.delete_selected()
-		KEY_ESCAPE:
+		"cancelar":
 			editor.cancel()
-		KEY_LEFT:
-			editor.nudge(-1, 0)
-		KEY_RIGHT:
-			editor.nudge(1, 0)
-		KEY_UP:
-			editor.nudge(0, 1)
-		KEY_DOWN:
-			editor.nudge(0, -1)
-		KEY_L:
-			editor.set_tool("selecionar" if editor.tool == "ligar" else "ligar")
-		KEY_N:
-			editor.set_tool("selecionar" if editor.tool == "rede" else "rede")
-		KEY_C:
-			editor.set_tool("selecionar" if editor.tool == "corredor" else "corredor")
-		KEY_E:
-			editor.set_tool("selecionar" if editor.tool == "equipe" else "equipe")
-		KEY_Z:
-			if k.ctrl_pressed or k.meta_pressed:
-				return false
-			editor.set_tool("selecionar" if editor.tool == "zona" else "zona")
-		KEY_ENTER, KEY_KP_ENTER:
-			if editor.tool == "zona":
-				editor.zone_finish()
-			elif editor.tool != "corredor" or not editor.corredores.finish():
-				return false
-		KEY_G:
+		"mover":
+			editor.nudge(int(arg), int(action.get_slice(":", 2)))
+		"ferramenta":
+			editor.set_tool(arg)
+		"zona_fechar":
+			editor.zone_finish()
+		"corredor_fechar":
+			return editor.corredores.finish()
+		"grade":
 			set_snap(not snap_on, grid_step)
 		_:
 			return false

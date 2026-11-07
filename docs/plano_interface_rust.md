@@ -594,6 +594,22 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   desenhadas como itens de canvas recortados, com as texturas próprias do nó resolvidas
   antes), `free_all`, `screen_of` e a área de transferência. O `UtsimUi` passou a usá-lo
   (de 1449 para 1224 linhas).
+
+### Passo 7, parte 3: a coordenação do `principal.gd`, primeira versão (2026-11-07)
+
+- `shortcuts.rs` (testes): qual ação cada tecla pede, pelo modo e pela ferramenta (Ctrl+Z,
+  Ctrl+S..., F1, F3, Tab, F, Espaço, Del, Esc, setas, L, N, C, E, Z, Enter, G);
+  `UtsimUi.key_action` a devolve pelo nome e o `principal.gd` só a executa
+  (`run_key_action`). Saíram o `_edit_key` e os dois `match` de teclas.
+- `grid.rs` (testes): a grade do Editar (em volta dos objetos, passo do encaixe dobrado até
+  400 linhas) e a do Simular (cerca de 40 células de 1, 2 ou 5 × 10^k m) e as linhas;
+  `UtsimUi.edit_grid` e `sim_grid` as entregam e o `principal.gd` as copia num `ArrayMesh`
+  de linhas (sem laço por linha).
+- `principal.gd`: de 1871 para 1823 linhas.
+- Fica para as próximas rodadas: o relógio e a câmera do Simular (`_process`,
+  `_drive_camera`), o fluxo dos trabalhos (`simulate`, `_poll_job`) e o despacho das ações da
+  barra e dos painéis (`bar_action`, `_panel_action`, `_form_action`), que chamam o
+  documento, a cena e os diálogos do Godot e ganham menos com a mudança.
 - Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
   encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto

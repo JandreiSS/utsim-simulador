@@ -593,6 +593,47 @@ impl UtsimUi {
             .set_dialog(crate::ui_form::parse_dialog(&dialog.to_string()));
     }
 
+    /// The floor grid of Editar: the lines (pairs of points) around `positions` (the
+    /// objects, Godot) for the snap step `snap` (`grid.rs`).
+    #[func]
+    fn edit_grid(&self, positions: PackedVector3Array, snap: f64) -> PackedVector3Array {
+        let p: Vec<[f64; 3]> = positions
+            .as_slice()
+            .iter()
+            .map(|v| [v.x as f64, v.y as f64, v.z as f64])
+            .collect();
+        let (lo, hi, step) = crate::grid::edit_extent(&p, snap);
+        grid_points(crate::grid::lines(lo, hi, step))
+    }
+
+    /// The floor grid of Simular, around the scene's bounds.
+    #[func]
+    fn sim_grid(&self, lo: Vector3, hi: Vector3) -> PackedVector3Array {
+        let v = |p: Vector3| [p.x as f64, p.y as f64, p.z as f64];
+        let (a, b, step) = crate::grid::sim_extent(v(lo), v(hi));
+        grid_points(crate::grid::lines(a, b, step))
+    }
+
+    /// The action of a key press in the main scene (`shortcuts.rs`), or `""`.
+    #[func]
+    fn key_action(
+        &self,
+        keycode: i64,
+        ctrl: bool,
+        shift: bool,
+        editing: bool,
+        tool: GString,
+    ) -> GString {
+        let ctx = crate::shortcuts::KeyContext {
+            editing,
+            tool: tool.to_string(),
+        };
+        crate::shortcuts::key_action(keycode, ctrl, shift, &ctx)
+            .unwrap_or_default()
+            .as_str()
+            .into()
+    }
+
     #[func]
     fn dialog_open(&self) -> bool {
         self.host.dialog.is_some()
@@ -1221,4 +1262,10 @@ fn value_string(v: &Value) -> String {
         Value::Text(t) => t.clone(),
         Value::List(l) => l.join(", "),
     }
+}
+
+fn grid_points(l: Vec<[f64; 3]>) -> PackedVector3Array {
+    l.iter()
+        .map(|p| Vector3::new(p[0] as f32, p[1] as f32, p[2] as f32))
+        .collect()
 }
