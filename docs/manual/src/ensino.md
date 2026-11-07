@@ -166,9 +166,25 @@ O resultado é a **matriz aluno por missão**, com nota, estrelas, tentativas e 
 
 Uma turma de 60 alunos com as 14 missões e duas tentativas por missão (1.680 tentativas) foi corrigida em cerca de 13 segundos no notebook de desenvolvimento.
 
+Abaixo da matriz, **pares para olhar de perto** lista os alunos com a mesma sequência de decisões numa missão cuja variante muda de aluno para aluno, ou com três ou mais tentativas nos mesmos instantes (até um minuto de diferença). Semelhança não é prova de cópia, e a decisão é do professor.
+
+### Prova
+
+A seção "Prova" do painel monta uma prova a partir do pacote aberto (a campanha ou outro):
+
+1. O professor dá um id e um título, a janela (início e fim, no horário de Brasília), o tempo máximo, as rodadas por missão e quantas missões sortear de cada ato. A semente fica vazia para ser sorteada na hora, ou recebe um número para repetir uma prova.
+2. "Sortear e publicar na pasta da turma" grava `pacotes/<id>.utse` na pasta da turma e anota a prova em `turma.ron`, com o fim da janela como prazo. A montagem (pacote de origem, regras e semente) fica só no perfil do professor, fora da pasta compartilhada.
+3. O aluno vê a prova na linha de pacotes do mapa, porque o app lê também a pasta `pacotes/` da turma. Todas as missões da prova abrem desde o início. O tempo máximo conta a partir da primeira missão aberta.
+4. Na prova não há dicas, nota, estrelas nem caixa de areia. A tela mostra a janela, o tempo que resta e as rodadas usadas, e depois de cada rodada só os indicadores. Fora da janela, depois do tempo ou sem rodadas, o botão de simular fica bloqueado.
+5. Para corrigir, o professor escolhe a prova em "A correção usa" e clica em "Corrigir todas as entregas". O app reconstrói a prova pela semente e confere que o pacote de origem é o mesmo da montagem. Só contam as rodadas dentro da janela e as primeiras de cada missão, e o que passar disso aparece nos avisos.
+
+O pacote do aluno não leva a referência, as dicas nem as respostas fixas das previsões e da justificativa. As missões de entregar modelo (ato 7) ficam fora do sorteio, porque o gabarito delas é um modelo. Com a mesma semente e as mesmas regras, sai a mesma prova.
+
 ### Limites
 
 Sem servidor, nada impede a consulta. O que o app faz é tornar a cópia pouco útil e visível. A variante muda os números de cada aluno. A nota não viaja, porque o professor simula de novo, e por isso editar o arquivo de entrega não muda a nota. Uma tentativa editada perde a assinatura e aparece nos avisos. Quem tem acesso aos arquivos pode tentar forjá-los: a assinatura revela a alteração, mas não a impede.
+
+Na prova, o relógio é o do computador do aluno. O app bloqueia a rodada fora da janela, e o professor ignora as tentativas assinadas com data fora dela, mas quem adianta ou atrasa o relógio consegue enganar as duas conferências. Nada substitui a sala com o professor presente.
 
 Nome, registro e notas são dados pessoais. A finalidade fica registrada na turma, o placar usa o apelido e a pasta de cada aluno fica compartilhada só com ele e o professor.
 
