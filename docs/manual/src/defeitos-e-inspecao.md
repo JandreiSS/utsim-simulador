@@ -79,3 +79,26 @@ utsim qualidade custos examples/inspecao_e_retrabalho.ron --lancamentos lancamen
 ```
 
 Os lançamentos digitados (treinamento, calibração, garantia, devoluções) ficam num CSV `categoria;descricao;valor`, com as categorias `prevencao`, `avaliacao`, `falha_interna` e `falha_externa`. O relatório mostra o total por categoria (média e intervalo de 95 % do que vem do modelo, mais os lançamentos), por posto e por tipo de defeito. Com `--comparar`, o outro cenário roda com as mesmas sementes e a diferença do total é calculada replicação a replicação.
+
+## Planos de amostragem por atributos
+
+```bash
+utsim qualidade amostragem --p1 0.01 --alfa 0.05 --p2 0.06 --beta 0.10 --lote 1000 --html plano.html
+utsim qualidade amostragem --n 80 --c 2 --lote 500
+```
+
+O comando projeta o plano simples de menor amostra que atende aos dois riscos: aceitar com probabilidade de pelo menos `1 - alfa` um lote com fração defeituosa `p1` (o nível de qualidade aceitável) e com probabilidade de no máximo `beta` um lote com `p2` (a qualidade limite). Com `--duplo`, projeta um plano de duas amostras iguais com o menor tamanho médio de amostra em `p1`. Com `--n` e `--c`, avalia um plano dado. A distribuição é a binomial (padrão), a hipergeométrica (`--dist hiper`, lote finito) ou a de Poisson.
+
+O relatório mostra a curva característica de operação, a qualidade média que sai com inspeção retificadora (AOQ) e o seu limite (AOQL), a inspeção total média por lote (ATI) e, no plano duplo, o tamanho médio da amostra (ASN). Os planos são calculados pelo programa. As tabelas das normas de amostragem não são embutidas: quem tem direito de uso cadastra os planos por CSV (`nome;n;c` ou `nome;n1;c1;r1;n2;c2`).
+
+Com `--aplicar modelo.ron --estacao inspecao --saida novo.ron`, o plano vira a fração amostral da estação de inspeção do modelo (uma peça a cada `lote / n`) e o simulador mostra o efeito sobre o escape, o custo e o fluxo. A decisão por lote e a inspeção completa dos lotes rejeitados não são simuladas peça a peça, e o relatório do plano as dá pelas fórmulas.
+
+Os planos de controle (característica, especificação, método, sistema de medição, frequência, amostra, carta e reação) e de inspeção (o que, como, quando, quem e o plano de amostragem) ficam por posto na pasta da unidade, no app UTSim Qualidade, e podem ser sugeridos a partir do modelo.
+
+## Dado real e dado simulado
+
+```bash
+utsim qualidade comparar medicoes_da_fabrica.csv --modelo examples/inspecao_e_retrabalho.ron --caracteristica diametro
+```
+
+O CSV da fábrica é lido do mesmo jeito que o `utsim qualidade carta` lê (codificação, vírgula decimal, coluna de rótulos, subgrupos), então as cartas e os limites são os mesmos para o mesmo arquivo, e o conjunto guarda o SHA-256 dos bytes lidos e a origem Real. O comando compara a característica real com a simulada: as médias com o intervalo de 95 % da diferença (teste de Welch), a razão dos desvios e a EWMA dos resíduos dos valores reais contra a média simulada, que mostra uma deriva como uma corrida para longe de zero. Serve para validar o modelo e para achar deriva no processo. No app UTSim Qualidade, a fase I estima os limites, a fase II aplica limites congelados, e cada sinal abre um cartão de reação com a reação escrita no plano de controle do posto.
