@@ -112,7 +112,6 @@ var team_from := ""
 ## Mouse position on screen (kept from the events, so scripted input works the same).
 var mouse := Vector2.ZERO
 
-var _press := {}
 var _drag_names: Array = []
 var _drag_offsets := {}
 var _box_rect: ColorRect
@@ -239,7 +238,8 @@ func set_tool(name: String, id := "") -> void:
 	tool = name
 	place_id = id if name == "colocar" else ""
 	team_from = ""
-	ed.set_tool(name if name in ["selecionar", "ligar", "zona", "rede"] else "selecionar")
+	ed.set_tool(name if name in ["selecionar", "ligar", "zona", "rede", "colocar", "equipe", "corredor"] else "selecionar")
+	ed.set_place_id(place_id)
 	_pull()
 	_show_ghost(place_id)
 	main.on_tool_changed()
@@ -470,6 +470,7 @@ func _pull() -> void:
 	serve_from = String(ed.serve_from())
 	_hover = String(ed.hover_name())
 	_hover_port = ed.hover_node()
+	team_from = String(ed.team_from())
 
 
 ## Applies what a gesture asked of the document (see `UtsimEditor`).
@@ -527,6 +528,8 @@ func _apply(effects: Array) -> void:
 			"mover_fim":
 				doc().end_drag()
 				main.after_edit()
+			"colocar":
+				_place_at(String(e["id"]), e["at"], bool(e["keep"]))
 			"zona_nova":
 				var name: String = doc().add_zone(e["points"])
 				if name == "":
@@ -627,10 +630,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				corredores.access_drag(mm.position)
 			return
 		if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-			if not _press.is_empty():
-				_on_drag(mm.position)
-			else:
-				_apply(ed.drag(mm.position))
+			_apply(ed.drag(mm.position))
 		return
 	var mb := event as InputEventMouseButton
 	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
@@ -677,6 +677,10 @@ func _place(id: String, p: Vector2, keep: bool) -> void:
 	if at == null:
 		main.set_status("Aponte para o chão para colocar o objeto.")
 		return
+	_place_at(id, at, keep)
+
+
+func _place_at(id: String, at: Vector3, keep: bool) -> void:
 	var name: String = doc().add(id, at, main.snap_step())
 	if name == "":
 		main.set_status("Não foi possível colocar: %s" % doc().last_error())
@@ -689,48 +693,11 @@ func _place(id: String, p: Vector2, keep: bool) -> void:
 	main.set_status("%s colocado." % name)
 	_feed()
 	_apply(ed.select_only(name).filter(func(x): return x["op"] == "status"))
-
-
 func _on_press(p: Vector2, shift: bool) -> void:
-	if tool == "colocar":
-		_place(place_id, p, shift)
-		return
-	if tool == "equipe" or (tool == "ligar" and _alt):
-		_team_press(p, hits_at(p), shift)
-		return
 	_feed()
+	ed.set_alt(_alt)
 	_apply(ed.press(p, shift))
-func _team_press(p: Vector2, hits: Array, shift: bool) -> void:
-	if team_from != "":
-		var from := team_from
-		team_from = ""
-		if hits.is_empty():
-			main.set_status("Equipe: clique no transportador ou despachante de destino.")
-			return
-		_team_link(from, hits[0], shift)
-		return
-	if hits.is_empty():
-		main.set_status("Equipe: comece num despachante ou num objeto.")
-		return
-	_press = {"pos": p, "shift": shift, "kind": "team", "name": hits[0]}
-	team_from = hits[0]
 
-
-func _team_link(from: String, to: String, operators: bool) -> void:
-	if from == to:
-		main.set_status("Equipe: solte sobre outro objeto.")
-		return
-	var r: Dictionary = doc().team_link(from, to, operators)
-	if r["ok"]:
-		main.after_edit()
-	main.set_status(("" if r["ok"] else "Não mudou: ") + String(r["message"]))
-
-
-## A drag of the Equipe tool (the others are Rust's).
-func _on_drag(p: Vector2) -> void:
-	var start: Vector2 = _press["pos"]
-	if p.distance_to(start) >= DRAG_PIXELS:
-		_press["moved"] = true
 
 
 func _doc_positions() -> Dictionary:
@@ -741,22 +708,7 @@ func _doc_positions() -> Dictionary:
 
 
 func _on_release(p: Vector2) -> void:
-	if _press.is_empty():
-		_apply(ed.release(p))
-		return
-	# The Equipe tool.
-	var press := _press
-	_press = {}
-	if not press.get("moved", false):
-		# A click: the next click is the destination.
-		main.set_status("Equipe: %s → clique no destino (Esc cancela)." % press["name"])
-		return
-	team_from = ""
-	var hits := hits_at(p)
-	if hits.is_empty():
-		main.set_status("Equipe: solte sobre o transportador ou despachante.")
-		return
-	_team_link(press["name"], hits[0], press["shift"])
+	_apply(ed.release(p))
 ## Cancels, in order: placing, a connection begun, the Ligar tool, the selection.
 func cancel() -> void:
 	if tool == "rede":
@@ -769,9 +721,8 @@ func cancel() -> void:
 		return
 	if tool == "colocar":
 		set_tool("selecionar")
-	elif team_from != "":
+	elif ed.team_cancel():
 		team_from = ""
-		_press = {}
 		main.set_status("Equipe: cancelado.")
 	elif tool == "equipe":
 		set_tool("selecionar")
