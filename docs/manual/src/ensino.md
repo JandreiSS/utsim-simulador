@@ -100,6 +100,8 @@ A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo
 
 Abaixo vêm a vista 2D, com uma replicação da fábrica animada (estações coloridas e com o estado escrito, filas como pilhas, peças andando nas setas), e as dicas automáticas, que explicam o que aconteceu e não descontam pontos.
 
+Quando o UTSim está instalado pelo launcher no mesmo computador, aparece "Ver em 3D". O botão grava o modelo da tentativa (com a variante e as decisões do aluno) e a replicação animada na pasta do perfil (`3d/`) e abre o cliente 3D já mostrando a fábrica. Se o UTSim instalado ainda não tiver o cliente 3D, abre o visualizador com o modelo.
+
 ### Nota
 
 A nota vai de 0 a 100 e tem quatro partes.
