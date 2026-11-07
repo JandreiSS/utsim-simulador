@@ -7,7 +7,7 @@
 use godot::prelude::*;
 
 use crate::editor3d::{
-    Block, Camera, Conn, Editor3d, Effect, Mark, PreviewKind, Side, TeamLine, V2, V3,
+    Block, Camera, Conn, Editor3d, Effect, Mark, PreviewKind, Side, TeamLine, V2, V3, ZoneView,
 };
 
 fn v2(p: Vector2) -> V2 {
@@ -48,6 +48,10 @@ fn team_dict(t: &TeamLine) -> VarDictionary {
 }
 fn names(v: &[String]) -> PackedStringArray {
     v.iter().map(|n| GString::from(n.as_str())).collect()
+}
+
+fn pts(v: &[V3]) -> PackedVector3Array {
+    v.iter().map(|p| g3(*p)).collect()
 }
 
 fn effects(list: Vec<Effect>) -> VarArray {
@@ -97,6 +101,42 @@ fn effects(list: Vec<Effect>) -> VarArray {
             Effect::Remove(n) => {
                 d.set("op", &GString::from("remover"));
                 d.set("names", &names(&n));
+            }
+            Effect::ZoneAdd(points) => {
+                d.set("op", &GString::from("zona_nova"));
+                d.set("points", &pts(&points));
+            }
+            Effect::ZoneSet { name, points } => {
+                d.set("op", &GString::from("zona_forma"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("points", &pts(&points));
+            }
+            Effect::NetAddNode(at) => {
+                d.set("op", &GString::from("rede_no"));
+                d.set("at", g3(at));
+            }
+            Effect::NetMoveNode { name, at } => {
+                d.set("op", &GString::from("rede_mover"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("at", g3(at));
+            }
+            Effect::NetAddEdge { from, to } => {
+                d.set("op", &GString::from("rede_trecho"));
+                d.set("from", &GString::from(from.as_str()));
+                d.set("to", &GString::from(to.as_str()));
+            }
+            Effect::NetRemoveEdge { from, to } => {
+                d.set("op", &GString::from("rede_trecho_excluir"));
+                d.set("from", &GString::from(from.as_str()));
+                d.set("to", &GString::from(to.as_str()));
+            }
+            Effect::NetRemoveNode(name) => {
+                d.set("op", &GString::from("rede_no_excluir"));
+                d.set("name", &GString::from(name.as_str()));
+            }
+            Effect::ZoneRemove(name) => {
+                d.set("op", &GString::from("zona_excluir"));
+                d.set("name", &GString::from(name.as_str()));
             }
         }
         out.push(&d.to_variant());
@@ -207,6 +247,165 @@ impl UtsimEditor {
             .collect();
         self.ed.hidden = hidden.as_slice().iter().map(|g| g.to_string()).collect();
         self.ed.set_scene(blocks, conns, teams);
+    }
+
+    /// The risk zones: {name, points (floor, Godot), level (0 = none)}.
+    #[func]
+    fn set_zones(&mut self, zones: VarArray) {
+        let list = zones
+            .iter_shared()
+            .filter_map(|v| v.try_to::<VarDictionary>().ok())
+            .map(|d| ZoneView {
+                name: s(&d, "name"),
+                points: d
+                    .get("points")
+                    .and_then(|v| v.try_to::<PackedVector3Array>().ok())
+                    .map(|a| a.as_slice().iter().map(|p| v3(*p)).collect())
+                    .unwrap_or_default(),
+                level: d
+                    .get("level")
+                    .and_then(|v| v.try_to::<i64>().ok())
+                    .filter(|l| *l > 0)
+                    .map(|l| l as u8),
+            })
+            .collect();
+        self.ed.set_zones(list);
+    }
+
+    /// The path network: `nodes` ({name, position}) and `edges` ({from, to}).
+    #[func]
+    fn set_network(&mut self, nodes: VarArray, edges: VarArray) {
+        let dicts = |a: &VarArray| -> Vec<VarDictionary> {
+            a.iter_shared()
+                .filter_map(|v| v.try_to::<VarDictionary>().ok())
+                .collect()
+        };
+        let nodes = dicts(&nodes)
+            .iter()
+            .map(|d| {
+                let at = d
+                    .get("position")
+                    .and_then(|v| v.try_to::<Vector3>().ok())
+                    .map_or([0.0; 3], v3);
+                (s(d, "name"), at)
+            })
+            .collect();
+        let edges = dicts(&edges)
+            .iter()
+            .map(|d| (s(d, "from"), s(d, "to")))
+            .collect();
+        self.ed.set_network(nodes, edges);
+    }
+
+    /// The network state for the script: `{armed, node, edge ([from, to] or []), drag (the
+    /// node dragged and where, or {})}`.
+    #[func]
+    fn network_state(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        d.set("armed", &GString::from(self.ed.armed.as_str()));
+        d.set("node", &GString::from(self.ed.net_node.as_str()));
+        let edge = self
+            .ed
+            .net_edge
+            .as_ref()
+            .map_or(PackedStringArray::new(), |(a, b)| {
+                names(&[a.clone(), b.clone()])
+            });
+        d.set("edge", &edge);
+        d
+    }
+
+    /// Where node `name` is drawn now, or null.
+    #[func]
+    fn net_position(&self, name: GString) -> Variant {
+        opt3(self.ed.net_position(&name.to_string()))
+    }
+
+    #[func]
+    fn net_node_screen(&self, name: GString) -> Variant {
+        opt2(
+            self.ed
+                .net_position(&name.to_string())
+                .and_then(|w| self.ed.camera.project(w)),
+        )
+    }
+
+    #[func]
+    fn net_placed(&mut self, name: GString) {
+        self.ed.net_placed(&name.to_string());
+    }
+
+    /// Selects a node or an edge from the script (the panel renames, reverses).
+    #[func]
+    fn net_select(&mut self, node: GString, edge: PackedStringArray) {
+        self.ed.net_node = node.to_string();
+        let e: Vec<String> = edge.as_slice().iter().map(|g| g.to_string()).collect();
+        self.ed.net_edge = (e.len() == 2).then(|| (e[0].clone(), e[1].clone()));
+    }
+
+    #[func]
+    fn set_armed(&mut self, name: GString) {
+        self.ed.armed = name.to_string();
+    }
+
+    #[func]
+    fn net_cancel(&mut self) -> bool {
+        self.ed.net_cancel()
+    }
+
+    #[func]
+    fn net_delete(&mut self) -> VarArray {
+        effects(self.ed.net_delete())
+    }
+
+    /// The grid step new points snap to (0: none).
+    #[func]
+    fn set_snap(&mut self, step: f64) {
+        self.ed.snap = step;
+    }
+
+    /// The next press is a double click.
+    #[func]
+    fn set_double(&mut self, on: bool) {
+        self.ed.double = on;
+    }
+
+    #[func]
+    fn zone_finish(&mut self) -> VarArray {
+        effects(self.ed.zone_finish())
+    }
+
+    #[func]
+    fn zone_back(&mut self) {
+        self.ed.zone_back();
+    }
+
+    #[func]
+    fn selected_zone(&self) -> GString {
+        self.ed.selected_zone.as_str().into()
+    }
+
+    #[func]
+    fn select_zone(&mut self, name: GString) {
+        self.ed.selected_zone = name.to_string();
+    }
+
+    #[func]
+    fn zone_drawing_count(&self) -> i64 {
+        self.ed.zone_points.len() as i64
+    }
+
+    #[func]
+    fn zone_vertex_screen(&self, name: GString, k: i64) -> Variant {
+        opt2(
+            self.ed
+                .zone_vertex_screen(&name.to_string(), k.max(0) as usize),
+        )
+    }
+
+    #[func]
+    fn zone_screen(&self, name: GString) -> Variant {
+        opt2(self.ed.zone_screen(&name.to_string()))
     }
 
     /// Where block `name` is drawn now (during a move).
@@ -473,6 +672,19 @@ impl UtsimEditor {
             preview.push(&GString::from(k).to_variant());
         }
         d.set("preview", &preview);
+        let mut zones = VarArray::new();
+        for (z, sel) in &o.zones {
+            let mut a = VarDictionary::new();
+            a.set("name", &GString::from(z.name.as_str()));
+            a.set("points", &pts(&z.points));
+            a.set("level", z.level.map_or(0, i64::from));
+            a.set("selected", *sel);
+            let c = crate::zone_edit::level_color(z.level);
+            a.set("color", Color::from_rgb(c[0], c[1], c[2]));
+            zones.push(&a.to_variant());
+        }
+        d.set("zones", &zones);
+        d.set("zone_drawing", &pts(&o.zone_drawing));
         d.set(
             "box",
             &o.boxing.map_or(Variant::nil(), |(a, b)| {

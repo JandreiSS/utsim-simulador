@@ -61,6 +61,7 @@
 ##    `{"item": ["Lista", 0]}` (an item of an ItemList),
 ##    `{"ligacao": ["de", "para"]}` (the middle of a connection's line) or
 ##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's nodes),
+##    `{"zona": "zona_1"}` (the middle of a risk zone), `{"vertice_zona": ["zona_1", 0]}`,
 ##    `{"remover_ligacao": true}` (the × of the selected connection or team line),
 ##    `{"no_atende": "operador_1"}` (the orange service node of a transporter or dispatcher),
 ##    `{"linha_equipe": ["operadores", "processo", "operador_1"]}` (the middle of a team line),
@@ -552,6 +553,12 @@ func _target(t: Variant) -> Variant:
 	if d.has("linha_equipe"):
 		var l: Array = d["linha_equipe"]
 		return _main.editor.team_line_screen(String(l[0]), String(l[1]), String(l[2]))
+	if d.has("zona"):
+		_main.editor._feed()
+		return _main.editor.ed.zone_screen(String(d["zona"]))
+	if d.has("vertice_zona"):
+		_main.editor._feed()
+		return _main.editor.ed.zone_vertex_screen(String(d["vertice_zona"][0]), int(d["vertice_zona"][1]))
 	if d.has("remover_ligacao"):
 		return _main.editor.remove_screen()
 	if d.has("ligacao"):
@@ -729,7 +736,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## the reference, comments and formatting aside; each difference is a failure),
 ## `status_contem` (text), `reproduzindo` (bool), `tempo_maior_que`, `pode_desfazer`,
 ## `pode_refazer`, `ferramenta`, `ligando` (the origin of a connection being made, or ""),
-## `ligacao_selecionada` (`[de, para]`, or []), `janela_valores` ({aberta, linhas,
+## `zonas` (count), `zona_selecionada` (name), `zona_def` ({nome, tipo, nivel, epi, pontos,
+## x0, y0}: a risk zone of the document, model plan), `ligacao_selecionada` (`[de, para]`, or []), `janela_valores` ({aberta, linhas,
 ## linhas_maior_que, comparado, escolhida, ordem, candidatas_maior_que}: the "Valores
 ## reais…" window), `no_destacado` (the node under the mouse,
 ## `[bloco, "out"|"in"|"service"]`, or []), `linha_equipe` / `sem_linha_equipe`
@@ -846,6 +854,28 @@ func _check(c: Dictionary, k: int) -> void:
 			"ligacao_selecionada":
 				var sel: Array = _main.editor.selected_link
 				report.call("ligação selecionada", sel == Array(want), str(sel))
+			"zonas":
+				report.call("zonas", _main.doc.zones().size() == int(want), str(_main.doc.zones().size()))
+			"zona_selecionada":
+				report.call("zona selecionada", _main.editor.selected_zone() == String(want), _main.editor.selected_zone())
+			"zona_def":
+				var found := {}
+				for z in _main.doc.zones():
+					if z["name"] == want["nome"]:
+						found = z
+				report.call("zona %s" % want["nome"], not found.is_empty(), "não existe")
+				if not found.is_empty():
+					if want.has("tipo"):
+						report.call("tipo da zona", found["kind"] == want["tipo"], str(found["kind"]))
+					if want.has("nivel"):
+						report.call("nível da zona", int(found["level"]) == int(want["nivel"]), str(found["level"]))
+					if want.has("epi"):
+						report.call("EPI da zona", Array(found["ppe"]) == Array(want["epi"]), str(found["ppe"]))
+					if want.has("pontos"):
+						report.call("pontos da zona", (found["points"] as PackedVector3Array).size() == int(want["pontos"]), str((found["points"] as PackedVector3Array).size()))
+					if want.has("x0"):
+						var p0: Vector3 = (found["points"] as PackedVector3Array)[0]
+						report.call("primeiro ponto da zona", absf(p0.x - float(want["x0"])) < 1e-4 and absf(-p0.z - float(want["y0"])) < 1e-4, "(%s, %s)" % [p0.x, -p0.z])
 			"janela_valores":
 				var info: Dictionary = _egui().fitwin_info() if _egui() != null else {}
 				for wk in want:
