@@ -70,6 +70,50 @@ pub enum Cmd {
         #[arg(long)]
         html: Option<PathBuf>,
     },
+    /// Plano de amostragem por atributos: projeta pelo risco do produtor e do consumidor ou
+    /// avalia um plano dado, com curva OC, AOQ, AOQL, ATI e ASN, e aplica o plano a uma
+    /// estação de inspeção de um modelo
+    Amostragem {
+        /// Amostra (plano simples dado)
+        #[arg(long)]
+        n: Option<u64>,
+        /// Número de aceitação (plano simples dado)
+        #[arg(long)]
+        c: Option<u64>,
+        /// Nível de qualidade aceitável (fração defeituosa) para projetar
+        #[arg(long)]
+        p1: Option<f64>,
+        /// Risco do produtor
+        #[arg(long, default_value_t = 0.05)]
+        alfa: f64,
+        /// Qualidade limite (fração defeituosa) para projetar
+        #[arg(long)]
+        p2: Option<f64>,
+        /// Risco do consumidor
+        #[arg(long, default_value_t = 0.10)]
+        beta: f64,
+        /// Projeta um plano duplo (duas amostras iguais)
+        #[arg(long)]
+        duplo: bool,
+        /// Tamanho do lote (AOQ, ATI; com --dist hiper, a hipergeométrica)
+        #[arg(long)]
+        lote: Option<u64>,
+        /// binomial (padrão), hiper ou poisson
+        #[arg(long, default_value = "binomial")]
+        dist: String,
+        /// Grava o relatório em HTML
+        #[arg(long)]
+        html: Option<PathBuf>,
+        /// Modelo (.ron) onde aplicar o plano (com --estacao e --saida)
+        #[arg(long)]
+        aplicar: Option<PathBuf>,
+        /// Estação de inspeção do modelo que recebe o plano
+        #[arg(long)]
+        estacao: Option<String>,
+        /// Modelo gravado com o plano aplicado
+        #[arg(long)]
+        saida: Option<PathBuf>,
+    },
     /// Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
     Carta {
         arquivo: PathBuf,
@@ -223,6 +267,35 @@ pub fn run(cmd: Cmd) -> Result<(), String> {
             html,
             csv,
         } => simulado(&model, reps, html.as_deref(), csv.as_deref()),
+        Cmd::Amostragem {
+            n,
+            c,
+            p1,
+            alfa,
+            p2,
+            beta,
+            duplo,
+            lote,
+            dist,
+            html,
+            aplicar,
+            estacao,
+            saida,
+        } => amostragem(Amostra {
+            n,
+            c,
+            p1,
+            alfa,
+            p2,
+            beta,
+            duplo,
+            lote,
+            dist,
+            html,
+            aplicar,
+            estacao,
+            saida,
+        }),
         Cmd::Custos {
             model,
             reps,
@@ -956,6 +1029,125 @@ fn custos(
     if let Some(p) = html {
         std::fs::write(p, custos::html(&r, c.as_ref())).map_err(|e| e.to_string())?;
         println!("Relatório: {}", p.display());
+    }
+    Ok(())
+}
+
+/// Arguments of `utsim qualidade amostragem`.
+struct Amostra {
+    n: Option<u64>,
+    c: Option<u64>,
+    p1: Option<f64>,
+    alfa: f64,
+    p2: Option<f64>,
+    beta: f64,
+    duplo: bool,
+    lote: Option<u64>,
+    dist: String,
+    html: Option<PathBuf>,
+    aplicar: Option<PathBuf>,
+    estacao: Option<String>,
+    saida: Option<PathBuf>,
+}
+
+/// `utsim qualidade amostragem`.
+fn amostragem(a: Amostra) -> Result<(), String> {
+    use utsim_qualidade_core::amostragem::{
+        Distribuicao, Plano, Riscos, aoql, desempenho, para_inspecao, projetar_duplo,
+        projetar_simples,
+    };
+    let dist = match a.dist.as_str() {
+        "binomial" => Distribuicao::Binomial,
+        "poisson" => Distribuicao::Poisson,
+        "hiper" | "hipergeometrica" => Distribuicao::Hipergeometrica {
+            lote: a.lote.ok_or("--dist hiper precisa de --lote")?,
+        },
+        outra => return Err(format!("distribuição desconhecida: {outra}")),
+    };
+    let riscos = match (a.p1, a.p2) {
+        (Some(p1), Some(p2)) => Some(Riscos {
+            p1,
+            alfa: a.alfa,
+            p2,
+            beta: a.beta,
+        }),
+        _ => None,
+    };
+    if let Some(r) = &riscos {
+        let p = r.problemas();
+        if !p.is_empty() {
+            return Err(p.join("\n"));
+        }
+    }
+    let plano = match (a.n, a.c, &riscos) {
+        (Some(n), Some(c), _) => Plano::Simples { n, c },
+        (_, _, Some(r)) => {
+            let p = if a.duplo {
+                projetar_duplo(r, dist)
+            } else {
+                projetar_simples(r, dist)
+            };
+            p.ok_or("nenhum plano atende aos dois riscos dentro dos limites da busca")?
+        }
+        _ => return Err("dê --n e --c, ou --p1 e --p2 para projetar o plano".into()),
+    };
+    match plano {
+        Plano::Simples { n, c } => println!("Plano simples: amostra de {n}, aceita com até {c}"),
+        Plano::Duplo { n1, c1, r1, n2, c2 } => {
+            println!("Plano duplo: n1 = {n1}, c1 = {c1}, r1 = {r1}; n2 = {n2}, c2 = {c2}")
+        }
+    }
+    if let Some(r) = &riscos {
+        println!(
+            "  aceita em p1 = {}: {:.4} (pedido >= {:.4}); em p2 = {}: {:.4} (pedido <= {:.4})",
+            r.p1,
+            desempenho(plano, r.p1, dist, a.lote).pa,
+            1.0 - r.alfa,
+            r.p2,
+            desempenho(plano, r.p2, dist, a.lote).pa,
+            r.beta
+        );
+    }
+    if let Some(n) = a.lote {
+        let (l, p) = aoql(plano, dist, n);
+        println!("  lote de {n}: AOQL = {l:.5} em p = {p:.4}");
+    }
+    if let Some(p) = &a.html {
+        std::fs::write(
+            p,
+            utsim_qualidade_core::relatorio::html_amostragem(plano, dist, a.lote, riscos.as_ref()),
+        )
+        .map_err(|e| e.to_string())?;
+        println!("Relatório: {}", p.display());
+    }
+    if let Some(m) = &a.aplicar {
+        let estacao = a
+            .estacao
+            .as_deref()
+            .ok_or("--aplicar precisa de --estacao")?;
+        let saida = a.saida.as_ref().ok_or("--aplicar precisa de --saida")?;
+        let lote = a.lote.ok_or("--aplicar precisa de --lote")?;
+        let mut model = utsim_model::Model::load(m).map_err(|e| e.to_string())?;
+        let obj = model
+            .objects
+            .iter_mut()
+            .find(|o| o.name == estacao)
+            .ok_or_else(|| format!("objeto '{estacao}' não existe no modelo"))?;
+        let base = obj
+            .inspection
+            .as_deref()
+            .ok_or_else(|| format!("'{estacao}' não é uma estação de inspeção"))?
+            .clone();
+        let nova = para_inspecao(plano, lote, &base);
+        println!(
+            "  {estacao}: inspeciona uma peça a cada {} (fração amostral do plano)",
+            nova.every
+        );
+        obj.inspection = Some(Box::new(nova));
+        let texto = ron::ser::to_string_pretty(&model, ron::ser::PrettyConfig::default())
+            .map_err(|e| e.to_string())?;
+        std::fs::write(saida, texto).map_err(|e| e.to_string())?;
+        println!("Modelo com o plano: {}", saida.display());
     }
     Ok(())
 }
