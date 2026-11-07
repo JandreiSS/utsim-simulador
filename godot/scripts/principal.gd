@@ -246,6 +246,7 @@ func _build_ui() -> void:
 	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
 	# answers them itself, so it keeps the Godot ones.
 	scripted = Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	_open_from_args.call_deferred()
 	if DisplayServer.get_name() != "headless" and not scripted:
 		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
 			d.use_native_dialog = true
@@ -1687,6 +1688,18 @@ func apply_warmup(warmup: float) -> void:
 
 ## Opens a replay recorded by `utsim run --replay` or "Gravar replay": it plays in
 ## Simular (with the statistics of that replication); the document is not touched.
+## `--utsim-abrir=<arquivo>` (the Ensino's "Ver em 3D", or any caller): opens that model
+## (`.ron`) or replay (`.json`, `utsim_model::replay::Replay` as JSON) when the scene starts.
+func _open_from_args() -> void:
+	for a in OS.get_cmdline_user_args():
+		var arg := String(a)
+		if arg.begins_with("--utsim-abrir="):
+			var path := arg.trim_prefix("--utsim-abrir=")
+			if not open_model(path):
+				set_status("Não abriu %s (pedido na linha de comando)." % path.get_file())
+			return
+
+
 func open_replay(path: String) -> bool:
 	set_playing(false)
 	var m: Object = ClassDB.instantiate(&"UtsimModel")
