@@ -462,6 +462,53 @@ pub enum Effect {
         to: String,
     },
     NetRemoveNode(String),
+    /// The Colocar tool: an object of library entry `id` at this floor point (`keep`: the
+    /// tool stays, Shift).
+    Place {
+        id: String,
+        at: V3,
+        keep: bool,
+    },
+    /// The Corredor tool: a new aisle along these points (already snapped by the script).
+    AisleAdd(Vec<V3>),
+    AisleMoveVertex {
+        name: String,
+        index: usize,
+        at: V3,
+    },
+    AisleInsert {
+        name: String,
+        segment: usize,
+        at: V3,
+    },
+    AisleRemove(String),
+}
+
+/// What a press of the Corredor tool began.
+#[derive(Clone, Debug, PartialEq)]
+enum AislePress {
+    Vertex {
+        name: String,
+        index: usize,
+        pos: V2,
+    },
+    Line(String),
+    Insert {
+        name: String,
+        segment: usize,
+        at: V3,
+    },
+    Floor(V3),
+}
+
+/// What a press of the Equipe tool began: the object it starts at, Shift (operators) and
+/// whether it was dragged.
+#[derive(Clone, Debug, PartialEq)]
+struct TeamPress {
+    from: String,
+    shift: bool,
+    pos: V2,
+    moved: bool,
 }
 
 /// What a press of the Rede tool began: a node (to drag or to click), or the floor.
@@ -558,6 +605,21 @@ pub struct Editor3d {
     pub net_edge: Option<(String, String)>,
     net_press: Option<NetPress>,
     pub net_drag_at: Option<V3>,
+    /// The Colocar tool's library entry.
+    pub place_id: String,
+    /// The Equipe tool: the start of a link made by two clicks, and the drag under way.
+    /// `alt` turns the Ligar tool into Equipe while held.
+    pub team_from: String,
+    team_press: Option<TeamPress>,
+    pub alt: bool,
+    /// The aisles (name, centre line), the one selected (and its vertex) and the one being
+    /// drawn (snapped points), and the vertex dragged (where to, snapped by the script).
+    pub aisles: Vec<(String, Vec<V3>)>,
+    pub aisle: String,
+    pub aisle_vertex: Option<usize>,
+    pub aisle_points: Vec<V3>,
+    aisle_press: Option<AislePress>,
+    pub aisle_drag_at: Option<V3>,
     /// The grid step points snap to (0: none) and whether the press is a double click.
     pub snap: f64,
     pub double: bool,
@@ -983,6 +1045,11 @@ impl Editor3d {
 
     pub fn set_tool(&mut self, tool: &str) {
         self.tool = tool.to_owned();
+        self.team_from.clear();
+        self.team_press = None;
+        self.aisle_points.clear();
+        self.aisle_press = None;
+        self.aisle_drag_at = None;
         self.net_press = None;
         self.net_drag_at = None;
         self.zone_points.clear();
@@ -1015,6 +1082,12 @@ impl Editor3d {
         }
         if self.tool == "rede" {
             return self.net_press(p);
+        }
+        if self.tool == "colocar" {
+            return self.place_press(p, shift);
+        }
+        if self.tool == "equipe" || (self.tool == "ligar" && self.alt) {
+            return self.team_press_at(p, shift);
         }
         let mut out = Vec::new();
         self.mouse = p;
@@ -1139,6 +1212,13 @@ impl Editor3d {
             self.net_drag_to(p);
             return Vec::new();
         }
+        if let Some(t) = self.team_press.as_mut() {
+            self.mouse = p;
+            if dist2(p, t.pos) >= DRAG_PIXELS {
+                t.moved = true;
+            }
+            return Vec::new();
+        }
         let mut out = Vec::new();
         self.mouse = p;
         let Some(press) = self.press.as_mut() else {
@@ -1187,6 +1267,9 @@ impl Editor3d {
         }
         if self.tool == "rede" {
             return self.net_release();
+        }
+        if self.team_press.is_some() {
+            return self.team_release(p);
         }
         let mut out = Vec::new();
         self.mouse = p;
@@ -1434,6 +1517,327 @@ impl Editor3d {
             o.zone_drawing = pts;
         }
         o
+    }
+
+    // ----- the Colocar and Equipe tools ------------------------------------------------
+
+    fn place_press(&mut self, p: V2, keep: bool) -> Vec<Effect> {
+        self.mouse = p;
+        match self.camera.floor_at(p) {
+            Some(at) if !self.place_id.is_empty() => vec![Effect::Place {
+                id: self.place_id.clone(),
+                at,
+                keep,
+            }],
+            Some(_) => Vec::new(),
+            None => vec![Effect::Status(
+                "Aponte para o chão para colocar o objeto.".into(),
+            )],
+        }
+    }
+
+    fn team_press_at(&mut self, p: V2, shift: bool) -> Vec<Effect> {
+        self.mouse = p;
+        let hits = self.hits_at(p);
+        if !self.team_from.is_empty() {
+            let from = std::mem::take(&mut self.team_from);
+            return match hits.first() {
+                Some(to) => self.team_effect(&from, to, shift),
+                None => vec![Effect::Status(
+                    "Equipe: clique no transportador ou despachante de destino.".into(),
+                )],
+            };
+        }
+        let Some(from) = hits.first().cloned() else {
+            return vec![Effect::Status(
+                "Equipe: comece num despachante ou num objeto.".into(),
+            )];
+        };
+        self.team_from = from.clone();
+        self.team_press = Some(TeamPress {
+            from,
+            shift,
+            pos: p,
+            moved: false,
+        });
+        Vec::new()
+    }
+
+    fn team_release(&mut self, p: V2) -> Vec<Effect> {
+        let Some(t) = self.team_press.take() else {
+            return Vec::new();
+        };
+        if !t.moved {
+            // A click: the next click is the destination.
+            return vec![Effect::Status(format!(
+                "Equipe: {} → clique no destino (Esc cancela).",
+                t.from
+            ))];
+        }
+        self.team_from.clear();
+        match self.hits_at(p).first() {
+            Some(to) => self.team_effect(&t.from, to, t.shift),
+            None => vec![Effect::Status(
+                "Equipe: solte sobre o transportador ou despachante.".into(),
+            )],
+        }
+    }
+
+    /// The `team_link` of the Equipe tool (the document says what changed).
+    fn team_effect(&self, from: &str, to: &str, operators: bool) -> Vec<Effect> {
+        if from == to {
+            return vec![Effect::Status("Equipe: solte sobre outro objeto.".into())];
+        }
+        vec![Effect::Team {
+            from: from.to_owned(),
+            to: to.to_owned(),
+            operators,
+            ok: String::new(),
+            removed: false,
+        }]
+    }
+
+    /// Esc with the Equipe tool: the link begun by a click (true when there was one).
+    pub fn team_cancel(&mut self) -> bool {
+        self.team_press = None;
+        !std::mem::take(&mut self.team_from).is_empty()
+    }
+
+    // ----- the Corredor tool -----------------------------------------------------------
+
+    /// The aisles (name, centre line). The selection stays if it still exists.
+    pub fn set_aisles(&mut self, aisles: Vec<(String, Vec<V3>)>) {
+        match aisles.iter().find(|a| a.0 == self.aisle) {
+            None => {
+                self.aisle.clear();
+                self.aisle_vertex = None;
+            }
+            Some(a) => {
+                if self.aisle_vertex.is_some_and(|k| k >= a.1.len()) {
+                    self.aisle_vertex = None;
+                }
+            }
+        }
+        self.aisles = aisles;
+    }
+
+    /// Where vertex `index` of aisle `name` is drawn (where it is dragged to, while dragged).
+    pub fn aisle_vertex_pos(&self, name: &str, index: usize) -> Option<V3> {
+        if let (
+            Some(AislePress::Vertex {
+                name: n, index: k, ..
+            }),
+            Some(at),
+        ) = (&self.aisle_press, self.aisle_drag_at)
+            && n == name
+            && *k == index
+        {
+            return Some(at);
+        }
+        self.aisles
+            .iter()
+            .find(|a| a.0 == name)
+            .and_then(|a| a.1.get(index).copied())
+    }
+
+    /// The vertex nearest to `p` within 12 px (the selected aisle wins ties).
+    pub fn aisle_vertex_at(&self, p: V2) -> Option<(String, usize)> {
+        let mut best = 12.0;
+        let mut hit = None;
+        for (name, pts) in &self.aisles {
+            for k in 0..pts.len() {
+                let Some(w) = self.aisle_vertex_pos(name, k) else {
+                    continue;
+                };
+                if let Some(sp) = self.camera.project(w) {
+                    let d = dist2(sp, p);
+                    if d < best || (d == best && *name == self.aisle) {
+                        best = d;
+                        hit = Some((name.clone(), k));
+                    }
+                }
+            }
+        }
+        hit
+    }
+
+    /// The centre line nearest to `p` within 9 px: the aisle and the segment.
+    pub fn aisle_line_at(&self, p: V2) -> Option<(String, usize)> {
+        let mut best = 9.0;
+        let mut hit = None;
+        for (name, pts) in &self.aisles {
+            for k in 0..pts.len().saturating_sub(1) {
+                let (Some(a), Some(b)) =
+                    (self.camera.project(pts[k]), self.camera.project(pts[k + 1]))
+                else {
+                    continue;
+                };
+                let d = segment_distance(p, a, b);
+                if d < best || (d == best && *name == self.aisle) {
+                    best = d;
+                    hit = Some((name.clone(), k));
+                }
+            }
+        }
+        hit
+    }
+
+    /// The vertex being dragged, `(aisle, index)`, for the script to snap the point to the
+    /// other aisles.
+    pub fn aisle_dragging(&self) -> Option<(String, usize)> {
+        match &self.aisle_press {
+            Some(AislePress::Vertex { name, index, .. }) => Some((name.clone(), *index)),
+            _ => None,
+        }
+    }
+
+    /// A press of the Corredor tool; `floor` is the floor point under `p` already snapped
+    /// (to the grid and to the other aisles) by the script.
+    pub fn aisle_press_at(&mut self, p: V2, shift: bool, floor: Option<V3>) -> Vec<Effect> {
+        self.mouse = p;
+        self.aisle_press = None;
+        if !self.aisle_points.is_empty() {
+            if let Some(f) = floor {
+                self.aisle_press = Some(AislePress::Floor(f));
+            }
+            return Vec::new();
+        }
+        if !shift && let Some((name, index)) = self.aisle_vertex_at(p) {
+            self.aisle_press = Some(AislePress::Vertex {
+                name,
+                index,
+                pos: p,
+            });
+            return Vec::new();
+        }
+        let line = self.aisle_line_at(p);
+        match (line, shift, floor) {
+            (Some((name, _)), false, _) => self.aisle_press = Some(AislePress::Line(name)),
+            (Some((name, segment)), true, Some(at)) if name == self.aisle => {
+                // Shift on the selected line: a bend in the middle of it.
+                self.aisle_press = Some(AislePress::Insert { name, segment, at });
+            }
+            (_, _, Some(f)) => self.aisle_press = Some(AislePress::Floor(f)),
+            (_, _, None) => {
+                return vec![Effect::Status(
+                    "Aponte para o chão para pôr um ponto do corredor.".into(),
+                )];
+            }
+        }
+        Vec::new()
+    }
+
+    /// The vertex dragged goes to `at` (snapped by the script) once the mouse moved enough.
+    pub fn aisle_drag_to(&mut self, p: V2, at: Option<V3>) {
+        self.mouse = p;
+        if let Some(AislePress::Vertex { pos, .. }) = &self.aisle_press
+            && (self.aisle_drag_at.is_some() || dist2(p, *pos) >= DRAG_PIXELS)
+            && let Some(at) = at
+        {
+            self.aisle_drag_at = Some(at);
+        }
+    }
+
+    pub fn aisle_release(&mut self) -> Vec<Effect> {
+        let Some(press) = self.aisle_press.take() else {
+            return Vec::new();
+        };
+        let dragged = self.aisle_drag_at.take();
+        match press {
+            AislePress::Vertex { name, index, .. } => {
+                if let Some(at) = dragged {
+                    self.aisle = name.clone();
+                    self.aisle_vertex = Some(index);
+                    return vec![Effect::AisleMoveVertex { name, index, at }];
+                }
+                self.select_aisle(&name, Some(index))
+            }
+            AislePress::Line(name) => self.select_aisle(&name, None),
+            AislePress::Insert { name, segment, at } => {
+                self.aisle_vertex = Some(segment + 1);
+                vec![Effect::AisleInsert { name, segment, at }]
+            }
+            AislePress::Floor(at) => {
+                if self
+                    .aisle_points
+                    .last()
+                    .is_some_and(|l| len(sub(*l, at)) < 0.02)
+                {
+                    return self.aisle_finish();
+                }
+                self.aisle.clear();
+                self.aisle_vertex = None;
+                self.aisle_points.push(at);
+                let msg = if self.aisle_points.len() == 1 {
+                    "Corredor: clique os próximos pontos; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela.".to_owned()
+                } else {
+                    format!(
+                        "{} ponto(s). Enter ou duplo clique termina.",
+                        self.aisle_points.len()
+                    )
+                };
+                vec![Effect::Selection, Effect::Status(msg)]
+            }
+        }
+    }
+
+    fn select_aisle(&mut self, name: &str, vertex: Option<usize>) -> Vec<Effect> {
+        self.aisle = name.to_owned();
+        self.aisle_vertex = vertex;
+        let msg = match vertex {
+            Some(k) => format!(
+                "Vértice {} de {name} selecionado (arraste para mover).",
+                k + 1
+            ),
+            None => format!(
+                "Corredor {name} selecionado (Del exclui; Shift + clique na linha acrescenta um vértice)."
+            ),
+        };
+        vec![Effect::Selection, Effect::Status(msg)]
+    }
+
+    /// Enter (or a click on the last point): the aisle being drawn ends. Empty when none.
+    pub fn aisle_finish(&mut self) -> Vec<Effect> {
+        if self.aisle_points.is_empty() {
+            return Vec::new();
+        }
+        let line = std::mem::take(&mut self.aisle_points);
+        if line.len() < 2 {
+            return vec![Effect::Status(
+                "Um corredor precisa de ao menos 2 pontos.".into(),
+            )];
+        }
+        vec![Effect::AisleAdd(line)]
+    }
+
+    /// Esc: the aisle being drawn, else the selection (true when there was one).
+    pub fn aisle_cancel(&mut self) -> bool {
+        if !self.aisle_points.is_empty() {
+            self.aisle_points.clear();
+            return true;
+        }
+        if !self.aisle.is_empty() {
+            self.aisle.clear();
+            self.aisle_vertex = None;
+            return true;
+        }
+        false
+    }
+
+    /// Del or Backspace: the last point while drawing, else the selected aisle (empty when
+    /// neither).
+    pub fn aisle_delete(&mut self) -> Vec<Effect> {
+        if self.aisle_points.pop().is_some() {
+            return vec![
+                Effect::Selection,
+                Effect::Status(format!("Ponto removido ({}).", self.aisle_points.len())),
+            ];
+        }
+        if !self.aisle.is_empty() {
+            self.aisle_vertex = None;
+            return vec![Effect::AisleRemove(std::mem::take(&mut self.aisle))];
+        }
+        Vec::new()
     }
 
     // ----- the path network (the Rede tool) --------------------------------------------
@@ -2253,6 +2657,113 @@ mod tests {
         ));
         assert!(e.net_cancel());
         assert!(!e.net_cancel());
+    }
+
+    #[test]
+    fn colocar_places_where_clicked_and_equipe_links_by_drag_or_two_clicks() {
+        let mut e = editor();
+        e.set_tool("colocar");
+        e.place_id = "Queue".into();
+        let q = screen(&e, [2.0, 0.0, 3.0]);
+        let out = e.press(q, true);
+        assert!(
+            matches!(&out[..], [Effect::Place { id, keep: true, at }] if id == "Queue" && len(sub(*at, [2.0, 0.0, 3.0])) < 1e-6)
+        );
+        // Equipe: a drag from a machine to the operator (Shift: its operators).
+        e.set_tool("equipe");
+        let a = e.block_screen("processo").unwrap();
+        let b = e.block_screen("operador").unwrap();
+        let mut out = e.press(a, true);
+        for k in 1..=6 {
+            let t = k as f64 / 6.0;
+            out.extend(e.drag([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]));
+        }
+        out.extend(e.release(b));
+        assert!(
+            matches!(&out[..], [Effect::Team { from, to, operators: true, .. }] if from == "processo" && to == "operador")
+        );
+        // Two clicks; Alt turns Ligar into Equipe.
+        e.set_tool("ligar");
+        e.alt = true;
+        click(&mut e, a, false);
+        assert_eq!(e.team_from, "processo");
+        let out = click(&mut e, b, false);
+        assert!(matches!(
+            &out[..],
+            [Effect::Team {
+                operators: false,
+                ..
+            }]
+        ));
+        e.alt = false;
+        click(&mut e, a, false);
+        assert!(!e.team_cancel(), "without Alt the press went to Ligar");
+    }
+
+    #[test]
+    fn the_corredor_tool_draws_selects_moves_bends_and_deletes() {
+        let mut e = editor();
+        e.set_tool("corredor");
+        // Three points (the script snaps them), the third twice: the aisle ends.
+        for w in [
+            [0.0, 0.0, 2.0],
+            [4.0, 0.0, 2.0],
+            [4.0, 0.0, 5.0],
+            [4.0, 0.0, 5.0],
+        ] {
+            let q = screen(&e, w);
+            e.aisle_press_at(q, false, Some(w));
+            let out = e.aisle_release();
+            if e.aisle_points.is_empty() {
+                assert!(matches!(&out[..], [Effect::AisleAdd(p)] if p.len() == 3));
+            }
+        }
+        assert!(e.aisle_points.is_empty());
+        e.set_aisles(vec![(
+            "corredor_1".into(),
+            vec![[0.0, 0.0, 2.0], [4.0, 0.0, 2.0], [4.0, 0.0, 5.0]],
+        )]);
+        // A click on the line selects; on a vertex too; dragging a vertex moves it.
+        let m = screen(&e, [2.0, 0.0, 2.0]);
+        e.aisle_press_at(m, false, None);
+        e.aisle_release();
+        assert_eq!((e.aisle.as_str(), e.aisle_vertex), ("corredor_1", None));
+        let v = screen(&e, [4.0, 0.0, 5.0]);
+        e.aisle_press_at(v, false, None);
+        assert_eq!(e.aisle_dragging(), Some(("corredor_1".into(), 2)));
+        let to = screen(&e, [6.0, 0.0, 6.0]);
+        e.aisle_drag_to(to, Some([6.0, 0.0, 6.0]));
+        assert_eq!(e.aisle_vertex_pos("corredor_1", 2), Some([6.0, 0.0, 6.0]));
+        assert_eq!(
+            e.aisle_release(),
+            vec![Effect::AisleMoveVertex {
+                name: "corredor_1".into(),
+                index: 2,
+                at: [6.0, 0.0, 6.0]
+            }]
+        );
+        // Shift on the selected line adds a bend; Del removes the aisle; Esc deselects.
+        e.aisle_press_at(m, true, Some([2.0, 0.0, 2.0]));
+        assert!(matches!(
+            &e.aisle_release()[..],
+            [Effect::AisleInsert { segment: 0, .. }]
+        ));
+        assert_eq!(
+            e.aisle_delete(),
+            vec![Effect::AisleRemove("corredor_1".into())]
+        );
+        assert!(!e.aisle_cancel());
+        // Backspace while drawing takes the last point; a single point does not make one.
+        e.set_aisles(Vec::new());
+        e.aisle_press_at(m, false, Some([9.0, 0.0, 9.0]));
+        e.aisle_release();
+        assert!(matches!(
+            &e.aisle_delete()[..],
+            [Effect::Selection, Effect::Status(_)]
+        ));
+        e.aisle_press_at(m, false, Some([9.0, 0.0, 9.0]));
+        e.aisle_release();
+        assert!(matches!(&e.aisle_finish()[..], [Effect::Status(_)]));
     }
 
     fn inside_of(e: &Editor3d, pts: &[V3]) -> V2 {
