@@ -168,6 +168,12 @@ Uma turma de 60 alunos com as 14 missões e duas tentativas por missão (1.680 t
 
 Abaixo da matriz, **pares para olhar de perto** lista os alunos com a mesma sequência de decisões numa missão cuja variante muda de aluno para aluno, ou com três ou mais tentativas nos mesmos instantes (até um minuto de diferença). Semelhança não é prova de cópia, e a decisão é do professor.
 
+### Desafio da turma e equipes
+
+Depois de uma correção, a seção "Desafio da turma e equipes" monta o placar de uma missão. Para cada aluno conta a tentativa da regra da turma (a melhor ou a última) feita até o prazo, se houver. A ordem é pela nota e depois pelo custo. Dois alunos aparecem empatados (com "=") quando diferem só no que a simulação mediu e os intervalos de todos os indicadores se sobrepõem, porque aí a diferença pode ser ruído. "Publicar o placar na pasta da turma" grava `placares/<missão>.csv` só com os apelidos, e os alunos o veem na aba Turma.
+
+As equipes são escritas uma por linha, como `Azul: 2027001, 2027002`, e ficam guardadas em `turma.ron`. A solução de cada equipe é a tentativa que conta entre as dos seus membros. "Comparar as equipes nesta missão" roda todas as soluções na mesma fábrica, com os mesmos números aleatórios, e mostra a média de cada equipe no indicador de maior peso e a diferença pareada de cada par. Uma equipe só fica à frente de outra quando o intervalo da diferença não contém o zero.
+
 ### Prova
 
 A seção "Prova" do painel monta uma prova a partir do pacote aberto (a campanha ou outro):
