@@ -202,7 +202,7 @@ mod tests {
     fn numbers_read_like_the_interface() {
         assert_eq!(num(24.0), "24");
         assert_eq!(num(1.2), "1.2");
-        assert_eq!(num(3.14159), "3.142");
+        assert_eq!(num(2.71828), "2.718");
         assert_eq!(num(0.0), "0");
         assert_eq!(num(1234.6), "1235");
     }
