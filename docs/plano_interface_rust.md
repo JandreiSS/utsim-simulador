@@ -566,6 +566,16 @@ Recomendação para o passo 7, nesta ordem:
 
 `cena.gd`, `pessoa.gd`, `camera_orbita.gd` e `roteiro.gd` são próprios do Godot (cena,
 animação, câmera, testes por eventos) e podem ficar em GDScript.
+
+### Passo 7, parte 1: os painéis das ferramentas em Rust (2026-11-07)
+
+- `tool_panels.rs` (testes): os painéis de Rede, Corredor, Zona e da ligação selecionada
+  montados a partir do modelo (com os problemas e os avisos que falam deles), nas linhas do
+  `ui_form` que o egui já desenhava. `UtsimDocument.tool_panel(ferramenta, estado)` devolve
+  as linhas; o `principal.gd` só passa o estado da ferramenta (`_tool_panel`), e as ações
+  continuam voltando como `form:<ação>:<valor>`.
+- `principal.gd`: de 1965 para 1871 linhas (saíram `_show_aisles`, `_show_network`,
+  `_show_zones`, `_show_link` e `_issue_rows` como montadores).
 - Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
   encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto
