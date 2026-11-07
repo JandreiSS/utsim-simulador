@@ -44,6 +44,7 @@ pub mod jobs;
 mod jobs_class;
 pub mod linha;
 pub mod network_edit;
+pub mod overlay_mesh;
 pub mod pert_view;
 pub mod playback;
 pub mod results;
