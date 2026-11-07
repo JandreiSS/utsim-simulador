@@ -1,0 +1,114 @@
+// Central multicanal (linha Serviços e atendimento): modelo pronto da linha, montado só com
+// as predefinições de linhas/servicos/biblioteca.ron.
+//
+// Dez atendentes atendem três canais das 8h às 20h, de segunda a sexta (e ficam até as
+// 20h30 para fechar os contatos em andamento): telefone (um
+// contato a cada 2 minutos, 5 de atendimento, o cliente desiste depois de uns 3 minutos
+// esperando), chat (a cada 3 minutos, 8 de atendimento, paciência de 8) e e-mail (a cada 6
+// minutos, 10 de atendimento, ninguém desiste). Cada atendente toca até três chats ou
+// e-mails ao mesmo tempo (multitarefa: cerca de 4 minutos em cada um, 0,3 minuto perdido
+// a cada troca), e o telefone, de prioridade maior, tira o atendente do chat ou do e-mail
+// (equipe com interrupções Full); o contato deixado volta à fila com o tempo que faltava.
+//
+// Tempo em minutos; a semana começa na segunda às 0h. Rode com:
+//   utsim linha servicos relatorio examples/central_multicanal.ron --meta 1 --html relatorio.html
+//
+//   telefone_contatos -> telefone_fila -> telefone -> telefone_fim   (prioridade 10)
+//   chat_contatos     -> chat_fila     -> chat     -> chat_fim       (prioridade 0)
+//   email_contatos    -> email_fila    -> email    -> email_fim      (prioridade 0)
+Model(
+    name: "Central multicanal",
+    description: "Serviços e atendimento: telefone, chat e e-mail na mesma equipe, multitarefa nos canais escritos e o telefone interrompendo",
+    line: "servicos",
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 67, replications: 5),
+    calendars: {
+        "central": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1200.0, duration: 720.0),
+            (start: 2640.0, duration: 720.0),
+            (start: 4080.0, duration: 720.0),
+            (start: 5520.0, duration: 720.0),
+            (start: 6960.0, duration: 3120.0),
+        ]),
+        "equipe": (period: 10080.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1230.0, duration: 690.0),
+            (start: 2670.0, duration: 690.0),
+            (start: 4110.0, duration: 690.0),
+            (start: 5550.0, duration: 690.0),
+            (start: 6990.0, duration: 3090.0),
+        ]),
+    },
+    objects: [
+        (name: "telefone", kind: Processor(capacity: 10, process: Exp(mean: 5.0),
+            operators: Some(OperatorUse(team: "atendentes", priority: Some(10)))), position: (4.5, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/canal", department: "Central", symbol: "operacao"),
+        (name: "telefone_contatos", kind: Source(interarrival: Exp(mean: 2.0)), shifts: Calendar("central"), position: (1.5, 0.0, 0.0),
+            preset: "servicos/canal", department: "Clientes", symbol: "inicio"),
+        (name: "telefone_fila", kind: Queue(patience: Some(Exp(mean: 3.0))), position: (3.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/canal", department: "Central", symbol: "espera"),
+        (name: "telefone_fim", kind: Sink, position: (6.0, 0.0, 0.0),
+            preset: "servicos/canal", department: "Central", symbol: "fim"),
+        (name: "chat", kind: Processor(capacity: 20, process: Exp(mean: 8.0),
+            operators: Some(OperatorUse(team: "atendentes", priority: Some(0)))), position: (4.5, 2.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/canal", department: "Central", symbol: "operacao"),
+        (name: "chat_contatos", kind: Source(interarrival: Exp(mean: 3.0)), shifts: Calendar("central"), position: (1.5, 2.0, 0.0),
+            preset: "servicos/canal", department: "Clientes", symbol: "inicio"),
+        (name: "chat_fila", kind: Queue(patience: Some(Exp(mean: 8.0))), position: (3.0, 2.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/canal", department: "Central", symbol: "espera"),
+        (name: "chat_fim", kind: Sink, position: (6.0, 2.0, 0.0),
+            preset: "servicos/canal", department: "Central", symbol: "fim"),
+        (name: "email", kind: Processor(capacity: 10, process: Exp(mean: 10.0),
+            operators: Some(OperatorUse(team: "atendentes", priority: Some(0)))), position: (4.5, 4.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/canal", department: "Central", symbol: "operacao"),
+        (name: "email_contatos", kind: Source(interarrival: Exp(mean: 6.0)), shifts: Calendar("central"), position: (1.5, 4.0, 0.0),
+            preset: "servicos/canal", department: "Clientes", symbol: "inicio"),
+        (name: "email_fila", kind: Queue(patience: None), position: (3.0, 4.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/canal", department: "Central", symbol: "espera"),
+        (name: "email_fim", kind: Sink, position: (6.0, 4.0, 0.0),
+            preset: "servicos/canal", department: "Central", symbol: "fim"),
+        (name: "atendentes", kind: Dispatcher(team: ["atendente_1", "atendente_2", "atendente_3", "atendente_4", "atendente_5", "atendente_6", "atendente_7", "atendente_8", "atendente_9", "atendente_10"], preempt: Full, metrics: true), position: (5.5, 6.0, 0.0),
+            preset: "servicos/equipe", department: "Central"),
+        (name: "atendente_1", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (0.5, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_2", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (1.1, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_3", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (1.6, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_4", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (2.2, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_5", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (2.7, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_6", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (3.2, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_7", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (3.8, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_8", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (4.4, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_9", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (4.9, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+        (name: "atendente_10", kind: Transporter(speed: 72.0, multitask: Some((max_open: 3, slice: Exp(mean: 4.0), switch: Const(0.3)))), position: (5.5, 5.0, 0.0),
+            shifts: Calendar("equipe", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Central"),
+    ],
+    connections: [
+        ("telefone_contatos", "telefone_fila"),
+        ("telefone_fila", "telefone"),
+        ("telefone", "telefone_fim"),
+        ("chat_contatos", "chat_fila"),
+        ("chat_fila", "chat"),
+        ("chat", "chat_fim"),
+        ("email_contatos", "email_fila"),
+        ("email_fila", "email"),
+        ("email", "email_fim"),
+    ],
+)

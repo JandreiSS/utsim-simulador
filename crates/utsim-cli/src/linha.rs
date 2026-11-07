@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
+use utsim_linhas::servicos::{self, Atendimento, Meta, SERVICOS};
 use utsim_linhas::{Pack, Placement, builtin, find};
 use utsim_model::Model;
 use utsim_model::quality::{ZoneDef, ZoneKind};
@@ -17,7 +18,7 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
 #[derive(Parser)]
 #[command(
     name = "utsim linha",
-    about = "Linhas especializadas (Lean Office, processos administrativos): predefinições, \
+    about = "Linhas especializadas (Lean Office, Serviços e atendimento): predefinições, \
              vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
@@ -51,6 +52,14 @@ enum Acao {
         /// Grava os indicadores de cada replicação em JSON
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Serviços e atendimento: espera máxima da meta de nível de serviço, em minutos
+        /// (padrão 15)
+        #[arg(long)]
+        meta: Option<f64>,
+        /// Serviços e atendimento: fração dos clientes atendidos dentro da meta, de 0 a 1
+        /// (padrão 0,8)
+        #[arg(long)]
+        alvo: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -183,8 +192,20 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             model,
             reps,
             html,
+            json,
+            meta,
+            alvo,
+            ..
+        }) if p.id() == SERVICOS => {
+            servicos_cmd(&p, &model, reps, html, json, meta_de(meta, alvo)?)?
+        }
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
             comparar,
             json,
+            ..
         }) => relatorio_cmd(&p, &model, reps, html, comparar, json)?,
         Some(Acao::Zona {
             model,
@@ -359,9 +380,62 @@ fn relatorio_cmd(
     Ok(())
 }
 
+/// The service level target of Serviços e atendimento from the options.
+fn meta_de(meta: Option<f64>, alvo: Option<f64>) -> Result<Meta, String> {
+    let d = Meta::default();
+    let wait = meta.unwrap_or(d.wait);
+    let share = alvo.unwrap_or(d.share);
+    if !(wait.is_finite() && wait >= 0.0) {
+        return Err(format!(
+            "--meta deve ser um número de minutos >= 0, recebi {wait}"
+        ));
+    }
+    if !(share > 0.0 && share < 1.0) {
+        return Err(format!("--alvo deve estar entre 0 e 1, recebi {share}"));
+    }
+    Ok(Meta { wait, share })
+}
+
+/// `utsim linha servicos relatorio`: the indicators of Serviços e atendimento.
+fn servicos_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Atendimento::rodar(&m, Some(p), meta)?;
+    print!("{}", servicos::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, servicos::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"espera": meta.wait, "fracao": meta.share},
+            "replicacoes": &k.reps,
+            "painel": &k.painel,
+            "dimensionamento": &k.horas,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
+    if p.id() == SERVICOS {
+        let k = Atendimento::rodar(model, Some(&p), Meta::default())?;
+        println!();
+        print!("{}", servicos::relatorio::texto(&k));
+        return Ok(());
+    }
     let k = Indicadores::rodar(model, Some(&p))?;
     println!();
     print!("{}", relatorio::texto(&k));
