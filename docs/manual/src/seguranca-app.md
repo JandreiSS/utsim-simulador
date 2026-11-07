@@ -36,6 +36,23 @@ Escolha um modelo e use "Rodar". A simulação roda em segundo plano e mostra, c
 
 "Sugerir perigos" propõe um perigo para cada zona em que alguém de um posto esteve. Marque os que fizerem sentido e grave. Eles entram no inventário sem avaliação, e a probabilidade e a severidade ficam por sua conta. "Gravar HTML de exposição" escreve o relatório na pasta `relatorios/`.
 
+## Ergonomia
+
+No alto da tela aparece o aviso da NR-17: a nota é uma pontuação própria para estudo, ensino e comparação, e não substitui a análise ergonômica do profissional habilitado. Escolha um modelo (pelo caminho ou pela lista dos modelos dos postos), a unidade de tempo (s, min ou h) e use "Rodar estudo". O estudo de tempos roda em segundo plano.
+
+Para cada elemento de trabalho de cada operador, marque a postura do tronco, dos braços, do pescoço e das pernas, a carga em kg, a pega e a vibração. A nota de 0 a 10 e a faixa aparecem ao vivo, calculadas com o método da unidade. Elementos sem marcação contam como neutros. A repetição e a duração vêm dos ciclos medidos no estudo.
+
+- **Gravar marcações** guarda as marcações na pasta de unidade, e só nesse momento. Ao rodar o mesmo modelo de novo, elas voltam.
+- **Importar método (CSV)** troca os pesos e as faixas pelos da sua empresa e grava o método na unidade. Se o CSV for recusado, o motivo aparece na tela.
+- **Rodar e comparar** estuda um segundo modelo e mostra a nota e o tempo padrão antes e depois, por posto.
+- **Gravar HTML de ergonomia** escreve `relatorios/ergonomia.html`.
+
 ## Relatório
 
 Escolha todos os postos ou só alguns e use "Gravar HTML do inventário". O arquivo vai para a pasta `relatorios/` da unidade e pode ser impresso pelo navegador. O relatório não é o documento legal do programa de gerenciamento de riscos. O PDF virá em uma etapa futura.
+
+## Dados pessoais e pasta restrita
+
+A unidade guarda as pessoas só por código (`P-1a2b3c`). Nome, setor e anotações de saúde ficam numa pasta restrita, separada da unidade, por causa da LGPD. O melhor é criar essa pasta numa pasta do Drive compartilhada só com quem pode ver os dados. O caminho dela fica gravado em `unidade.json`, e quem abre a unidade sem acesso à pasta restrita simplesmente não vê os nomes. Além do compartilhamento do Drive, o arquivo `acesso.json` da pasta restrita lista quem pode gravar nela.
+
+Anonimizar uma pessoa reescreve o registro só com o código e apaga da pasta restrita os arquivos de operação antigos que tinham o nome e os dados de saúde. Os relatórios da unidade usam sempre o código, e um teste confere que nenhum nome da pasta restrita aparece nos arquivos da unidade.
