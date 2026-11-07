@@ -86,6 +86,10 @@ Há dois caminhos para analisar:
 
 Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de qualidade que o Seis Sigma, sobre os mesmos valores com 4 casas do arquivo. "Gravar os dados (.csv)" grava os conjuntos numa pasta, para outra ferramenta.
 
+### Pacote de qualidade e segurança do trabalho
+
+O pacote `ensino/pacotes/qualidade_seguranca` fica fora da campanha e abre em "Outros pacotes de missões". São seis casos de fábrica: onde inspecionar para o defeito não chegar ao cliente, quando a inspeção vira o gargalo, uma medição ruim, o cruzamento de pessoas com a empilhadeira, o posto de carga pesada (com a fadiga de cada pessoa) e o custo da qualidade. Os casos de segurança comparam cenários do mesmo modelo, com quase-conflitos simulados, entradas em zona sem EPI e fadiga. Eles não estimam a chance de um acidente real nem certificam conformidade com norma, e cada texto lembra isso ao aluno.
+
 ### Resultados
 
 A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo de 95 %, a meta e a situação:
