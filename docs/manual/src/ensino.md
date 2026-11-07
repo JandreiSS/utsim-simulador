@@ -23,10 +23,11 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
 | 6 | Tempos e métodos | 6.1 Quantas máquinas por operador · 6.2 Trabalho externo · 6.3 Célula com operadores · 6.4 Cronometragem |
 | 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Do enunciado ao modelo |
+| 8 | O caso Lean Seis Sigma | 8.1 Definir · 8.2 Medir · 8.3 Analisar · 8.4 Melhorar · 8.5 Controlar |
 
 A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
-Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O caso final de Lean Seis Sigma vem numa próxima versão.
+Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O ato 8 é o caso final, um projeto DMAIC completo na fábrica de eixos.
 
 ## Uma missão
 
@@ -71,6 +72,19 @@ Nas missões de modelagem o aluno monta ou completa o modelo no UTSim. O botão 
 3. roda o modelo do aluno e o modelo de referência e compara as medidas pedidas: cada uma passa quando o intervalo de 95 % do aluno encontra a faixa de tolerância em volta do valor de referência.
 
 O enunciado diz os nomes de objeto que a correção procura (por exemplo `expedicao` para as peças aprovadas). Quando um nome falta, o critério diz qual. A lista de critérios mostra "OK" ou "Falta" e o que foi encontrado. O modelo vai dentro da tentativa assinada, e o professor corrige de novo na correção em lote. O modelo de referência da missão 7.1 é o gabarito do estudo de caso 1 do manual.
+
+### O caso Lean Seis Sigma (ato 8)
+
+A Usinagem Serra Alta refuga eixos por diâmetro fora da especificação e atrasa entregas. O aluno conduz o projeto como green belt, uma fase por missão: definir (CTQ, meta e escopo), medir (estudo de R&R do micrômetro e Ppk dos diâmetros), analisar (estratificação por máquina e turno e um experimento fatorial no acabamento), melhorar (troca preventiva da ferramenta e lote menor, testados no modelo da fábrica) e controlar (carta de valores individuais e regras de Nelson).
+
+Os dados de cada aluno são gerados da semente dele, e o deslocamento da média aparece, em cada aluno, numa máquina e num turno sorteados. As respostas certas são calculadas dos dados do próprio aluno: a resposta de um colega não serve.
+
+Há dois caminhos para analisar:
+
+- **No jogo.** A seção "Dados da sua fábrica" mostra as primeiras linhas de cada conjunto e as ferramentas do jogo (estudo de R&R, médias por grupo, amplitude móvel, efeitos do fatorial).
+- **No UTSim Seis Sigma.** "Levar para o UTSim Seis Sigma" cria um projeto DMAIC de treino (`.lss`), marcado como treino e fora dos indicadores do programa, com cada conjunto registrado com a origem "Simulado" e o modelo da fábrica em `modelos/`. O aluno analisa lá com as ferramentas completas e digita as respostas no jogo.
+
+Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de qualidade que o Seis Sigma, sobre os mesmos valores com 4 casas do arquivo. "Gravar os dados (.csv)" grava os conjuntos numa pasta, para outra ferramenta.
 
 ### Resultados
 
