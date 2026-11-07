@@ -129,6 +129,10 @@ O professor envia um convite (`.utsc`). Na aba **Turma**, o aluno indica o convi
 
 Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo.
 
+### Programa Lean Seis Sigma da empresa
+
+Quem está num programa Lean Seis Sigma no UTSim Seis Sigma pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim Seis Sigma do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
+
 ## Modo professor
 
 Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do professor. O mesmo app serve para aluno e professor.
