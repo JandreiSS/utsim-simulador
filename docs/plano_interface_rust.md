@@ -588,6 +588,12 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
 - `editor.gd`: de 1161 para 1079 linhas (saíram `_port_mark`, `_disc`, `_corners`,
   `_draw_remove` e `_draw_zones`). A rede e os corredores ainda desenham pelo `_ribbon` do
   `editor.gd`; as linhas de equipe também (valem no Simular).
+- `egui_canvas.rs` (pedido da sessão do Ensino para o modo missão): o que qualquer nó com
+  uma interface egui precisa, tirado do `UtsimUi` — `read_input` (eventos do Godot),
+  `EguiCanvas::present` (comandos da plataforma, cursor, texturas enviadas ao Godot, malhas
+  desenhadas como itens de canvas recortados, com as texturas próprias do nó resolvidas
+  antes), `free_all`, `screen_of` e a área de transferência. O `UtsimUi` passou a usá-lo
+  (de 1449 para 1224 linhas).
 - Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
   encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto

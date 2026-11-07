@@ -35,6 +35,7 @@ pub mod document;
 mod document_class;
 pub mod editor3d;
 mod editor_class;
+pub mod egui_canvas;
 pub mod egui_host;
 pub mod egui_input;
 pub mod egui_mesh;
