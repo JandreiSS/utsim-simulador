@@ -781,6 +781,47 @@ impl UtsimEditor {
         out
     }
 
+    /// The editor's drawing as mesh arrays (`overlay_mesh.rs`): `{lines: [vertices,
+    /// colours], fill: [vertices, colours], port_labels, zone_labels ([position, text,
+    /// colour] each), remove (position or null)}`.
+    #[func]
+    fn draw(&self, critical: PackedStringArray) -> VarDictionary {
+        let crit: Vec<String> = critical.as_slice().iter().map(|g| g.to_string()).collect();
+        let d = crate::overlay_mesh::draw(&self.ed, &crit);
+        let tris = |t: &crate::overlay_mesh::Tris| {
+            let v: PackedVector3Array = t.verts.iter().map(|p| g3(*p)).collect();
+            let c: PackedColorArray = t
+                .colors
+                .iter()
+                .map(|c| Color::from_rgba(c[0], c[1], c[2], c[3]))
+                .collect();
+            let mut a = VarArray::new();
+            a.push(&v.to_variant());
+            a.push(&c.to_variant());
+            a
+        };
+        let labels = |l: &[crate::overlay_mesh::Label]| {
+            let mut out = VarArray::new();
+            for x in l {
+                let mut a = VarArray::new();
+                a.push(&g3(x.at).to_variant());
+                a.push(&GString::from(x.text.as_str()).to_variant());
+                a.push(
+                    &Color::from_rgba(x.color[0], x.color[1], x.color[2], x.color[3]).to_variant(),
+                );
+                out.push(&a.to_variant());
+            }
+            out
+        };
+        let mut out = VarDictionary::new();
+        out.set("lines", &tris(&d.lines));
+        out.set("fill", &tris(&d.fill));
+        out.set("port_labels", &labels(&d.port_labels));
+        out.set("zone_labels", &labels(&d.zone_labels));
+        out.set("remove", &opt3(d.remove));
+        out
+    }
+
     /// What to draw: `nodes` ([pos, side, lit, edge_x]), `corners` ([min, max, mark]:
     /// `primary`, `other`, `problem`), `remove` (pos or null), `preview` ([a, b, kind] or
     /// empty: `flow`, `service`), `box` (Rect2 or null).
