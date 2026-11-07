@@ -94,3 +94,11 @@ O relatório mostra a curva característica de operação, a qualidade média qu
 Com `--aplicar modelo.ron --estacao inspecao --saida novo.ron`, o plano vira a fração amostral da estação de inspeção do modelo (uma peça a cada `lote / n`) e o simulador mostra o efeito sobre o escape, o custo e o fluxo. A decisão por lote e a inspeção completa dos lotes rejeitados não são simuladas peça a peça, e o relatório do plano as dá pelas fórmulas.
 
 Os planos de controle (característica, especificação, método, sistema de medição, frequência, amostra, carta e reação) e de inspeção (o que, como, quando, quem e o plano de amostragem) ficam por posto na pasta da unidade, no app UTSim Qualidade, e podem ser sugeridos a partir do modelo.
+
+## Dado real e dado simulado
+
+```bash
+utsim qualidade comparar medicoes_da_fabrica.csv --modelo examples/inspecao_e_retrabalho.ron --caracteristica diametro
+```
+
+O CSV da fábrica é lido do mesmo jeito que o `utsim qualidade carta` lê (codificação, vírgula decimal, coluna de rótulos, subgrupos), então as cartas e os limites são os mesmos para o mesmo arquivo, e o conjunto guarda o SHA-256 dos bytes lidos e a origem Real. O comando compara a característica real com a simulada: as médias com o intervalo de 95 % da diferença (teste de Welch), a razão dos desvios e a EWMA dos resíduos dos valores reais contra a média simulada, que mostra uma deriva como uma corrida para longe de zero. Serve para validar o modelo e para achar deriva no processo. No app UTSim Qualidade, a fase I estima os limites, a fase II aplica limites congelados, e cada sinal abre um cartão de reação com a reação escrita no plano de controle do posto.

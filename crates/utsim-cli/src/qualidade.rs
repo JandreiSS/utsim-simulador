@@ -114,6 +114,22 @@ pub enum Cmd {
         #[arg(long)]
         saida: Option<PathBuf>,
     },
+    /// Compara a característica medida na fábrica (CSV, origem Real) com a mesma
+    /// característica simulada pelo modelo: médias com IC, razão dos desvios e deriva pela
+    /// EWMA dos resíduos
+    Comparar {
+        /// CSV com os valores reais, lido como em `carta`
+        arquivo: PathBuf,
+        /// Modelo (.ron) com a característica no bloco `quality`
+        #[arg(long)]
+        modelo: PathBuf,
+        /// Nome da característica no modelo
+        #[arg(long)]
+        caracteristica: String,
+        /// Número de replicações simuladas (sobrescreve run.replications)
+        #[arg(short = 'n', long)]
+        reps: Option<u32>,
+    },
     /// Carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u, EWMA ou CUSUM)
     Carta {
         arquivo: PathBuf,
@@ -296,6 +312,12 @@ pub fn run(cmd: Cmd) -> Result<(), String> {
             estacao,
             saida,
         }),
+        Cmd::Comparar {
+            arquivo,
+            modelo,
+            caracteristica,
+            reps,
+        } => comparar_real(&arquivo, &modelo, &caracteristica, reps),
         Cmd::Custos {
             model,
             reps,
@@ -1148,6 +1170,60 @@ fn amostragem(a: Amostra) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         std::fs::write(saida, texto).map_err(|e| e.to_string())?;
         println!("Modelo com o plano: {}", saida.display());
+    }
+    Ok(())
+}
+
+/// `utsim qualidade comparar`.
+fn comparar_real(
+    arquivo: &Path,
+    modelo: &Path,
+    caracteristica: &str,
+    reps: Option<u32>,
+) -> Result<(), String> {
+    use utsim_qualidade_core::cep::{Conjunto, Origem, comparar};
+    let bytes = std::fs::read(arquivo).map_err(|e| format!("{}: {e}", arquivo.display()))?;
+    let real = Conjunto::de_csv(&file_name(arquivo), Origem::Real, &bytes, None)?;
+    let model = utsim_model::Model::load(modelo).map_err(|e| e.to_string())?;
+    let r = utsim_qualidade_core::rodar(&model, reps).map_err(|e| e.to_string())?;
+    let valores: Vec<f64> = r
+        .medicoes
+        .iter()
+        .filter(|m| m.caracteristica == caracteristica)
+        .map(|m| m.valor)
+        .collect();
+    if valores.is_empty() {
+        return Err(format!(
+            "o modelo não mede a característica '{caracteristica}'"
+        ));
+    }
+    let sim = Conjunto::simulado(caracteristica, &valores);
+    let c = comparar(&real, &sim)?;
+    println!(
+        "{caracteristica}: real (n = {}, SHA-256 {}) contra simulado (n = {})",
+        c.n_real,
+        &real.hash[..12],
+        c.n_simulado
+    );
+    println!(
+        "  média real {:.5}, simulada {:.5}, diferença {:.5} (IC 95 % {:.5} a {:.5}, p = {:.4})",
+        c.media_real, c.media_simulada, c.diferenca, c.ic95.0, c.ic95.1, c.p_valor
+    );
+    println!(
+        "  desvio real {:.5}, simulado {:.5}, razão {:.3}",
+        c.dp_real, c.dp_simulado, c.razao_dp
+    );
+    println!(
+        "  {}",
+        if c.media_compativel {
+            "o modelo reproduz a média real"
+        } else {
+            "a média real difere da simulada: confira o modelo ou procure uma causa no processo"
+        }
+    );
+    match c.deriva_em {
+        Some(i) => println!("  deriva: a EWMA dos resíduos sai do limite no valor real {i}"),
+        None => println!("  sem deriva pela EWMA dos resíduos"),
     }
     Ok(())
 }
