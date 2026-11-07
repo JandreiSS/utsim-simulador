@@ -154,6 +154,30 @@ Sem servidor, nada impede a consulta. O que o app faz é tornar a cópia pouco �
 
 Nome, registro e notas são dados pessoais. A finalidade fica registrada na turma, o placar usa o apelido e a pasta de cada aluno fica compartilhada só com ele e o professor.
 
+## Construtor de casos
+
+O professor cria missões novas a partir de qualquer modelo do UTSim, sem escrever o arquivo da missão à mão. Na aba **Professor**, a seção "Construtor de casos" pede o modelo `.ron`, o título e a pasta do pacote. "Criar e calibrar" faz o seguinte:
+
+1. sugere as alavancas do modelo: a capacidade de cada processador (até dois servidores a mais), o tamanho de cada fila limitada (da metade ao dobro) e o tamanho de cada equipe.
+2. sugere as medidas de cada saída (lead time e itens que chegam).
+3. escreve o rascunho da missão e um texto inicial.
+4. calcula a referência pela busca exaustiva e põe metas a 5 % do valor dela.
+5. confere a missão e grava a pasta do pacote, com o resultado em `conferencia.txt`.
+
+Depois o professor reescreve o texto, ajusta faixas, custos, orçamento e metas nos arquivos da pasta e clica em "Conferir de novo". "Gravar .utse" empacota a pasta para publicar na turma. Os mesmos passos existem na linha de comando:
+
+```text
+utsim-ensino caso examples/linha_com_bloqueio.ron pacote_pulmao "Pulmão do torno"
+utsim-ensino conferir pacote_pulmao
+utsim-ensino pacote pacote_pulmao pulmao.utse
+```
+
+O conferidor avisa quando a referência e o estado inicial empatam (a missão não ensina nada), quando nenhuma combinação bate as metas e quando mais de 30 % batem (missão fácil). A busca exaustiva aceita até 400 combinações de alavancas.
+
+## Dados com efeito plantado
+
+O módulo `dados` do núcleo gera conjuntos de dados didáticos com semente, com a resposta conhecida guardada junto: tempos de processo de uma distribuição, um estudo de R&R com os desvios de peça, operador e repetibilidade, grupos com a média de um deles deslocada, uma série com deslocamento ou tendência e um fatorial de dois níveis com efeitos e interação. A mesma receita dá os mesmos dados em qualquer computador. A verificação confere que as análises que o aluno usa recuperam o efeito plantado: o ajuste de distribuições, o estudo de R&R por ANOVA, a ANOVA de um fator, as regras de Nelson e os efeitos do fatorial.
+
 ## Pacotes de missões
 
 As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas (ou um `balanceamento`, com as tarefas, o takt e as estações, ou um `arranjo`, com a grade, as máquinas e os fluxos), cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
