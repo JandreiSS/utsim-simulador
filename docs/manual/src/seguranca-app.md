@@ -56,3 +56,40 @@ Escolha todos os postos ou só alguns e use "Gravar HTML do inventário". O arqu
 A unidade guarda as pessoas só por código (`P-1a2b3c`). Nome, setor e anotações de saúde ficam numa pasta restrita, separada da unidade, por causa da LGPD. O melhor é criar essa pasta numa pasta do Drive compartilhada só com quem pode ver os dados. O caminho dela fica gravado em `unidade.json`, e quem abre a unidade sem acesso à pasta restrita simplesmente não vê os nomes. Além do compartilhamento do Drive, o arquivo `acesso.json` da pasta restrita lista quem pode gravar nela.
 
 Anonimizar uma pessoa reescreve o registro só com o código e apaga da pasta restrita os arquivos de operação antigos que tinham o nome e os dados de saúde. Os relatórios da unidade usam sempre o código, e um teste confere que nenhum nome da pasta restrita aparece nos arquivos da unidade.
+
+## Checklist de máquinas e cadastro de EPI
+
+O checklist próprio do UTSim tem itens escritos pelo projeto em sete temas: proteções fixas e móveis, intertravamento, parada de emergência, comandos, sinalização, manutenção e bloqueio, e capacitação. A NR-12 (segurança no trabalho em máquinas e equipamentos) aparece só por número e tema. O checklist não reproduz a norma e não substitui a apreciação de riscos do profissional habilitado. A empresa pode usar o roteiro do seu responsável técnico, importado por CSV (`tema;item;severidade`).
+
+Cada item recebe conforme, não conforme ou não se aplica, com observação, foto e ação. Um item não conforme vira perigo no inventário do posto, com a origem do checklist e a severidade sugerida pelo item, uma vez só, mesmo que a inspeção seja gravada de novo.
+
+O cadastro de EPI guarda o tipo, o uso, o número do certificado de aprovação digitado pelo usuário, a validade e o intervalo de troca (NR-6, por número e tema). O app aponta o EPI exigido num posto que não está no cadastro e o certificado vencido.
+
+## Incidentes e indicadores
+
+O registro de quase-acidentes e incidentes guarda data, posto, zona, tipo, descrição, causas, ações, o perigo do inventário e as pessoas, estas só pelo código da pasta restrita. Um registro com nome no lugar do código é recusado.
+
+Os indicadores usam as horas-homem de exposição de cada mês e uma base configurável (um milhão de horas por padrão):
+
+- taxa de frequência (incidentes com lesão, com e sem afastamento) e taxa de frequência com afastamento;
+- taxa de gravidade (dias perdidos e dias debitados);
+- dias sem acidente;
+- razão entre quase-acidentes e incidentes com lesão;
+- Pareto de causas e de postos;
+- contagem por zona do layout;
+- carta de controle `u` das lesões por mês.
+
+A tabela de dias debitados de norma técnica não é embutida: a empresa digita, em cada caso, os dias que debita pela tabela que usa.
+
+## Telas de checklist, EPI e incidentes
+
+A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item.
+
+A tela EPI cadastra o tipo, o uso, o número do certificado digitado, a validade e o intervalo de troca. Abaixo do cadastro ficam as pendências: o equipamento exigido num posto que não está no cadastro e o certificado vencido.
+
+A tela Incidentes tem quatro abas:
+
+- **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo.
+- **Horas-homem** guarda as horas de exposição de cada mês.
+- **Indicadores** calcula as taxas do período escolhido, o Pareto de causas e de postos, os eventos por zona e a carta `u` das lesões por mês. Esta aba nunca mostra nomes.
+- **Pessoas (restrita)** cria a pasta restrita, cadastra pessoas e anonimiza. Cadastrar e anonimizar só aparecem para quem pode gravar na pasta restrita, e a anonimização pede uma segunda confirmação porque apaga o nome para sempre.
