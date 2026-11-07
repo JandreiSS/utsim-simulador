@@ -134,6 +134,32 @@ fn effects(list: Vec<Effect>) -> VarArray {
                 d.set("op", &GString::from("rede_no_excluir"));
                 d.set("name", &GString::from(name.as_str()));
             }
+            Effect::Place { id, at, keep } => {
+                d.set("op", &GString::from("colocar"));
+                d.set("id", &GString::from(id.as_str()));
+                d.set("at", g3(at));
+                d.set("keep", keep);
+            }
+            Effect::AisleAdd(points) => {
+                d.set("op", &GString::from("corredor_novo"));
+                d.set("points", &pts(&points));
+            }
+            Effect::AisleMoveVertex { name, index, at } => {
+                d.set("op", &GString::from("corredor_vertice"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("index", index as i64);
+                d.set("at", g3(at));
+            }
+            Effect::AisleInsert { name, segment, at } => {
+                d.set("op", &GString::from("corredor_dobra"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("segment", segment as i64);
+                d.set("at", g3(at));
+            }
+            Effect::AisleRemove(name) => {
+                d.set("op", &GString::from("corredor_excluir"));
+                d.set("name", &GString::from(name.as_str()));
+            }
             Effect::ZoneRemove(name) => {
                 d.set("op", &GString::from("zona_excluir"));
                 d.set("name", &GString::from(name.as_str()));
@@ -356,6 +382,132 @@ impl UtsimEditor {
     #[func]
     fn net_delete(&mut self) -> VarArray {
         effects(self.ed.net_delete())
+    }
+
+    /// The Colocar tool's library entry.
+    #[func]
+    fn set_place_id(&mut self, id: GString) {
+        self.ed.place_id = id.to_string();
+    }
+
+    /// Alt is held (Ligar works as Equipe).
+    #[func]
+    fn set_alt(&mut self, on: bool) {
+        self.ed.alt = on;
+    }
+
+    #[func]
+    fn team_from(&self) -> GString {
+        self.ed.team_from.as_str().into()
+    }
+
+    #[func]
+    fn team_cancel(&mut self) -> bool {
+        self.ed.team_cancel()
+    }
+
+    /// The aisles: {name, points}.
+    #[func]
+    fn set_aisles(&mut self, aisles: VarArray) {
+        let list = aisles
+            .iter_shared()
+            .filter_map(|v| v.try_to::<VarDictionary>().ok())
+            .map(|d| {
+                let pts = d
+                    .get("points")
+                    .and_then(|v| v.try_to::<PackedVector3Array>().ok())
+                    .map(|a| a.as_slice().iter().map(|p| v3(*p)).collect())
+                    .unwrap_or_default();
+                (s(&d, "name"), pts)
+            })
+            .collect();
+        self.ed.set_aisles(list);
+    }
+
+    /// The Corredor tool's state: `{selected, vertex (-1 = none), points (being drawn),
+    /// dragging ([aisle, index] or [])}`.
+    #[func]
+    fn aisle_state(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        d.set("selected", &GString::from(self.ed.aisle.as_str()));
+        d.set("vertex", self.ed.aisle_vertex.map_or(-1, |k| k as i64));
+        d.set("points", &pts(&self.ed.aisle_points));
+        let mut drag = VarArray::new();
+        if let Some((n, k)) = self.ed.aisle_dragging() {
+            drag.push(&GString::from(n.as_str()).to_variant());
+            drag.push(&(k as i64).to_variant());
+        }
+        d.set("dragging", &drag);
+        d
+    }
+
+    /// Sets the selection from the script (the panel, an issue clicked).
+    #[func]
+    fn aisle_select(&mut self, name: GString, vertex: i64) {
+        self.ed.aisle = name.to_string();
+        self.ed.aisle_vertex = (vertex >= 0).then_some(vertex as usize);
+    }
+
+    #[func]
+    fn aisle_vertex_pos(&self, name: GString, index: i64) -> Variant {
+        opt3(
+            self.ed
+                .aisle_vertex_pos(&name.to_string(), index.max(0) as usize),
+        )
+    }
+
+    /// `[aisle, index]` of the vertex near `p`, or [].
+    #[func]
+    fn aisle_vertex_at(&self, p: Vector2) -> VarArray {
+        let mut a = VarArray::new();
+        if let Some((n, k)) = self.ed.aisle_vertex_at(v2(p)) {
+            a.push(&GString::from(n.as_str()).to_variant());
+            a.push(&(k as i64).to_variant());
+        }
+        a
+    }
+
+    /// `[aisle, segment]` of the line near `p`, or [].
+    #[func]
+    fn aisle_line_at(&self, p: Vector2) -> VarArray {
+        let mut a = VarArray::new();
+        if let Some((n, k)) = self.ed.aisle_line_at(v2(p)) {
+            a.push(&GString::from(n.as_str()).to_variant());
+            a.push(&(k as i64).to_variant());
+        }
+        a
+    }
+
+    #[func]
+    fn aisle_press(&mut self, p: Vector2, shift: bool, floor: Variant) -> VarArray {
+        let f = floor.try_to::<Vector3>().ok().map(v3);
+        effects(self.ed.aisle_press_at(v2(p), shift, f))
+    }
+
+    #[func]
+    fn aisle_drag(&mut self, p: Vector2, at: Variant) {
+        let f = at.try_to::<Vector3>().ok().map(v3);
+        self.ed.aisle_drag_to(v2(p), f);
+    }
+
+    #[func]
+    fn aisle_release(&mut self) -> VarArray {
+        effects(self.ed.aisle_release())
+    }
+
+    #[func]
+    fn aisle_finish(&mut self) -> VarArray {
+        effects(self.ed.aisle_finish())
+    }
+
+    #[func]
+    fn aisle_cancel(&mut self) -> bool {
+        self.ed.aisle_cancel()
+    }
+
+    #[func]
+    fn aisle_delete(&mut self) -> VarArray {
+        effects(self.ed.aisle_delete())
     }
 
     /// The grid step new points snap to (0: none).

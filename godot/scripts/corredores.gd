@@ -13,6 +13,10 @@
 ##   width, direction, profile and name. Dragging a vertex moves it (one undo step);
 ##   Shift + click on the line of the selected aisle adds a vertex; Del excludes it.
 ##
+## The picking and the gestures of the tool are Rust's (`UtsimEditor`, `editor3d.rs`, step 6
+## of `docs/plano_interface_rust.md`); this script snaps the points to the other aisles
+## (`UtsimDocument.aisle_snap`), applies the effects, keeps the panel and draws.
+##
 ## "Mostrar obstáculos e folgas" (any tool) draws the areas of the objects and the walls of
 ## the model, the clearance kept from them, and the access point of every object: a
 ## diamond to drag with the Select tool (it edits `access` of the object).
@@ -57,9 +61,6 @@ var new_two_way := true
 ## Aisles and objects outlined in orange (a warning was clicked).
 var highlight: Array = []
 
-var _press := {}
-var _dragging := false
-var _drag_at := Vector3.ZERO
 var _apress := {}
 var _adragging := false
 var _adrag_at := Vector3.ZERO
@@ -85,11 +86,21 @@ func sync() -> void:
 	obstacles = doc().obstacles()
 	access = doc().access_points()
 	highlight = []
-	if _aisle(selected).is_empty():
-		selected = ""
-		selected_vertex = -1
-	elif selected_vertex >= (_aisle(selected)["points"] as PackedVector3Array).size():
-		selected_vertex = -1
+	editor.ed.set_aisles(list)
+	_pull()
+
+
+## Reads back what Rust keeps: the aisle and vertex selected and the aisle being drawn.
+func _pull() -> void:
+	var st: Dictionary = editor.ed.aisle_state()
+	selected = String(st["selected"])
+	selected_vertex = int(st["vertex"])
+	points = st["points"]
+
+
+## Tells Rust what the panel selected.
+func _push() -> void:
+	editor.ed.aisle_select(selected, selected_vertex)
 
 
 func _aisle(name: String) -> Dictionary:
@@ -118,10 +129,10 @@ func clear() -> void:
 	selected_vertex = -1
 	points = PackedVector3Array()
 	highlight = []
-	_press = {}
 	_apress = {}
-	_dragging = false
 	_adragging = false
+	editor.ed.aisle_cancel()
+	editor.ed.aisle_cancel()
 
 
 func set_obstacles_visible(on: bool) -> void:
@@ -141,49 +152,15 @@ func _screen(w: Vector3) -> Variant:
 	return cam.unproject_position(w)
 
 
-## `[aisle, index]` of the vertex nearest to screen point `p` within `PICK_PIXELS`.
+## `[aisle, index]` of the vertex nearest to screen point `p`.
 func vertex_at(p: Vector2) -> Array:
-	var best: Array = []
-	var best_d := PICK_PIXELS
-	for a in list:
-		var pts: PackedVector3Array = a["points"]
-		for i in pts.size():
-			var s = _screen(_vertex_world(a["name"], i, pts[i]))
-			if s == null:
-				continue
-			var d: float = (s as Vector2).distance_to(p)
-			# The selected aisle wins ties.
-			if d < best_d or (d == best_d and a["name"] == selected):
-				best_d = d
-				best = [a["name"], i]
-	return best
-
-
-func _vertex_world(name: String, index: int, w: Vector3) -> Vector3:
-	if _dragging and _press.get("vertex", "") == name and _press.get("index", -1) == index:
-		return _drag_at
-	return w
-
+	editor._feed()
+	return editor.ed.aisle_vertex_at(p)
 
 ## `[aisle, segment]` of the centre line nearest to screen point `p`.
 func line_at(p: Vector2) -> Array:
-	var best: Array = []
-	var best_d := LINE_PIXELS
-	for a in list:
-		var pts: PackedVector3Array = a["points"]
-		for i in pts.size() - 1:
-			var sa = _screen(pts[i])
-			var sb = _screen(pts[i + 1])
-			if sa == null or sb == null:
-				continue
-			var q := Geometry2D.get_closest_point_to_segment(p, sa, sb)
-			var d := q.distance_to(p)
-			if d < best_d or (d == best_d and a["name"] == selected):
-				best_d = d
-				best = [a["name"], i]
-	return best
-
-
+	editor._feed()
+	return editor.ed.aisle_line_at(p)
 ## Screen point of a vertex, or null (scripts).
 func vertex_screen(name: String, index: int) -> Variant:
 	var a := _aisle(name)
@@ -219,155 +196,102 @@ func _snapped(at: Vector3, skip := "", skip_index := -1) -> Vector3:
 
 
 func press(p: Vector2, shift: bool) -> void:
-	_press = {}
+	editor._feed()
 	var at = editor.floor_at(p)
-	if not points.is_empty():
-		if at != null:
-			_press = {"floor": at, "pos": p}
-		return
-	var v := vertex_at(p)
-	if not v.is_empty() and not shift:
-		_press = {"vertex": v[0], "index": v[1], "pos": p}
-		return
-	var l := line_at(p)
-	if not l.is_empty() and not shift:
-		_press = {"line": l[0], "pos": p}
-		return
-	if not l.is_empty() and shift and l[0] == selected and at != null:
-		# Shift on the selected line: a bend in the middle of it.
-		_press = {"insert": l[0], "segment": l[1], "floor": at, "pos": p}
-		return
-	if at == null:
-		main.set_status("Aponte para o chão para pôr um ponto do corredor.")
-		return
-	_press = {"floor": at, "pos": p}
+	_apply(editor.ed.aisle_press(p, shift, _snapped(at) if at != null else null))
 
 
 func drag(p: Vector2) -> void:
-	if not _press.has("vertex"):
-		return
-	if not _dragging and p.distance_to(_press["pos"]) < DRAG_PIXELS:
+	var d: Array = editor.ed.aisle_state()["dragging"]
+	if d.is_empty():
 		return
 	var at = editor.floor_at(p)
-	if at == null:
-		return
-	_dragging = true
-	_drag_at = _snapped(at, _press["vertex"], _press["index"])
+	editor.ed.aisle_drag(p, _snapped(at, d[0], d[1]) if at != null else null)
 
 
 func release(_p: Vector2) -> void:
-	if _press.is_empty():
-		return
-	var pr := _press
-	_press = {}
-	if pr.has("vertex"):
-		var name: String = pr["vertex"]
-		if _dragging:
-			_dragging = false
-			if doc().move_aisle_point(name, pr["index"], _drag_at):
-				selected = name
-				selected_vertex = pr["index"]
-				main.after_edit()
-				main.on_aisle_selection()
-				main.set_status("Vértice %d de %s movido." % [int(pr["index"]) + 1, name])
-			else:
-				main.set_status("Não moveu: %s" % doc().last_error())
-			return
-		_select(name, pr["index"])
-		return
-	if pr.has("line"):
-		_select(pr["line"], -1)
-		return
-	if pr.has("insert"):
-		var at: Vector3 = _snapped(pr["floor"])
-		if doc().insert_aisle_point(pr["insert"], pr["segment"], at):
-			selected_vertex = int(pr["segment"]) + 1
-			main.after_edit()
-			main.on_aisle_selection()
-			main.set_status("Vértice acrescentado a %s." % pr["insert"])
-		else:
-			main.set_status("Não acrescentou: %s" % doc().last_error())
-		return
-	var at: Vector3 = _snapped(pr["floor"])
-	if not points.is_empty() and at.distance_to(points[points.size() - 1]) < 0.02:
-		finish()
-		return
-	selected = ""
-	selected_vertex = -1
-	points.append(at)
-	main.on_aisle_selection()
-	if points.size() == 1:
-		main.set_status("Corredor: clique os próximos pontos; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela.")
-	else:
-		main.set_status("%d ponto(s). Enter ou duplo clique termina." % points.size())
+	_apply(editor.ed.aisle_release())
 
 
 func _select(name: String, vertex: int) -> void:
 	selected = name
 	selected_vertex = vertex
 	highlight = []
+	_push()
 	main.on_aisle_selection()
-	if vertex >= 0:
-		main.set_status("Vértice %d de %s selecionado (arraste para mover)." % [vertex + 1, name])
-	else:
-		main.set_status("Corredor %s selecionado (Del exclui; Shift + clique na linha acrescenta um vértice)." % name)
 
 
 ## Ends the aisle being drawn (Enter, or a double click on its last point).
 func finish() -> bool:
-	if points.is_empty():
+	var effects: Array = editor.ed.aisle_finish()
+	if effects.is_empty():
 		return false
-	var line := points
-	points = PackedVector3Array()
-	if line.size() < 2:
-		main.set_status("Um corredor precisa de ao menos 2 pontos.")
-		return true
-	var name: String = doc().add_aisle(line, new_kind, new_width, new_two_way)
-	if name == "":
-		main.set_status("Não criou o corredor: %s" % doc().last_error())
-		return true
-	selected = name
-	selected_vertex = -1
-	main.after_edit()
-	main.on_aisle_selection()
-	main.set_status("Corredor %s criado (%s, %s m)." % [name, KIND_LABELS[KINDS.find(new_kind)].to_lower(), _num(new_width)])
+	_apply(effects)
 	return true
 
 
 ## Esc: cancels the aisle being drawn, else the selection; true when there was one.
 func cancel() -> bool:
-	if not points.is_empty():
-		points = PackedVector3Array()
-		main.on_aisle_selection()
+	var drawing := not points.is_empty()
+	if not editor.ed.aisle_cancel():
+		return false
+	_pull()
+	main.on_aisle_selection()
+	if drawing:
 		main.set_status("Corredor cancelado. Clique no chão para começar outro, ou Esc para sair da ferramenta.")
-		return true
-	if selected != "":
-		selected = ""
-		selected_vertex = -1
-		main.on_aisle_selection()
-		return true
-	return false
+	return true
 
 
 ## Del or Backspace: the last point while drawing, else the selected aisle.
 func delete_selected() -> bool:
-	if not points.is_empty():
-		points.remove_at(points.size() - 1)
-		main.on_aisle_selection()
-		main.set_status("Ponto removido (%d)." % points.size())
-		return true
-	if selected != "":
-		var name := selected
-		if doc().remove_aisle(name):
-			selected = ""
-			selected_vertex = -1
-			main.after_edit()
-			main.on_aisle_selection()
-			main.set_status("Corredor %s excluído." % name)
-		else:
-			main.set_status("Não excluiu: %s" % doc().last_error())
-		return true
-	return false
+	var effects: Array = editor.ed.aisle_delete()
+	if effects.is_empty():
+		return false
+	_apply(effects)
+	return true
+
+
+## Applies what a gesture of the Corredor tool asked of the document.
+func _apply(effects: Array) -> void:
+	_pull()
+	for e in effects:
+		match String(e["op"]):
+			"status":
+				main.set_status(String(e["text"]))
+			"selecao":
+				highlight = []
+				main.on_aisle_selection()
+			"corredor_novo":
+				var name: String = doc().add_aisle(e["points"], new_kind, new_width, new_two_way)
+				if name == "":
+					main.set_status("Não criou o corredor: %s" % doc().last_error())
+					continue
+				editor.ed.aisle_select(name, -1)
+				main.after_edit()
+				main.on_aisle_selection()
+				main.set_status("Corredor %s criado (%s, %s m)." % [name, KIND_LABELS[KINDS.find(new_kind)].to_lower(), _num(new_width)])
+			"corredor_vertice":
+				if doc().move_aisle_point(e["name"], e["index"], e["at"]):
+					main.after_edit()
+					main.on_aisle_selection()
+					main.set_status("Vértice %d de %s movido." % [int(e["index"]) + 1, e["name"]])
+				else:
+					main.set_status("Não moveu: %s" % doc().last_error())
+			"corredor_dobra":
+				if doc().insert_aisle_point(e["name"], e["segment"], e["at"]):
+					main.after_edit()
+					main.on_aisle_selection()
+					main.set_status("Vértice acrescentado a %s." % e["name"])
+				else:
+					main.set_status("Não acrescentou: %s" % doc().last_error())
+			"corredor_excluir":
+				if doc().remove_aisle(e["name"]):
+					main.after_edit()
+					main.on_aisle_selection()
+					main.set_status("Corredor %s excluído." % e["name"])
+				else:
+					main.set_status("Não excluiu: %s" % doc().last_error())
+	_pull()
 
 
 # ---------------------------------------------------------------------------
@@ -494,6 +418,7 @@ func rename(to: String) -> void:
 	var from := selected
 	if doc().rename_aisle(from, to):
 		selected = to.strip_edges()
+		_push()
 		main.after_edit()
 		main.set_status("Corredor %s agora se chama %s." % [from, selected])
 	else:
@@ -505,6 +430,7 @@ func remove_vertex() -> void:
 		return
 	if doc().remove_aisle_point(selected, selected_vertex):
 		selected_vertex = -1
+		_push()
 		main.after_edit()
 		main.on_aisle_selection()
 		main.set_status("Vértice removido.")
@@ -581,9 +507,12 @@ func _draw_aisle(e: EditorUtsim, a: Dictionary) -> void:
 	var pts: PackedVector3Array = a["points"]
 	var name: String = a["name"]
 	var sel := name == selected
-	if _dragging and _press.get("vertex", "") == name:
-		pts = pts.duplicate()
-		pts[_press["index"]] = _drag_at
+	var dv: Array = editor.ed.aisle_state()["dragging"]
+	if not dv.is_empty() and dv[0] == name:
+		var at = editor.ed.aisle_vertex_pos(name, dv[1])
+		if at != null:
+			pts = pts.duplicate()
+			pts[int(dv[1])] = at
 	var color := SELECTED if sel else LINE
 	for i in pts.size() - 1:
 		e._ribbon(_lift(pts[i], 0.05), _lift(pts[i + 1], 0.05), 0.16 if sel else 0.10, color)

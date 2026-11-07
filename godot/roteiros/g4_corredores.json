@@ -87,7 +87,7 @@
 		{"conferir": {"campo_painel": {"objeto": "ana", "caminho": "movement", "valor": "Aisles"}}},
 		{"capturar": "g4_corredores_05_movimentacao"},
 		{"nota": "O padrão do modelo e o perfil da faixa, no painel do modelo."},
-		{"clicar": {"chao": [22, -14]}},
+		{"tecla": "escape"},
 		{"conferir": {"selecao": [], "visivel": ["Prop_movement", "Prop_marking_profile", "Prop_marking_crossing_stop"]}},
 		{"escolher": {"controle": "Prop_marking_profile", "item": "Branco (redação original da NR-26)"}},
 		{"conferir": {"campo_painel": {"objeto": "run", "caminho": "marking.profile", "valor": "Branco"}}},
