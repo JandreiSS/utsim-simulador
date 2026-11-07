@@ -239,7 +239,7 @@ func set_tool(name: String, id := "") -> void:
 	tool = name
 	place_id = id if name == "colocar" else ""
 	team_from = ""
-	ed.set_tool(name if name in ["selecionar", "ligar", "zona"] else "selecionar")
+	ed.set_tool(name if name in ["selecionar", "ligar", "zona", "rede"] else "selecionar")
 	_pull()
 	_show_ghost(place_id)
 	main.on_tool_changed()

@@ -527,8 +527,11 @@ Como ficou (primeira versão, 2026-11-07):
   e o gesto (as variáveis que os painéis e os roteiros leem continuam as mesmas), e o desenho
   sai de `overlay()`. A seleção é do script (ele a filtra pelos objetos do documento): o Rust
   não a apaga ao receber uma cena antiga, de antes de a vista 3D ser refeita.
-- Fica para depois: Rede, Corredor, Colocar e a ferramenta Equipe em Rust; a conferência com
-  janela (a tela estava ocupada).
+- Fica para depois: Corredor, Colocar e a ferramenta Equipe em Rust.
+- Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
+  encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
+  `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto
+  inteiro); o `rede.gd` fica com o painel e o desenho. Roteiro `g3_rede` sem mudança.
 
 ### Zonas de risco no editor 3D (2026-11-07)
 

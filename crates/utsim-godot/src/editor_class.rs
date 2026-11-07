@@ -111,6 +111,29 @@ fn effects(list: Vec<Effect>) -> VarArray {
                 d.set("name", &GString::from(name.as_str()));
                 d.set("points", &pts(&points));
             }
+            Effect::NetAddNode(at) => {
+                d.set("op", &GString::from("rede_no"));
+                d.set("at", g3(at));
+            }
+            Effect::NetMoveNode { name, at } => {
+                d.set("op", &GString::from("rede_mover"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("at", g3(at));
+            }
+            Effect::NetAddEdge { from, to } => {
+                d.set("op", &GString::from("rede_trecho"));
+                d.set("from", &GString::from(from.as_str()));
+                d.set("to", &GString::from(to.as_str()));
+            }
+            Effect::NetRemoveEdge { from, to } => {
+                d.set("op", &GString::from("rede_trecho_excluir"));
+                d.set("from", &GString::from(from.as_str()));
+                d.set("to", &GString::from(to.as_str()));
+            }
+            Effect::NetRemoveNode(name) => {
+                d.set("op", &GString::from("rede_no_excluir"));
+                d.set("name", &GString::from(name.as_str()));
+            }
             Effect::ZoneRemove(name) => {
                 d.set("op", &GString::from("zona_excluir"));
                 d.set("name", &GString::from(name.as_str()));
@@ -247,6 +270,92 @@ impl UtsimEditor {
             })
             .collect();
         self.ed.set_zones(list);
+    }
+
+    /// The path network: `nodes` ({name, position}) and `edges` ({from, to}).
+    #[func]
+    fn set_network(&mut self, nodes: VarArray, edges: VarArray) {
+        let dicts = |a: &VarArray| -> Vec<VarDictionary> {
+            a.iter_shared()
+                .filter_map(|v| v.try_to::<VarDictionary>().ok())
+                .collect()
+        };
+        let nodes = dicts(&nodes)
+            .iter()
+            .map(|d| {
+                let at = d
+                    .get("position")
+                    .and_then(|v| v.try_to::<Vector3>().ok())
+                    .map_or([0.0; 3], v3);
+                (s(d, "name"), at)
+            })
+            .collect();
+        let edges = dicts(&edges)
+            .iter()
+            .map(|d| (s(d, "from"), s(d, "to")))
+            .collect();
+        self.ed.set_network(nodes, edges);
+    }
+
+    /// The network state for the script: `{armed, node, edge ([from, to] or []), drag (the
+    /// node dragged and where, or {})}`.
+    #[func]
+    fn network_state(&self) -> VarDictionary {
+        let mut d = VarDictionary::new();
+        d.set("armed", &GString::from(self.ed.armed.as_str()));
+        d.set("node", &GString::from(self.ed.net_node.as_str()));
+        let edge = self
+            .ed
+            .net_edge
+            .as_ref()
+            .map_or(PackedStringArray::new(), |(a, b)| {
+                names(&[a.clone(), b.clone()])
+            });
+        d.set("edge", &edge);
+        d
+    }
+
+    /// Where node `name` is drawn now, or null.
+    #[func]
+    fn net_position(&self, name: GString) -> Variant {
+        opt3(self.ed.net_position(&name.to_string()))
+    }
+
+    #[func]
+    fn net_node_screen(&self, name: GString) -> Variant {
+        opt2(
+            self.ed
+                .net_position(&name.to_string())
+                .and_then(|w| self.ed.camera.project(w)),
+        )
+    }
+
+    #[func]
+    fn net_placed(&mut self, name: GString) {
+        self.ed.net_placed(&name.to_string());
+    }
+
+    /// Selects a node or an edge from the script (the panel renames, reverses).
+    #[func]
+    fn net_select(&mut self, node: GString, edge: PackedStringArray) {
+        self.ed.net_node = node.to_string();
+        let e: Vec<String> = edge.as_slice().iter().map(|g| g.to_string()).collect();
+        self.ed.net_edge = (e.len() == 2).then(|| (e[0].clone(), e[1].clone()));
+    }
+
+    #[func]
+    fn set_armed(&mut self, name: GString) {
+        self.ed.armed = name.to_string();
+    }
+
+    #[func]
+    fn net_cancel(&mut self) -> bool {
+        self.ed.net_cancel()
+    }
+
+    #[func]
+    fn net_delete(&mut self) -> VarArray {
+        effects(self.ed.net_delete())
     }
 
     /// The grid step new points snap to (0: none).

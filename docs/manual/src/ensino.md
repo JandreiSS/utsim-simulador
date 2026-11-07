@@ -23,10 +23,11 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
 | 6 | Tempos e métodos | 6.1 Quantas máquinas por operador · 6.2 Trabalho externo · 6.3 Célula com operadores · 6.4 Cronometragem |
 | 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Do enunciado ao modelo |
+| 8 | O caso Lean Seis Sigma | 8.1 Definir · 8.2 Medir · 8.3 Analisar · 8.4 Melhorar · 8.5 Controlar |
 
 A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
-Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O caso final de Lean Seis Sigma vem numa próxima versão.
+Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O ato 8 é o caso final, um projeto DMAIC completo na fábrica de eixos.
 
 ## Uma missão
 
@@ -71,6 +72,19 @@ Nas missões de modelagem o aluno monta ou completa o modelo no UTSim. O botão 
 3. roda o modelo do aluno e o modelo de referência e compara as medidas pedidas: cada uma passa quando o intervalo de 95 % do aluno encontra a faixa de tolerância em volta do valor de referência.
 
 O enunciado diz os nomes de objeto que a correção procura (por exemplo `expedicao` para as peças aprovadas). Quando um nome falta, o critério diz qual. A lista de critérios mostra "OK" ou "Falta" e o que foi encontrado. O modelo vai dentro da tentativa assinada, e o professor corrige de novo na correção em lote. O modelo de referência da missão 7.1 é o gabarito do estudo de caso 1 do manual.
+
+### O caso Lean Seis Sigma (ato 8)
+
+A Usinagem Serra Alta refuga eixos por diâmetro fora da especificação e atrasa entregas. O aluno conduz o projeto como green belt, uma fase por missão: definir (CTQ, meta e escopo), medir (estudo de R&R do micrômetro e Ppk dos diâmetros), analisar (estratificação por máquina e turno e um experimento fatorial no acabamento), melhorar (troca preventiva da ferramenta e lote menor, testados no modelo da fábrica) e controlar (carta de valores individuais e regras de Nelson).
+
+Os dados de cada aluno são gerados da semente dele, e o deslocamento da média aparece, em cada aluno, numa máquina e num turno sorteados. As respostas certas são calculadas dos dados do próprio aluno: a resposta de um colega não serve.
+
+Há dois caminhos para analisar:
+
+- **No jogo.** A seção "Dados da sua fábrica" mostra as primeiras linhas de cada conjunto e as ferramentas do jogo (estudo de R&R, médias por grupo, amplitude móvel, efeitos do fatorial).
+- **No UTSim Seis Sigma.** "Levar para o UTSim Seis Sigma" cria um projeto DMAIC de treino (`.lss`), marcado como treino e fora dos indicadores do programa, com cada conjunto registrado com a origem "Simulado" e o modelo da fábrica em `modelos/`. O aluno analisa lá com as ferramentas completas e digita as respostas no jogo.
+
+Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de qualidade que o Seis Sigma, sobre os mesmos valores com 4 casas do arquivo. "Gravar os dados (.csv)" grava os conjuntos numa pasta, para outra ferramenta.
 
 ### Resultados
 
@@ -153,6 +167,30 @@ Uma turma de 60 alunos com as 14 missões e duas tentativas por missão (1.680 t
 Sem servidor, nada impede a consulta. O que o app faz é tornar a cópia pouco útil e visível. A variante muda os números de cada aluno. A nota não viaja, porque o professor simula de novo, e por isso editar o arquivo de entrega não muda a nota. Uma tentativa editada perde a assinatura e aparece nos avisos. Quem tem acesso aos arquivos pode tentar forjá-los: a assinatura revela a alteração, mas não a impede.
 
 Nome, registro e notas são dados pessoais. A finalidade fica registrada na turma, o placar usa o apelido e a pasta de cada aluno fica compartilhada só com ele e o professor.
+
+## Construtor de casos
+
+O professor cria missões novas a partir de qualquer modelo do UTSim, sem escrever o arquivo da missão à mão. Na aba **Professor**, a seção "Construtor de casos" pede o modelo `.ron`, o título e a pasta do pacote. "Criar e calibrar" faz o seguinte:
+
+1. sugere as alavancas do modelo: a capacidade de cada processador (até dois servidores a mais), o tamanho de cada fila limitada (da metade ao dobro) e o tamanho de cada equipe.
+2. sugere as medidas de cada saída (lead time e itens que chegam).
+3. escreve o rascunho da missão e um texto inicial.
+4. calcula a referência pela busca exaustiva e põe metas a 5 % do valor dela.
+5. confere a missão e grava a pasta do pacote, com o resultado em `conferencia.txt`.
+
+Depois o professor reescreve o texto, ajusta faixas, custos, orçamento e metas nos arquivos da pasta e clica em "Conferir de novo". "Gravar .utse" empacota a pasta para publicar na turma. Os mesmos passos existem na linha de comando:
+
+```text
+utsim-ensino caso examples/linha_com_bloqueio.ron pacote_pulmao "Pulmão do torno"
+utsim-ensino conferir pacote_pulmao
+utsim-ensino pacote pacote_pulmao pulmao.utse
+```
+
+O conferidor avisa quando a referência e o estado inicial empatam (a missão não ensina nada), quando nenhuma combinação bate as metas e quando mais de 30 % batem (missão fácil). A busca exaustiva aceita até 400 combinações de alavancas.
+
+## Dados com efeito plantado
+
+O módulo `dados` do núcleo gera conjuntos de dados didáticos com semente, com a resposta conhecida guardada junto: tempos de processo de uma distribuição, um estudo de R&R com os desvios de peça, operador e repetibilidade, grupos com a média de um deles deslocada, uma série com deslocamento ou tendência e um fatorial de dois níveis com efeitos e interação. A mesma receita dá os mesmos dados em qualquer computador. A verificação confere que as análises que o aluno usa recuperam o efeito plantado: o ajuste de distribuições, o estudo de R&R por ANOVA, a ANOVA de um fator, as regras de Nelson e os efeitos do fatorial.
 
 ## Pacotes de missões
 
