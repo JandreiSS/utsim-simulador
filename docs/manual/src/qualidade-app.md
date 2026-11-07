@@ -38,6 +38,24 @@ Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções
 
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 
+## Planos
+
+A tela Planos guarda, por posto, o plano de controle (característica, limites, método de medição, frequência, carta e a reação ao sinal) e o plano de inspeção (o que, como, quando e quem). Cada linha pode ser incluída, editada e removida. O botão "Sugerir do modelo" lê um modelo `.ron` e propõe uma linha de controle para cada característica com limites e uma linha de inspeção para cada estação de inspeção, ligadas ao posto pelo objeto. As sugestões só vão para a unidade quando você clica em "Gravar as sugestões".
+
+Ao editar uma linha de inspeção aparece o painel de amostragem por atributos. Você pode projetar o plano pelos quatro números (p1, alfa, p2 e beta, simples ou duplo) ou digitar n e c. A tela mostra a probabilidade de aceitação em p1 e em p2, o AOQL para o lote informado e a curva característica de operação. "Usar este plano na linha" leva o plano para a linha, e "Gravar HTML da amostragem" escreve `relatorios/plano_amostragem.html`. Planos de uma tabela que a empresa tenha o direito de usar entram por CSV (`nome;n;c` ou `nome;n1;c1;r1;n2;c2`).
+
+## 8D
+
+A tela 8D lista os 8D da unidade e abre um para edição. Há uma seção para cada uma das oito disciplinas, com o texto que explica o que ela pede, e a disciplina seguinte aparece em destaque. A contenção atrasada em relação a hoje é avisada em vermelho. Na causa raiz, cada causa tem a categoria dos 6M e a marca de confirmada por dado, e sob cada causa ficam os porquês. As ações têm verificação por dado (carta ou estudo no modelo) e a prevenção registra a atualização da FMEA e do plano de controle. O 8D só encerra quando D1 a D7 estão completas. Nada vai para a unidade antes de "Gravar".
+
+Quando a causa não aparece, o botão "Enviar para a carteira do Seis Sigma" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
+
+## CEP
+
+A tela CEP importa o CSV de uma característica (valores individuais ou subgrupos), calcula a carta de fase I com as regras de Western Electric e mostra os sinais. "Congelar limites" guarda os limites na unidade. A fase II aplica esses limites a dados novos, e cada subgrupo com sinal abre um cartão de reação com a reação escrita na linha do plano de controle escolhida. A origem do dado (Real ou Simulado) fica sempre visível.
+
+Para comparar com o simulado, informe o modelo e a característica. O modelo roda em segundo plano e a tela mostra as médias, o teste da diferença, a razão dos desvios e a curva EWMA dos resíduos, que mostra a deriva do processo real em relação ao modelo.
+
 ## Limites desta versão
 
-O PDF do relatório, o plano de controle e as ferramentas de projeto (FMEA, A3, 8D) ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
+O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
