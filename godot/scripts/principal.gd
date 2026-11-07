@@ -1693,6 +1693,10 @@ func apply_warmup(warmup: float) -> void:
 func _open_from_args() -> void:
 	for a in OS.get_cmdline_user_args():
 		var arg := String(a)
+		# Modo missão do UTSim Ensino (cena própria, `ensino.gd`).
+		if arg == "--utsim-ensino" and not Engine.has_meta(&"utsim_ensino_aberto"):
+			get_tree().change_scene_to_file.call_deferred("res://cenas/ensino.tscn")
+			return
 		if arg.begins_with("--utsim-abrir="):
 			var path := arg.trim_prefix("--utsim-abrir=")
 			if not open_model(path):
