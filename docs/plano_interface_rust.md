@@ -576,6 +576,18 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   continuam voltando como `form:<ação>:<valor>`.
 - `principal.gd`: de 1965 para 1871 linhas (saíram `_show_aisles`, `_show_network`,
   `_show_zones`, `_show_link` e `_issue_rows` como montadores).
+
+### Passo 7, parte 2: o desenho da sobreposição em Rust (2026-11-07)
+
+- `overlay_mesh.rs` (testes): triângulos com cor para os cantos da seleção e dos problemas, o
+  contorno do caminho crítico, as setas das ligações (com os números das portas), os nós, o
+  × da ligação selecionada, a seta de prévia e as zonas de risco (enchimento translúcido por
+  triangulação por orelhas, borda, cantos da selecionada e o nome); `UtsimEditor.draw`
+  entrega os vetores, que o `editor.gd` copia num `ArrayMesh` (sem laço por vértice) e usa
+  para pôr os rótulos.
+- `editor.gd`: de 1161 para 1079 linhas (saíram `_port_mark`, `_disc`, `_corners`,
+  `_draw_remove` e `_draw_zones`). A rede e os corredores ainda desenham pelo `_ribbon` do
+  `editor.gd`; as linhas de equipe também (valem no Simular).
 - Rede (2026-11-07): a escolha de nós e trechos, colocar e ligar nós, arrastar um nó com
   encaixe, selecionar trecho, Esc e Del saíram do `rede.gd` para o `editor3d.rs` (efeitos
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto

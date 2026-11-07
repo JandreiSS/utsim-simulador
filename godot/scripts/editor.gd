@@ -140,7 +140,9 @@ var _links_of: Object
 var _alt := false
 ## The editor in Rust (`UtsimEditor`) and what it was last fed.
 var ed: Object
-var _zone_mesh: ImmediateMesh
+var _zone_mesh: ArrayMesh
+var _rust_mesh: ArrayMesh
+var _rust_lines: MeshInstance3D
 var _zone_fill: MeshInstance3D
 var _zone_labels: Array[Label3D] = []
 var _scene_dirty := true
@@ -171,8 +173,17 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	_team_lines.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_team_lines.material_override = mat
 	add_child(_team_lines)
+	# What Rust draws (`overlay_mesh.rs`): the marks over everything.
+	_rust_mesh = ArrayMesh.new()
+	var rust := MeshInstance3D.new()
+	rust.name = "SobreposicaoRust"
+	rust.mesh = _rust_mesh
+	rust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	rust.material_override = mat
+	add_child(rust)
+	_rust_lines = rust
 	# Risk zones: a translucent fill on the floor (hidden by what stands on it).
-	_zone_mesh = ImmediateMesh.new()
+	_zone_mesh = ArrayMesh.new()
 	var zones := MeshInstance3D.new()
 	zones.name = "ZonasRisco"
 	zones.mesh = _zone_mesh
@@ -788,6 +799,7 @@ func _process(_dt: float) -> void:
 	_draw_team()
 	if not main.is_editing():
 		_lines.visible = false
+		_rust_lines.visible = false
 		for l in _ports:
 			l.visible = false
 		if _remove_label != null:
@@ -799,6 +811,7 @@ func _process(_dt: float) -> void:
 			_ghost.visible = false
 		return
 	_lines.visible = true
+	_rust_lines.visible = true
 	_zone_fill.visible = true
 	if _ghost != null:
 		var at = floor_at(mouse)
@@ -855,50 +868,87 @@ func _redraw() -> void:
 	var c := cena()
 	if c != null and c.playback != null:
 		_feed()
-		var o: Dictionary = ed.overlay()
-		for k in o["corners"]:
-			var box := AABB(k[0], (k[1] as Vector3) - (k[0] as Vector3))
-			match String(k[2]):
-				"primary":
-					_corners(box.grow(0.1), PRIMARY, 0.09)
-				"other":
-					_corners(box.grow(0.1), OTHERS, 0.09)
-				_:
-					_corners(box.grow(0.04), PROBLEM, 0.04)
-		for i in c.blocks.size():
-			if critical.has(c.blocks[i]["name"]):
-				_rect(_box_of(i).grow(0.3), CRITICAL, 0.1)
 		corredores.draw(self)
 		rede.draw(self)
-		var segs := _segments()
-		var outs := {}
-		for s in segs:
-			outs[s["from"]] = outs.get(s["from"], 0) + 1
+		var d: Dictionary = ed.draw(PackedStringArray(critical))
+		_surface(_rust_mesh, d["lines"])
+		_surface(_zone_mesh, d["fill"])
 		var k := 0
-		for s in segs:
-			var color := LINK_LOGICAL if s["logical"] else LINK
-			if selected_link.size() == 2 and selected_link[0] == s["from"] and selected_link[1] == s["to"]:
-				color = LINK_SELECTED
-			_arrow(s["a"], s["b"], color, 0.09 if color == LINK_SELECTED else 0.06)
-			if int(outs[s["from"]]) > 1:
-				_port_label(k, s["a"].lerp(s["b"], 0.25), str(s["port"]), color)
-				k += 1
+		for l in d["port_labels"]:
+			_port_label(k, (l[0] as Vector3) - Vector3(0, 0.25, 0), String(l[1]), l[2])
+			k += 1
 		for j in range(k, _ports.size()):
 			_ports[j].visible = false
-		var colors := {"out": PORT_OUT, "in": PORT_IN, "service": PORT_SERVICE}
-		for n in o["nodes"]:
-			_port_mark(n[0], colors[String(n[1])], bool(n[2]), float(n[3]))
-		_draw_remove(o["remove"])
-		var pv: Array = o["preview"]
-		if pv.size() == 3 and String(pv[2]) == "flow":
-			_arrow(pv[0], pv[1], CONNECTING, 0.07)
-		_draw_zones(o)
-		var bx = o["box"]
+		_zone_label_set(d["zone_labels"])
+		_remove_label_at(d["remove"])
+		var bx = ed.overlay()["box"]
 		_box_rect.visible = bx != null
 		if bx != null:
 			_box_rect.position = (bx as Rect2).position
 			_box_rect.size = (bx as Rect2).size
 	_mesh.surface_end()
+
+
+## Replaces the triangles of `mesh` with `tris` ([vertices, colours]).
+func _surface(mesh: ArrayMesh, tris: Array) -> void:
+	mesh.clear_surfaces()
+	var v: PackedVector3Array = tris[0]
+	if v.is_empty():
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = v
+	arrays[Mesh.ARRAY_COLOR] = tris[1]
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+
+## The names of the risk zones ([position, text, colour] each).
+func _zone_label_set(labels: Array) -> void:
+	var n := 0
+	for z in labels:
+		while _zone_labels.size() <= n:
+			var l := Label3D.new()
+			l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			l.fixed_size = true
+			l.no_depth_test = true
+			l.pixel_size = 0.0006
+			l.font_size = 28
+			l.outline_size = 10
+			l.outline_modulate = Color(0.06, 0.07, 0.09, 0.95)
+			l.render_priority = 12
+			l.outline_render_priority = 11
+			add_child(l)
+			_zone_labels.append(l)
+		var lab := _zone_labels[n]
+		lab.visible = true
+		lab.position = z[0]
+		lab.text = String(z[1])
+		lab.modulate = z[2]
+		n += 1
+	for j in range(n, _zone_labels.size()):
+		_zone_labels[j].visible = false
+
+
+## The × over the red disc Rust draws on the selected link (null: hidden).
+func _remove_label_at(at: Variant) -> void:
+	if at == null:
+		if _remove_label != null:
+			_remove_label.visible = false
+		return
+	if _remove_label == null:
+		_remove_label = Label3D.new()
+		_remove_label.name = "RemoverLigacao"
+		_remove_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_remove_label.fixed_size = true
+		_remove_label.no_depth_test = true
+		_remove_label.pixel_size = 0.0006
+		_remove_label.font_size = 34
+		_remove_label.modulate = Color.WHITE
+		_remove_label.render_priority = 13
+		_remove_label.text = "×"
+		add_child(_remove_label)
+	_remove_label.visible = true
+	_remove_label.position = at
 
 
 ## The team and request lines, in both modes (see the header).
@@ -971,68 +1021,6 @@ func _draw_team() -> void:
 	_team_mesh.surface_end()
 
 
-## The risk zones (fill, outline, name; the corners of the one selected with the Zona
-## tool) and the zone being drawn.
-func _draw_zones(o: Dictionary) -> void:
-	_zone_mesh.clear_surfaces()
-	_zone_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	for k in 3:
-		_zone_mesh.surface_set_color(Color(0, 0, 0, 0))
-		_zone_mesh.surface_add_vertex(Vector3.ZERO)
-	var n := 0
-	for z in o["zones"]:
-		var pts: PackedVector3Array = z["points"]
-		if pts.size() < 3:
-			continue
-		var col: Color = z["color"]
-		var sel: bool = z["selected"]
-		var flat := PackedVector2Array()
-		var centre := Vector3.ZERO
-		for v in pts:
-			flat.append(Vector2(v.x, v.z))
-			centre += v
-		centre /= pts.size()
-		var fill := Color(col, 0.34 if sel else 0.22)
-		for i in Geometry2D.triangulate_polygon(flat):
-			_zone_mesh.surface_set_color(fill)
-			_zone_mesh.surface_add_vertex(Vector3(pts[i].x, 0.02, pts[i].z))
-		for k in pts.size():
-			var a := pts[k] + Vector3(0, 0.035, 0)
-			var b := pts[(k + 1) % pts.size()] + Vector3(0, 0.035, 0)
-			_ribbon(a, b, 0.1 if sel else 0.06, col)
-		if sel and tool == "zona":
-			for v in pts:
-				_disc(v + Vector3(0, 0.04, 0), 0.14, PORT_HOVER)
-				_disc(v + Vector3(0, 0.045, 0), 0.1, col)
-		while _zone_labels.size() <= n:
-			var l := Label3D.new()
-			l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-			l.fixed_size = true
-			l.no_depth_test = true
-			l.pixel_size = 0.0006
-			l.font_size = 28
-			l.outline_size = 10
-			l.outline_modulate = Color(0.06, 0.07, 0.09, 0.95)
-			l.render_priority = 12
-			l.outline_render_priority = 11
-			add_child(l)
-			_zone_labels.append(l)
-		var lab := _zone_labels[n]
-		lab.visible = true
-		lab.text = String(z["name"])
-		lab.modulate = col.lightened(0.3)
-		lab.position = centre + Vector3(0, 0.3, 0)
-		n += 1
-	for j in range(n, _zone_labels.size()):
-		_zone_labels[j].visible = false
-	var drawing: PackedVector3Array = o["zone_drawing"]
-	for k in drawing.size() - 1:
-		_ribbon(drawing[k] + Vector3(0, 0.04, 0), drawing[k + 1] + Vector3(0, 0.04, 0), 0.07, CONNECTING)
-	for k in drawing.size() - 1:
-		_disc(drawing[k] + Vector3(0, 0.045, 0), 0.12, CONNECTING)
-	_zone_mesh.surface_end()
-
-
 ## A dashed ribbon from `a` to `b` (`on` metres drawn, `off` skipped).
 func _dashed(a: Vector3, b: Vector3, color: Color, width: float, on: float, off: float) -> void:
 	var d := b - a
@@ -1068,76 +1056,6 @@ func _ring(c: Vector3, r: float, color: Color) -> void:
 		for v in [p0, q0, q1, p0, q1, p1]:
 			_team_mesh.surface_set_color(color)
 			_team_mesh.surface_add_vertex(v)
-
-
-## A node: a disc on the floor with a dark rim, joined to the side of its block (at
-## `edge_x`) by a short stub; bigger and white-rimmed when `lit` (under the mouse, or the
-## end of the connection being made).
-func _port_mark(at: Variant, color: Color, lit := false, edge_x := NAN) -> void:
-	if at == null:
-		return
-	var c: Vector3 = at
-	if not is_nan(edge_x):
-		_ribbon(Vector3(edge_x, c.y, c.z), c, 0.04, Color(color, 0.8))
-	var r := 0.17 if lit else 0.12
-	_disc(c, r + 0.035, PORT_HOVER if lit else PORT_RING)
-	_disc(c, r, color.lightened(0.25) if lit else color)
-
-
-## A filled disc on the floor plane.
-func _disc(c: Vector3, r: float, color: Color) -> void:
-	var n := 16
-	for k in n:
-		var a0 := TAU * k / n
-		var a1 := TAU * (k + 1) / n
-		for v in [c, c + Vector3(cos(a0), 0, sin(a0)) * r, c + Vector3(cos(a1), 0, sin(a1)) * r]:
-			_mesh.surface_set_color(color)
-			_mesh.surface_add_vertex(v)
-
-
-## The red × in the middle of the selected connection (a click on it removes it).
-func _draw_remove(at: Variant) -> void:
-	if at == null:
-		if _remove_label != null:
-			_remove_label.visible = false
-		return
-	var sp = ed.project(at)
-	var lit: bool = sp != null and (sp as Vector2).distance_to(mouse) <= PORT_PIXELS
-	for seg in (_segments() if selected_team.is_empty() else []):
-		if seg["from"] == selected_link[0] and seg["to"] == selected_link[1]:
-			var m: Vector3 = (seg["a"] as Vector3).lerp(seg["b"], 0.5)
-			if m.distance_to(at) > 0.05:
-				_ribbon(m, at, 0.03, Color(REMOVE, 0.8))
-	_disc(at, 0.2 if lit else 0.17, PORT_HOVER)
-	_disc(at, 0.17 if lit else 0.14, REMOVE)
-	if _remove_label == null:
-		_remove_label = Label3D.new()
-		_remove_label.name = "RemoverLigacao"
-		_remove_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		_remove_label.fixed_size = true
-		_remove_label.no_depth_test = true
-		_remove_label.pixel_size = 0.0006
-		_remove_label.font_size = 34
-		_remove_label.modulate = Color.WHITE
-		_remove_label.render_priority = 13
-		_remove_label.text = "×"
-		add_child(_remove_label)
-	_remove_label.visible = true
-	_remove_label.position = (at as Vector3) + Vector3(0, 0.02, 0)
-
-
-## The selection: L marks at the four corners of the footprint (no frame over the nodes).
-func _corners(box: AABB, color: Color, width: float) -> void:
-	var y := 0.03
-	var arm := clampf(minf(box.size.x, box.size.z) * 0.3, 0.25, 0.8)
-	var x0 := box.position.x
-	var x1 := box.end.x
-	var z0 := box.position.z
-	var z1 := box.end.z
-	for corner in [[x0, z0, 1, 1], [x1, z0, -1, 1], [x1, z1, -1, -1], [x0, z1, 1, -1]]:
-		var p := Vector3(corner[0], y, corner[1])
-		_ribbon(p, p + Vector3(corner[2] * arm, 0, 0), width, color)
-		_ribbon(p, p + Vector3(0, 0, corner[3] * arm), width, color)
 
 
 func _port_label(k: int, at: Vector3, text: String, color: Color) -> void:
