@@ -604,6 +604,12 @@ Escolha o conjunto, a análise e as colunas:
 | MSA: linearidade | coluna da referência e coluna da medida, a variação do processo opcional |
 | MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
 | Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
+| Igualdade de variâncias (Levene com a mediana e Bartlett) | coluna dos valores e coluna dos grupos |
+| Kruskal-Wallis e teste da mediana de Mood | coluna dos valores e coluna dos grupos |
+| Friedman | coluna dos valores, do tratamento e do bloco (um valor de cada tratamento em cada bloco) |
+| ANOVA de dois fatores (com a interação quando há repetições) | coluna dos valores e as colunas dos dois fatores |
+| Regressão linear, simples ou múltipla | a resposta e os preditores |
+| Tamanho de amostra e poder | uma média, duas médias ou duas proporções; a diferença e o desvio (ou as proporções), o poder e a significância |
 
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
@@ -612,6 +618,17 @@ novo sobre o mesmo arquivo e confere se os números são os mesmos.
 
 O estudo do tipo 1 usa Cg = 0,2·T / (6·s) e Cgk = (0,1·T − |média − referência|) / (3·s),
 com T a tolerância; o instrumento é capaz com Cg e Cgk ≥ 1,33.
+
+Nas análises novas: **Levene** com a mediana serve para qualquer distribuição, e **Bartlett**
+supõe dados normais e é mais sensível quando eles são. **Kruskal-Wallis** e **Mood** comparam
+grupos sem supor normalidade. Mood é mais robusto a valores extremos, e Kruskal-Wallis é mais
+poderoso. **Friedman** compara tratamentos medidos nos mesmos blocos, por exemplo as mesmas
+peças ou os mesmos turnos. A **ANOVA de dois fatores** precisa de todas as combinações com o
+mesmo número de repetições. Sem repetições, a interação vira o erro, e o gráfico mostra a média
+de cada combinação. A **regressão** dá os coeficientes com os valores-p, o R², o R² ajustado, o
+VIF de cada preditor (acima de 5, os preditores estão muito ligados entre si) e o gráfico dos
+resíduos com ±2 erros padrão. O **tamanho de amostra** dá o menor n que atinge o poder pedido;
+nas comparações de dois grupos, o n é de cada grupo.
 
 O **viés** compara a média de medições repetidas de uma peça de referência com o valor dela
 pelo teste t (viés = 0) e dá o intervalo de 95 % do viés; com a tolerância, mostra o viés em
