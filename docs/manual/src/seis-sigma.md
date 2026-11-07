@@ -135,7 +135,10 @@ programa do master black belt vai usar mais adiante (etapa L6). Abrir a pasta da
 diretamente, pela tela inicial, também leva à tela Carteira.
 
 - **Ideias**: qualquer pessoa registra uma oportunidade (título, processo, problema observado,
-  dados disponíveis, ganho grosseiro). O quadro mostra as ideias por situação: ideia, triagem,
+  dados disponíveis, ganho grosseiro). Outros apps da família também mandam ideias: o **8D do
+  UTSim Qualidade**, quando o problema pede um projeto Lean Seis Sigma, envia a ideia com o
+  número do 8D, quem enviou e quando, e os anexos (relatório, dados). A ideia mostra a origem
+  no alto, e cada anexo abre com um clique; os arquivos ficam em `anexos/` da carteira. O quadro mostra as ideias por situação: ideia, triagem,
   aprovada, em execução e suspensa; encerradas, canceladas e arquivadas aparecem contadas.
   Os botões "→" mostram só as passagens permitidas (por exemplo, de ideia para triagem; de
   triagem para aprovada ou de volta para ideia).
@@ -865,6 +868,14 @@ aplicou (a ferramenta está num entregável concluído de fase aprovada de um pr
 preenche sozinho) e **D** demonstrou (confirmado pelo MBB em revisão ou mentoria, com a
 evidência). Passe o mouse numa célula para ver as evidências. A linha do tempo do belt junta
 sessões, tollgates aprovados, ferramentas novas e a certificação.
+
+O **UTSim Ensino** também registra níveis no mapa: quando a pessoa conclui o caso final do
+jogo, ele grava **E** estudou ou **P** praticou nas ferramentas do caso, com origem "UTSim
+Ensino" e a nota como evidência. Para isso a pessoa usa no Ensino a mesma identidade do UTSim
+Seis Sigma e precisa estar no cadastro do programa, ou seja, ter aberto o programa ao menos
+uma vez. O próprio registro é a única coisa que o Ensino grava. Ele nunca dá "aplicou" (que vem
+de projeto real) nem "demonstrou" (que só o MBB confirma), e a conferência do diário recusa
+qualquer tentativa nesse sentido.
 
 ### Revisões de tollgate
 
