@@ -464,7 +464,7 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Linhas especializadas (Lean Office, processos administrativos): predefinições,
+    /// Linhas especializadas (Lean Office, Serviços e atendimento): predefinições,
     /// vocabulário, modelos prontos, indicadores e relatório da linha
     #[command(disable_help_flag = true)]
     Linha {

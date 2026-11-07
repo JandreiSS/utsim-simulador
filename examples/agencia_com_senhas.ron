@@ -1,0 +1,102 @@
+// Agência com senhas (linha Serviços e atendimento): modelo pronto da linha, montado só com
+// as predefinições de linhas/servicos/biblioteca.ron.
+//
+// A agência abre das 10h às 16h, de segunda a sexta; os caixas ficam até as 16h30 para
+// atender quem já está dentro. Os clientes tiram senha normal (80 %)
+// ou preferencial (20 %); a fila chama primeiro a preferencial. O movimento cresce no
+// almoço (de 30 para 54 clientes por hora das 12h às 14h). Quatro caixas trabalham o dia
+// todo e dois de reforço só das 11h30 às 14h30: no pico, um a menos do que o
+// dimensionamento pede. Quem espera mais que a paciência (cerca de
+// 25 minutos, em média) desiste e vai embora.
+//
+// Tempo em minutos; a semana começa na segunda às 0h. Rode com:
+//   utsim linha servicos relatorio examples/agencia_com_senhas.ron --html relatorio.html
+//
+//   clientes -> fila -> guiche -> saida
+Model(
+    name: "Agência com senhas",
+    description: "Serviços e atendimento: senhas normal e preferencial, pico do almoço, reforço na escala e desistência na fila",
+    line: "servicos",
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 61, replications: 5),
+    calendars: {
+        "agencia": (period: 10080.0, off: [
+            (start: 0.0, duration: 600.0),
+            (start: 960.0, duration: 1080.0),
+            (start: 2400.0, duration: 1080.0),
+            (start: 3840.0, duration: 1080.0),
+            (start: 5280.0, duration: 1080.0),
+            (start: 6720.0, duration: 3360.0),
+        ]),
+        "caixas": (period: 10080.0, off: [
+            (start: 0.0, duration: 600.0),
+            (start: 990.0, duration: 1050.0),
+            (start: 2430.0, duration: 1050.0),
+            (start: 3870.0, duration: 1050.0),
+            (start: 5310.0, duration: 1050.0),
+            (start: 6750.0, duration: 3330.0),
+        ]),
+        "almoco": (period: 10080.0, off: [
+            (start: 0.0, duration: 690.0),
+            (start: 870.0, duration: 1260.0),
+            (start: 2310.0, duration: 1260.0),
+            (start: 3750.0, duration: 1260.0),
+            (start: 5190.0, duration: 1260.0),
+            (start: 6630.0, duration: 3450.0),
+        ]),
+    },
+    objects: [
+        (name: "clientes", kind: Source(interarrival: Exp(mean: 2.0),
+            labels: {"tipo": Discrete([(1.0, 0.8), (2.0, 0.2)])},
+            schedule: Some((cycle: 10080.0, periods: [
+                (start: 600.0, end: 720.0, arrivals: Rate(0.5)),
+                (start: 720.0, end: 840.0, arrivals: Rate(0.9)),
+                (start: 840.0, end: 960.0, arrivals: Rate(0.6)),
+                (start: 2040.0, end: 2160.0, arrivals: Rate(0.5)),
+                (start: 2160.0, end: 2280.0, arrivals: Rate(0.9)),
+                (start: 2280.0, end: 2400.0, arrivals: Rate(0.6)),
+                (start: 3480.0, end: 3600.0, arrivals: Rate(0.5)),
+                (start: 3600.0, end: 3720.0, arrivals: Rate(0.9)),
+                (start: 3720.0, end: 3840.0, arrivals: Rate(0.6)),
+                (start: 4920.0, end: 5040.0, arrivals: Rate(0.5)),
+                (start: 5040.0, end: 5160.0, arrivals: Rate(0.9)),
+                (start: 5160.0, end: 5280.0, arrivals: Rate(0.6)),
+                (start: 6360.0, end: 6480.0, arrivals: Rate(0.5)),
+                (start: 6480.0, end: 6600.0, arrivals: Rate(0.9)),
+                (start: 6600.0, end: 6720.0, arrivals: Rate(0.6)),
+            ]))),
+            shifts: Calendar("agencia"), position: (0.0, 0.0, 0.0),
+            preset: "servicos/chegada", department: "Agência", symbol: "inicio"),
+        (name: "fila", kind: Queue(order: Some(Desc("tipo")), patience: Some(Exp(mean: 25.0))), position: (2.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "servicos/fila", department: "Agência", symbol: "espera"),
+        (name: "guiche", kind: Processor(capacity: 7, process: Exp(mean: 6.0),
+            operators: Some(OperatorUse(team: "caixas"))), position: (4.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "servicos/guiche", department: "Agência", symbol: "operacao"),
+        (name: "saida", kind: Sink, position: (6.0, 0.0, 0.0),
+            preset: "servicos/saida", department: "Agência", symbol: "fim"),
+        (name: "caixas", kind: Dispatcher(team: ["caixa_1", "caixa_2", "caixa_3", "caixa_4", "reforco_1", "reforco_2"]), position: (3.0, 2.0, 0.0),
+            preset: "servicos/equipe", department: "Agência"),
+        (name: "caixa_1", kind: Transporter(speed: 72.0), position: (1.0, 3.0, 0.0),
+            shifts: Calendar("caixas", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+        (name: "caixa_2", kind: Transporter(speed: 72.0), position: (1.6, 3.0, 0.0),
+            shifts: Calendar("caixas", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+        (name: "caixa_3", kind: Transporter(speed: 72.0), position: (2.2, 3.0, 0.0),
+            shifts: Calendar("caixas", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+        (name: "caixa_4", kind: Transporter(speed: 72.0), position: (2.8, 3.0, 0.0),
+            shifts: Calendar("caixas", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+        (name: "reforco_1", kind: Transporter(speed: 72.0), position: (1.0, 4.0, 0.0),
+            shifts: Calendar("almoco", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+        (name: "reforco_2", kind: Transporter(speed: 72.0), position: (1.6, 4.0, 0.0),
+            shifts: Calendar("almoco", Finish), visual: Some((asset: Some("pessoa"))), person: Some(()),
+            preset: "servicos/atendente", department: "Agência"),
+    ],
+    connections: [
+        ("clientes", "fila"),
+        ("fila", "guiche"),
+        ("guiche", "saida"),
+    ],
+)

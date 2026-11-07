@@ -908,6 +908,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             discipline,
             batch,
             order,
+            ..
         } => {
             out.push(
                 Field::new(
