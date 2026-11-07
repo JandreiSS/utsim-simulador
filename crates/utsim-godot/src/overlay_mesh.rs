@@ -405,7 +405,7 @@ mod tests {
         t.disc([0.0; 3], 0.2, REMOVE);
         t.corners([0.0; 3], [2.0, 1.0, 2.0], PRIMARY, 0.05);
         t.node([1.0, 0.06, 0.0], PORT_OUT, true, 0.5);
-        assert_eq!(t.verts.len() % 3, 0);
+        assert!(t.verts.len().is_multiple_of(3));
         assert_eq!(t.verts.len(), t.colors.len());
         // A zero-length ribbon draws nothing.
         let mut z = Tris::default();
@@ -456,7 +456,7 @@ mod tests {
             level: Some(5),
         }]);
         let d = draw(&e, &["q".to_owned()]);
-        assert!(!d.lines.verts.is_empty() && d.lines.verts.len() % 3 == 0);
+        assert!(!d.lines.verts.is_empty() && d.lines.verts.len().is_multiple_of(3));
         assert_eq!(d.lines.verts.len(), d.lines.colors.len());
         // The selected link is yellow; the × is there; two port labels (a has two outputs).
         assert!(d.lines.colors.contains(&LINK_SELECTED));
