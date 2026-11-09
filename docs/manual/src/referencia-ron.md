@@ -179,6 +179,7 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 | `setup` | nenhum |
 | `process` | obrigatório |
 | `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None)`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
+| `also` | `[]`: outras equipes pedidas junto com `operators`, cada uma um `OperatorUse` (por exemplo `[OperatorUse(team: "enfermagem")]` para o médico e o enfermeiro na mesma sala). A etapa só começa quando chegam as pessoas de todas as equipes que ela usa (`setup` e `process` de cada uma); se as equipes da preparação e do processo forem diferentes, quem preparou é liberado e as do processo são chamadas. Precisa de `operators`, e cada equipe aparece uma vez. Quem chega primeiro espera os outros na estação. Veja [Saúde e hospital](linhas/saude/index.md) |
 
 ### `Combiner`
 

@@ -976,7 +976,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             setup,
             process,
             operators,
-            ..
+            also,
         } => {
             out.push(
                 int(s, "capacity", "Capacidade", *capacity as u64)
@@ -1026,6 +1026,17 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                         "Durante o processamento",
                         op.process,
                     )
+                    .depth(1),
+                );
+                out.push(
+                    Field::new(
+                        s,
+                        "also",
+                        "Outras equipes ao mesmo tempo",
+                        FieldType::Ron,
+                        Value::Text(ron::operator_uses(also)),
+                    )
+                    .help("Equipes que precisam estar juntas com os operadores (um médico e um enfermeiro na mesma sala). Exemplo: [OperatorUse(team: \"enfermagem\")]. A etapa só começa quando todos chegam.")
                     .depth(1),
                 );
             }
@@ -1671,9 +1682,7 @@ fn serves_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let operates: Vec<&str> = model
         .objects
         .iter()
-        .filter(|o| {
-            matches!(&o.kind, ObjectKind::Processor { operators: Some(op), .. } if op.team == me)
-        })
+        .filter(|o| o.kind.operator_uses().any(|op| op.team == me))
         .map(|o| o.name.as_str())
         .collect();
     let carries: Vec<&str> = model
@@ -1808,6 +1817,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Processor { operators, .. }, "operators") => {
             ron::option(operators, ron::operator_use)
         }
+        (ObjectKind::Processor { also, .. }, "also") => ron::operator_uses(also),
         (ObjectKind::Transporter { speed, .. }, "speed") => ron::float(*speed),
         (ObjectKind::Transporter { acceleration, .. }, "acceleration") => {
             ron::option(acceleration, |v| ron::float(*v))
@@ -2892,6 +2902,38 @@ mod tests {
         apply(&mut d, "p", "transfer.on", Value::Bool(false));
         assert!(object(&d, "p").transfer.is_none());
         assert!(edit(d.model(), "q", "batch.size", &Value::Int(0)).is_err());
+    }
+
+    #[test]
+    fn processor_with_another_team_at_the_same_time() {
+        let mut d = doc();
+        d.apply(Command::Add(Box::new(
+            template("Transporter", "enf", [0.0; 3]).unwrap(),
+        )))
+        .unwrap();
+        // Without operators the field is not shown.
+        assert!(
+            !object_fields(d.model(), object(&d, "p"))
+                .iter()
+                .any(|f| f.path == "also")
+        );
+        apply(&mut d, "p", "operators.on", Value::Bool(true));
+        assert_eq!(field(&d, "p", "also").value, Value::Text("[]".into()));
+        apply(
+            &mut d,
+            "p",
+            "also",
+            Value::Text("[OperatorUse(team: \"enf\", count: 1)]".into()),
+        );
+        let ObjectKind::Processor { also, .. } = &object(&d, "p").kind else {
+            unreachable!()
+        };
+        assert_eq!(also.len(), 1);
+        assert_eq!(also[0].team, "enf");
+        assert_eq!(
+            field(&d, "p", "also").value,
+            Value::Text("[(team: \"enf\", count: 1, setup: true, process: true)]".into())
+        );
     }
 
     #[test]

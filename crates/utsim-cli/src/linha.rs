@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
 use utsim_linhas::logistica::{self, Armazem, LOGISTICA};
+use utsim_linhas::saude::{self, SAUDE, Saude};
 use utsim_linhas::servicos::{self, Atendimento, Meta, SERVICOS};
 use utsim_linhas::{Pack, Placement, builtin, find};
 use utsim_model::Model;
@@ -20,7 +21,7 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
 #[command(
     name = "utsim linha",
     about = "Linhas especializadas (Lean Office, Serviços e atendimento, Logística e \
-             armazém): predefinições, \
+             armazém, Saúde e hospital): predefinições, \
              vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
@@ -65,6 +66,13 @@ enum Acao {
         /// Logística e armazém: meta do tempo de doca, em minutos (padrão 60)
         #[arg(long)]
         meta_doca: Option<f64>,
+        /// Saúde e hospital: tempos-alvo de espera até o médico por cor, do vermelho ao
+        /// azul, em minutos (padrão 0,10,60,120,240)
+        #[arg(long, value_delimiter = ',', num_args = 1)]
+        alvos: Option<Vec<f64>>,
+        /// Saúde e hospital: ocupação-alvo dos leitos, de 0 a 1 (padrão 0,85)
+        #[arg(long)]
+        ocupacao_leitos: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -214,6 +222,22 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
         }) if p.id() == LOGISTICA => {
             logistica_cmd(&p, &model, reps, html, json, meta_doca_de(meta_doca)?)?
         }
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
+            json,
+            alvos,
+            ocupacao_leitos,
+            ..
+        }) if p.id() == SAUDE => saude_cmd(
+            &p,
+            &model,
+            reps,
+            html,
+            json,
+            meta_saude_de(alvos, ocupacao_leitos)?,
+        )?,
         Some(Acao::Relatorio {
             model,
             reps,
@@ -483,6 +507,58 @@ fn logistica_cmd(
     Ok(())
 }
 
+/// The targets of Saúde e hospital from the options.
+fn meta_saude_de(alvos: Option<Vec<f64>>, ocupacao: Option<f64>) -> Result<saude::Meta, String> {
+    let mut meta = saude::Meta::default();
+    if let Some(v) = alvos {
+        if v.len() != 5 || v.iter().any(|x| !(x.is_finite() && *x >= 0.0)) {
+            return Err(format!(
+                "--alvos deve ter cinco números de minutos >= 0 (vermelho a azul), recebi {v:?}"
+            ));
+        }
+        meta.alvo.copy_from_slice(&v);
+    }
+    if let Some(o) = ocupacao {
+        if !(o.is_finite() && o > 0.0 && o <= 1.0) {
+            return Err(format!(
+                "--ocupacao-leitos deve ser uma fração entre 0 e 1, recebi {o}"
+            ));
+        }
+        meta.ocupacao = o;
+    }
+    Ok(meta)
+}
+
+/// `utsim linha saude relatorio`: the indicators of Saúde e hospital.
+fn saude_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: saude::Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Saude::rodar(&m, Some(p), meta)?;
+    print!("{}", saude::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, saude::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"alvos": meta.alvo, "ocupacao_leitos": meta.ocupacao},
+            "replicacoes": &k.reps,
+            "censo": &k.censo,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
@@ -496,6 +572,12 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
         let k = Armazem::rodar(model, Some(&p), logistica::Meta::default())?;
         println!();
         print!("{}", logistica::relatorio::texto(&k));
+        return Ok(());
+    }
+    if p.id() == SAUDE {
+        let k = Saude::rodar(model, Some(&p), saude::Meta::default())?;
+        println!();
+        print!("{}", saude::relatorio::texto(&k));
         return Ok(());
     }
     let k = Indicadores::rodar(model, Some(&p))?;
