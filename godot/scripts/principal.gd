@@ -64,6 +64,8 @@ var speed: float:
 		if ui != null:
 			ui.set_clock_speed(v)
 var model_path := ""
+## The status already said that another app saved the model over local changes.
+var _disk_warned := false
 ## `editar` or `simular`.
 var mode := "editar"
 var snap_on := true
@@ -757,6 +759,7 @@ func open_model(path: String) -> bool:
 		set_status("Não abriu %s: %s" % [path.get_file(), r["error"]])
 		return false
 	model_path = path
+	_disk_warned = false
 	editor.set_tool("selecionar")
 	editor.clear_selection()
 	if mode != "editar":
@@ -783,6 +786,44 @@ func _renew_lock() -> void:
 		set_status("O outro app fechou o modelo: as abas Qualidade, Segurança e Manutenção voltaram a editar.")
 		if ui != null:
 			ui.repaint()
+	_check_disk()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_check_disk()
+
+
+## Another app (UTSim Qualidade, UTSim Segurança do Trabalho) may have saved the model
+## (`disco.rs`): without local changes it is read again; with them, "Salvar" over it is
+## refused and the status says why, once.
+func _check_disk() -> void:
+	if doc == null:
+		return
+	match String(doc.disk_check()):
+		"recarregar":
+			_reload_from_disk()
+		"conflito":
+			if not _disk_warned:
+				_disk_warned = true
+				set_status("Outro app gravou %s e há mudanças suas não salvas: use Salvar como para não apagar o trabalho dele." % model_path.get_file())
+
+
+## Reads the model again from its file, keeping the mode, the camera and the selection.
+func _reload_from_disk() -> void:
+	var keep: Array = editor.selected.duplicate()
+	var r: Dictionary = doc.reload()
+	if not r["ok"]:
+		set_status("Não releu %s: %s" % [model_path.get_file(), r["error"]])
+		return
+	_disk_warned = false
+	after_edit(true)
+	var names := []
+	for o in doc.objects():
+		if o["name"] in keep:
+			names.append(o["name"])
+	editor.select_names(names, false)
+	set_status("%s foi gravado por outro app: recarregado do disco." % model_path.get_file())
 
 
 func save() -> bool:
@@ -813,6 +854,7 @@ func save_as(path: String) -> bool:
 func _report_save(r: Dictionary) -> void:
 	if r["ok"]:
 		model_path = doc.path()
+		_disk_warned = false
 		set_status("Salvo em %s." % doc.path())
 	else:
 		set_status("Não salvou: %s" % r["error"])

@@ -34,6 +34,7 @@ pub mod andamento;
 pub mod camera_follow;
 pub mod coords;
 pub mod dados;
+pub mod disco;
 pub mod document;
 mod document_class;
 pub mod editor3d;

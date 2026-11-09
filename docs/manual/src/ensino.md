@@ -135,7 +135,7 @@ Depois de resolver uma missão, a caixa de areia abre a mesma fábrica sem meta 
 
 O professor envia um convite (`.utsc`). Na aba **Turma**, o aluno indica o convite e, se a turma usa uma pasta compartilhada no Google Drive, a pasta sincronizada no computador. Com a pasta, cada tentativa é gravada nela assim que termina. Sem a pasta, o botão "Gravar entrega" grava um arquivo `.utsr` com todas as tentativas, para enviar ao professor pelo ambiente da disciplina, por e-mail ou pen drive.
 
-Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo.
+Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo. A assinatura e a cadeia são as mesmas do UTSim Seis Sigma. Elas revelam um arquivo alterado, uma tentativa que falta no meio ou um diário restaurado de uma cópia antiga, mas não impedem a edição e não valem como assinatura digital com validade jurídica.
 
 ### Programa Lean Seis Sigma da empresa
 
