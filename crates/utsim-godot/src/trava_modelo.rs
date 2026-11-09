@@ -54,7 +54,13 @@ pub struct TravaModelo {
     maquina: String,
     arquivo: Option<PathBuf>,
     estado: Option<Estado>,
+    /// The lock handed to another app (`ceder`): the app and until when we wait for it to
+    /// take it, without taking it back.
+    cedida: Option<(String, u64)>,
 }
+
+/// How long a lock handed to another app waits for it (the app may take a while to open).
+pub const ESPERA_CEDIDA_MS: u64 = 60_000;
 
 impl Default for TravaModelo {
     fn default() -> Self {
@@ -69,6 +75,7 @@ impl TravaModelo {
             maquina: maquina.into(),
             arquivo: None,
             estado: None,
+            cedida: None,
         }
     }
 
@@ -92,6 +99,20 @@ impl TravaModelo {
         }
         self.arquivo = None;
         self.estado = None;
+        self.cedida = None;
+    }
+
+    /// Hands the lock to `app` (`qualidade`, `seguranca`), which is opening the model: ours is
+    /// released and not taken back at the renewals until that app holds it (then the model
+    /// is read only, as with any other writer) or [`ESPERA_CEDIDA_MS`] goes by.
+    pub fn ceder(&mut self, app: &str, agora_ms: u64) {
+        if let (Some(a), Some(Estado::Minha)) = (&self.arquivo, &self.estado) {
+            let _ = trava::soltar(a, APP, &self.pessoa, &self.maquina);
+        }
+        if self.arquivo.is_some() {
+            self.estado = None;
+            self.cedida = Some((app.to_owned(), agora_ms + ESPERA_CEDIDA_MS));
+        }
     }
 
     /// Renews our lock, or takes it when the other side let it go.
@@ -99,6 +120,18 @@ impl TravaModelo {
         let Some(a) = self.arquivo.clone() else {
             return;
         };
+        if let Some((_, ate)) = &self.cedida {
+            let agora = trava::agora_ms();
+            match trava::ler(&a, agora) {
+                Some(t) => {
+                    self.cedida = None;
+                    self.estado = Some(Estado::DeOutro(t));
+                    return;
+                }
+                None if agora < *ate => return,
+                None => self.cedida = None,
+            }
+        }
         if let Ok(e) = trava::renovar(&a, APP, &self.pessoa, &self.maquina, trava::agora_ms()) {
             self.estado = Some(e);
         }
@@ -114,11 +147,17 @@ impl TravaModelo {
 
     /// The model can be saved over its file (ours, or no lock to speak of).
     pub fn pode_gravar(&self) -> bool {
-        self.de_outro().is_none()
+        self.de_outro().is_none() && self.cedida.is_none()
     }
 
     /// "Em edição por ana no UTSim Qualidade desde 14:05", when someone else holds it.
     pub fn aviso(&self) -> Option<String> {
+        if let Some((app, _)) = &self.cedida {
+            return Some(format!(
+                "Aberto no {}, que vai editar o modelo",
+                nome_app(app)
+            ));
+        }
         self.de_outro().map(|t| {
             format!(
                 "Em edição por {} no {} desde {}",
@@ -160,6 +199,34 @@ mod tests {
         let m = dir.join("linha.ron");
         std::fs::write(&m, "Model()").unwrap();
         m
+    }
+
+    #[test]
+    fn a_lock_handed_over_waits_for_the_other_app() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = modelo(dir.path());
+        let mut t = TravaModelo::nova("ana", "pc1");
+        t.abrir(&m);
+        t.ceder("qualidade", trava::agora_ms());
+        assert!(trava::ler(&m, trava::agora_ms()).is_none(), "released");
+        assert!(!t.pode_gravar());
+        assert!(t.aviso().unwrap().contains("UTSim Qualidade"));
+        // Not taken back while the other app opens.
+        t.renovar();
+        assert!(trava::ler(&m, trava::agora_ms()).is_none());
+        // The other app takes it: read only, with who.
+        trava::travar(&m, "qualidade", "ana", "pc1", trava::agora_ms()).unwrap();
+        t.renovar();
+        assert!(t.de_outro().is_some());
+        assert!(t.aviso().unwrap().starts_with("Em edição por ana"));
+        // It closes: ours again at the next renewal.
+        trava::soltar(&m, "qualidade", "ana", "pc1").unwrap();
+        t.renovar();
+        assert!(t.pode_gravar());
+        // A handover nobody takes ends after the wait.
+        t.ceder("seguranca", 0);
+        t.renovar();
+        assert!(t.pode_gravar());
     }
 
     #[test]

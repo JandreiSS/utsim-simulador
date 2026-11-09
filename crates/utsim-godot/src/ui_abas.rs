@@ -9,7 +9,8 @@
 //! (the tabs), `AbaCampo_<path>` (a field: dots and brackets as underscores, so
 //! `safety.hazards[0].severity` is `AbaCampo_safety_hazards_0_severity`),
 //! `AbaAdicionar_<list>`, `AbaRemover_<item>`, `AbaItem_<item>` (opens and closes an item),
-//! `AbaTrava` (who edits) and `AbaErro` (the last refusal).
+//! `AbaTrava` (who edits), `AbaErro` (the last refusal) and `AbaSim_<k>` (line `k` of what
+//! the last run says, `indicadores.rs`; `AbaSimNota` above them).
 
 use std::collections::HashSet;
 
@@ -22,6 +23,16 @@ use crate::ui_props::{
     PropAction, PropsState, PropsView, combo, line_edit, named, named_toggle, row_label,
 };
 
+/// What the last run says about the object: the lines of each tab (in the order of
+/// `PropsView::abas`) and the note above them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Simulado {
+    pub nota: String,
+    pub linhas: Vec<Vec<crate::indicadores::Linha>>,
+    /// The quality and safety numbers are still being computed.
+    pub calculando: bool,
+}
+
 /// What the user did in a tab.
 #[derive(Clone, Debug, PartialEq)]
 pub enum AbaAcao {
@@ -31,6 +42,8 @@ pub enum AbaAcao {
     Adicionar(String),
     /// Remove item `indice` of list `lista`.
     Remover(String, usize),
+    /// "Abrir no UTSim Qualidade / Segurança": the app (`qualidade`, `seguranca`).
+    AbrirApp(String),
 }
 
 /// What the tabs keep between frames.
@@ -125,6 +138,10 @@ pub fn show(
         let r = ui.add(Label::new(RichText::new(e).color(colors::ERROR)).wrap());
         named(ui, reg, "AbaErro", &r, e);
     }
+    abrir_app(ui, reg, out, v.abas[st.abas.aba].0);
+    if let Some(s) = &v.simulado {
+        simulado(ui, reg, s, st.abas.aba);
+    }
     let editavel = v.somente_leitura.is_none();
     let campos = &v.abas[st.abas.aba].1;
     let mut esconder: Option<u8> = None;
@@ -142,6 +159,53 @@ pub fn show(
             campo(ui, st, reg, out, c);
         }
     });
+}
+
+/// "Abrir no UTSim Qualidade" on the Qualidade tab, "Abrir no UTSim Segurança" on the
+/// Segurança tab (`outro_app.rs`): the app opens on this node of the saved model.
+fn abrir_app(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, aba: Aba) {
+    let (app, texto, ajuda) = match aba {
+        Aba::Qualidade => (
+            "qualidade",
+            "Abrir no UTSim Qualidade",
+            "Abre este nó no UTSim Qualidade (defeitos, inspeção, custos, CEP). O modelo é salvo antes e fica com o outro app para editar; o UTSim 3D relê o que ele gravar.",
+        ),
+        Aba::Seguranca => (
+            "seguranca",
+            "Abrir no UTSim Segurança",
+            "Abre este nó no UTSim Segurança do Trabalho (perigos, matriz de risco, EPI). O modelo é salvo antes e fica com o outro app para editar; o UTSim 3D relê o que ele gravar.",
+        ),
+        Aba::Manutencao => return,
+    };
+    let r = ui
+        .add_sized([ui.available_width(), 26.0], Button::new(texto))
+        .on_hover_text(ajuda);
+    named(ui, reg, &format!("AbaAbrir_{app}"), &r, texto);
+    if r.clicked() {
+        out.push(PropAction::Aba(AbaAcao::AbrirApp(app.into())));
+    }
+}
+
+/// The lines of the last run in the tab shown, above the fields.
+fn simulado(ui: &mut Ui, reg: &mut Registry, s: &Simulado, aba: usize) {
+    let linhas = s.linhas.get(aba).map_or(&[][..], |l| l.as_slice());
+    if linhas.is_empty() && !s.calculando {
+        return;
+    }
+    let nota = if linhas.is_empty() {
+        "Calculando os números da simulação...".to_owned()
+    } else {
+        s.nota.clone()
+    };
+    let r = ui.add(Label::new(RichText::new(&nota).strong().color(colors::HEADING)).wrap());
+    named(ui, reg, "AbaSimNota", &r, &nota);
+    for (k, l) in linhas.iter().enumerate() {
+        row_label(ui, &l.rotulo, &l.ajuda, 0, |ui, _| {
+            let r = ui.add(Label::new(RichText::new(&l.valor).monospace()).wrap());
+            named(ui, reg, &format!("AbaSim_{k}"), &r, &l.valor);
+        });
+    }
+    ui.separator();
 }
 
 fn editar(out: &mut Vec<PropAction>, caminho: &str, valor: String) {

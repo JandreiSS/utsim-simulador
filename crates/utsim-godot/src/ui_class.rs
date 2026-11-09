@@ -79,6 +79,14 @@ pub struct UtsimUi {
     /// The playback clock of Simular and the replication it plays (for its events).
     relogio: Relogio,
     clock_pb: Option<Gd<crate::UtsimPlayback>>,
+    /// What the last run says about each node (the node tabs), the quality and safety
+    /// numbers still coming from a thread, and its stop flag.
+    indicadores: Option<crate::indicadores::Indicadores>,
+    ind_rx: Option<std::sync::mpsc::Receiver<crate::indicadores::Indicadores>>,
+    ind_stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Those threads, joined when the interface goes away: the library must not be
+    /// unloaded under a thread still running its code.
+    ind_threads: Vec<std::thread::JoinHandle<()>>,
     base: Base<Node2D>,
 }
 
@@ -108,6 +116,10 @@ impl INode2D for UtsimUi {
             flows_pb: None,
             relogio: Relogio::default(),
             clock_pb: None,
+            indicadores: None,
+            ind_rx: None,
+            ind_stop: Default::default(),
+            ind_threads: Vec::new(),
             base,
         }
     }
@@ -120,6 +132,7 @@ impl INode2D for UtsimUi {
     }
 
     fn process(&mut self, _delta: f64) {
+        self.poll_indicators();
         self.frame_if_needed();
     }
 
@@ -640,8 +653,36 @@ impl UtsimUi {
         let Some(run) = res.bind().run().cloned() else {
             return;
         };
+        self.start_indicators(&run);
         self.host
             .set_results(ResultsView::new(run, can_run), &export_dir.to_string());
+    }
+
+    /// Forgets the numbers of the last run in the node tabs (another model).
+    #[func]
+    fn clear_indicators(&mut self) {
+        self.ind_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.indicadores = None;
+        self.ind_rx = None;
+        self.props_key = None;
+        self.host.invalidate();
+    }
+
+    /// Waits (at most two minutes) for the quality and safety numbers of the node tabs;
+    /// false when they did not come. For the scripted runs.
+    #[func]
+    fn indicators_wait(&mut self) -> bool {
+        if let Some(rx) = &self.ind_rx {
+            match rx.recv_timeout(std::time::Duration::from_secs(120)) {
+                Ok(ind) => self.indicadores = Some(ind),
+                Err(_) => return false,
+            }
+            self.ind_rx = None;
+            self.props_key = None;
+            self.host.invalidate();
+        }
+        true
     }
 
     /// Opens or closes the "Resultados" window (it opens only with a run to show).
@@ -1360,6 +1401,70 @@ impl UtsimUi {
         self.host.set_edit(self.edit_state.clone());
     }
 
+    /// The numbers of the node tabs for a new run: Manutenção now, from the reports;
+    /// Qualidade and Segurança from one more run per replication in a thread (with the
+    /// per-item log and the trace), which a newer run stops.
+    fn start_indicators(&mut self, run: &crate::results::RunOutput) {
+        use crate::indicadores::{Indicadores, replica, tem_qualidade, tem_seguranca};
+        use std::sync::atomic::{AtomicBool, Ordering};
+        self.ind_stop.store(true, Ordering::Relaxed);
+        let stop = std::sync::Arc::new(AtomicBool::new(false));
+        self.ind_stop = stop.clone();
+        let precisa = tem_qualidade(&run.model) || tem_seguranca(&run.model);
+        let mut agora = Indicadores::montar(&run.model, &run.reports, &[]);
+        agora.calculando = precisa;
+        self.indicadores = Some(agora);
+        self.ind_rx = None;
+        self.props_key = None;
+        self.host.invalidate();
+        if !precisa {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.ind_rx = Some(rx);
+        let model = run.model.clone();
+        let reports = run.reports.clone();
+        self.ind_threads.retain(|h| !h.is_finished());
+        let h = std::thread::spawn(move || {
+            let mut reps = Vec::new();
+            for r in &reports {
+                if stop.load(Ordering::Relaxed) {
+                    return;
+                }
+                // A replication that fails here failed in the run too: left out.
+                if let Ok(x) = replica(&model, r.replication) {
+                    reps.push(x);
+                }
+            }
+            if !stop.load(Ordering::Relaxed) {
+                let _ = tx.send(Indicadores::montar(&model, &reports, &reps));
+            }
+        });
+        self.ind_threads.push(h);
+    }
+
+    /// Takes the quality and safety numbers when the thread is done.
+    fn poll_indicators(&mut self) {
+        let Some(rx) = &self.ind_rx else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(ind) => {
+                self.indicadores = Some(ind);
+                self.ind_rx = None;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => return,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                self.ind_rx = None;
+                if let Some(i) = self.indicadores.as_mut() {
+                    i.calculando = false;
+                }
+            }
+        }
+        self.props_key = None;
+        self.host.invalidate();
+    }
+
     /// The properties view from the document, rebuilt only when the document or the
     /// object shown changed.
     fn refresh_props_view(&mut self) {
@@ -1419,8 +1524,12 @@ impl UtsimUi {
             } else {
                 d.editor.tab_fields(&self.object)
             },
+            simulado: None,
             somente_leitura: notice,
         });
+        if let Some(pv) = self.host.props.as_mut() {
+            pv.simulado = simulated_view(self.indicadores.as_ref(), &self.object, &pv.abas);
+        }
         self.props_key = Some(key);
     }
 
@@ -1498,6 +1607,11 @@ impl UtsimUi {
     /// (one undo step); a refusal stays under the field.
     fn tab_action(&mut self, acao: crate::ui_abas::AbaAcao) {
         use crate::ui_abas::AbaAcao;
+        if let AbaAcao::AbrirApp(app) = &acao {
+            // Saving first and handing the model over are the main scene's.
+            self.emit(&format!("abrir_app:{app}:{}", self.object));
+            return;
+        }
         let Some(mut doc) = self.doc.clone() else {
             return;
         };
@@ -1524,6 +1638,7 @@ impl UtsimUi {
                         let r = d.editor.tab_remove(&object, &lista, i);
                         (format!("{lista}[{i}]"), "remover".to_owned(), r)
                     }
+                    AbaAcao::AbrirApp(_) => return,
                 }
             }
         };
@@ -1543,6 +1658,11 @@ impl UtsimUi {
 
     fn free_all(&mut self) {
         self.canvas.free_all();
+        self.ind_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in self.ind_threads.drain(..) {
+            let _ = h.join();
+        }
     }
 }
 
@@ -1608,4 +1728,32 @@ fn steps_array(steps: Vec<crate::acoes::Passo>) -> VarArray {
         out.push(&d.to_variant());
     }
     out
+}
+
+/// The lines of the last run for `object`, in the order of its tabs.
+fn simulated_view(
+    ind: Option<&crate::indicadores::Indicadores>,
+    object: &str,
+    abas: &[(utsim_edit::abas::Aba, Vec<utsim_edit::abas::Campo>)],
+) -> Option<crate::ui_abas::Simulado> {
+    let ind = ind?;
+    if abas.is_empty() {
+        return None;
+    }
+    Some(crate::ui_abas::Simulado {
+        nota: format!(
+            "Na última simulação ({} {}), média ± semiamplitude do IC de 95 %:",
+            ind.replicacoes,
+            if ind.replicacoes == 1 {
+                "replicação"
+            } else {
+                "replicações"
+            }
+        ),
+        linhas: abas
+            .iter()
+            .map(|(a, _)| ind.de(object, *a).to_vec())
+            .collect(),
+        calculando: ind.calculando,
+    })
 }
