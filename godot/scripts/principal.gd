@@ -40,14 +40,30 @@ const CAMERAS := [["orbita", "Órbita"], ["planta", "Planta (2D)"], ["seguir", "
 
 var doc: Object
 var model: Object
-var playback: Object
+## The replication played in Simular; the clock of the bridge follows it.
+var playback: Object:
+	set(v):
+		playback = v
+		if ui != null:
+			ui.clock_load(v)
 var cena: CenaUtsim
 var editor: EditorUtsim
 var camera: CameraOrbita
 var sun: DirectionalLight3D
-var t := 0.0
-var playing := false
-var speed := 1.0
+## The playback clock is the bridge's (`relogio.rs`, kept by the `UtsimUi`): the playback
+## bar changes it by itself; these read it (the roteiros too).
+var t: float:
+	get:
+		return ui.clock_t() if ui != null else 0.0
+var playing: bool:
+	get:
+		return ui != null and ui.clock_playing()
+var speed: float:
+	get:
+		return ui.clock_speed() if ui != null else 1.0
+	set(v):
+		if ui != null:
+			ui.set_clock_speed(v)
 var model_path := ""
 ## `editar` or `simular`.
 var mode := "editar"
@@ -544,15 +560,10 @@ func bar_action(what: String) -> void:
 		# The status bar and the playback bar.
 		"cancelar":
 			cancel_job()
-		"evento":
-			step_event(int(arg))
-		"reproduzir":
-			set_playing(not playing)
-		"velocidade":
-			speed = float(arg)
-			_sync_play()
-		"tempo":
-			seek(float(arg), true)
+		# Play, speed, time and events of the playback bar are the clock's (in the bridge);
+		# it says only when the time jumped.
+		"relogio":
+			_apply_clock(true)
 	_sync_bar()
 
 
@@ -589,15 +600,8 @@ func _sync_sim() -> void:
 
 ## What the playback bar shows (only in Simular).
 func _sync_play() -> void:
-	if ui == null:
-		return
-	ui.set_playback_bar({
-		"visible": mode == "simular",
-		"playing": playing,
-		"t": t,
-		"end": playback.end() if playback != null else 0.0,
-		"speed": speed,
-	})
+	if ui != null:
+		ui.set_playback_bar({"visible": mode == "simular"})
 
 
 ## What the egui properties panel did (the edits are already applied by the bridge).
@@ -1297,45 +1301,33 @@ func _grid_lines(points: PackedVector3Array) -> void:
 
 
 func set_playing(on: bool) -> void:
-	playing = on and playback != null and mode == "simular"
-	_sync_play()
+	if ui != null:
+		ui.clock_play(on and mode == "simular")
 
 
 ## Jumps to `time` (no crossfade when `snap`).
 func seek(time: float, snap := false) -> void:
-	if playback == null:
-		return
-	t = clampf(time, 0.0, playback.end())
+	if ui != null and ui.clock_seek(time):
+		_apply_clock(snap)
+
+
+## Shows the clock's time in the scene (no crossfade when `snap`).
+func _apply_clock(snap: bool) -> void:
 	cena.apply(t, 0.0, snap)
-	_show_time()
 	if ui != null:
 		ui.flows_time(t)
 
 
 func step_event(direction: int) -> void:
-	if playback == null:
-		return
-	set_playing(false)
-	var e: float = playback.next_event(t) if direction > 0 else playback.prev_event(t)
-	if e >= 0.0:
-		seek(e, true)
-
-
-func _show_time() -> void:
-	_sync_play()
+	if ui != null and ui.clock_step(direction):
+		_apply_clock(true)
 
 
 func _process(dt: float) -> void:
 	_poll_job()
-	if playback != null and playing:
-		t += dt * speed
-		if t >= playback.end():
-			t = playback.end()
-			set_playing(false)
+	if ui != null and ui.clock_tick(dt):
 		cena.apply(t, dt)
-		_show_time()
-		if ui != null:
-			ui.flows_time(t)
+		ui.flows_time(t)
 	_frames += 1
 	if mode == "simular" and playback != null:
 		_drive_camera()
@@ -1450,33 +1442,20 @@ func cancel_job() -> void:
 		set_status("Cancelando: %s..." % job.what())
 
 
+## The job's progress and how it ended are the bridge's (`andamento.rs`).
 func _poll_job() -> void:
-	if job == null:
+	if job == null or ui == null:
 		return
-	var p: Dictionary = job.progress()
-	var total := int(p["total"])
-	if ui != null:
-		if total > 0:
-			ui.set_status_bar({"progress": float(p["done"]) / total, "percent": true})
-		else:
-			# Unknown length: a bar that goes back and forth.
-			ui.set_status_bar({"progress": absf(sin(Time.get_ticks_msec() / 400.0)), "percent": false})
-	if not p["finished"]:
+	var r: Dictionary = ui.poll_job(job)
+	if not r["finished"]:
 		return
 	var j := job
 	var done := _job_done
 	job = null
 	_job_done = Callable()
-	if ui != null:
-		ui.set_status_bar({"progress": -1.0})
-	if not j.ok():
-		if j.cancelled():
-			set_status("%s: cancelado." % j.what())
-		else:
-			set_status("%s: erro: %s" % [j.what(), j.error()])
-		if j.kind() != "replicacoes":
-			return
-	if done.is_valid():
+	if r["message"] != "":
+		set_status(r["message"])
+	if r["call"] and done.is_valid():
 		done.call(j)
 
 

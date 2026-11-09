@@ -29,6 +29,7 @@
 
 pub mod aisle_edit;
 pub mod aisle_godot;
+pub mod andamento;
 pub mod camera_follow;
 pub mod coords;
 pub mod dados;
@@ -51,6 +52,7 @@ pub mod network_edit;
 pub mod overlay_mesh;
 pub mod pert_view;
 pub mod playback;
+pub mod relogio;
 pub mod results;
 pub mod schema;
 pub mod seguranca;

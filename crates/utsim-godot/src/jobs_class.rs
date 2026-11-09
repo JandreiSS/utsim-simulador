@@ -112,13 +112,13 @@ impl UtsimJob {
 
     /// What is running, in Portuguese ("Rodando replicações").
     #[func]
-    fn what(&self) -> GString {
+    pub(crate) fn what(&self) -> GString {
         GString::from(self.job.as_ref().map_or("", |j| j.what))
     }
 
     /// `{done, total, finished}`; `total` 0 when the job cannot count.
     #[func]
-    fn progress(&mut self) -> VarDictionary {
+    pub(crate) fn progress(&mut self) -> VarDictionary {
         self.poll();
         let (done, total) = self.job.as_ref().map_or((0, 0), Job::progress);
         let mut d = VarDictionary::new();
@@ -154,17 +154,17 @@ impl UtsimJob {
     }
 
     #[func]
-    fn ok(&self) -> bool {
+    pub(crate) fn ok(&self) -> bool {
         matches!(self.outcome, Some(Ok(_)))
     }
 
     #[func]
-    fn cancelled(&self) -> bool {
+    pub(crate) fn cancelled(&self) -> bool {
         matches!(&self.outcome, Some(Err(e)) if e == CANCELLED)
     }
 
     #[func]
-    fn error(&self) -> GString {
+    pub(crate) fn error(&self) -> GString {
         match &self.outcome {
             Some(Err(e)) => GString::from(e.as_str()),
             _ => GString::new(),
