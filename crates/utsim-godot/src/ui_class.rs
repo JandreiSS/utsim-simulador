@@ -593,6 +593,28 @@ impl UtsimUi {
             .set_dialog(crate::ui_form::parse_dialog(&dialog.to_string()));
     }
 
+    /// The eye and the aim of a camera riding a block (`camera_follow.rs`): `[eye, aim]`, or
+    /// empty for the cameras that ride nothing. `head`: a driver's eye, or null.
+    #[func]
+    fn follow_view(
+        &self,
+        mode: GString,
+        at: Vector3,
+        axis_x: Vector3,
+        top: f64,
+        head: Variant,
+    ) -> PackedVector3Array {
+        let v = |p: Vector3| [p.x as f64, p.y as f64, p.z as f64];
+        let h = head.try_to::<Vector3>().ok().map(v);
+        match crate::camera_follow::view(&mode.to_string(), v(at), v(axis_x), top, h) {
+            Some((e, a)) => [e, a]
+                .iter()
+                .map(|p| Vector3::new(p[0] as f32, p[1] as f32, p[2] as f32))
+                .collect(),
+            None => PackedVector3Array::new(),
+        }
+    }
+
     /// The floor grid of Editar: the lines (pairs of points) around `positions` (the
     /// objects, Godot) for the snap step `snap` (`grid.rs`).
     #[func]

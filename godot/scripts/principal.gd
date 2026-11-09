@@ -1716,43 +1716,26 @@ func set_camera_mode(which: String) -> void:
 
 ## Places the camera for the modes that follow a block (called every frame in Simular).
 func _drive_camera() -> void:
-	if camera_mode in ["orbita", "planta"] or follow_name == "":
+	if camera_mode in ["orbita", "planta"] or follow_name == "" or ui == null:
 		return
 	var i := cena.block_index(follow_name)
 	if i < 0:
 		return
+	if camera_mode == "seguir":
+		camera.target = cena.block_focus(i)
+		camera.update()
+		return
+	# Where the eye goes and what it looks at is Rust's (`camera_follow.rs`); the parts of
+	# the vehicle on the sight line and any block the eye goes through are hidden.
 	var root: Node3D = cena.rigs[i]["root"]
-	var at := root.global_position
-	var forward := root.global_basis.x.normalized()
-	forward.y = 0.0
-	if forward.length() < 1e-3:
-		forward = Vector3.RIGHT
-	forward = forward.normalized()
-	match camera_mode:
-		"seguir":
-			camera.target = cena.block_focus(i)
-			camera.update()
-		"primeira_pessoa":
-			var eye := at + Vector3(0, 1.6, 0) + forward * 0.35
-			camera_aim = eye + forward * 10.0 - Vector3(0, 1.2, 0)
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
-			cena.clear_view(eye, camera_aim, i)
-		"recurso":
-			# The driving position: above the vehicle (an AGV has no cab; a forklift's
-			# seat is about its mast's height), looking ahead and a little down. The
-			# parts of the vehicle on the sight line and any block the eye goes through
-			# are hidden while the camera is there.
-			var eye_y := clampf(float(cena.rigs[i].get("top", 1.0)) + 0.6, 1.4, 2.4)
-			var eye := at + Vector3(0, eye_y, 0)
-			# A forklift with a driver: the camera is at the driver's head, and the
-			# driver is hidden from there.
-			var head = cena.driver_eye(i)
-			if head != null:
-				eye = head
-				eye_y = eye.y - at.y
-			camera_aim = eye + forward * 10.0 - Vector3(0, eye_y * 0.8, 0)
-			camera.transform = Transform3D(Basis.IDENTITY, eye).looking_at(camera_aim, Vector3.UP)
-			cena.clear_view(eye, camera_aim, i)
+	var head = cena.driver_eye(i) if camera_mode == "recurso" else null
+	var v: PackedVector3Array = ui.follow_view(camera_mode, root.global_position, root.global_basis.x,
+		float(cena.rigs[i].get("top", 1.0)), head)
+	if v.size() < 2:
+		return
+	camera_aim = v[1]
+	camera.transform = Transform3D(Basis.IDENTITY, v[0]).looking_at(camera_aim, Vector3.UP)
+	cena.clear_view(v[0], camera_aim, i)
 
 
 # ---------------------------------------------------------------------------

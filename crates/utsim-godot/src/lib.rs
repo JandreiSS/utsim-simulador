@@ -29,6 +29,7 @@
 
 pub mod aisle_edit;
 pub mod aisle_godot;
+pub mod camera_follow;
 pub mod coords;
 pub mod dados;
 pub mod document;
