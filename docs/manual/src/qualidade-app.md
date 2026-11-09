@@ -59,3 +59,13 @@ Para comparar com o simulado, informe o modelo e a característica. O modelo rod
 ## Limites desta versão
 
 O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
+
+## Modelo (mão dupla com o UTSim)
+
+A aba "Modelo" é a tela de entrada quando a unidade tem modelo ligado a algum posto. Ela abre o mesmo arquivo `.ron` que o UTSim usa: escolha um dos modelos dos postos ou digite o caminho. A lista à esquerda mostra os objetos do modelo, com filtro por nome, o que cada um tem (qualidade, inspeção, retrabalho, EPI, perigos, quebras) e um número-chave do resultado simulado. Ao escolher um objeto, os resultados da simulação daquele nó aparecem primeiro, marcados como "Simulado", e "Simular de novo" refaz a simulação. Abaixo ficam as abas de campos: a aba Qualidade mostra os campos do próprio nó (defeitos, características medidas, inspeção, retrabalho e custos) e a aba Manutenção mostra os dados de quebras só para leitura. Cada campo editado vale na hora, com erro de faixa ao lado do campo, e há desfazer e refazer (Ctrl+Z e Ctrl+Y).
+
+Nada vai para o arquivo antes de "Gravar no modelo" (ou Ctrl+S). A gravação troca o arquivo inteiro de uma vez, e o UTSim enxerga a mudança. O que se edita no UTSim aparece aqui: quando o arquivo muda no disco e você não tem mudança sem gravar, a aba recarrega sozinha. Se tiver, ela avisa e deixa você escolher entre recarregar e manter.
+
+Só uma pessoa edita o modelo por vez. Ao abrir, a aba grava uma trava ao lado do arquivo e a renova a cada minuto. Se o UTSim, o UTSim Segurança do Trabalho ou outra pessoa já edita, a aba abre só para leitura e avisa "Em edição por ... no ... desde ...". O botão "Tentar editar" tenta de novo, e a trava de um programa que travou vence sozinha em cinco minutos.
+
+À direita ficam os resultados da simulação do mesmo modelo, por nó: defeitos gerados, rendimento da inspeção e, para o modelo inteiro, refugo, retrabalho e escape. Eles são sempre marcados como "Simulado".
