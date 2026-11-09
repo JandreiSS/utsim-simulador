@@ -2921,7 +2921,10 @@ mod tests {
     #[test]
     fn processor_with_a_product_changeover() {
         let mut d = doc();
-        assert_eq!(field(&d, "p", "changeover").value, Value::Text("None".into()));
+        assert_eq!(
+            field(&d, "p", "changeover").value,
+            Value::Text("None".into())
+        );
         apply(&mut d, "p", "setup.on", Value::Bool(true));
         apply(
             &mut d,
