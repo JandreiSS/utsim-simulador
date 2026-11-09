@@ -74,6 +74,15 @@ O resultado aparece ao lado dos dados, com os indicadores, os achados (o que o r
 
 Na tela **Modelo**, o painel do nó mostra quantos estudos o nó tem, e "Abrir em Ferramentas" leva aos estudos dele (ou prepara um estudo novo do nó).
 
+## Abrir pelo UTSim e pelo Ensino
+
+Outros programas da família abrem o UTSim Qualidade já no lugar certo:
+
+- **Do UTSim 3D**, "Abrir no UTSim Qualidade" nas abas do nó abre a tela Modelo com o nó escolhido, mesmo sem unidade aberta. O UTSim grava o que estiver pendente e entrega a edição. Se outra pessoa ou outro programa estiver editando, o modelo abre só para leitura, com o aviso de quem edita.
+- **Do UTSim Ensino**, "Analisar no UTSim Qualidade" abre os dados da missão (CSV ou xlsx) num estudo novo, "Análise de ...", com a ferramenta da missão e os limites já preenchidos. O estudo fica na última unidade aberta ou, sem unidade, na unidade "Análises avulsas", que o aplicativo cria sozinho. Os dados ficam com a origem Importado. Se a missão não diz a ferramenta, a tela Ferramentas pergunta qual usar.
+
+Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.ron> --utsim-no=<nó>` ou `utsim-qualidade --utsim-abrir=<dados.csv> --utsim-ferramenta=capacidade --utsim-lie=24,985 --utsim-lse=25,015`. As opções aparecem em `utsim-qualidade --ajuda`.
+
 ## Limites desta versão
 
 O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.

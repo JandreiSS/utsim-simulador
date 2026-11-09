@@ -98,6 +98,10 @@ A tela Incidentes tem quatro abas:
 
 A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA e A3. Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo.
 
+## Abrir pelo UTSim
+
+No UTSim 3D, "Abrir no UTSim Segurança" nas abas do nó abre a tela Modelo com o nó escolhido, mesmo sem unidade aberta. O UTSim grava o que estiver pendente e entrega a edição. Se outra pessoa ou outro programa estiver editando, o modelo abre só para leitura, com o aviso de quem edita. Na linha de comando: `utsim-seguranca --utsim-abrir=<modelo.ron> --utsim-no=<nó>`. Arquivos de dados (CSV ou xlsx) também abrem, com `--utsim-ferramenta=<chave>`, como no UTSim Qualidade.
+
 ## Modelo (mão dupla com o UTSim)
 
 A aba "Modelo" é a tela de entrada quando a unidade tem modelo ligado a algum posto. Ela abre o mesmo arquivo `.ron` que o UTSim usa: escolha um dos modelos dos postos ou digite o caminho. A lista à esquerda mostra os objetos do modelo, com filtro por nome, o que cada um tem (qualidade, inspeção, retrabalho, EPI, perigos, quebras) e um número-chave do resultado simulado. Ao escolher um objeto, os resultados da simulação daquele nó aparecem primeiro, marcados como "Simulado", e "Simular de novo" refaz a simulação. Abaixo ficam as abas de campos: a aba Segurança mostra os campos do próprio nó (EPI exigido, perigos do posto e marcações de ergonomia) e a aba Manutenção mostra os dados de quebras só para leitura. Cada campo editado vale na hora, com erro de faixa ao lado do campo, e há desfazer e refazer (Ctrl+Z e Ctrl+Y).
