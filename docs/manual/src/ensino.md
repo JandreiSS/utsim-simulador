@@ -106,6 +106,8 @@ Abaixo vêm a vista 2D, com uma replicação da fábrica animada (estações col
 
 Quando o UTSim está instalado pelo launcher no mesmo computador, aparece "Ver em 3D". O botão grava o modelo da tentativa (com a variante e as decisões do aluno) e a replicação animada na pasta do perfil (`3d/`) e abre o cliente 3D já mostrando a fábrica. Se o UTSim instalado ainda não tiver o cliente 3D, abre o visualizador com o modelo.
 
+Ao lado aparece "Levar para o UTSim" (fora do modo prova). O botão grava só o modelo da tentativa, com a variante e as decisões do aluno, na pasta `modelos/` do perfil, e abre esse modelo no UTSim para editar. O aluno continua no simulador completo a partir do que decidiu na missão, e a missão não muda. O caminho do arquivo aparece na barra de mensagens.
+
 O cliente 3D também tem um **modo missão**, com as mesmas telas do Ensino (campanha, missões, nota, turma e professor) dentro da janela do UTSim 3D. Ele usa o mesmo perfil do aluno e a mesma lógica, e por isso a nota de uma tentativa é a mesma nos dois programas. Para abrir, use `-- --utsim-ensino` na linha de comando do cliente 3D, com `--utsim-missao=<id>` para ir direto a uma missão e `--utsim-pacote=<pasta|pacote.utse>` para abrir outro pacote. O botão "← Voltar ao UTSim 3D" volta ao editor.
 
 ### Nota
@@ -133,7 +135,7 @@ Depois de resolver uma missão, a caixa de areia abre a mesma fábrica sem meta 
 
 O professor envia um convite (`.utsc`). Na aba **Turma**, o aluno indica o convite e, se a turma usa uma pasta compartilhada no Google Drive, a pasta sincronizada no computador. Com a pasta, cada tentativa é gravada nela assim que termina. Sem a pasta, o botão "Gravar entrega" grava um arquivo `.utsr` com todas as tentativas, para enviar ao professor pelo ambiente da disciplina, por e-mail ou pen drive.
 
-Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo.
+Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo. A assinatura e a cadeia são as mesmas do UTSim Seis Sigma. Elas revelam um arquivo alterado, uma tentativa que falta no meio ou um diário restaurado de uma cópia antiga, mas não impedem a edição e não valem como assinatura digital com validade jurídica.
 
 ### Programa Lean Seis Sigma da empresa
 

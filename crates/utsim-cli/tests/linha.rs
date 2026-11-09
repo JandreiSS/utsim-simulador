@@ -48,7 +48,7 @@ fn list_and_presets() {
     }
     let (ok, out, _) = utsim(&["linha", "lean_office", "vocabulario"]);
     assert!(ok && out.contains("caso"));
-    let (ok, _, err) = utsim(&["linha", "saude"]);
+    let (ok, _, err) = utsim(&["linha", "inexistente"]);
     assert!(!ok && err.contains("linhas instaladas"), "{err}");
 }
 
