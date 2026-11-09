@@ -301,7 +301,10 @@ fn seguranca(model: &Model, name: &str, reps: &[Replica]) -> Vec<Linha> {
             zonas.contains(&z.zone.as_str())
         }
     };
-    let pessoa = movel && exps.iter().any(|e| e.zones.iter().any(|z| z.person == name));
+    let pessoa = movel
+        && exps
+            .iter()
+            .any(|e| e.zones.iter().any(|z| z.person == name));
     if !zonas.is_empty() || pessoa {
         let tempo: Vec<f64> = exps
             .iter()
@@ -329,7 +332,11 @@ fn seguranca(model: &Model, name: &str, reps: &[Replica]) -> Vec<Linha> {
             )
         };
         if !zonas.is_empty() {
-            out.push(linha("Zonas", zonas.join(", "), "Zonas de risco onde o posto está."));
+            out.push(linha(
+                "Zonas",
+                zonas.join(", "),
+                "Zonas de risco onde o posto está.",
+            ));
         }
         out.push(linha(rot, mh(&tempo, false), ajuda));
         out.push(linha(
@@ -380,7 +387,11 @@ fn manutencao(name: &str, reports: &[RunReport]) -> Vec<Linha> {
     let frac = |b: &&utsim_core::BlockReport, s: &str| b.states.get(s).copied().unwrap_or(0.0);
     let mut out = Vec::new();
     if let Some(f) = custom("maintenance.failures") {
-        out.push(linha("Quebras", mh(&f, false), "Falhas do posto, por replicação."));
+        out.push(linha(
+            "Quebras",
+            mh(&f, false),
+            "Falhas do posto, por replicação.",
+        ));
         if let Some(v) = custom("maintenance.mtbf") {
             out.push(linha(
                 "MTBF",
@@ -477,11 +488,15 @@ mod tests {
             .name
             .clone();
         assert!(cedo.de(&posto, Aba::Qualidade).is_empty());
-        let reps: Vec<Replica> = reports.iter().map(|r| replica(&m, r.replication).unwrap()).collect();
+        let reps: Vec<Replica> = reports
+            .iter()
+            .map(|r| replica(&m, r.replication).unwrap())
+            .collect();
         let ind = Indicadores::montar(&m, &reports, &reps);
         let q = ind.de(&posto, Aba::Qualidade);
         assert!(
-            q.iter().any(|l| l.rotulo == "Defeitos gerados" && l.valor != "-"),
+            q.iter()
+                .any(|l| l.rotulo == "Defeitos gerados" && l.valor != "-"),
             "{q:?}"
         );
         if let Some(insp) = m.objects.iter().find(|o| o.inspection.is_some()) {
@@ -506,15 +521,11 @@ mod tests {
             .position(|o| matches!(o.kind, ObjectKind::Processor { .. }))
             .unwrap();
         let name = m.objects[p].name.clone();
-        m.objects[p].downtime = Some(
-            ron::from_str("(mtbf: Exp(mean: 60.0), mttr: Exp(mean: 5.0))").unwrap(),
-        );
+        m.objects[p].downtime =
+            Some(ron::from_str("(mtbf: Exp(mean: 60.0), mttr: Exp(mean: 5.0))").unwrap());
         let reports = m.run_replications().unwrap();
         let ind = Indicadores::montar(&m, &reports, &[]);
         let l = ind.de(&name, Aba::Manutencao);
-        assert!(
-            l.iter().any(|l| l.rotulo == "Disponibilidade"),
-            "{l:?}"
-        );
+        assert!(l.iter().any(|l| l.rotulo == "Disponibilidade"), "{l:?}");
     }
 }

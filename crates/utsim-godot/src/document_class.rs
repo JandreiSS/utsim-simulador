@@ -383,7 +383,8 @@ impl UtsimDocument {
             .unwrap_or(file);
         let had = self.trava.pode_gravar();
         if had {
-            self.trava.ceder(a.produto(), utsim_pasta::trava::agora_ms());
+            self.trava
+                .ceder(a.produto(), utsim_pasta::trava::agora_ms());
         }
         match crate::outro_app::abrir(a, &file, &node.to_string()) {
             Ok(()) => GString::new(),

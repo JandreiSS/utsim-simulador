@@ -153,7 +153,10 @@ impl TravaModelo {
     /// "Em edição por ana no UTSim Qualidade desde 14:05", when someone else holds it.
     pub fn aviso(&self) -> Option<String> {
         if let Some((app, _)) = &self.cedida {
-            return Some(format!("Aberto no {}, que vai editar o modelo", nome_app(app)));
+            return Some(format!(
+                "Aberto no {}, que vai editar o modelo",
+                nome_app(app)
+            ));
         }
         self.de_outro().map(|t| {
             format!(

@@ -657,7 +657,8 @@ impl UtsimUi {
     /// Forgets the numbers of the last run in the node tabs (another model).
     #[func]
     fn clear_indicators(&mut self) {
-        self.ind_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.ind_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         self.indicadores = None;
         self.ind_rx = None;
         self.props_key = None;
@@ -1732,9 +1733,16 @@ fn simulated_view(
         nota: format!(
             "Na última simulação ({} {}), média ± semiamplitude do IC de 95 %:",
             ind.replicacoes,
-            if ind.replicacoes == 1 { "replicação" } else { "replicações" }
+            if ind.replicacoes == 1 {
+                "replicação"
+            } else {
+                "replicações"
+            }
         ),
-        linhas: abas.iter().map(|(a, _)| ind.de(object, *a).to_vec()).collect(),
+        linhas: abas
+            .iter()
+            .map(|(a, _)| ind.de(object, *a).to_vec())
+            .collect(),
         calculando: ind.calculando,
     })
 }
