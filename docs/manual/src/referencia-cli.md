@@ -17,7 +17,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
 | `utsim tempos` | estudo de tempos e métodos: ciclo homem-máquina, tempos por elemento, máquinas por operador, tempo padrão e comparação de métodos | [Estudo de tempos e métodos](tempos-e-metodos.md) |
-| `utsim linha` | linhas especializadas (Lean Office e Serviços e atendimento; [Serviços](linhas/servicos/index.md)): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office/index.md) |
+| `utsim linha` | linhas especializadas (Lean Office, Serviços e atendimento, Logística e armazém; [Serviços](linhas/servicos/index.md), [Logística](linhas/logistica/index.md)): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office/index.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
 | `utsim pert` | PERT/CPM de uma seleção de objetos ou de um trecho | [PERT/CPM](pert-cpm.md) |
 | `utsim qualidade` | cartas de controle, capacidade e análise do sistema de medição sobre um CSV | [Qualidade](qualidade.md) |
@@ -86,7 +86,7 @@ utsim corredores modelo.ron --svg planta.svg
 - `fluxograma`: `--tipo` escolhe entre dez diagramas (`carta`, `blocos`, `operacoes`, `raias`, `sipoc`, `mapofluxograma`, `espaguete`, `de-para`, `homem-maquina`, `vsm`) ou `todos` (índice em `--html`); `--replica`, `--de`/`--ate`, `--comparar` e `--raia` ajustam os tipos da simulação e das raias; `--svg`, `--html`, `--mermaid` e `--csv` escolhem as saídas (sem nenhuma, imprime o Mermaid); `--simbolo objeto=simbolo` troca o símbolo de um objeto; `--horizontal`, `--sem-tempos` e `--sem-distancias` ajustam o desenho; `--com-resultados` roda o modelo e põe os números nas caixas.
 
 - `tempos`: sem `--ator`, estuda cada operador que trabalhou em máquinas no intervalo; `--de` e `--ate` vão juntos (padrão: do fim do aquecimento ao fim da rodada); `--ciclo N` escolhe o ciclo desenhado (padrão: o mediano); `--ritmo` e `--tolerancia` são em %; `--custo-operador` e `--custo-maquina` vão juntos (por hora; `--unidade s|min|h` diz a unidade de tempo do modelo); `--comparar depois.ron` pareia os elementos dos dois métodos pelo nome. O resumo vai sempre para o terminal; `--html`, `--svg`, `--csv` e `--json` gravam os arquivos.
-- `linha`: `utsim linha lista` mostra as linhas instaladas; `utsim linha <linha>` resume a linha; as ações são `predefinicoes`, `vocabulario`, `modelos`, `relatorio` (indicadores no terminal; `-n`, `--html`, `--json` e `--comparar futuro.ron` para o estado futuro; na linha `servicos`, `--meta` minutos e `--alvo` fração da meta de nível de serviço, padrão 15 e 0,8) e `colocar` (cria o arquivo se não existir, grava `line` no modelo; `--campo chave=valor` repetível com valores em RON, `--posicao x y`, `--departamento`, `--nome`, `--saida`). Cada ação tem o seu `--help`.
+- `linha`: `utsim linha lista` mostra as linhas instaladas; `utsim linha <linha>` resume a linha; as ações são `predefinicoes`, `vocabulario`, `modelos`, `relatorio` (indicadores no terminal; `-n`, `--html`, `--json` e `--comparar futuro.ron` para o estado futuro; na linha `servicos`, `--meta` minutos e `--alvo` fração da meta de nível de serviço, padrão 15 e 0,8; na linha `logistica`, `--meta-doca` minutos, padrão 60) e `colocar` (cria o arquivo se não existir, grava `line` no modelo; `--campo chave=valor` repetível com valores em RON, `--posicao x y`, `--departamento`, `--nome`, `--saida`). Cada ação tem o seu `--help`.
 
 ## Saída de `--help`
 
@@ -604,7 +604,7 @@ Options:
 ### `utsim linha --help`
 
 ```text
-Linhas especializadas (Lean Office, Serviços e atendimento): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha
+Linhas especializadas (Lean Office, Serviços e atendimento, Logística e armazém): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha
 
 Usage: utsim linha <LINHA> [COMMAND]
 
@@ -635,13 +635,14 @@ Arguments:
   <MODEL>  Modelo (.ron)
 
 Options:
-  -n, --reps <REPS>          Número de replicações (sobrescreve run.replications)
-      --html <HTML>          Grava o relatório completo (indicadores, gráficos, VSM administrativo, raias)
-      --comparar <COMPARAR>  Cenário do estado futuro (outro .ron): VSM e indicadores lado a lado
-      --json <JSON>          Grava os indicadores de cada replicação em JSON
-      --meta <META>          Serviços e atendimento: espera máxima da meta de nível de serviço, em minutos (padrão 15)
-      --alvo <ALVO>          Serviços e atendimento: fração dos clientes atendidos dentro da meta, de 0 a 1 (padrão 0,8)
-  -h, --help                 Print help
+  -n, --reps <REPS>            Número de replicações (sobrescreve run.replications)
+      --html <HTML>            Grava o relatório completo (indicadores, gráficos, VSM administrativo, raias)
+      --comparar <COMPARAR>    Cenário do estado futuro (outro .ron): VSM e indicadores lado a lado
+      --json <JSON>            Grava os indicadores de cada replicação em JSON
+      --meta <META>            Serviços e atendimento: espera máxima da meta de nível de serviço, em minutos (padrão 15)
+      --alvo <ALVO>            Serviços e atendimento: fração dos clientes atendidos dentro da meta, de 0 a 1 (padrão 0,8)
+      --meta-doca <META_DOCA>  Logística e armazém: meta do tempo de doca, em minutos (padrão 60)
+  -h, --help                   Print help
 ```
 
 ### `utsim linha lean_office colocar --help`
