@@ -650,7 +650,7 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   quadro (livre, alvo ou olho, `UtsimUi.camera_drive`), qual bloco uma replicação nova
   segue (`camera_pick`) e o que a troca de câmera diz e devolve à vista (`camera_choice`);
   o `_drive_camera` só põe a câmera.
-- `principal.gd`: de 1826 para 1754 linhas. O que sobra nele chama o Godot (cena, diálogos,
+- `principal.gd`: de 1826 para 1791 linhas. O que sobra nele chama o Godot (cena, diálogos,
   câmera, editor em GDScript) e fica lá.
 
 ### Zonas de risco no editor 3D (2026-11-07)
