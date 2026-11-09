@@ -1,0 +1,30 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Outro app (UTSim Qualidade, UTSim Segurança do Trabalho) grava o modelo aberto no UTSim 3D: sem mudança local, o 3D relê o arquivo; com mudança local, Salvar recusa para não apagar o trabalho do outro, e Salvar como continua."},
+		{"novo": true},
+		{"camera": {"alvo": [0, 0], "distancia": 14.0, "giro": 0.0, "inclinacao": 0.85}},
+		{"arrastar": {"de": {"controle": "Biblioteca_Processor"}, "para": {"chao": [0.0, 0.0]}}},
+		{"conferir": {"objetos": 1}},
+		{"clicar": {"objeto": "processo"}},
+		{"tecla": "ctrl+s"},
+		{"dialogo": "{saida}/g4_disco.ron"},
+		{"conferir": {"sujo": false, "status_contem": "Salvo em"}},
+		{"nota": "O outro app renomeia o nó e grava: o 3D relê, e a seleção segue o que ainda existe."},
+		{"outro_app": {"arquivo": "{saida}/g4_disco.ron", "trocar": ["name: \"processo\"", "name: \"prensa\""]}},
+		{"conferir": {"existe": ["prensa"], "nao_existe": ["processo"], "sujo": false, "status_contem": "recarregado do disco"}},
+		{"nota": "Uma mudança local e outra gravação do outro app: o 3D não relê, avisa e Salvar recusa."},
+		{"clicar": {"objeto": "prensa"}},
+		{"clicar": {"controle": "Aba_Seguranca"}},
+		{"digitar": "luvas", "em": {"controle": "AbaCampo_ppe"}, "enter": true},
+		{"conferir": {"sujo": true, "campo": {"objeto": "prensa", "campo": "ppe", "valor": "luvas"}}},
+		{"outro_app": {"arquivo": "{saida}/g4_disco.ron", "trocar": ["name: \"prensa\"", "name: \"torno\""]}},
+		{"conferir": {"existe": ["prensa"], "status_contem": "use Salvar como"}},
+		{"tecla": "ctrl+s"},
+		{"conferir": {"status_contem": "Outro app gravou este modelo", "sujo": true, "arquivo": {"caminho": "{saida}/g4_disco.ron", "contem": ["torno"]}}},
+		{"nota": "Salvar como outro arquivo vale."},
+		{"tecla": "ctrl+shift+s"},
+		{"dialogo": "{saida}/g4_disco_copia.ron"},
+		{"conferir": {"sujo": false, "status_contem": "Salvo em", "arquivo": {"caminho": "{saida}/g4_disco_copia.ron", "contem": ["prensa", "luvas"]}}}
+	]
+}

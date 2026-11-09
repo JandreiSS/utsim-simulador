@@ -683,6 +683,24 @@ Pedido do dono (`docs/plano_integracao_familia.md`, seção 3): o nó tem as aba
 - `field_text` do documento também lê os campos das abas pelo caminho, para o `conferir` `campo` dos roteiros. Roteiro `g4_abas.json`.
 - A seção "Quebras e turnos" continua: a aba Manutenção edita o mesmo `downtime`.
 
+### Modelo gravado por outro app (2026-11-09)
+
+Lacuna da mão dupla (`docs/plano_integracao_familia.md`, seção 3.2): o 3D não olhava o
+disco, então mostrava dados velhos enquanto o UTSim Qualidade ou o Segurança editava, e o
+"Salvar" seguinte, depois de tomar a trava, gravava por cima do trabalho do outro app.
+
+- `disco.rs` (puro, testes): a marca do arquivo (tamanho e hash do conteúdo, então um
+  arquivo regravado igual não conta) e a decisão: igual, recarregar (sem mudança local) ou
+  conflito (com mudança local).
+- `UtsimDocument` guarda a marca ao abrir e ao salvar; `disk_check` diz o que fazer,
+  `reload` relê, e `save` (e `save_as` para o mesmo arquivo) recusa com a mensagem de
+  `disco::RECUSA` quando o arquivo mudou por fora.
+- `principal.gd`: `_check_disk` na renovação da trava (a cada minuto) e no
+  `NOTIFICATION_APPLICATION_FOCUS_IN`; `_reload_from_disk` mantém modo, câmera e a seleção
+  que ainda existe; o conflito é avisado uma vez.
+- `roteiro.gd`: passo `outro_app` (troca um texto no arquivo e confere o disco). Roteiro
+  `g4_disco.json`. Manual: `objetos.md`.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
