@@ -1006,6 +1006,11 @@ certificado de cada certificação sai na tela Certificação do programa. Os ar
 pasta `relatorios/` do projeto (ou `certificacoes/` do programa) e abrem no leitor de PDF do
 computador; refazer um relatório substitui o anterior.
 
+Os relatórios longos (A4 com três seções ou mais, como o do tollgate e o relatório anual do
+programa) abrem com uma **capa** (o app, o título, o projeto ou programa, quem imprimiu e
+quando) e um **sumário** com a página de cada seção. As tabelas têm o cabeçalho na cor do
+modelo da empresa e linhas alternadas, e uma seção nunca começa sozinha no pé da página.
+
 Os PDF trazem **gráficos** desenhados pelo próprio programa (linhas e barras, sem imagem):
 
 - cada análise guardada em Dados e análises tem o seu relatório, com o conjunto e a origem, o
