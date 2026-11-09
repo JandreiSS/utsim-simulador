@@ -1,0 +1,82 @@
+// Usinagem com troca de produto: modelo pronto da linha Manufatura discreta, montado só com
+// as predefinições de linhas/manufatura/biblioteca.ron.
+//
+// Ordens de três produtos (50 % do produto 1, 30 % do 2 e 20 % do 3) chegam em média a cada
+// 14 minutos, cada uma com um prazo entre 1 e 3 horas. Passam pelo torno, pela fresa e pela
+// retífica. O torno e a fresa só preparam quando o produto muda (campo changeover), com o
+// tempo de cada troca na matriz (de, para); a retífica não troca. A fresa e a retífica quebram
+// de vez em quando (campo downtime do nó, aba Manutenção). As filas atendem pela data de
+// entrega (Asc("vence")); a fila de ordens grava a data na primeira passagem.
+//
+// Experimentos: trocar a regra da fila do torno por Asc("produto") (junta produtos iguais,
+// troca menos, mas o produto 3 espera mais), mudar a mistura dos produtos ou encurtar as
+// trocas da matriz (SMED) e ver o OEE e as ordens no prazo.
+//
+// Resultado (5 replicações, média): cerca de 103 ordens por dia, atravessamento de 66 min,
+// 88 % no prazo; OEE do torno perto de 59 % e da fresa perto de 51 %, com 18 a 23 % do tempo
+// em troca (cerca de 63 trocas por dia em cada). Com Asc("produto") na fila do torno, as trocas
+// caem para cerca de 56 por dia e o atravessamento para 56 min, mas as ordens atrasadas
+// atrasam mais.
+//
+// Tempo em minutos. Rode com:
+//   utsim linha manufatura relatorio examples/usinagem_troca.ron --html relatorio.html
+//
+//   liberacao -> fila_torno -> torno -> fila_fresa -> fresa -> fila_retifica -> retifica
+//     -> expedicao
+Model(
+    name: "Usinagem com troca de produto",
+    description: "Manufatura discreta: três produtos, troca que depende da sequência no torno e na fresa, quebras e OEE",
+    line: "manufatura",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 101, replications: 5),
+    objects: [
+        (name: "liberacao", kind: Source(interarrival: Exp(mean: 14.0),
+            labels: {"produto": Discrete([(1.0, 0.5), (2.0, 0.3), (3.0, 0.2)]), "prazo": Uniform(min: 60.0, max: 180.0)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "manufatura/liberacao", department: "Usinagem"),
+        (name: "fila_torno", kind: Queue(order: Some(Asc("vence"))), position: (3.0, 0.0, 0.0), symbol: "espera",
+            on_entry: Some("if label(item, \"vence\", -1.0) < 0.0 { item.vence = now + label(item, \"prazo\", 1.0e9); }"),
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Usinagem"),
+        (name: "torno", kind: Processor(setup: Some(Const(6.0)), process: Triangular(min: 6.0, mode: 8.0, max: 11.0),
+            changeover: Some((label: "produto", matrix: [
+                (from: 1.0, to: 2.0, time: Triangular(min: 2.0, mode: 3.0, max: 5.0)),
+                (from: 2.0, to: 1.0, time: Triangular(min: 3.0, mode: 4.0, max: 6.0)),
+                (from: 1.0, to: 3.0, time: Triangular(min: 5.0, mode: 6.0, max: 9.0)),
+                (from: 3.0, to: 1.0, time: Triangular(min: 5.0, mode: 7.0, max: 10.0)),
+                (from: 2.0, to: 3.0, time: Triangular(min: 4.0, mode: 5.0, max: 7.0)),
+                (from: 3.0, to: 2.0, time: Triangular(min: 4.0, mode: 5.0, max: 8.0)),
+            ]))),
+            ppe: ["oculos", "protetor_auricular"], position: (6.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina_troca", department: "Usinagem"),
+        (name: "fila_fresa", kind: Queue(order: Some(Asc("vence"))), position: (9.0, 0.0, 0.0), symbol: "espera",
+            on_entry: Some("if label(item, \"vence\", -1.0) < 0.0 { item.vence = now + label(item, \"prazo\", 1.0e9); }"),
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Usinagem"),
+        (name: "fresa", kind: Processor(setup: Some(Const(5.0)), process: Triangular(min: 5.0, mode: 7.0, max: 9.5),
+            changeover: Some((label: "produto", matrix: [
+                (from: 1.0, to: 2.0, time: Triangular(min: 2.0, mode: 3.0, max: 4.0)),
+                (from: 2.0, to: 1.0, time: Triangular(min: 2.0, mode: 3.0, max: 4.0)),
+                (from: 1.0, to: 3.0, time: Triangular(min: 4.0, mode: 5.0, max: 7.0)),
+                (from: 3.0, to: 1.0, time: Triangular(min: 4.0, mode: 5.0, max: 7.0)),
+            ]))),
+            downtime: Some((mtbf: Exp(mean: 960.0), mttr: Exp(mean: 45.0))),
+            ppe: ["oculos", "protetor_auricular"], position: (12.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina_troca", department: "Usinagem"),
+        (name: "fila_retifica", kind: Queue(order: Some(Asc("vence"))), position: (15.0, 0.0, 0.0), symbol: "espera",
+            on_entry: Some("if label(item, \"vence\", -1.0) < 0.0 { item.vence = now + label(item, \"prazo\", 1.0e9); }"),
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Usinagem"),
+        (name: "retifica", kind: Processor(process: Triangular(min: 3.0, mode: 4.0, max: 6.0)),
+            downtime: Some((mtbf: Exp(mean: 1440.0), mttr: Exp(mean: 60.0))),
+            ppe: ["oculos", "protetor_auricular"], position: (18.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Usinagem"),
+        (name: "expedicao", kind: Sink, position: (21.0, 0.0, 0.0), symbol: "fim", preset: "manufatura/expedicao",
+            department: "Expedição"),
+    ],
+    connections: [
+        ("liberacao", "fila_torno"),
+        ("fila_torno", "torno"),
+        ("torno", "fila_fresa"),
+        ("fila_fresa", "fresa"),
+        ("fresa", "fila_retifica"),
+        ("fila_retifica", "retifica"),
+        ("retifica", "expedicao"),
+    ],
+)
