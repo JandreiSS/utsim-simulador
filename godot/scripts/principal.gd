@@ -448,6 +448,43 @@ func bar_action(what: String) -> void:
 	_sync_bar()
 
 
+## What the left panel of Editar shows besides the library and the objects (which the
+## bridge reads from the document): the entry armed, the selection, the obstacles.
+func _sync_edit() -> void:
+	if ui == null or editor == null:
+		return
+	ui.set_edit_state({
+		"armed": editor.place_id if editor.tool == "colocar" else "",
+		"selected": PackedStringArray(editor.selected),
+		"obstacles": editor.corredores.show_obstacles,
+	})
+
+
+## What the left panel of Simular shows.
+func _sync_sim() -> void:
+	if ui == null:
+		return
+	ui.set_sim_state({
+		"reps": _run_reps,
+		"status": _sim_status,
+		"blocks": _block_labels,
+		"follow": cena.block_index(follow_name) if follow_name != "" else -1,
+		"camera": camera_mode,
+		"labels": labels_on,
+		"seguranca": seguranca_on,
+		"calor": calor_on,
+		"quase": cena.camada.lista_quase() if cena.camada != null else [],
+		"shadows": sun.shadow_enabled,
+		"summary": _summary,
+	})
+
+
+## What the playback bar shows (only in Simular).
+func _sync_play() -> void:
+	if ui != null:
+		ui.set_playback_bar({"visible": mode == "simular"})
+
+
 ## What the routing decisions of the bridge need (`acoes.rs`).
 func _route_state() -> Dictionary:
 	return {
