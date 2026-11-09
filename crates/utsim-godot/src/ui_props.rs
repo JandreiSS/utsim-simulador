@@ -31,6 +31,8 @@ use crate::document::Properties;
 use crate::egui_widgets::Registry;
 use crate::schema::{Field, FieldType, Value};
 
+/// The section of the Qualidade, Segurança and Manutenção tabs.
+pub const S_ABAS: &str = "Qualidade, Segurança e Manutenção";
 /// Width of the panel, in points.
 pub const WIDTH: f32 = 420.0;
 /// Width of the label column: a share of the row, between a minimum and a maximum (the
@@ -70,6 +72,10 @@ pub struct PropsView {
     pub data_families: Vec<String>,
     /// The folder of the model (relative data files are read from it).
     pub base_dir: Option<std::path::PathBuf>,
+    /// The Qualidade, Segurança and Manutenção tabs of the object (`ui_abas`).
+    pub abas: Vec<(utsim_edit::abas::Aba, Vec<utsim_edit::abas::Campo>)>,
+    /// Who edits the model when it is not us ("Em edição por ..."): the tabs are read only.
+    pub somente_leitura: Option<String>,
 }
 
 /// What the user did in the panel.
@@ -105,6 +111,8 @@ pub enum PropAction {
     ArrivalsPreview,
     /// The miniature should show this asset (the one chosen, or the one under the mouse).
     Miniature(String),
+    /// An edit in the Qualidade, Segurança or Manutenção tab.
+    Aba(crate::ui_abas::AbaAcao),
 }
 
 /// What the panel keeps between frames.
@@ -131,6 +139,8 @@ pub struct PropsState {
     requested: HashSet<String>,
     /// The arrival table and schedule editors (`ui_arrivals`).
     pub(crate) arrivals: crate::ui_arrivals::ArrivalsState,
+    /// The Qualidade, Segurança and Manutenção tabs.
+    pub abas: crate::ui_abas::AbasState,
 }
 
 impl PropsState {
@@ -220,6 +230,7 @@ pub fn show(
         st.requested.clear();
         st.arrivals = Default::default();
         st.miniature_sent = None;
+        st.abas.outro_objeto();
     }
     // The end of a colour drag: the button is up again.
     if st.gesture && !ui.input(|i| i.pointer.any_down()) {
@@ -309,6 +320,12 @@ fn contents(
         }
         if f.path == "output" {
             outputs(ui, reg, out, p);
+        }
+    }
+    if p.kind != "run" && !v.abas.is_empty() {
+        section_header(ui, reg, st, S_ABAS);
+        if !st.closed.contains(S_ABAS) {
+            crate::ui_abas::show(ui, v, st, reg, out);
         }
     }
     ui.add_space(8.0);
@@ -1902,6 +1919,8 @@ mod tests {
             data: HashMap::new(),
             data_families: Vec::new(),
             base_dir: None,
+            abas: e.tab_fields(object),
+            somente_leitura: None,
         }
     }
 
@@ -2033,6 +2052,53 @@ mod tests {
             }
             assert!(p.reg.get(&name).is_some(), "{name} rolado para a vista");
         }
+    }
+
+    impl Panel {
+        /// Scrolls `name` into view and clicks it.
+        fn reveal_click(&mut self, v: &PropsView, name: &str) -> Vec<PropAction> {
+            self.frame(v, vec![]);
+            if self.reg.get(name).is_none_or(|w| !w.rect.is_positive()) {
+                assert!(self.reg.reveal(name), "{name}: {:?}", self.reg.names());
+                for _ in 0..6 {
+                    self.frame(v, vec![]);
+                }
+            }
+            self.click(v, name)
+        }
+    }
+
+    #[test]
+    fn the_tabs_switch_and_send_their_edits() {
+        use crate::ui_abas::AbaAcao;
+        let (e, name) = editor_with_processor();
+        let mut v = view(&e, &name);
+        let mut p = Panel::new();
+        p.frame(&v, vec![]);
+        // Qualidade first: its switch is off.
+        assert!(p.reg.knows("Aba_Qualidade"), "{:?}", p.reg.names());
+        p.reveal_click(&v, "Aba_Seguranca");
+        p.frame(&v, vec![]);
+        assert_eq!(p.st.abas.aba, 1);
+        let out = p.reveal_click(&v, "AbaCampo_safety");
+        assert_eq!(
+            out,
+            vec![PropAction::Aba(AbaAcao::Editar {
+                caminho: "safety".into(),
+                valor: "sim".into()
+            })]
+        );
+        // Someone else edits the model: the tab says who and sends nothing.
+        v.somente_leitura = Some("Em edição por bruno no UTSim Qualidade desde 10:00".into());
+        p.frame(&v, vec![]);
+        assert!(p.reg.knows("AbaTrava"));
+        let out = p.reveal_click(&v, "AbaCampo_safety");
+        assert!(out.is_empty(), "{out:?}");
+        // The run settings have no tabs.
+        let run = view(&e, "run");
+        let mut p = Panel::new();
+        p.frame(&run, vec![]);
+        assert!(!p.reg.knows("Aba_Qualidade"));
     }
 
     #[test]

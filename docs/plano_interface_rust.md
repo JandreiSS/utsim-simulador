@@ -619,6 +619,40 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto
   inteiro); o `rede.gd` fica com o painel e o desenho. Roteiro `g3_rede` sem mudança.
 
+### Passo 7, parte 3: reprodução, trabalhos e ações da barra de reprodução (2026-11-09)
+
+- `relogio.rs` (puro, testes): o relógio do Simular (tempo, velocidade, tocando, fim da
+  replicação carregada). Só toca com uma replicação e no Simular, para no fim, `ir` limita ao
+  intervalo, `ao_evento` pausa e salta. O `UtsimUi` o guarda (`clock_load`, `clock_play`,
+  `clock_tick`, `clock_seek`, `clock_step`, `clock_t`, `clock_playing`, `clock_speed`,
+  `set_clock_speed`) e a barra de reprodução lê dele.
+- As ações da própria barra (reproduzir, velocidade, tempo, evento anterior e seguinte) não
+  passam mais pelo `principal.gd`: o `UtsimUi` as aplica no relógio e só avisa `relogio`
+  quando o tempo saltou, para a cena mostrar o novo tempo.
+- `andamento.rs` (puro, testes): a barra de progresso de um trabalho (com porcentagem, ou
+  vaivém quando ele não conta) e, no fim, a mensagem (cancelado, erro) e se a cena segue com
+  o resultado. `UtsimUi.poll_job(job)` faz o acompanhamento; o `principal.gd` só guarda o
+  trabalho e o que fazer com o resultado.
+- `principal.gd`: `t`, `playing` e `speed` viraram propriedades que leem o relógio (os
+  roteiros continuam iguais); `playback` carrega o relógio ao mudar. Saíram `_show_time`, o
+  avanço do tempo no `_process` e o corpo do `_poll_job`. De 1847 para 1826 linhas.
+- Segunda rodada (2026-11-09), o despacho das ações: `acoes.rs` (puro, testes) lê toda
+  ação da interface (barra superior, painéis da esquerda, barra de reprodução, linhas do
+  painel de propriedades separadas por tabulação, painéis das ferramentas `form:` e as
+  teclas do `shortcuts.rs`) e toma as decisões (a ferramenta que um clique deixa armada, a
+  Biblioteca que arma e desarma, os tipos de ligação ocultos, o encaixe, o limite das
+  replicações, o instante do salto a um quase-conflito, os campos da zona, números
+  inválidos ignorados). Devolve `Passo`s, que o `UtsimUi` entrega como `{op, s, s2, s3, n,
+  n2, x, b, lista}` (`route_action`, `route_key`); o `principal.gd` só os executa num
+  `_run_step`. Os quatro `match` (`bar_action`, `run_key_action`, `_panel_action`,
+  `_form_action`) viraram esse executor.
+- A câmera do Simular: `camera_follow.rs` também decide como a câmera segue o bloco a cada
+  quadro (livre, alvo ou olho, `UtsimUi.camera_drive`), qual bloco uma replicação nova
+  segue (`camera_pick`) e o que a troca de câmera diz e devolve à vista (`camera_choice`);
+  o `_drive_camera` só põe a câmera.
+- `principal.gd`: de 1826 para 1791 linhas. O que sobra nele chama o Godot (cena, diálogos,
+  câmera, editor em GDScript) e fica lá.
+
 ### Zonas de risco no editor 3D (2026-11-07)
 
 Pedido da frente de Segurança (os arquivos do editor são desta frente), combinado com a sessão
@@ -639,6 +673,33 @@ de Qualidade e Segurança: editar `Model.zones` no 3D.
   `principal.gd` tem o painel (nome, tipo, nível, EPI) e a tecla `Z`. A barra ganhou o botão
   Zona; para caber a 1600 px os botões da barra perderam 1 px de margem de cada lado.
 - Roteiro `godot/roteiros/g4_zonas.json`; manual em `zonas-e-exposicao.md`.
+
+### Abas Qualidade, Segurança e Manutenção do nó (2026-11-08)
+
+Pedido do dono (`docs/plano_integracao_familia.md`, seção 3): o nó tem as abas Qualidade, Segurança e Manutenção no painel, e os apps dedicados editam os mesmos dados nos dois sentidos. Divisão combinada com a frente de Qualidade e Segurança: ela fez o lado do modelo (`utsim_edit::abas` com `campos`, `editar`, `adicionar` e `remover`, os comandos `Set*`, os blocos `safety` e `quality.control` e a trava `utsim_pasta::trava`); esta frente fez as abas e a trava do UTSim 3D.
+
+- `ui_abas.rs` (egui, puro, com testes): a faixa das três abas e os campos de `abas::Campo` nas duas colunas do painel, por tipo (bloco liga e desliga, booleano, escolha, conjunto como texto com vírgulas, números e distribuição como texto, lista com "+ Adicionar", item com abrir e fechar e "Remover", informação só leitura). Sai como `PropAction::Aba(AbaAcao)`; a ponte (`UtsimUi::tab_action`) chama `Editor::tab_edit`, `tab_add` e `tab_remove`, um passo de desfazer cada. Nomes para os roteiros: `Aba_<aba>`, `AbaCampo_<caminho>` (pontos e colchetes viram `_`), `AbaAdicionar_<lista>`, `AbaRemover_<item>`, `AbaItem_<item>`, `AbaTrava`, `AbaErro`.
+- `trava_modelo.rs` (puro, com testes): `TravaModelo` no `UtsimDocument` toma a trava ao abrir e ao salvar (app `utsim`, pessoa e máquina do ambiente), renova (`renew_lock`, um `Timer` de 60 s no `principal.gd`), solta no modelo novo, ao abrir outro e ao liberar o documento. Com a trava de outro, `lock_notice` diz quem edita, as abas ficam só de leitura e `save` recusa; `save_as` para outro arquivo continua.
+- `field_text` do documento também lê os campos das abas pelo caminho, para o `conferir` `campo` dos roteiros. Roteiro `g4_abas.json`.
+- A seção "Quebras e turnos" continua: a aba Manutenção edita o mesmo `downtime`.
+
+### Modelo gravado por outro app (2026-11-09)
+
+Lacuna da mão dupla (`docs/plano_integracao_familia.md`, seção 3.2): o 3D não olhava o
+disco, então mostrava dados velhos enquanto o UTSim Qualidade ou o Segurança editava, e o
+"Salvar" seguinte, depois de tomar a trava, gravava por cima do trabalho do outro app.
+
+- `disco.rs` (puro, testes): a marca do arquivo (tamanho e hash do conteúdo, então um
+  arquivo regravado igual não conta) e a decisão: igual, recarregar (sem mudança local) ou
+  conflito (com mudança local).
+- `UtsimDocument` guarda a marca ao abrir e ao salvar; `disk_check` diz o que fazer,
+  `reload` relê, e `save` (e `save_as` para o mesmo arquivo) recusa com a mensagem de
+  `disco::RECUSA` quando o arquivo mudou por fora.
+- `principal.gd`: `_check_disk` na renovação da trava (a cada minuto) e no
+  `NOTIFICATION_APPLICATION_FOCUS_IN`; `_reload_from_disk` mantém modo, câmera e a seleção
+  que ainda existe; o conflito é avisado uma vez.
+- `roteiro.gd`: passo `outro_app` (troca um texto no arquivo e confere o disco). Roteiro
+  `g4_disco.json`. Manual: `objetos.md`.
 
 ### Plano original do passo 2b
 

@@ -13,6 +13,7 @@
 use std::path::Path;
 
 use utsim_core::RunReport;
+use utsim_edit::abas;
 use utsim_edit::arrange::{self, Align, Axis, Clipboard};
 use utsim_edit::{Command, Document, FieldSource, Issue, PaletteEntry};
 use utsim_model::replay::{Replay, ReplayBlock, kind_name};
@@ -569,6 +570,33 @@ impl Editor {
             .starts_with("visual.")
             .then(|| format!("aparencia:{}", all.join(",")));
         self.doc.apply_coalescing(command, key.as_deref())
+    }
+
+    /// The Qualidade, Segurança and Manutenção tabs of `object` (`utsim_edit::abas`, the
+    /// fields UTSim Qualidade and Segurança edit too); none for the run settings.
+    pub fn tab_fields(&self, object: &str) -> Vec<(abas::Aba, Vec<abas::Campo>)> {
+        abas::Aba::TODAS
+            .iter()
+            .filter_map(|a| abas::campos(self.model(), object, *a).ok().map(|c| (*a, c)))
+            .collect()
+    }
+
+    /// Sets field `caminho` of a tab to `valor` as typed (one undo step).
+    pub fn tab_edit(&mut self, object: &str, caminho: &str, valor: &str) -> Result<(), String> {
+        let c = abas::editar(self.model(), object, caminho, valor)?;
+        self.apply(c)
+    }
+
+    /// Adds an item to list `lista` of a tab.
+    pub fn tab_add(&mut self, object: &str, lista: &str) -> Result<(), String> {
+        let c = abas::adicionar(self.model(), object, lista)?;
+        self.apply(c)
+    }
+
+    /// Removes item `indice` of list `lista` of a tab.
+    pub fn tab_remove(&mut self, object: &str, lista: &str, indice: usize) -> Result<(), String> {
+        let c = abas::remover(self.model(), object, lista, indice)?;
+        self.apply(c)
     }
 
     /// The key of the data entry that feeds the distribution `path` of `object` belongs

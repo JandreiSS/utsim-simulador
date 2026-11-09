@@ -20,6 +20,8 @@ utsim-scene.workspace = true
 utsim-assets.workspace = true
 utsim-exposicao.workspace = true
 utsim-edit.workspace = true
+# The one-writer lock next to the model file, shared with UTSim Qualidade and Segurança.
+utsim-pasta.workspace = true
 utsim-linhas.workspace = true
 utsim-fit.workspace = true
 utsim-look.workspace = true
@@ -43,3 +45,6 @@ egui_plot = { version = "=0.37.0", default-features = false }
 # (dictionaries and packed arrays) and every node is built in GDScript, which keeps the
 # build short. `api-4-7` matches Godot 4.7; GDExtension is forward compatible.
 godot = { version = "=0.5.5", default-features = false, features = ["api-4-7"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"

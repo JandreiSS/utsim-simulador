@@ -48,6 +48,62 @@ pub fn view(mode: &str, at: V3, axis_x: V3, top: f64, head: Option<V3>) -> Optio
     }
 }
 
+/// How the camera of Simular follows the block chosen in the list, each frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Conducao {
+    /// Órbita and Planta (or no block chosen): the camera is the user's.
+    Livre,
+    /// Seguir: the orbit camera aims at the block.
+    Alvo,
+    /// Primeira pessoa and Do recurso: the eye rides the block ([`view`]).
+    Olho,
+}
+
+/// How camera `mode` follows `seguido` (empty: none chosen).
+pub fn conducao(mode: &str, seguido: &str) -> Conducao {
+    match mode {
+        _ if seguido.is_empty() => Conducao::Livre,
+        "seguir" => Conducao::Alvo,
+        "primeira_pessoa" | "recurso" => Conducao::Olho,
+        _ => Conducao::Livre,
+    }
+}
+
+/// The block a new replication follows: the one followed before when it is still there,
+/// else the first mobile one (`blocos`: name and mobile), else none.
+pub fn seguido(atual: &str, blocos: &[(String, bool)]) -> String {
+    if !atual.is_empty() && blocos.iter().any(|(n, _)| n == atual) {
+        return atual.to_owned();
+    }
+    blocos
+        .iter()
+        .find(|(_, movel)| *movel)
+        .map(|(n, _)| n.clone())
+        .unwrap_or_default()
+}
+
+/// Whether choosing `mode` gives back the blocks hidden on a riding camera's sight line.
+pub fn restaura_vista(mode: &str) -> bool {
+    !matches!(mode, "primeira_pessoa" | "recurso")
+}
+
+/// What the status bar says when camera `mode` is chosen.
+pub fn aviso(mode: &str, seguido: &str) -> String {
+    let label = crate::ui_left::CAMERAS
+        .iter()
+        .find(|(id, _)| *id == mode)
+        .map_or(mode, |(_, l)| *l);
+    match mode {
+        "orbita" => "Câmera de órbita.".to_owned(),
+        "planta" => {
+            "Planta (2D): vista de cima, sem perspectiva; arraste com o botão direito para mover."
+                .to_owned()
+        }
+        _ if seguido.is_empty() => "Escolha na lista o bloco que a câmera acompanha.".to_owned(),
+        _ => format!("Câmera {}: {seguido}.", label.to_lowercase()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,5 +144,25 @@ mod tests {
         // A block facing straight up still looks along +x; the other cameras ride nothing.
         assert_eq!(flat_forward([0.0, 1.0, 0.0]), [1.0, 0.0, 0.0]);
         assert!(view("orbita", [0.0; 3], [1.0, 0.0, 0.0], 1.0, None).is_none());
+    }
+
+    #[test]
+    fn the_follow_decisions() {
+        assert_eq!(conducao("seguir", "agv_1"), Conducao::Alvo);
+        assert_eq!(conducao("recurso", "agv_1"), Conducao::Olho);
+        assert_eq!(conducao("primeira_pessoa", ""), Conducao::Livre);
+        assert_eq!(conducao("orbita", "agv_1"), Conducao::Livre);
+        let blocos = vec![
+            ("fonte".to_owned(), false),
+            ("agv_1".to_owned(), true),
+            ("agv_2".to_owned(), true),
+        ];
+        assert_eq!(seguido("agv_2", &blocos), "agv_2");
+        assert_eq!(seguido("sumiu", &blocos), "agv_1");
+        assert_eq!(seguido("", &blocos[..1]), "");
+        assert!(restaura_vista("seguir") && !restaura_vista("recurso"));
+        assert_eq!(aviso("orbita", "x"), "Câmera de órbita.");
+        assert_eq!(aviso("recurso", "agv_1"), "Câmera do recurso: agv_1.");
+        assert!(aviso("seguir", "").starts_with("Escolha na lista"));
     }
 }

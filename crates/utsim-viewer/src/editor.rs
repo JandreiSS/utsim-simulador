@@ -206,7 +206,7 @@ enum Act {
     SelectAll,
     Align(Align),
     Distribute(Axis),
-    Exec(Command),
+    Exec(Box<Command>),
 }
 
 impl Editor {
@@ -620,7 +620,7 @@ impl Editor {
                 let command = arrange::distribute_command(self.doc.model(), &names, axis);
                 self.exec_some(command);
             }
-            Act::Exec(c) => self.exec(c),
+            Act::Exec(c) => self.exec(*c),
         }
     }
 }
@@ -1642,14 +1642,14 @@ pub fn edit_panels(
                 match ed.selected.clone() {
                     _ if ed.layer != Layer::Objects => {
                         for command in layers::properties_ui(ui, ed) {
-                            acts.push(Act::Exec(command));
+                            acts.push(Act::Exec(Box::new(command)));
                         }
                     }
                     None => {
                         ui.label("Selecione um bloco para editar suas propriedades.");
                         ui.separator();
                         for command in run_panel(ui, &ed.doc) {
-                            acts.push(Act::Exec(command));
+                            acts.push(Act::Exec(Box::new(command)));
                         }
                     }
                     Some(name) if !ed.multi.is_empty() => {
@@ -1673,7 +1673,7 @@ pub fn edit_panels(
                         }
                         ui.separator();
                         for command in properties_panel(ui, &ed.doc, &name) {
-                            acts.push(Act::Exec(command));
+                            acts.push(Act::Exec(Box::new(command)));
                         }
                         ui.separator();
                         connections_ui(ui, &ed.doc, &name, &mut acts);
@@ -1739,7 +1739,7 @@ pub fn edit_panels(
     let property_commands: Vec<Command> = acts
         .iter()
         .filter_map(|a| match a {
-            Act::Exec(c) => Some(c.clone()),
+            Act::Exec(c) => Some((**c).clone()),
             _ => None,
         })
         .collect();
@@ -1869,7 +1869,7 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
             .filter(|c| !matches!(c, Command::Rename { .. }))
             .collect();
         if let Some(c) = arrange::fan_out(&edits, primary, &names) {
-            acts.push(Act::Exec(c));
+            acts.push(Act::Exec(Box::new(c)));
         }
     } else {
         ui.weak(
@@ -1981,30 +1981,30 @@ fn order_row(
             .on_hover_text("Troca de lugar com a anterior (Ctrl+Z desfaz)")
             .clicked()
         {
-            acts.push(Act::Exec(Command::SwapConnections {
+            acts.push(Act::Exec(Box::new(Command::SwapConnections {
                 first: list[k - 1].clone(),
                 second: this.clone(),
-            }));
+            })));
         }
         if ui
             .add_enabled(k + 1 < list.len(), egui::Button::new(MOVE_DOWN).small())
             .on_hover_text("Troca de lugar com a seguinte (Ctrl+Z desfaz)")
             .clicked()
         {
-            acts.push(Act::Exec(Command::SwapConnections {
+            acts.push(Act::Exec(Box::new(Command::SwapConnections {
                 first: this.clone(),
                 second: list[k + 1].clone(),
-            }));
+            })));
         }
         if ui
             .small_button("x")
             .on_hover_text("Remover ligação")
             .clicked()
         {
-            acts.push(Act::Exec(Command::Disconnect {
+            acts.push(Act::Exec(Box::new(Command::Disconnect {
                 from: this.0.clone(),
                 to: this.1.clone(),
-            }));
+            })));
         }
     });
 }

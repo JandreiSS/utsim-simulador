@@ -832,6 +832,8 @@ mod tests {
                 data: std::collections::HashMap::new(),
                 data_families: Vec::new(),
                 base_dir: None,
+                abas: e.tab_fields(&name),
+                somente_leitura: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
             assert!(meshes > 0);
@@ -889,6 +891,8 @@ mod tests {
                 data: std::collections::HashMap::new(),
                 data_families: Vec::new(),
                 base_dir: None,
+                abas: e.tab_fields(&name),
+                somente_leitura: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
             assert!(meshes > 0);

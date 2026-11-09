@@ -1,11 +1,11 @@
 //! Embute o ícone e as informações de versão no `utsim-view.exe` (somente no Windows).
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../assets/icone/utsim.ico");
+    println!("cargo:rerun-if-changed=../../assets/icone/familia/utsim.ico");
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut recurso = winresource::WindowsResource::new();
-        recurso.set_icon("../../assets/icone/utsim.ico");
+        recurso.set_icon("../../assets/icone/familia/utsim.ico");
         recurso.set("ProductName", "UTSim");
         recurso.set(
             "FileDescription",

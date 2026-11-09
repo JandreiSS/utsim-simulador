@@ -36,19 +36,36 @@ const TOP_HEIGHT := 46
 const BOTTOM_HEIGHT := 40
 const RED := Color(1.0, 0.45, 0.42)
 const YELLOW := Color(0.98, 0.80, 0.35)
-const CAMERAS := [["orbita", "Órbita"], ["planta", "Planta (2D)"], ["seguir", "Seguir"], ["primeira_pessoa", "Primeira pessoa"], ["recurso", "Do recurso"]]
 
 var doc: Object
 var model: Object
-var playback: Object
+## The replication played in Simular; the clock of the bridge follows it.
+var playback: Object:
+	set(v):
+		playback = v
+		if ui != null:
+			ui.clock_load(v)
 var cena: CenaUtsim
 var editor: EditorUtsim
 var camera: CameraOrbita
 var sun: DirectionalLight3D
-var t := 0.0
-var playing := false
-var speed := 1.0
+## The playback clock is the bridge's (`relogio.rs`, kept by the `UtsimUi`): the playback
+## bar changes it by itself; these read it (the roteiros too).
+var t: float:
+	get:
+		return ui.clock_t() if ui != null else 0.0
+var playing: bool:
+	get:
+		return ui != null and ui.clock_playing()
+var speed: float:
+	get:
+		return ui.clock_speed() if ui != null else 1.0
+	set(v):
+		if ui != null:
+			ui.set_clock_speed(v)
 var model_path := ""
+## The status already said that another app saved the model over local changes.
+var _disk_warned := false
 ## `editar` or `simular`.
 var mode := "editar"
 var snap_on := true
@@ -138,6 +155,13 @@ func _ready() -> void:
 	add_child(editor)
 	editor.setup(self, _ui)
 	set_mode("editar")
+	# The one-writer lock of the open file (UTSim Qualidade and Segurança read it): renewed
+	# every minute; taken again when the other app lets it go.
+	var lock_timer := Timer.new()
+	lock_timer.wait_time = 60.0
+	lock_timer.autostart = true
+	lock_timer.timeout.connect(_renew_lock)
+	add_child(lock_timer)
 	camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
 	set_status("Arraste um objeto da Biblioteca para o chão, ou abra um modelo (Ctrl+O).")
 
@@ -246,6 +270,7 @@ func _build_ui() -> void:
 	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
 	# answers them itself, so it keeps the Godot ones.
 	scripted = Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	_maximize_window()
 	_open_from_args.call_deferred()
 	if DisplayServer.get_name() != "headless" and not scripted:
 		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
@@ -418,133 +443,10 @@ func _sync_bar() -> void:
 
 ## The clicks of the top bar (`UtsimUi.action`): the same as the Godot buttons did.
 func bar_action(what: String) -> void:
-	if doc == null:
+	if doc == null or ui == null:
 		return
-	if what.contains("\t"):
-		_panel_action(what.split("\t"))
-		return
-	var arg := what.substr(what.find(":") + 1) if what.contains(":") else ""
-	match what.get_slice(":", 0):
-		"modo":
-			set_mode(arg)
-		"novo":
-			new_document()
-		"abrir":
-			_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
-		"salvar":
-			save()
-		"salvar_como":
-			save_as_dialog()
-		"desfazer":
-			undo()
-		"refazer":
-			redo()
-		"ligacoes":
-			var kind := arg.get_slice(":", 0)
-			links_hidden.erase(kind)
-			if arg.get_slice(":", 1) == "desligar":
-				links_hidden.append(kind)
-		"ferramenta":
-			if arg == "selecionar" or arg == "ligar":
-				editor.set_tool(arg)
-			else:
-				editor.set_tool("selecionar" if editor.tool == arg else arg)
-		"organizar":
-			arrange_action(what.substr("organizar:".length()))
-		"grade":
-			set_snap(arg == "ligar", grid_step)
-		"passo":
-			set_snap(snap_on, float(arg))
-		"analisar":
-			analysis_action(arg)
-		"ensino":
-			# The UTSim Ensino's mission mode, in its own scene (`ensino.tscn`).
-			if ResourceLoader.exists("res://cenas/ensino.tscn"):
-				get_tree().change_scene_to_file.call_deferred("res://cenas/ensino.tscn")
-			else:
-				set_status("O modo missão do UTSim Ensino não está nesta versão.")
-		"resultados":
-			results_action(what.substr("resultados:".length()))
-		"pert":
-			pert_action(what.substr("pert:".length()))
-		"form":
-			_form_action(what.substr("form:".length()))
-		"fluxos":
-			ui.flows_time(t)
-		"dialogo":
-			if arg == "descartar" and _pending.is_valid():
-				var go := _pending
-				_pending = Callable()
-				go.call()
-			else:
-				_pending = Callable()
-		"atalhos":
-			toggle_shortcuts()
-		# The left panel of Editar.
-		"biblioteca":
-			if editor.tool == "colocar" and editor.place_id == arg:
-				editor.set_tool("selecionar")
-			else:
-				editor.set_tool("colocar", arg)
-		"biblioteca_arrastar":
-			# The drag started in the egui library; the editor follows the mouse and the
-			# drop is resolved over the 3D view (the free central area).
-			editor.start_palette_drag(arg)
-		"objeto":
-			editor.select_only(arg)
-		"objeto_focar":
-			focus_block(arg, 8.0)
-		"obstaculos":
-			editor.corredores.set_obstacles_visible(arg == "ligar")
-			_sync_edit()
-		# The left panel of Simular.
-		"replicacoes":
-			_run_reps = clampi(int(arg), 1, 1000)
-			_sync_sim()
-		"rodar_de_novo":
-			simulate(_run_reps)
-		"bloco":
-			var k := int(arg)
-			if k >= 0 and k < cena.blocks.size():
-				follow_name = cena.blocks[k]["name"]
-				if camera_mode == "orbita":
-					focus_block(follow_name, 8.0)
-				_sync_sim()
-		"camera":
-			set_camera_mode(arg)
-		"gravar_replay":
-			_replay_dialog.popup_centered_ratio(0.7)
-		"rotulos":
-			labels_on = arg == "ligar"
-			cena.set_labels_visible(labels_on)
-			_sync_sim()
-		"seguranca":
-			seguranca_on = arg == "ligar"
-			_aplicar_camadas()
-			_sync_sim()
-		"calor":
-			calor_on = arg == "ligar"
-			_aplicar_camadas()
-			_sync_sim()
-		"quase":
-			# Salto da reprodução até o instante de um quase-conflito.
-			set_playing(false)
-			seek(maxf(0.0, float(arg) - 2.0), true)
-		"sombras":
-			sun.shadow_enabled = arg == "ligar"
-			_sync_sim()
-		# The status bar and the playback bar.
-		"cancelar":
-			cancel_job()
-		"evento":
-			step_event(int(arg))
-		"reproduzir":
-			set_playing(not playing)
-		"velocidade":
-			speed = float(arg)
-			_sync_play()
-		"tempo":
-			seek(float(arg), true)
+	for p in ui.route_action(what, _route_state()):
+		_run_step(p)
 	_sync_bar()
 
 
@@ -581,68 +483,235 @@ func _sync_sim() -> void:
 
 ## What the playback bar shows (only in Simular).
 func _sync_play() -> void:
-	if ui == null:
-		return
-	ui.set_playback_bar({
-		"visible": mode == "simular",
-		"playing": playing,
-		"t": t,
-		"end": playback.end() if playback != null else 0.0,
-		"speed": speed,
-	})
+	if ui != null:
+		ui.set_playback_bar({"visible": mode == "simular"})
 
 
-## What the egui properties panel did (the edits are already applied by the bridge).
-func _panel_action(a: PackedStringArray) -> void:
-	match a[0]:
+## What the routing decisions of the bridge need (`acoes.rs`).
+func _route_state() -> Dictionary:
+	return {
+		"tool": editor.tool if editor != null else "selecionar",
+		"place_id": editor.place_id if editor != null else "",
+		"snap": snap_on,
+		"step": grid_step,
+		"links_hidden": PackedStringArray(links_hidden),
+	}
+
+
+## Runs one step the bridge decided (`acoes.rs`: the clicks, the panel rows, the tool
+## panels and the keys). False only when a key had nothing to do.
+func _run_step(p: Dictionary) -> bool:
+	var s: String = p["s"]
+	var on: bool = p["b"]
+	var rede: EditorRede = editor.rede
+	var ai: EditorCorredores = editor.corredores
+	match String(p["op"]):
+		# Document and modes.
+		"modo":
+			set_mode(s)
+		"alternar_modo":
+			set_mode("editar" if mode == "simular" else "simular")
+		"novo":
+			new_document()
+		"abrir":
+			_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
+		"salvar":
+			save()
+		"salvar_como":
+			save_as_dialog()
+		"desfazer":
+			undo()
+		"refazer":
+			redo()
+		"dialogo":
+			var go := _pending
+			_pending = Callable()
+			if on and go.is_valid():
+				go.call()
+		"atalhos":
+			toggle_shortcuts()
+		"desempenho":
+			toggle_performance()
+		"ensino":
+			# The UTSim Ensino's mission mode, in its own scene (`ensino.tscn`).
+			if ResourceLoader.exists("res://cenas/ensino.tscn"):
+				get_tree().change_scene_to_file.call_deferred("res://cenas/ensino.tscn")
+			else:
+				set_status("O modo missão do UTSim Ensino não está nesta versão.")
+		"analisar":
+			analysis_action(s)
+		"resultados":
+			results_action(s)
+		"pert":
+			pert_action(s)
+		# Editar.
+		"ferramenta":
+			editor.set_tool(s, p["s2"])
+		"organizar":
+			arrange_action(s)
+		"encaixe":
+			set_snap(on, float(p["x"]))
+		"ocultas":
+			links_hidden = Array(p["lista"])
+		"arrastar_biblioteca":
+			# The drag started in the egui library; the editor follows the mouse and the
+			# drop is resolved over the 3D view (the free central area).
+			editor.start_palette_drag(s)
+		"selecionar":
+			editor.select_only(s)
+		"selecionar_tudo":
+			editor.select_all()
+		"focar":
+			focus_block(s, 8.0)
+		"obstaculos":
+			editor.corredores.set_obstacles_visible(on)
+			_sync_edit()
+		"enquadrar":
+			if mode == "simular" and cena.playback != null:
+				camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
+			else:
+				_frame_model()
+		"excluir":
+			editor.delete_selected()
+		"cancelar_editor":
+			editor.cancel()
+		"mover":
+			editor.nudge(int(p["n"]), int(p["n2"]))
+		"fechar_zona":
+			editor.zone_finish()
+		"fechar_corredor":
+			return editor.corredores.finish()
+		# Simular.
+		"replicacoes":
+			_run_reps = int(p["n"])
+			_sync_sim()
+		"simular_de_novo":
+			simulate(_run_reps)
+		"bloco":
+			var k := int(p["n"])
+			if k < cena.blocks.size():
+				follow_name = cena.blocks[k]["name"]
+				if camera_mode == "orbita":
+					focus_block(follow_name, 8.0)
+				_sync_sim()
+		"camera":
+			set_camera_mode(s)
+		"gravar_replay":
+			_replay_dialog.popup_centered_ratio(0.7)
+		"rotulos":
+			labels_on = on
+			cena.set_labels_visible(on)
+			_sync_sim()
+		"seguranca":
+			seguranca_on = on
+			_aplicar_camadas()
+			_sync_sim()
+		"calor":
+			calor_on = on
+			_aplicar_camadas()
+			_sync_sim()
+		"sombras":
+			sun.shadow_enabled = on
+			_sync_sim()
+		"ir_para":
+			set_playing(false)
+			seek(float(p["x"]), true)
+		"reproduzir":
+			set_playing(not playing)
+		"relogio":
+			_apply_clock(true)
+		"fluxos_tempo":
+			ui.flows_time(t)
+		"cancelar_trabalho":
+			cancel_job()
+		# The properties panel.
 		"prop_ok":
-			var path := a[2]
-			if path == "name" and not editor.selected.is_empty():
-				editor.selected[0] = a[3].strip_edges()
+			if p["s2"] == "name" and not editor.selected.is_empty():
+				editor.selected[0] = String(p["s3"]).strip_edges()
 			after_edit.call_deferred()
-			set_status("%s: %s alterado." % [a[1], path])
+			set_status("%s: %s alterado." % [s, p["s2"]])
 		"prop_erro":
-			set_status("Não alterou %s: %s" % [a[1], a[2] if a.size() > 2 else ""])
+			set_status("Não alterou %s: %s" % [s, p["s2"]])
 			_show_properties.call_deferred()
 		"prop_fim":
 			after_edit.call_deferred()
 		"problema":
-			editor.corredores.highlight_issue(a[1])
+			editor.corredores.highlight_issue(s)
 		"saida_ordem":
-			if not editor.selected.is_empty() and doc.move_connection(editor.selected[0], int(a[1]), int(a[2])):
+			if not editor.selected.is_empty() and doc.move_connection(editor.selected[0], int(p["n"]), int(p["n2"])):
 				after_edit.call_deferred()
 		"saida_remover":
-			if not editor.selected.is_empty() and doc.disconnect_objects(editor.selected[0], a[1]):
+			if not editor.selected.is_empty() and doc.disconnect_objects(editor.selected[0], s):
 				after_edit.call_deferred()
 		"motorista":
-			cena.set_driver_visible(a[1], a[2] == "true")
+			cena.set_driver_visible(s, on)
 			_show_properties()
 		"dados":
-			# a: dados, what, path, draft (JSON)
-			var draft = JSON.parse_string(a[3]) if a.size() > 3 else null
-			var d: Dictionary = draft if draft is Dictionary else {}
-			match a[1]:
-				"aplicar":
-					_on_data_apply(a[2], d)
-				"analisar":
-					_on_data_analyze(a[2], d)
-				"para_dist":
-					_on_data_to_dist(a[2])
-				"relatorio":
-					_report_target = "modelo"
-					_report_dialog.popup_centered_ratio(0.6)
-				"escolher_arquivo":
-					_data_pick_path = a[2]
-					_data_target = "painel"
-					_data_dialog.popup_centered_ratio(0.7)
-				"janela_csv":
-					_data_target = "janela"
-					_data_dialog.popup_centered_ratio(0.7)
-				"janela_relatorio":
-					_report_target = "janela"
-					_report_dialog.popup_centered_ratio(0.6)
+			_data_step(s, p["s2"], p["s3"])
 		"miniatura":
-			show_miniature(a[1])
+			show_miniature(s)
+		# The tool panels.
+		"rede_novos_mao_dupla":
+			rede.two_way = on
+		"rede_nome":
+			rede.rename(s)
+		"rede_excluir":
+			rede.delete_selected()
+		"rede_mao_dupla":
+			rede.set_two_way(on)
+		"rede_capacidade":
+			rede.set_capacity(int(p["n"]))
+		"rede_inverter":
+			rede.reverse()
+		"corredor_excluir":
+			ai.delete_selected()
+		"corredor_tipo":
+			ai.set_kind(s)
+		"corredor_largura":
+			ai.set_width(float(p["x"]))
+		"corredor_mao_dupla":
+			ai.set_two_way(on)
+		"corredor_secundaria":
+			ai.set_secondary(on)
+		"corredor_nome":
+			ai.rename(s)
+		"corredor_perfil":
+			ai.set_profile(s)
+		"corredor_remover_vertice":
+			ai.remove_vertex()
+		"corredor_inverter":
+			ai.reverse()
+		"zona_campo":
+			editor.set_zone_field(s, p["s2"])
+		"mostrar_propriedades":
+			_show_properties.call_deferred()
+	return true
+
+
+## The real-data actions of the properties panel and of the fit window.
+func _data_step(what: String, path: String, draft_json: String) -> void:
+	var draft = JSON.parse_string(draft_json) if draft_json != "" else null
+	var d: Dictionary = draft if draft is Dictionary else {}
+	match what:
+		"aplicar":
+			_on_data_apply(path, d)
+		"analisar":
+			_on_data_analyze(path, d)
+		"para_dist":
+			_on_data_to_dist(path)
+		"relatorio":
+			_report_target = "modelo"
+			_report_dialog.popup_centered_ratio(0.6)
+		"escolher_arquivo":
+			_data_pick_path = path
+			_data_target = "painel"
+			_data_dialog.popup_centered_ratio(0.7)
+		"janela_csv":
+			_data_target = "janela"
+			_data_dialog.popup_centered_ratio(0.7)
+		"janela_relatorio":
+			_report_target = "janela"
+			_report_dialog.popup_centered_ratio(0.6)
 
 
 # ---------------------------------------------------------------------------
@@ -690,6 +759,7 @@ func open_model(path: String) -> bool:
 		set_status("Não abriu %s: %s" % [path.get_file(), r["error"]])
 		return false
 	model_path = path
+	_disk_warned = false
 	editor.set_tool("selecionar")
 	editor.clear_selection()
 	if mode != "editar":
@@ -697,11 +767,63 @@ func open_model(path: String) -> bool:
 	after_edit(true)
 	_frame_model()
 	var issues: Array = doc.issues()
-	if issues.is_empty():
+	var lock: String = doc.lock_notice()
+	if lock != "":
+		set_status("%s aberto, mas %s: Salvar fica para quando a pessoa fechar (ou use Salvar como)." % [path.get_file(), lock])
+	elif issues.is_empty():
 		set_status("%s aberto: %d objetos. Simular roda as replicações." % [path.get_file(), doc.objects().size()])
 	else:
 		set_status("%s aberto com %d problema(s): veja o painel de propriedades." % [path.get_file(), issues.size()])
 	return true
+
+
+func _renew_lock() -> void:
+	if doc == null:
+		return
+	var before: String = doc.lock_notice()
+	doc.renew_lock()
+	if before != "" and doc.lock_notice() == "":
+		set_status("O outro app fechou o modelo: as abas Qualidade, Segurança e Manutenção voltaram a editar.")
+		if ui != null:
+			ui.repaint()
+	_check_disk()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_check_disk()
+
+
+## Another app (UTSim Qualidade, UTSim Segurança do Trabalho) may have saved the model
+## (`disco.rs`): without local changes it is read again; with them, "Salvar" over it is
+## refused and the status says why, once.
+func _check_disk() -> void:
+	if doc == null:
+		return
+	match String(doc.disk_check()):
+		"recarregar":
+			_reload_from_disk()
+		"conflito":
+			if not _disk_warned:
+				_disk_warned = true
+				set_status("Outro app gravou %s e há mudanças suas não salvas: use Salvar como para não apagar o trabalho dele." % model_path.get_file())
+
+
+## Reads the model again from its file, keeping the mode, the camera and the selection.
+func _reload_from_disk() -> void:
+	var keep: Array = editor.selected.duplicate()
+	var r: Dictionary = doc.reload()
+	if not r["ok"]:
+		set_status("Não releu %s: %s" % [model_path.get_file(), r["error"]])
+		return
+	_disk_warned = false
+	after_edit(true)
+	var names := []
+	for o in doc.objects():
+		if o["name"] in keep:
+			names.append(o["name"])
+	editor.select_names(names, false)
+	set_status("%s foi gravado por outro app: recarregado do disco." % model_path.get_file())
 
 
 func save() -> bool:
@@ -732,6 +854,7 @@ func save_as(path: String) -> bool:
 func _report_save(r: Dictionary) -> void:
 	if r["ok"]:
 		model_path = doc.path()
+		_disk_warned = false
 		set_status("Salvo em %s." % doc.path())
 	else:
 		set_status("Não salvou: %s" % r["error"])
@@ -1167,12 +1290,8 @@ func _show_playback() -> void:
 		_block_labels.append("%s (%s)" % [b["name"], term if term != "" else b["kind"]])
 	if ui != null:
 		ui.set_flows_playback(playback)
-	if follow_name == "" or cena.block_index(follow_name) < 0:
-		follow_name = ""
-		for b in cena.blocks:
-			if b["mobile"]:
-				follow_name = b["name"]
-				break
+	if ui != null:
+		follow_name = ui.camera_pick(follow_name, cena.blocks)
 	_sync_sim()
 	seek(0.0, true)
 
@@ -1275,45 +1394,33 @@ func _grid_lines(points: PackedVector3Array) -> void:
 
 
 func set_playing(on: bool) -> void:
-	playing = on and playback != null and mode == "simular"
-	_sync_play()
+	if ui != null:
+		ui.clock_play(on and mode == "simular")
 
 
 ## Jumps to `time` (no crossfade when `snap`).
 func seek(time: float, snap := false) -> void:
-	if playback == null:
-		return
-	t = clampf(time, 0.0, playback.end())
+	if ui != null and ui.clock_seek(time):
+		_apply_clock(snap)
+
+
+## Shows the clock's time in the scene (no crossfade when `snap`).
+func _apply_clock(snap: bool) -> void:
 	cena.apply(t, 0.0, snap)
-	_show_time()
 	if ui != null:
 		ui.flows_time(t)
 
 
 func step_event(direction: int) -> void:
-	if playback == null:
-		return
-	set_playing(false)
-	var e: float = playback.next_event(t) if direction > 0 else playback.prev_event(t)
-	if e >= 0.0:
-		seek(e, true)
-
-
-func _show_time() -> void:
-	_sync_play()
+	if ui != null and ui.clock_step(direction):
+		_apply_clock(true)
 
 
 func _process(dt: float) -> void:
 	_poll_job()
-	if playback != null and playing:
-		t += dt * speed
-		if t >= playback.end():
-			t = playback.end()
-			set_playing(false)
+	if ui != null and ui.clock_tick(dt):
 		cena.apply(t, dt)
-		_show_time()
-		if ui != null:
-			ui.flows_time(t)
+		ui.flows_time(t)
 	_frames += 1
 	if mode == "simular" and playback != null:
 		_drive_camera()
@@ -1336,55 +1443,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 ## Runs a keyboard action (see `shortcuts.rs`); false when it did nothing (the key goes on).
+## What a key does (the action `UtsimUi.key_action` named), routed by the bridge.
 func run_key_action(action: String) -> bool:
-	var arg := action.get_slice(":", 1)
-	match action.get_slice(":", 0):
-		"desfazer":
-			undo()
-		"refazer":
-			redo()
-		"salvar":
-			save()
-		"salvar_como":
-			save_as_dialog()
-		"abrir":
-			_confirm_discard(func(): _open_dialog.popup_centered_ratio(0.7))
-		"novo":
-			new_document()
-		"organizar":
-			arrange_action(arg)
-		"selecionar_tudo":
-			editor.select_all()
-		"atalhos":
-			toggle_shortcuts()
-		"desempenho":
-			toggle_performance()
-		"modo":
-			set_mode("editar" if mode == "simular" else "simular")
-		"enquadrar":
-			if mode == "simular" and cena.playback != null:
-				camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
-			else:
-				_frame_model()
-		"reproduzir":
-			set_playing(not playing)
-		"excluir":
-			editor.delete_selected()
-		"cancelar":
-			editor.cancel()
-		"mover":
-			editor.nudge(int(arg), int(action.get_slice(":", 2)))
-		"ferramenta":
-			editor.set_tool(arg)
-		"zona_fechar":
-			editor.zone_finish()
-		"corredor_fechar":
-			return editor.corredores.finish()
-		"grade":
-			set_snap(not snap_on, grid_step)
-		_:
-			return false
-	return true
+	if ui == null:
+		return false
+	var steps: Array = ui.route_key(action, _route_state())
+	if steps.is_empty():
+		return false
+	var done := true
+	for p in steps:
+		done = _run_step(p)
+	return done
 
 
 ## Aims the orbit camera at block `name` (the viewer's `Focar` step).
@@ -1428,33 +1497,20 @@ func cancel_job() -> void:
 		set_status("Cancelando: %s..." % job.what())
 
 
+## The job's progress and how it ended are the bridge's (`andamento.rs`).
 func _poll_job() -> void:
-	if job == null:
+	if job == null or ui == null:
 		return
-	var p: Dictionary = job.progress()
-	var total := int(p["total"])
-	if ui != null:
-		if total > 0:
-			ui.set_status_bar({"progress": float(p["done"]) / total, "percent": true})
-		else:
-			# Unknown length: a bar that goes back and forth.
-			ui.set_status_bar({"progress": absf(sin(Time.get_ticks_msec() / 400.0)), "percent": false})
-	if not p["finished"]:
+	var r: Dictionary = ui.poll_job(job)
+	if not r["finished"]:
 		return
 	var j := job
 	var done := _job_done
 	job = null
 	_job_done = Callable()
-	if ui != null:
-		ui.set_status_bar({"progress": -1.0})
-	if not j.ok():
-		if j.cancelled():
-			set_status("%s: cancelado." % j.what())
-		else:
-			set_status("%s: erro: %s" % [j.what(), j.error()])
-		if j.kind() != "replicacoes":
-			return
-	if done.is_valid():
+	if r["message"] != "":
+		set_status(r["message"])
+	if r["call"] and done.is_valid():
 		done.call(j)
 
 
@@ -1631,6 +1687,15 @@ func apply_warmup(warmup: float) -> void:
 # ---------------------------------------------------------------------------
 
 
+## Every tool opens maximized. A scripted run (`roteiro.gd`) keeps the size asked on the
+## command line (`--resolution WxH`, as the windowed roteiros do), so its captures keep
+## their size. (`window/size/mode=2` in project.godot would ignore `--resolution`.)
+func _maximize_window() -> void:
+	if DisplayServer.get_name() == "headless" or scripted:
+		return
+	get_window().mode = Window.MODE_MAXIMIZED
+
+
 ## Opens a replay recorded by `utsim run --replay` or "Gravar replay": it plays in
 ## Simular (with the statistics of that replication); the document is not touched.
 ## `--utsim-abrir=<arquivo>` (the Ensino's "Ver em 3D", or any caller): opens that model
@@ -1695,33 +1760,27 @@ func save_replay(path: String) -> bool:
 
 func set_camera_mode(which: String) -> void:
 	camera_mode = which
-	if which not in ["primeira_pessoa", "recurso"]:
+	var c: Dictionary = ui.camera_choice(which, follow_name) if ui != null else {"restore": true, "notice": ""}
+	if c["restore"]:
 		cena.restore_view()
 	camera.set_plan(which == "planta")
-	var label := which
-	for c in CAMERAS:
-		if c[0] == which:
-			label = c[1]
 	_sync_sim()
 	if which == "orbita":
 		camera.update()
-		set_status("Câmera de órbita.")
-	elif which == "planta":
-		set_status("Planta (2D): vista de cima, sem perspectiva; arraste com o botão direito para mover.")
-	elif follow_name == "":
-		set_status("Escolha na lista o bloco que a câmera acompanha.")
-	else:
-		set_status("Câmera %s: %s." % [label.to_lower(), follow_name])
+	set_status(c["notice"])
 
 
 ## Places the camera for the modes that follow a block (called every frame in Simular).
 func _drive_camera() -> void:
-	if camera_mode in ["orbita", "planta"] or follow_name == "" or ui == null:
+	if ui == null:
+		return
+	var how: String = ui.camera_drive(camera_mode, follow_name)
+	if how == "livre":
 		return
 	var i := cena.block_index(follow_name)
 	if i < 0:
 		return
-	if camera_mode == "seguir":
+	if how == "alvo":
 		camera.target = cena.block_focus(i)
 		camera.update()
 		return
@@ -1752,56 +1811,14 @@ func _show_link(link: Array) -> void:
 func _tool_panel(tool: String, state: Dictionary) -> void:
 	if ui != null:
 		ui.show_form(doc.tool_panel(tool, state))
-## Shows `rows` (see `ui_form.rs`) as the right panel; the edits come back in `_form_action`.
+## Shows `rows` (see `ui_form.rs`) as the right panel; the edits come back as `form:` actions (`acoes.rs`).
 func _show_form(rows: Array) -> void:
 	if ui != null:
 		ui.show_form(JSON.stringify(rows))
 
 
 ## What the tool panels (`form:<action>:<value>`) asked.
-func _form_action(what: String) -> void:
-	var action := what.get_slice(":", 0)
-	var value := what.substr(action.length() + 1)
-	var rede: EditorRede = editor.rede
-	var ai: EditorCorredores = editor.corredores
-	match action:
-		"ligacao_remover":
-			editor.delete_selected()
-		"rede_novos_mao_dupla":
-			rede.two_way = value == "1"
-		"rede_no_nome":
-			rede.rename(value)
-		"rede_excluir", "corredor_excluir":
-			(rede if action == "rede_excluir" else ai).delete_selected()
-		"rede_mao_dupla":
-			rede.set_two_way(value == "1")
-		"rede_capacidade":
-			rede.set_capacity(int(float(value)))
-		"rede_inverter":
-			rede.reverse()
-		"corredor_tipo":
-			ai.set_kind(value)
-		"corredor_largura":
-			ai.set_width(float(value))
-		"corredor_mao_dupla":
-			ai.set_two_way(value == "1")
-		"corredor_secundaria":
-			ai.set_secondary(value == "1")
-		"corredor_nome":
-			ai.rename(value)
-		"corredor_perfil":
-			ai.set_profile(value)
-		"corredor_vertice_remover":
-			ai.remove_vertex()
-		"corredor_inverter":
-			ai.reverse()
-		"zona_nome", "zona_tipo", "zona_nivel":
-			editor.set_zone_field(action.trim_prefix("zona_").replace("nome", "name").replace("tipo", "kind").replace("nivel", "level"), value)
-		"zona_excluir":
-			editor.delete_selected()
-		_ when action.begins_with("zona_epi_"):
-			editor.set_zone_field("ppe", action.trim_prefix("zona_epi_"))
-	_show_properties.call_deferred()
+
 
 
 

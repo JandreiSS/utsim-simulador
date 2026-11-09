@@ -9,6 +9,7 @@
 - [UTSim Ensino (o jogo e a sala de aula)](ensino.md)
 - [UTSim Qualidade](qualidade-app.md)
 - [UTSim Segurança do Trabalho](seguranca-app.md)
+- [UTSim Estatística](estatistica-app.md)
 
 # Construindo modelos
 
