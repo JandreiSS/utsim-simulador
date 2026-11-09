@@ -2,7 +2,7 @@
 
 O UTSim Estatística é o aplicativo de análise estatística da família UTSim, com janela própria. Ele trabalha com planilhas de dados digitados, importados de CSV ou xlsx, ou vindos da simulação, faz as análises mais usadas no dia a dia da engenharia e grava relatórios em HTML e PDF. Funciona sem internet e sem servidor. Esta versão cobre as etapas E1 e E2 de `docs/plano_estatistica.md`.
 
-Pela linha de comando, `utsim-estatistica` abre a janela.
+Pela linha de comando, `utsim-estatistica` abre a janela. Com `utsim-estatistica --utsim-abrir=<arquivo.csv ou .xlsx>` (a convenção da família, usada por exemplo pelo "Analisar no UTSim Estatística" das missões do UTSim Ensino), o app já abre numa planilha nova com o arquivo: na última unidade usada, onde a planilha é gravada; sem unidade conhecida, a planilha fica aberta e a barra pede para abrir ou criar uma unidade antes de analisar.
 
 ## A pasta de unidade
 
