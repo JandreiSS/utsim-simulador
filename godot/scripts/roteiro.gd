@@ -50,6 +50,7 @@
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
 ##    - `{"esperar_valores": true}`: waits for the comparison of the "Valores reais…" window
+##    - `{"esperar_indicadores": true}`: waits for the simulated numbers of the node tabs
 ##    - `{"esperar_trabalho": 120}` (G3): waits until the run on the bridge's thread ends
 ##      (at most that many seconds; a failure if it does not). `modo` and the captures of
 ##      models wait by themselves.
@@ -413,6 +414,11 @@ func _step(s: Dictionary, k: int) -> void:
 		# The comparison of the "Valores reais…" window runs on its own thread.
 		if _egui() == null or not _egui().fitwin_wait():
 			_fail("passo %d: a comparação dos valores reais não terminou" % k)
+		await _frames(4)
+	elif s.has("esperar_indicadores"):
+		# Quality and safety of the node tabs come from one more run on a thread.
+		if _egui() == null or not _egui().indicators_wait():
+			_fail("passo %d: os números da simulação nas abas não vieram" % k)
 		await _frames(4)
 	elif s.has("esperar_trabalho"):
 		if not await _wait_idle(float(s["esperar_trabalho"])):
