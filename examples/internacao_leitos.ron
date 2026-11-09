@@ -1,0 +1,68 @@
+// Internação e leitos (linha Saúde e hospital): modelo pronto da linha, montado só com as
+// predefinições de linhas/saude/biblioteca.ron.
+//
+// Duas entradas: as internações do pronto-socorro, oito por dia em média a qualquer hora
+// (cores vermelho, laranja e amarelo), e as cirurgias eletivas, marcadas às 7h (três) e às
+// 13h (duas). Cada uma tem a sua unidade: clínica médica, 28 leitos com permanência média de
+// três dias, e clínica cirúrgica, 12 leitos com permanência média de dois dias. O paciente
+// espera um leito, o mais grave primeiro; ao chegar ao leito, a enfermagem faz a admissão
+// (preparo do leito, campo setup) e depois o paciente fica internado sem prender a
+// enfermagem. A ocupação-alvo dos leitos é de 85 %: o relatório mostra quanto cada unidade
+// passa disso e quanto se espera por um leito.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha saude relatorio examples/internacao_leitos.ron --html relatorio.html
+//
+//   do_pronto_socorro -> espera_leito_clinica -> clinica_medica -> alta
+//   eletivas -> espera_leito_cirurgica -> clinica_cirurgica -> alta
+Model(
+    name: "Internação e leitos",
+    description: "Saúde e hospital: entradas do pronto-socorro e eletivas, tempo de permanência, ocupação e espera por leito",
+    line: "saude",
+    packs: ["seguranca"],
+    run: (stop_time: 50400.0, warmup: 10080.0, seed: 97, replications: 5),
+    objects: [
+        (name: "do_pronto_socorro", kind: Source(interarrival: Exp(mean: 180.0),
+            labels: {"gravidade": Discrete([(1.0, 0.1), (2.0, 0.4), (3.0, 0.5)])}), position: (0.0, 3.0, 0.0),
+            preset: "saude/chegada", department: "Internação", symbol: "inicio"),
+        (name: "eletivas", kind: Source(interarrival: Const(1440.0),
+            labels: {"agendado": Const(1.0), "gravidade": Const(4.0), "presenca": Const(1.0)},
+            table: Some((
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 420.0, count: 3),
+                    (at: 780.0, count: 2),
+                ],
+            ))), position: (0.0, -3.0, 0.0), preset: "saude/agenda", department: "Centro cirúrgico", symbol: "inicio"),
+        (name: "espera_leito_clinica", kind: Queue(order: Some(Asc("gravidade"))), position: (4.0, 3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Clínica médica", symbol: "espera"),
+        (name: "clinica_medica", kind: Processor(capacity: 28, setup: Some(Triangular(min: 15.0, mode: 20.0, max: 30.0)),
+            process: LogNormal(mean: 4320.0, sd: 2880.0),
+            operators: Some(OperatorUse(team: "enfermagem", process: false))), position: (8.0, 3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/leitos", department: "Clínica médica", symbol: "operacao"),
+        (name: "espera_leito_cirurgica", kind: Queue(order: Some(Asc("gravidade"))), position: (4.0, -3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Clínica cirúrgica", symbol: "espera"),
+        (name: "clinica_cirurgica", kind: Processor(capacity: 12, setup: Some(Triangular(min: 15.0, mode: 20.0, max: 30.0)),
+            process: LogNormal(mean: 2880.0, sd: 1440.0),
+            operators: Some(OperatorUse(team: "enfermagem", process: false))), position: (8.0, -3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/leitos", department: "Clínica cirúrgica", symbol: "operacao"),
+        (name: "alta", kind: Sink, position: (12.0, 0.0, 0.0), preset: "saude/alta", department: "Internação", symbol: "fim"),
+        (name: "enfermagem", kind: Dispatcher(team: ["enfermagem_1", "enfermagem_2"], rule: FirstAvailable), position: (8.0, 0.0, 0.0),
+            preset: "saude/enfermagem", department: "Enfermagem"),
+        (name: "enfermagem_1", kind: Transporter(speed: 60.0), position: (7.0, 0.0, 0.0),
+            ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+        (name: "enfermagem_2", kind: Transporter(speed: 60.0), position: (9.0, 0.0, 0.0),
+            ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+    ],
+    connections: [
+        ("do_pronto_socorro", "espera_leito_clinica"),
+        ("espera_leito_clinica", "clinica_medica"),
+        ("clinica_medica", "alta"),
+        ("eletivas", "espera_leito_cirurgica"),
+        ("espera_leito_cirurgica", "clinica_cirurgica"),
+        ("clinica_cirurgica", "alta"),
+    ],
+)

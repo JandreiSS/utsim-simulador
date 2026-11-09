@@ -1,0 +1,132 @@
+// Pronto-socorro com classificação de risco (linha Saúde e hospital): modelo pronto da
+// linha, montado só com as predefinições de linhas/saude/biblioteca.ron.
+//
+// Os pacientes chegam o dia todo: um a cada 5 minutos em média das 7h às 19h, um a cada 9
+// minutos à noite e um a cada 15 minutos de madrugada (da 0h às 7h). A cor da classificação de risco é sorteada na chegada: 1 %
+// vermelho, 9 % laranja, 30 % amarelo, 45 % verde e 15 % azul. Depois da recepção (dois
+// guichês), a enfermagem classifica o risco (duas salas) e o paciente espera o médico, o mais grave
+// primeiro; quem espera demais vai embora sem atendimento (paciência entre 2 e 8 horas).
+// Quatro consultórios; da consulta, o paciente recebe alta, vai para a medicação e
+// observação, para o laboratório, para a tomografia ou para a sala de procedimento, onde o
+// médico e a enfermagem precisam estar juntos (campo also); o pedido do médico ali tem
+// prioridade, para a enfermagem não ficar parada esperando por ele. Depois dos exames, 15 % são
+// internados e esperam um leito. O tomógrafo para de vez em quando (campo downtime do nó,
+// aba Manutenção); o EPI de cada profissional e da sala de procedimento fica no campo ppe
+// (aba Segurança).
+//
+// Plantões: dois médicos e três profissionais de enfermagem das 7h às 19h, mais dois médicos
+// e um profissional de enfermagem o dia todo. A internação tem 30 leitos.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha saude relatorio examples/pronto_socorro.ron --html relatorio.html
+//
+//   chegada -> espera_recepcao -> recepcao -> espera_classificacao -> classificacao
+//     -> espera_medico -> consultorio -> alta | medicacao | laboratorio | tomografia | procedimento
+//   laboratorio, tomografia -> resultado -> alta | espera_leito -> leitos -> alta
+Model(
+    name: "Pronto-socorro com classificação de risco",
+    description: "Saúde e hospital: cinco cores, consulta, exames com parada do tomógrafo, medicação, procedimento com médico e enfermagem juntos e internação",
+    line: "saude",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 83, replications: 5),
+    calendars: {
+        "dia": (period: 1440.0, off: [
+            (start: 0.0, duration: 420.0),
+            (start: 1140.0, duration: 300.0),
+        ]),
+    },
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 5.0), labels: {"gravidade": Discrete([(1.0, 0.01), (2.0, 0.09), (3.0, 0.3), (4.0, 0.45), (5.0, 0.15)])},
+            schedule: Some((cycle: 1440.0, periods: [
+                (start: 0.0, end: 420.0, arrivals: Interarrival(Exp(mean: 15.0))),
+                (start: 420.0, end: 1140.0),
+                (start: 1140.0, end: 1440.0, arrivals: Interarrival(Exp(mean: 9.0))),
+            ]))), position: (0.0, 0.0, 0.0), preset: "saude/chegada", department: "Recepção", symbol: "inicio"),
+        (name: "espera_recepcao", kind: Queue(order: Some(Asc("gravidade"))), position: (3.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Recepção", symbol: "espera"),
+        (name: "recepcao", kind: Processor(capacity: 2, process: Triangular(min: 1.0, mode: 2.0, max: 5.0)),
+            position: (6.0, 0.0, 0.0), visual: Some((asset: Some("mesa"))), preset: "saude/recepcao", department: "Recepção",
+            symbol: "operacao"),
+        (name: "espera_classificacao", kind: Queue(order: Some(Asc("gravidade"))), position: (9.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Enfermagem", symbol: "espera"),
+        (name: "classificacao", kind: Processor(capacity: 2, process: Triangular(min: 2.0, mode: 4.0, max: 8.0),
+            operators: Some(OperatorUse(team: "enfermagem"))), position: (12.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "saude/triagem", department: "Enfermagem", symbol: "inspecao"),
+        (name: "espera_medico", kind: Queue(order: Some(Asc("gravidade")), patience: Some(Uniform(min: 120.0, max: 480.0))), position: (15.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Médicos", symbol: "espera"),
+        (name: "consultorio", kind: Processor(capacity: 4, process: Triangular(min: 6.0, mode: 10.0, max: 20.0),
+            operators: Some(OperatorUse(team: "medicos"))), output: Weighted([0.4, 0.22, 0.2, 0.1, 0.08]),
+            position: (18.0, 0.0, 0.0), visual: Some((asset: Some("mesa"))), preset: "saude/consultorio", department: "Médicos",
+            symbol: "operacao"),
+        (name: "medicacao", kind: Processor(capacity: 8, setup: Some(Triangular(min: 3.0, mode: 5.0, max: 10.0)),
+            process: Triangular(min: 30.0, mode: 60.0, max: 120.0),
+            operators: Some(OperatorUse(team: "enfermagem", process: false))), position: (22.0, 6.0, 0.0), ppe: ["luvas"],
+            visual: Some((asset: Some("area"))), preset: "saude/medicacao", department: "Observação", symbol: "operacao"),
+        (name: "laboratorio", kind: Processor(capacity: 6, process: Triangular(min: 30.0, mode: 50.0, max: 90.0)),
+            position: (22.0, -4.0, 0.0), visual: Some((asset: Some("maquina"))), preset: "saude/exame", department: "Exames",
+            symbol: "operacao"),
+        (name: "tomografia", kind: Processor(process: Triangular(min: 15.0, mode: 20.0, max: 30.0)),
+            downtime: Some((mtbf: Exp(mean: 2880.0), mttr: Exp(mean: 120.0))), position: (22.0, -8.0, 0.0),
+            visual: Some((asset: Some("maquina"))), preset: "saude/exame", department: "Exames", symbol: "operacao"),
+        (name: "procedimento", kind: Processor(process: Triangular(min: 15.0, mode: 25.0, max: 45.0),
+            operators: Some(OperatorUse(team: "medicos", priority: Some(10))), also: [OperatorUse(team: "enfermagem")]),
+            position: (22.0, 10.0, 0.0), ppe: ["luvas", "mascara", "avental"], visual: Some((asset: Some("bancada"))),
+            preset: "saude/procedimento", department: "Médicos", symbol: "operacao"),
+        (name: "resultado", kind: Queue(), output: Weighted([0.85, 0.15]), position: (26.0, -6.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Exames", symbol: "espera"),
+        (name: "espera_leito", kind: Queue(order: Some(Asc("gravidade"))), position: (30.0, -10.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Internação", symbol: "espera"),
+        (name: "leitos", kind: Processor(capacity: 30, process: LogNormal(mean: 4320.0, sd: 2880.0)), position: (34.0, -10.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/leitos", department: "Internação", symbol: "operacao"),
+        (name: "alta", kind: Sink, position: (38.0, 0.0, 0.0), preset: "saude/alta", department: "Recepção", symbol: "fim"),
+        (name: "medicos", kind: Dispatcher(team: ["medicos_1", "medicos_2", "medicos_3", "medicos_4"], rule: FirstAvailable), position: (18.0, 4.0, 0.0),
+            preset: "saude/medicos", department: "Médicos"),
+        (name: "medicos_1", kind: Transporter(speed: 60.0), position: (17.0, 3.0, 0.0),
+            shifts: Calendar("dia", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Médicos"),
+        (name: "medicos_2", kind: Transporter(speed: 60.0), position: (18.0, 3.0, 0.0),
+            shifts: Calendar("dia", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Médicos"),
+        (name: "medicos_3", kind: Transporter(speed: 60.0), position: (19.0, 3.0, 0.0),
+            ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Médicos"),
+        (name: "medicos_4", kind: Transporter(speed: 60.0), position: (20.0, 3.0, 0.0),
+            ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Médicos"),
+        (name: "enfermagem", kind: Dispatcher(team: ["enfermagem_1", "enfermagem_2", "enfermagem_3", "enfermagem_4"], rule: FirstAvailable), position: (12.0, 4.0, 0.0),
+            preset: "saude/enfermagem", department: "Enfermagem"),
+        (name: "enfermagem_1", kind: Transporter(speed: 60.0), position: (11.0, 3.0, 0.0),
+            shifts: Calendar("dia", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+        (name: "enfermagem_2", kind: Transporter(speed: 60.0), position: (12.0, 3.0, 0.0),
+            shifts: Calendar("dia", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+        (name: "enfermagem_3", kind: Transporter(speed: 60.0), position: (13.0, 3.0, 0.0),
+            shifts: Calendar("dia", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+        (name: "enfermagem_4", kind: Transporter(speed: 60.0), position: (14.0, 3.0, 0.0),
+            ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+    ],
+    connections: [
+        ("chegada", "espera_recepcao"),
+        ("espera_recepcao", "recepcao"),
+        ("recepcao", "espera_classificacao"),
+        ("espera_classificacao", "classificacao"),
+        ("classificacao", "espera_medico"),
+        ("espera_medico", "consultorio"),
+        ("consultorio", "alta"),
+        ("consultorio", "medicacao"),
+        ("consultorio", "laboratorio"),
+        ("consultorio", "procedimento"),
+        ("consultorio", "tomografia"),
+        ("medicacao", "alta"),
+        ("procedimento", "alta"),
+        ("laboratorio", "resultado"),
+        ("tomografia", "resultado"),
+        ("resultado", "alta"),
+        ("resultado", "espera_leito"),
+        ("espera_leito", "leitos"),
+        ("leitos", "alta"),
+    ],
+)
