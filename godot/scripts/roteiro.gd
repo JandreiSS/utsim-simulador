@@ -54,6 +54,9 @@
 ##      (at most that many seconds; a failure if it does not). `modo` and the captures of
 ##      models wait by themselves.
 ##    - `{"tempo": 120.0}`: jumps the playback to that instant.
+##    - `{"outro_app": {"arquivo": "{saida}/m.ron", "trocar": ["de", "para"]}}`: another app
+##      (UTSim Qualidade, Segurança) saves the model: the text is replaced in the file, and
+##      the main scene looks at the disk as when the window gets the focus back.
 ##
 ##    A target (<alvo>) is one of: `{"ponto": [x, y]}` (pixels), `{"controle": "Nome"}`
 ##    (a control by node name, its centre), `{"chao": [x, y]}` (a floor point in model
@@ -418,6 +421,19 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("tempo"):
 		_main.seek(float(s["tempo"]), true)
 		await _frames(3)
+	elif s.has("outro_app"):
+		var o: Dictionary = s["outro_app"]
+		var path := _resolve(_base, String(o["arquivo"]))
+		var text := FileAccess.get_file_as_string(path)
+		var swap: Array = o.get("trocar", [])
+		if text == "" or swap.size() != 2 or not text.contains(String(swap[0])):
+			_fail("passo %d: o outro app não achou \"%s\" em %s" % [k, swap[0] if swap.size() > 0 else "", path])
+		else:
+			var f := FileAccess.open(path, FileAccess.WRITE)
+			f.store_string(text.replace(String(swap[0]), String(swap[1])))
+			f.close()
+			_main._check_disk()
+		await _frames(5)
 	elif s.has("conferir"):
 		_check(s["conferir"], k)
 	else:

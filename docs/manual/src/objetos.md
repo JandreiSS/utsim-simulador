@@ -31,6 +31,8 @@ Num objeto novo tudo começa desligado: o modelo só muda quando você liga um b
 
 **Um escritor por vez.** Ao abrir ou salvar um modelo, o UTSim 3D marca que está editando o arquivo (um arquivo `.<nome>.trava` ao lado dele) e renova a marca a cada minuto. Os outros apps da família que abrirem o mesmo modelo ficam só de leitura e dizem quem edita. Do mesmo jeito, se o UTSim Qualidade ou o Segurança já estiver editando, o UTSim 3D abre o modelo, mostra "Em edição por ..." nas abas, deixa as abas só de leitura e não salva por cima do arquivo: use "Salvar como" ou espere a pessoa fechar. Quando ela fecha, as abas voltam a editar sozinhas em até um minuto. Uma marca que ninguém renova por cinco minutos (o programa fechou de repente) deixa de valer.
 
+**Quando o outro app grava o modelo.** O UTSim 3D confere o arquivo a cada minuto e sempre que a janela volta a ficar ativa. Se o UTSim Qualidade ou o Segurança gravou o modelo e você não mudou nada desde que abriu ou salvou, o UTSim 3D relê o arquivo sozinho, no mesmo modo, com a mesma câmera e a mesma seleção, e avisa na barra de status. Se você também mudou algo, ele não relê (para não perder o seu trabalho), avisa, e "Salvar" recusa gravar por cima do que o outro app gravou: use "Salvar como" para guardar a sua versão em outro arquivo, ou abra o modelo de novo para partir do que está no disco.
+
 ## Source (Chegada)
 
 Cria itens. É por aqui que o trabalho entra no modelo.
