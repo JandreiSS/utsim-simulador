@@ -37,7 +37,10 @@ impl INode2D for UtsimEnsino {
     fn init(base: Base<Node2D>) -> Self {
         let (app, erro) = match Perfil::padrao() {
             Some(p) => (Some(App::new(p)), String::new()),
-            None => (None, "não encontrei a pasta do usuário".to_string()),
+            None => (
+                None,
+                utsim_ensino_ui::texto::sem_pasta_usuario().to_string(),
+            ),
         };
         UtsimEnsino {
             ctx: egui::Context::default(),
@@ -82,7 +85,7 @@ impl INode2D for UtsimEnsino {
         let (app, erro) = (&mut self.app, &self.erro);
         let out = self.ctx.run_ui(raw, |ui| {
             egui::Panel::top("ensino_volta").show(ui, |ui| {
-                if ui.button("← Voltar ao UTSim 3D").clicked() {
+                if ui.button(utsim_ensino_ui::texto::voltar_3d()).clicked() {
                     sair = true;
                 }
             });
@@ -159,7 +162,7 @@ impl UtsimEnsino {
     #[func]
     fn abrir_pacote(&mut self, caminho: GString) -> GString {
         let Some(app) = self.app.as_mut() else {
-            return GString::from("sem perfil");
+            return GString::from(utsim_ensino_ui::texto::sem_perfil());
         };
         match app.abrir_pacote(std::path::Path::new(&caminho.to_string())) {
             Ok(()) => GString::new(),
