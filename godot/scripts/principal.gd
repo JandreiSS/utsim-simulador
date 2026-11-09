@@ -253,6 +253,7 @@ func _build_ui() -> void:
 	# The file dialogs are the system's own on a screen; a scripted run (`roteiro.gd`)
 	# answers them itself, so it keeps the Godot ones.
 	scripted = Array(OS.get_cmdline_user_args()).any(func(a): return String(a).begins_with("--utsim-roteiro="))
+	_maximize_window()
 	_open_from_args.call_deferred()
 	if DisplayServer.get_name() != "headless" and not scripted:
 		for d in [_open_dialog, _save_dialog, _data_dialog, _report_dialog, _replay_dialog]:
@@ -1650,6 +1651,15 @@ func apply_warmup(warmup: float) -> void:
 # ---------------------------------------------------------------------------
 # Recorded replays (G3)
 # ---------------------------------------------------------------------------
+
+
+## Every tool opens maximized. A scripted run (`roteiro.gd`) keeps the size asked on the
+## command line (`--resolution WxH`, as the windowed roteiros do), so its captures keep
+## their size. (`window/size/mode=2` in project.godot would ignore `--resolution`.)
+func _maximize_window() -> void:
+	if DisplayServer.get_name() == "headless" or scripted:
+		return
+	get_window().mode = Window.MODE_MAXIMIZED
 
 
 ## Opens a replay recorded by `utsim run --replay` or "Gravar replay": it plays in
