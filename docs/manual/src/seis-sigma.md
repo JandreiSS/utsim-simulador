@@ -326,8 +326,9 @@ A tela **Ferramentas** reúne as ferramentas qualitativas das fases (etapa L2 do
 ferramenta é um **entregável** de uma fase: escolha a ferramenta em "Novo entregável" e
 clique em "Criar". Ela entra na fase onde costuma ser usada no DMAIC (VOC, SIPOC, Pareto e
 A3 no Definir; plano de coleta no Medir; Ishikawa, 5 porquês, matriz causa-efeito e FMEA no
-Analisar; planos de controle e de resposta no Controlar) e pode ser mudada de fase no alto
-do entregável. Um projeto pode ter mais de um entregável da mesma ferramenta (dois Paretos,
+Analisar; seleção de soluções, 5S, SMED e trabalho padronizado no Melhorar; planos de
+controle e de resposta no Controlar; o evento kaizen e os ciclos PDCA nas fases da própria
+abordagem) e pode ser mudada de fase no alto do entregável. Um projeto pode ter mais de um entregável da mesma ferramenta (dois Paretos,
 por exemplo).
 
 No alto de cada entregável ficam o nome, a fase, o estado (em elaboração ou concluído) e
@@ -588,6 +589,81 @@ do quadro com coluna, prazo e responsável; as linhas do plano de controle, os s
 de resposta e as características críticas sem controle. Cada bloco tem uma nota da equipe,
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
+
+### Seleção de soluções
+
+Escolhe entre soluções (no Melhorar) ou conceitos (no Analisar do DMADV). Os critérios têm
+peso de 1 a 10. Há dois métodos, escolhidos no alto:
+
+- **Matriz ponderada:** cada opção recebe de 1 a 5 em cada critério; o total soma peso ×
+  nota e aparece também como percentual do máximo possível.
+- **Matriz de Pugh:** marque uma opção como referência (o conceito atual ou o mais
+  conhecido); as outras são comparadas com ela em cada critério como melhor (+), igual (S) ou
+  pior (−). O total soma peso × sinal, e a tabela mostra quantos +, S e − cada opção teve.
+
+A melhor opção aparece quando todas as células dela têm nota. Impacto e esforço (1 a 10) de
+cada opção montam a grade de prioridade: fazer já, planejar, se sobrar tempo ou descartar.
+
+### Auditoria 5S
+
+A lista de verificação tem perguntas por senso (utilização, organização, limpeza,
+padronização e disciplina). "Lista inicial" acrescenta duas perguntas por senso, para a
+equipe adaptar à área; a lista é da empresa. "Nova auditoria" abre uma coluna com a data de
+hoje e o auditor; cada pergunta recebe de 0 a 4. Embaixo ficam o percentual de cada senso e
+o total, o senso mais fraco da última auditoria, o radar (a última auditoria cheia, a
+primeira em contorno) e a evolução do total entre as auditorias. As fotos de antes e depois
+vão como anexos do projeto.
+
+### SMED (troca rápida)
+
+Cada atividade da troca entra com o tempo em minutos e a classe de hoje: **interna** (feita
+com a máquina parada) ou **externa** (feita com a máquina rodando). Na coluna "Depois" diga
+o que a atividade vira com o estudo (interna, externa ou eliminada) e, se mudou, o tempo
+novo e como. O tempo de setup é a soma das internas; a tela mostra antes e depois, as
+atividades convertidas e a redução do setup, com o gráfico das duas situações. Para ver o
+efeito na linha, mude o tempo de setup no modelo e rode o estudo de cenários.
+
+### Trabalho padronizado
+
+O takt vem do tempo disponível e da demanda do mesmo período (por exemplo 27 000 s e 450
+peças: 60 s), ou é digitado. Cada elemento de trabalho tem o operador, os tempos manual,
+automático (a máquina trabalha sozinha) e de deslocamento, em segundos, e o estoque padrão
+em processo. A tela mostra:
+
+- o conteúdo de trabalho de cada operador (manual mais deslocamento) e o total;
+- o número mínimo de operadores, ⌈conteúdo total / takt⌉, e a eficiência do balanceamento
+  (conteúdo total sobre operadores × o maior ciclo);
+- o gráfico de balanceamento, com os operadores acima do takt em laranja;
+- a tabela de combinação de cada operador: o trabalho manual em barra cheia, a máquina em
+  barra clara (laranja quando ela ainda trabalha quando o operador volta, no ciclo seguinte)
+  e o deslocamento em linha, com o takt em vermelho.
+
+### Evento kaizen
+
+Para o kaizen rápido. No alto ficam o primeiro dia e a duração (3 a 5 dias).
+"Preencher preparo e pauta" traz o preparo (escopo e meta com o patrocinador, dados, equipe
+liberada, logística) e a pauta, com os seis temas distribuídos pelos dias: entender, medir,
+analisar, melhorar, padronizar e apresentar. Itens marcados como feitos ficam registrados.
+
+As pendências têm responsável e prazo; "Mandar ao quadro" cria o cartão no quadro de ações
+com origem kaizen, ligado à pendência. A pendência fica feita quando o cartão chega a
+"Feito". O acompanhamento mostra as datas de 30, 60 e 90 dias depois do evento, as
+pendências atrasadas em cada uma e o que a equipe viu em cada revisão. O tollgate de
+abertura do kaizen confere que o evento existe.
+
+### Ciclos PDCA
+
+Cada ciclo registra a hipótese, o plano (Planejar), o que foi feito (Fazer), o que se
+verificou com dados (Verificar), o resultado da hipótese (confirmada ou refutada) e o que se
+padronizou ou ajustou (Agir). A tela diz em que etapa cada ciclo está e conta os ciclos
+confirmados, refutados e em andamento. Um ciclo novo mostra o que o anterior padronizou,
+para partir dali.
+
+### Ferramentas da qualidade do DMADV
+
+A casa da qualidade (QFD), as tolerâncias por Monte Carlo e o poka-yoke ligado ao FMEA são
+ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o Seis Sigma guarda o
+resultado como entregável quando elas forem abertas de lá.
 
 ## Roteiro DMAIC
 
@@ -1257,8 +1333,9 @@ Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com
 UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
 trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
 experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
-exportação dos painéis. Ficam para depois Plackett-Burman, superfície de resposta e
-desejabilidade no DOE, o espaguete desenhado sem modelo e, do programa, a lista de papéis
+exportação dos painéis. A P6 trouxe a seleção de soluções (ponderada e Pugh), a auditoria 5S, o SMED, o
+trabalho padronizado com o balanceamento, o evento kaizen e os ciclos PDCA. Ficam para depois
+Plackett-Burman, superfície de resposta e desejabilidade no DOE (no UTSim Estatística), o espaguete desenhado sem modelo e, do programa, a lista de papéis
 assinada. Da gestão do projeto ficam para
 depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
 capacidade dos belts em horas.
