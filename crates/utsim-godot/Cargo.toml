@@ -20,6 +20,8 @@ utsim-scene.workspace = true
 utsim-assets.workspace = true
 utsim-exposicao.workspace = true
 utsim-edit.workspace = true
+utsim-qualidade-core.workspace = true
+utsim-launcher-core = { path = "../utsim-launcher-core" }
 # The one-writer lock next to the model file, shared with UTSim Qualidade and Segurança.
 utsim-pasta.workspace = true
 utsim-linhas.workspace = true
