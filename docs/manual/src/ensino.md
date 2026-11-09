@@ -245,6 +245,20 @@ utsim-ensino pacote pacote_pulmao pulmao.utse
 
 O conferidor avisa quando a referência e o estado inicial empatam (a missão não ensina nada), quando nenhuma combinação bate as metas e quando mais de 30 % batem (missão fácil). A busca exaustiva aceita até 400 combinações de alavancas.
 
+## Editor de missões
+
+O editor de missões faz o mesmo que o construtor, mas tudo na tela, sem abrir os arquivos da pasta. Ele fica na aba **Editor de missões**, que aparece no modo professor.
+
+1. **Seu pacote.** Indique a pasta do pacote e clique em "Abrir ou criar". Uma pasta com `pacote.ron` abre o pacote que já está lá. Uma pasta vazia começa um pacote novo, gravado junto com a primeira missão. A lista mostra as missões por ato, com "Editar", as setas para mudar a ordem (descer a última missão de um ato a leva para o ato seguinte) e "Remover", que apaga só os arquivos daquela missão.
+2. **Missão nova.** Escolha o modelo `.ron` e o título e clique em "Criar o rascunho". O editor sugere as mesmas alavancas e métricas do construtor e escreve um enunciado inicial. O identificador nasce do título (`prof/<título>`) e pode ser trocado.
+3. **Alavancas.** Cada linha tem uma caixa para usar ou não a alavanca, o rótulo que o aluno vê, a faixa (de, até, e o passo nas alavancas de valor) e o custo por unidade acima do valor inicial. O orçamento é opcional. Embaixo aparece quantas combinações a calibragem vai simular. O limite é o da busca exaustiva, 400.
+4. **Métricas.** Para cada métrica há o rótulo, se ela é melhor quando menor ou maior, a meta, a tolerância (em % ou na unidade da métrica) e o peso na nota. Peso zero mostra a métrica ao aluno sem contar na nota.
+5. **Enunciado.** O texto em Markdown que o aluno lê.
+6. **Calibrar.** Simula todas as combinações em segundo plano. Mostra quantas cabem no orçamento e nas restrições, quantas batem todas as metas e uma tabela com a situação inicial, a referência e a meta sugerida de cada métrica (5 % de folga em torno da referência). Os avisos do conferidor aparecem embaixo. "Usar a referência e as metas sugeridas" leva os valores para a missão.
+7. **Gravar no pacote.** Confere os campos e grava a missão na pasta. Uma missão com o mesmo identificador é trocada no lugar dela. "Conferir o pacote" faz a mesma conferência que o app do aluno faz ao abrir o pacote, e "Gravar o .utse" empacota a pasta para publicar na turma.
+
+Ao abrir de novo uma missão gravada, as alavancas e as métricas que ela não usa voltam como sugestões desmarcadas. Os campos que o editor ainda não mostra (perguntas, dicas, rodadas) são mantidos como estavam. Missões de modelagem, de peças e de dados ainda não abrem no editor.
+
 ## Dados com efeito plantado
 
 O módulo `dados` do núcleo gera conjuntos de dados didáticos com semente, com a resposta conhecida guardada junto: tempos de processo de uma distribuição, um estudo de R&R com os desvios de peça, operador e repetibilidade, grupos com a média de um deles deslocada, uma série com deslocamento ou tendência e um fatorial de dois níveis com efeitos e interação. A mesma receita dá os mesmos dados em qualquer computador. A verificação confere que as análises que o aluno usa recuperam o efeito plantado: o ajuste de distribuições, o estudo de R&R por ANOVA, a ANOVA de um fator, as regras de Nelson e os efeitos do fatorial.
