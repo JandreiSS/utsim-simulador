@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 utsim-core.workspace = true
 utsim-model.workspace = true
+utsim-objects.workspace = true
 utsim-edit.workspace = true
 utsim-flow.workspace = true
 utsim-fluid.workspace = true

@@ -619,6 +619,27 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   `NetAddNode`, `NetMoveNode`, `NetAddEdge`, `NetRemoveEdge`, `NetRemoveNode`; teste do gesto
   inteiro); o `rede.gd` fica com o painel e o desenho. Roteiro `g3_rede` sem mudança.
 
+### Passo 7, parte 3: reprodução, trabalhos e ações da barra de reprodução (2026-11-09)
+
+- `relogio.rs` (puro, testes): o relógio do Simular (tempo, velocidade, tocando, fim da
+  replicação carregada). Só toca com uma replicação e no Simular, para no fim, `ir` limita ao
+  intervalo, `ao_evento` pausa e salta. O `UtsimUi` o guarda (`clock_load`, `clock_play`,
+  `clock_tick`, `clock_seek`, `clock_step`, `clock_t`, `clock_playing`, `clock_speed`,
+  `set_clock_speed`) e a barra de reprodução lê dele.
+- As ações da própria barra (reproduzir, velocidade, tempo, evento anterior e seguinte) não
+  passam mais pelo `principal.gd`: o `UtsimUi` as aplica no relógio e só avisa `relogio`
+  quando o tempo saltou, para a cena mostrar o novo tempo.
+- `andamento.rs` (puro, testes): a barra de progresso de um trabalho (com porcentagem, ou
+  vaivém quando ele não conta) e, no fim, a mensagem (cancelado, erro) e se a cena segue com
+  o resultado. `UtsimUi.poll_job(job)` faz o acompanhamento; o `principal.gd` só guarda o
+  trabalho e o que fazer com o resultado.
+- `principal.gd`: `t`, `playing` e `speed` viraram propriedades que leem o relógio (os
+  roteiros continuam iguais); `playback` carrega o relógio ao mudar. Saíram `_show_time`, o
+  avanço do tempo no `_process` e o corpo do `_poll_job`. De 1847 para 1826 linhas.
+- Ficam para as próximas rodadas: a câmera do Simular (`_drive_camera`) e o despacho das
+  demais ações da barra e dos painéis (`bar_action`, `_panel_action`, `_form_action`), que
+  chamam a cena, o editor e os diálogos do Godot.
+
 ### Zonas de risco no editor 3D (2026-11-07)
 
 Pedido da frente de Segurança (os arquivos do editor são desta frente), combinado com a sessão
