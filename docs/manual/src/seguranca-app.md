@@ -94,6 +94,10 @@ A tela Incidentes tem quatro abas:
 - **Indicadores** calcula as taxas do período escolhido, o Pareto de causas e de postos, os eventos por zona e a carta `u` das lesões por mês. Esta aba nunca mostra nomes.
 - **Pessoas (restrita)** cria a pasta restrita, cadastra pessoas e anonimiza. Cadastrar e anonimizar só aparecem para quem pode gravar na pasta restrita, e a anonimização pede uma segunda confirmação porque apaga o nome para sempre.
 
+## Ferramentas e estudos
+
+A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA e A3. Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo.
+
 ## Modelo (mão dupla com o UTSim)
 
 A aba "Modelo" é a tela de entrada quando a unidade tem modelo ligado a algum posto. Ela abre o mesmo arquivo `.ron` que o UTSim usa: escolha um dos modelos dos postos ou digite o caminho. A lista à esquerda mostra os objetos do modelo, com filtro por nome, o que cada um tem (qualidade, inspeção, retrabalho, EPI, perigos, quebras) e um número-chave do resultado simulado. Ao escolher um objeto, os resultados da simulação daquele nó aparecem primeiro, marcados como "Simulado", e "Simular de novo" refaz a simulação. Abaixo ficam as abas de campos: a aba Segurança mostra os campos do próprio nó (EPI exigido, perigos do posto e marcações de ergonomia) e a aba Manutenção mostra os dados de quebras só para leitura. Cada campo editado vale na hora, com erro de faixa ao lado do campo, e há desfazer e refazer (Ctrl+Z e Ctrl+Y).

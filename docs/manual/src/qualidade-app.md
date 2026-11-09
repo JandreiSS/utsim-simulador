@@ -56,6 +56,24 @@ A tela CEP importa o CSV de uma característica (valores individuais ou subgrupo
 
 Para comparar com o simulado, informe o modelo e a característica. O modelo roda em segundo plano e a tela mostra as médias, o teste da diferença, a razão dos desvios e a curva EWMA dos resíduos, que mostra a deriva do processo real em relação ao modelo.
 
+## Ferramentas e estudos
+
+A aba **Ferramentas** reúne os estudos da unidade. Um estudo junta as ferramentas aplicadas a um assunto: um nó do modelo, um posto ou um problema solto. Ele fica gravado na pasta de unidade (coleção `estudos`) e os dois apps o leem.
+
+As ferramentas são folha de verificação, estratificação, Pareto, histograma, diagrama de dispersão, carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u), capacidade, MSA (estudo de R&R), Ishikawa, 5 porquês, FMEA e A3. O UTSim Segurança do Trabalho oferece as que servem a acidentes e exposições: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA e A3.
+
+Toda ferramenta funciona com ou sem simulação. Os dados podem ser:
+
+- **Manual:** digitados na grade da ferramenta;
+- **Importado:** de um CSV (`;` com vírgula decimal, tabulação ou `,`) ou de uma aba de um xlsx, com o nome do arquivo, a aba e o SHA-256 guardados na origem;
+- **Simulado:** puxados de uma rodada do modelo do nó (só no UTSim Qualidade), como os defeitos do nó por tipo, os defeitos do modelo, os defeitos por nó, as medições de uma característica ou duas características medidas na mesma peça.
+
+Editar à mão uma tabela importada ou simulada muda a origem para Manual, e a tela avisa.
+
+O resultado aparece ao lado dos dados, com os indicadores, os achados (o que o resultado mostra), os gráficos, as tabelas e os avisos. O relatório imprime o mesmo resultado. "Relatório desta ferramenta" gera um PDF e um HTML com capa. "Relatório do estudo" gera o consolidado com capa, sumário, resumo do estudo, uma seção por ferramenta escolhida e a conclusão. Os arquivos ficam em `relatorios/` da pasta de unidade.
+
+Na tela **Modelo**, o painel do nó mostra quantos estudos o nó tem, e "Abrir em Ferramentas" leva aos estudos dele (ou prepara um estudo novo do nó).
+
 ## Limites desta versão
 
 O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
