@@ -934,6 +934,8 @@ uma vez. O próprio registro é a única coisa que o Ensino grava. Ele nunca dá
 de projeto real) nem "demonstrou" (que só o MBB confirma), e a conferência do diário recusa
 qualquer tentativa nesse sentido.
 
+O instrutor também registra uma turma inteira a partir do Ensino. Depois de corrigir a turma, ele indica a pasta do programa, e o Ensino grava **P** praticou com origem "exercício" para cada belt que resolveu as missões. O belt é achado pelo e-mail da lista de alunos, comparado com o e-mail do cadastro do programa. Só o instrutor e o MBB podem fazer isso, porque o e-mail é dado pessoal, e uma pessoa anonimizada não é achada.
+
 ### Revisões de tollgate
 
 A **fila de revisões** tem todos os tollgates do programa em revisão sem parecer do MBB na
