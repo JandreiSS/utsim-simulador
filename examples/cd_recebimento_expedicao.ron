@@ -25,6 +25,7 @@ Model(
     name: "CD com recebimento e expedição",
     description: "Logística e armazém: agenda de caminhões, docas, armazenagem ABC com empilhadeiras, separação de pedidos e expedição",
     line: "logistica",
+    packs: ["seguranca"],
     run: (stop_time: 11520.0, warmup: 1440.0, seed: 71, replications: 5),
     calendars: {
         "pedidos": (period: 1440.0, off: [

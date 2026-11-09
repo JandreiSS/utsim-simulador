@@ -17,6 +17,7 @@ Model(
     name: "Separação em ondas",
     description: "Logística e armazém: pedidos com várias linhas, ondas por horário, consolidação e corte da transportadora",
     line: "logistica",
+    packs: ["seguranca"],
     run: (stop_time: 11520.0, warmup: 1440.0, seed: 73, replications: 5),
     calendars: {
         "separacao": (period: 1440.0, off: [

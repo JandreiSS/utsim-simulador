@@ -18,6 +18,7 @@ Model(
     name: "Cross-docking",
     description: "Logística e armazém: paletes da doca de entrada direto à área de carregamento, sem armazenar, e saídas em horários fixos",
     line: "logistica",
+    packs: ["seguranca"],
     run: (stop_time: 11520.0, warmup: 1440.0, seed: 79, replications: 5),
     objects: [
         (name: "caminhoes", kind: Source(interarrival: Exp(mean: 60.0), labels: {"paletes": Const(20.0)},
