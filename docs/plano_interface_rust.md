@@ -636,9 +636,22 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
 - `principal.gd`: `t`, `playing` e `speed` viraram propriedades que leem o relógio (os
   roteiros continuam iguais); `playback` carrega o relógio ao mudar. Saíram `_show_time`, o
   avanço do tempo no `_process` e o corpo do `_poll_job`. De 1847 para 1826 linhas.
-- Ficam para as próximas rodadas: a câmera do Simular (`_drive_camera`) e o despacho das
-  demais ações da barra e dos painéis (`bar_action`, `_panel_action`, `_form_action`), que
-  chamam a cena, o editor e os diálogos do Godot.
+- Segunda rodada (2026-11-09), o despacho das ações: `acoes.rs` (puro, testes) lê toda
+  ação da interface (barra superior, painéis da esquerda, barra de reprodução, linhas do
+  painel de propriedades separadas por tabulação, painéis das ferramentas `form:` e as
+  teclas do `shortcuts.rs`) e toma as decisões (a ferramenta que um clique deixa armada, a
+  Biblioteca que arma e desarma, os tipos de ligação ocultos, o encaixe, o limite das
+  replicações, o instante do salto a um quase-conflito, os campos da zona, números
+  inválidos ignorados). Devolve `Passo`s, que o `UtsimUi` entrega como `{op, s, s2, s3, n,
+  n2, x, b, lista}` (`route_action`, `route_key`); o `principal.gd` só os executa num
+  `_run_step`. Os quatro `match` (`bar_action`, `run_key_action`, `_panel_action`,
+  `_form_action`) viraram esse executor.
+- A câmera do Simular: `camera_follow.rs` também decide como a câmera segue o bloco a cada
+  quadro (livre, alvo ou olho, `UtsimUi.camera_drive`), qual bloco uma replicação nova
+  segue (`camera_pick`) e o que a troca de câmera diz e devolve à vista (`camera_choice`);
+  o `_drive_camera` só põe a câmera.
+- `principal.gd`: de 1826 para 1791 linhas. O que sobra nele chama o Godot (cena, diálogos,
+  câmera, editor em GDScript) e fica lá.
 
 ### Zonas de risco no editor 3D (2026-11-07)
 

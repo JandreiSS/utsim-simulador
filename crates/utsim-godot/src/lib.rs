@@ -27,6 +27,7 @@
 // `#[derive(GodotClass)]` with `init` writes `base: base` in the generated constructor.
 #![allow(clippy::redundant_field_names)]
 
+pub mod acoes;
 pub mod aisle_edit;
 pub mod aisle_godot;
 pub mod andamento;
