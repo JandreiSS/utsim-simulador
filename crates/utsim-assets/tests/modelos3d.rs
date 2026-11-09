@@ -270,7 +270,15 @@ fn os_arquivos_sao_leves() {
 }
 
 /// O que a interface e a ponte esperam de cada elemento.
-const CONTRATO: &[(&str, &[&str], &[&str], &[&str])] = &[
+/// (elemento, nós, pontos, clipes).
+type Contrato = (
+    &'static str,
+    &'static [&'static str],
+    &'static [&'static str],
+    &'static [&'static str],
+);
+
+const CONTRATO: &[Contrato] = &[
     // (elemento, nós, pontos, clipes)
     (
         "cnc",
