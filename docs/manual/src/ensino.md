@@ -10,6 +10,10 @@ Na primeira abertura o app pede o nome e o registro acadêmico. O registro ident
 
 Em computadores compartilhados, o perfil pode ficar numa pasta escolhida (um pen drive, por exemplo). Para isso, abra o app com a variável `UTSIM_ENSINO_PERFIL` apontando para a pasta.
 
+### Idioma
+
+O programa fala português, inglês e espanhol. A língua se escolhe em **Ajustes**, em "Idioma", vale na hora e fica guardada no perfil. Na linha de comando, `--idioma en` (ou `es`, `pt-BR`) escolhe a língua daquela abertura. A língua muda os textos do programa (telas, botões, mensagens, ajuda da linha de comando e o modo missão do UTSim 3D). As missões aparecem na língua em que o pacote foi escrito, informada no campo `idioma` do `pacote.ron` (português quando falta), e o mapa avisa quando ela é outra. A campanha embutida está em português. Os relatórios do construtor de casos e as mensagens que vêm do núcleo também continuam em português.
+
 ## A campanha
 
 A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida libera a próxima. A primeira missão de um ato abre quando todas as do ato anterior estão resolvidas.
@@ -101,6 +105,8 @@ A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo
 Abaixo vêm a vista 2D, com uma replicação da fábrica animada (estações coloridas e com o estado escrito, filas como pilhas, peças andando nas setas), e as dicas automáticas, que explicam o que aconteceu e não descontam pontos.
 
 Quando o UTSim está instalado pelo launcher no mesmo computador, aparece "Ver em 3D". O botão grava o modelo da tentativa (com a variante e as decisões do aluno) e a replicação animada na pasta do perfil (`3d/`) e abre o cliente 3D já mostrando a fábrica. Se o UTSim instalado ainda não tiver o cliente 3D, abre o visualizador com o modelo.
+
+Ao lado aparece "Levar para o UTSim" (fora do modo prova). O botão grava só o modelo da tentativa, com a variante e as decisões do aluno, na pasta `modelos/` do perfil, e abre esse modelo no UTSim para editar. O aluno continua no simulador completo a partir do que decidiu na missão, e a missão não muda. O caminho do arquivo aparece na barra de mensagens.
 
 O cliente 3D também tem um **modo missão**, com as mesmas telas do Ensino (campanha, missões, nota, turma e professor) dentro da janela do UTSim 3D. Ele usa o mesmo perfil do aluno e a mesma lógica, e por isso a nota de uma tentativa é a mesma nos dois programas. Para abrir, use `-- --utsim-ensino` na linha de comando do cliente 3D, com `--utsim-missao=<id>` para ir direto a uma missão e `--utsim-pacote=<pasta|pacote.utse>` para abrir outro pacote. O botão "← Voltar ao UTSim 3D" volta ao editor.
 
@@ -229,6 +235,8 @@ O módulo `dados` do núcleo gera conjuntos de dados didáticos com semente, com
 ## Pacotes de missões
 
 As missões vêm em pacotes (`pacote.ron` com as missões, os modelos, os textos e o glossário, numa pasta ou num `.utse`). Cada missão (`missao.ron`) aponta um modelo do UTSim e lista as alavancas (ou um `balanceamento`, com as tarefas, o takt e as estações, ou um `arranjo`, com a grade, as máquinas e os fluxos), cada uma traduzida em chaves `<objeto>.<campo>` do modelo, as métricas com meta e tolerância, as previsões, as perguntas e as dicas. O app confere tudo ao carregar: as chaves existem no modelo, as faixas são possíveis, o orçamento permite uma solução e as métricas saem da simulação. Um pacote com erro é recusado com a razão de cada problema.
+
+O pacote diz do que precisa em `requer`. `nucleo >= 0.1` pede uma versão mínima do núcleo de simulação (também valem `>`, `=`, `<=` e `<`). `linha:lean_office` pede uma linha especializada ou um pacote transversal do UTSim (`lean_office`, `servicos`, `logistica`, `qualidade`, `seguranca`). Um requisito que esta versão não atende não impede nada. O pacote abre, o mapa mostra um aviso com o que falta e a razão, a lista de pacotes marca o pacote com ⚠, e `utsim-ensino conferir` escreve o aviso no relatório. O caminho é atualizar o UTSim Ensino pelo launcher.
 
 Os pacotes que vêm com o programa (a pasta `pacotes`, instalada pelo launcher ao lado de `bin`) aparecem sozinhos numa linha no topo do mapa, junto com a campanha, e também em "Outros pacotes de missões", no fim do mapa. Um clique troca de pacote. Para jogar um pacote que o professor passou, o aluno digita a pasta ou o `.utse` em "Outros pacotes de missões" e clica em "Abrir pacote". O mapa passa a mostrar as missões desse pacote, e o app volta a abri-lo nas próximas vezes até o aluno clicar em "Voltar à campanha". O progresso fica guardado por pacote, então a campanha continua de onde parou. As tentativas entram no mesmo diário assinado, e o professor corrige as entregas com o mesmo pacote aberto no modo professor. Na linha de comando, `utsim-ensino --pacote <pasta|pacote.utse>` abre o pacote direto.
 

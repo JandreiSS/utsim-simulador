@@ -20,10 +20,12 @@ use godot::classes::notify::CanvasItemNotification;
 use godot::classes::{INode2D, InputEvent, Node2D, RenderingServer, Resource, Viewport};
 use godot::prelude::*;
 
+use crate::andamento;
 use crate::document_class::UtsimDocument;
 use crate::egui_host::Host;
 use crate::egui_input::Input;
 use crate::jobs_class::{UtsimJob, UtsimPert, UtsimResults, job_object, variant_of_json};
+use crate::relogio::{Efeito, Relogio};
 use crate::schema::{self, Value};
 use crate::ui_bar::BarState;
 use crate::ui_bottom::{PlayView, StatusView};
@@ -74,6 +76,9 @@ pub struct UtsimUi {
     flows_pb: Option<Gd<crate::UtsimPlayback>>,
     /// The PERT/CPM shown (kept for the exports).
     pert: Option<Gd<UtsimPert>>,
+    /// The playback clock of Simular and the replication it plays (for its events).
+    relogio: Relogio,
+    clock_pb: Option<Gd<crate::UtsimPlayback>>,
     base: Base<Node2D>,
 }
 
@@ -101,6 +106,8 @@ impl INode2D for UtsimUi {
             results_error: String::new(),
             pert: None,
             flows_pb: None,
+            relogio: Relogio::default(),
+            clock_pb: None,
             base,
         }
     }
@@ -465,27 +472,137 @@ impl UtsimUi {
         GString::from(self.host.status().text.as_str())
     }
 
-    /// The playback bar: `{visible, playing, t, end, speed}` (missing keys keep their value).
+    /// The playback bar: `{visible}` (shown in Simular); what it shows of the time comes
+    /// from the clock.
     #[func]
     fn set_playback_bar(&mut self, state: VarDictionary) {
-        let mut v: PlayView = self.host.play().clone();
-        let get = |k: &str| state.get(&k.to_variant());
-        if let Some(x) = get("visible") {
+        if let Some(x) = state.get(&"visible".to_variant()) {
+            let mut v: PlayView = self.host.play().clone();
             v.visible = x.try_to::<bool>().unwrap_or(v.visible);
+            self.host.set_play(v);
         }
-        if let Some(x) = get("playing") {
-            v.playing = x.try_to::<bool>().unwrap_or(v.playing);
+        self.sync_clock();
+    }
+
+    /// The replication the clock plays (null: none): paused at 0.
+    #[func]
+    fn clock_load(&mut self, playback: Option<Gd<crate::UtsimPlayback>>) {
+        let end = playback
+            .as_ref()
+            .and_then(|p| p.bind().core.as_ref().map(crate::playback::Playback::end));
+        self.relogio.carregar(end);
+        self.clock_pb = playback.filter(|_| end.is_some());
+        self.sync_clock();
+    }
+
+    /// Plays or pauses (it only plays with a replication, in Simular).
+    #[func]
+    fn clock_play(&mut self, on: bool) {
+        let simulando = self.host.play().visible;
+        self.relogio.tocar(on, simulando);
+        self.sync_clock();
+    }
+
+    /// Advances a frame of `dt` real seconds; true when the time moved (show it).
+    #[func]
+    fn clock_tick(&mut self, dt: f64) -> bool {
+        let moved = self.relogio.avancar(dt);
+        if moved {
+            self.sync_clock();
         }
-        if let Some(x) = get("t") {
-            v.t = x.try_to::<f64>().unwrap_or(v.t);
+        moved
+    }
+
+    /// Jumps to `time` (clamped); false without a replication.
+    #[func]
+    fn clock_seek(&mut self, time: f64) -> bool {
+        let ok = self.relogio.ir(time);
+        self.sync_clock();
+        ok
+    }
+
+    /// Pauses and jumps to the next (`direction` > 0) or previous event; true when the
+    /// time jumped.
+    #[func]
+    fn clock_step(&mut self, direction: i64) -> bool {
+        let t = self.relogio.t;
+        let alvo = self
+            .clock_pb
+            .as_ref()
+            .and_then(|p| {
+                let b = p.bind();
+                let core = b.core.as_ref()?;
+                if direction > 0 {
+                    core.next_event(t)
+                } else {
+                    core.prev_event(t)
+                }
+            })
+            .unwrap_or(-1.0);
+        let jumped = self.relogio.ao_evento(alvo);
+        self.sync_clock();
+        jumped
+    }
+
+    #[func]
+    fn clock_t(&self) -> f64 {
+        self.relogio.t
+    }
+
+    #[func]
+    fn clock_playing(&self) -> bool {
+        self.relogio.playing
+    }
+
+    #[func]
+    fn clock_speed(&self) -> f64 {
+        self.relogio.speed
+    }
+
+    #[func]
+    fn set_clock_speed(&mut self, speed: f64) {
+        self.relogio.velocidade(speed);
+        self.sync_clock();
+    }
+
+    /// Follows a background job: shows its progress in the status bar and, when it ends,
+    /// hides the bar and says how it ended. `{finished, message, call}`: `call` true when
+    /// the main scene goes on with the result.
+    #[func]
+    fn poll_job(&mut self, mut job: Gd<crate::jobs_class::UtsimJob>) -> VarDictionary {
+        let p = job.bind_mut().progress();
+        let num = |k: &str| p.get(&k.to_variant()).and_then(|v| v.try_to::<i64>().ok());
+        let finished = p
+            .get(&"finished".to_variant())
+            .and_then(|v| v.try_to::<bool>().ok())
+            .unwrap_or(false);
+        let mut out = VarDictionary::new();
+        put(&mut out, "finished", finished);
+        let mut st: StatusView = self.host.status().clone();
+        if !finished {
+            let ms = self.start.elapsed().as_millis() as u64;
+            let (progress, percent) =
+                andamento::barra(num("done").unwrap_or(0), num("total").unwrap_or(0), ms);
+            st.progress = Some(progress as f32);
+            st.percent = percent;
+            self.host.set_status(st);
+            return out;
         }
-        if let Some(x) = get("end") {
-            v.end = x.try_to::<f64>().unwrap_or(v.end);
-        }
-        if let Some(x) = get("speed") {
-            v.speed = x.try_to::<f64>().unwrap_or(v.speed);
-        }
-        self.host.set_play(v);
+        st.progress = None;
+        let (message, call) = {
+            let j = job.bind();
+            andamento::fim(
+                &j.what().to_string(),
+                j.kind_name(),
+                j.ok(),
+                j.cancelled(),
+                &j.error().to_string(),
+            )
+        };
+        self.host.set_status(st);
+        put(&mut out, "message", message);
+        put(&mut out, "call", call);
+        out
     }
 
     /// The `SubViewport` the asset miniature is drawn in: its texture is shown in the panel.
@@ -615,6 +732,47 @@ impl UtsimUi {
         }
     }
 
+    /// How camera `mode` follows block `follow` each frame (`camera_follow::conducao`):
+    /// `livre`, `alvo` (Seguir) or `olho` (Primeira pessoa, Do recurso).
+    #[func]
+    fn camera_drive(&self, mode: GString, follow: GString) -> GString {
+        use crate::camera_follow::Conducao;
+        match crate::camera_follow::conducao(&mode.to_string(), &follow.to_string()) {
+            Conducao::Livre => "livre",
+            Conducao::Alvo => "alvo",
+            Conducao::Olho => "olho",
+        }
+        .into()
+    }
+
+    /// The block a new replication follows (`blocks`: the scene's `{name, mobile}`).
+    #[func]
+    fn camera_pick(&self, current: GString, blocks: VarArray) -> GString {
+        let list: Vec<(String, bool)> = blocks
+            .iter_shared()
+            .filter_map(|b| b.try_to::<VarDictionary>().ok())
+            .map(|b| {
+                let name = b.get(&"name".to_variant()).map(|v| v.to_string());
+                let mobile = b
+                    .get(&"mobile".to_variant())
+                    .and_then(|v| v.try_to::<bool>().ok());
+                (name.unwrap_or_default(), mobile.unwrap_or(false))
+            })
+            .collect();
+        GString::from(crate::camera_follow::seguido(&current.to_string(), &list).as_str())
+    }
+
+    /// Choosing camera `mode`: `{restore, notice}` (give back the blocks hidden on the
+    /// sight line; the status message).
+    #[func]
+    fn camera_choice(&self, mode: GString, follow: GString) -> VarDictionary {
+        let (m, f) = (mode.to_string(), follow.to_string());
+        let mut d = VarDictionary::new();
+        put(&mut d, "restore", crate::camera_follow::restaura_vista(&m));
+        put(&mut d, "notice", crate::camera_follow::aviso(&m, &f));
+        d
+    }
+
     /// The floor grid of Editar: the lines (pairs of points) around `positions` (the
     /// objects, Godot) for the snap step `snap` (`grid.rs`).
     #[func]
@@ -654,6 +812,27 @@ impl UtsimUi {
             .unwrap_or_default()
             .as_str()
             .into()
+    }
+
+    /// What a click of the interface does (`acoes.rs`): the steps for the main scene to
+    /// run, `{op, s, s2, s3, n, n2, x, b, lista}`. `state`: `{tool, place_id, snap, step,
+    /// links_hidden}`.
+    #[func]
+    fn route_action(&self, what: GString, state: VarDictionary) -> VarArray {
+        steps_array(crate::acoes::rotear(
+            &what.to_string(),
+            &route_state(&state),
+        ))
+    }
+
+    /// What the key action `what` (from `key_action`) does, as [`UtsimUi::route_action`];
+    /// empty when the key is not used.
+    #[func]
+    fn route_key(&self, what: GString, state: VarDictionary) -> VarArray {
+        steps_array(crate::acoes::rotear_tecla(
+            &what.to_string(),
+            &route_state(&state),
+        ))
     }
 
     #[func]
@@ -1012,6 +1191,9 @@ impl UtsimUi {
                 self.fitwin_action(rest);
                 continue;
             }
+            if self.clock_bar_action(&a) {
+                continue;
+            }
             self.emit(&a);
         }
         for a in frame.props {
@@ -1081,6 +1263,41 @@ impl UtsimUi {
             "csv" => self.emit(&format!("dados\tjanela_csv\t{path}")),
             "relatorio" => self.emit(&format!("dados\tjanela_relatorio\t{path}")),
             _ => {}
+        }
+    }
+
+    /// The playback bar's own actions (play, speed, time, events) go to the clock; the
+    /// main scene is told only when the time jumped (`relogio`). True when handled.
+    fn clock_bar_action(&mut self, what: &str) -> bool {
+        if let Some(dir) = what.strip_prefix("evento:") {
+            if self.clock_step(dir.parse::<i64>().unwrap_or(1)) {
+                self.emit("relogio");
+            }
+            return true;
+        }
+        let simulando = self.host.play().visible;
+        match self.relogio.acao(what, simulando) {
+            Efeito::Nenhum => return false,
+            Efeito::Estado => {}
+            Efeito::Salto => self.emit("relogio"),
+        }
+        self.sync_clock();
+        true
+    }
+
+    /// What the playback bar shows of the clock.
+    fn sync_clock(&mut self) {
+        let v: PlayView = self.host.play().clone();
+        let r = &self.relogio;
+        let new = PlayView {
+            playing: r.playing,
+            t: r.t,
+            end: r.end.unwrap_or(0.0),
+            speed: r.speed,
+            ..v.clone()
+        };
+        if new != v {
+            self.host.set_play(new);
         }
     }
 
@@ -1345,4 +1562,50 @@ fn grid_points(l: Vec<[f64; 3]>) -> PackedVector3Array {
     l.iter()
         .map(|p| Vector3::new(p[0] as f32, p[1] as f32, p[2] as f32))
         .collect()
+}
+
+/// The main scene's state the routing decisions need (`UtsimUi::route_action`).
+fn route_state(d: &VarDictionary) -> crate::acoes::Estado {
+    let text = |k: &str| {
+        d.get(&k.to_variant())
+            .map(|v| v.to_string())
+            .unwrap_or_default()
+    };
+    crate::acoes::Estado {
+        ferramenta: text("tool"),
+        colocar: text("place_id"),
+        encaixe: d
+            .get(&"snap".to_variant())
+            .and_then(|v| v.try_to::<bool>().ok())
+            .unwrap_or(false),
+        passo: d
+            .get(&"step".to_variant())
+            .and_then(|v| v.try_to::<f64>().ok())
+            .unwrap_or(1.0),
+        ocultas: d
+            .get(&"links_hidden".to_variant())
+            .and_then(|v| v.try_to::<PackedStringArray>().ok())
+            .map(|l| l.as_slice().iter().map(|s| s.to_string()).collect())
+            .unwrap_or_default(),
+    }
+}
+
+/// The steps as dictionaries for the main scene.
+fn steps_array(steps: Vec<crate::acoes::Passo>) -> VarArray {
+    let mut out = VarArray::new();
+    for p in steps {
+        let (op, a) = p.campos();
+        let mut d = VarDictionary::new();
+        put(&mut d, "op", op);
+        put(&mut d, "s", a.s);
+        put(&mut d, "s2", a.s2);
+        put(&mut d, "s3", a.s3);
+        put(&mut d, "n", a.n);
+        put(&mut d, "n2", a.n2);
+        put(&mut d, "x", a.x);
+        put(&mut d, "b", a.b);
+        put(&mut d, "lista", strings(&a.lista));
+        out.push(&d.to_variant());
+    }
+    out
 }
