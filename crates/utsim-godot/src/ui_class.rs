@@ -84,6 +84,9 @@ pub struct UtsimUi {
     indicadores: Option<crate::indicadores::Indicadores>,
     ind_rx: Option<std::sync::mpsc::Receiver<crate::indicadores::Indicadores>>,
     ind_stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Those threads, joined when the interface goes away: the library must not be
+    /// unloaded under a thread still running its code.
+    ind_threads: Vec<std::thread::JoinHandle<()>>,
     base: Base<Node2D>,
 }
 
@@ -116,6 +119,7 @@ impl INode2D for UtsimUi {
             indicadores: None,
             ind_rx: None,
             ind_stop: Default::default(),
+            ind_threads: Vec::new(),
             base,
         }
     }
@@ -1420,7 +1424,8 @@ impl UtsimUi {
         self.ind_rx = Some(rx);
         let model = run.model.clone();
         let reports = run.reports.clone();
-        std::thread::spawn(move || {
+        self.ind_threads.retain(|h| !h.is_finished());
+        let h = std::thread::spawn(move || {
             let mut reps = Vec::new();
             for r in &reports {
                 if stop.load(Ordering::Relaxed) {
@@ -1435,6 +1440,7 @@ impl UtsimUi {
                 let _ = tx.send(Indicadores::montar(&model, &reports, &reps));
             }
         });
+        self.ind_threads.push(h);
     }
 
     /// Takes the quality and safety numbers when the thread is done.
@@ -1652,6 +1658,11 @@ impl UtsimUi {
 
     fn free_all(&mut self) {
         self.canvas.free_all();
+        self.ind_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in self.ind_threads.drain(..) {
+            let _ = h.join();
+        }
     }
 }
 
