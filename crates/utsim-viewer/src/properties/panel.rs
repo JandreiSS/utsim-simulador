@@ -1402,6 +1402,7 @@ impl Editor<'_> {
                 placement,
                 bay_width,
                 level_height,
+                ..
             } => {
                 self.uint_field(ui, "Colunas", "bays", *bays, 1);
                 self.uint_field(ui, "Níveis", "levels", *levels, 1);

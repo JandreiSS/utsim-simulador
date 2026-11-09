@@ -1,0 +1,114 @@
+// CD com recebimento e expedição (linha Logística e armazém): modelo pronto da linha,
+// montado só com as predefinições de linhas/logistica/biblioteca.ron.
+//
+// Recebimento: oito caminhões por dia em horários marcados (três às 6h, dois às 8h, dois às
+// 13h e um às 17h30), com 20 a 28 paletes de uma classe da curva ABC. Como chegam juntos,
+// esperam no pátio por uma das duas docas; cada
+// doca leva 10 minutos para encostar e abrir e só libera o caminhão quando as empilhadeiras
+// tiram o último palete. As duas empilhadeiras levam os paletes ao porta-paletes (30
+// colunas, 5 níveis), endereçados pela curva ABC: a classe A fica nas posições de acesso
+// mais rápido. Cada empilhadeira quebra de vez em quando (campo downtime do nó, aba
+// Manutenção) e o EPI exigido fica no campo ppe (aba Segurança). Depois da permanência, o
+// palete sai do porta-paletes para a expedição de paletes fechados.
+//
+// Expedição de pedidos: os pedidos chegam das 8h às 18h, com uma a cinco linhas e prazo de
+// um dia; a divisão separa as linhas, duas pessoas separam (até quatro linhas ao mesmo
+// tempo) e a consolidação junta o pedido para expedir. A separação não tira paletes do
+// porta-paletes: os dois fluxos correm em paralelo.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha logistica relatorio examples/cd_recebimento_expedicao.ron --html relatorio.html
+//
+//   caminhoes -> patio -> doca_1 | doca_2 -> (empilhadeiras) -> porta_paletes -> saida_paletes
+//   pedidos -> linhas -> separacao -> consolidacao -> expedicao
+Model(
+    name: "CD com recebimento e expedição",
+    description: "Logística e armazém: agenda de caminhões, docas, armazenagem ABC com empilhadeiras, separação de pedidos e expedição",
+    line: "logistica",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 71, replications: 5),
+    calendars: {
+        "pedidos": (period: 1440.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1080.0, duration: 360.0),
+        ]),
+        "separacao": (period: 1440.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 1140.0, duration: 300.0),
+        ]),
+    },
+    objects: [
+        (name: "caminhoes", kind: Source(interarrival: Exp(mean: 60.0), labels: {"paletes": Const(12.0)},
+            table: Some((
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 360.0, labels: {"paletes": 24.0, "classe": 1.0}),
+                    (at: 360.0, labels: {"paletes": 20.0, "classe": 2.0}),
+                    (at: 360.0, labels: {"paletes": 28.0, "classe": 3.0}),
+                    (at: 480.0, labels: {"paletes": 24.0, "classe": 1.0}),
+                    (at: 480.0, labels: {"paletes": 20.0, "classe": 2.0}),
+                    (at: 780.0, labels: {"paletes": 28.0, "classe": 1.0}),
+                    (at: 780.0, labels: {"paletes": 24.0, "classe": 3.0}),
+                    (at: 1050.0, labels: {"paletes": 20.0, "classe": 2.0}),
+                ],
+            ))),
+            position: (0.0, 4.0, 0.0), preset: "logistica/caminhoes", department: "Recebimento", symbol: "inicio"),
+        (name: "patio", kind: Queue(), position: (3.0, 4.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/patio", department: "Recebimento", symbol: "espera"),
+        (name: "doca_1", kind: Separator(mode: SplitBy(count: "paletes", group: "caminhao"), process: Const(10.0)),
+            transport: "empilhadeiras", position: (6.0, 6.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/doca", department: "Recebimento", symbol: "transporte"),
+        (name: "doca_2", kind: Separator(mode: SplitBy(count: "paletes", group: "caminhao"), process: Const(10.0)),
+            transport: "empilhadeiras", position: (6.0, 2.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/doca", department: "Recebimento", symbol: "transporte"),
+        (name: "porta_paletes", kind: Rack(bays: 30, levels: 5, dwell: Some(Exp(mean: 480.0)),
+            placement: Abc(a: 0.2, b: 0.3), access: Some((per_bay: 0.2, per_level: 0.5))),
+            position: (20.0, 4.0, 0.0), preset: "logistica/porta_paletes", department: "Armazenagem", symbol: "armazenagem"),
+        (name: "saida_paletes", kind: Sink, position: (24.0, 4.0, 0.0),
+            preset: "logistica/expedicao", department: "Expedição", symbol: "fim"),
+        (name: "empilhadeiras", kind: Dispatcher(team: ["empilhadeira_1", "empilhadeira_2"], rule: Nearest),
+            position: (12.0, 8.0, 0.0), preset: "logistica/empilhadeiras", department: "Armazenagem"),
+        (name: "empilhadeira_1", kind: Transporter(speed: 120.0, load_time: Const(0.3), unload_time: Const(0.3)),
+            position: (10.0, 6.0, 0.0),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 60.0))), ppe: ["colete", "botina"],
+            visual: Some((asset: Some("empilhadeira"))), preset: "logistica/empilhadeira", department: "Armazenagem"),
+        (name: "empilhadeira_2", kind: Transporter(speed: 120.0, load_time: Const(0.3), unload_time: Const(0.3)),
+            position: (10.0, 2.0, 0.0),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 60.0))), ppe: ["colete", "botina"],
+            visual: Some((asset: Some("empilhadeira"))), preset: "logistica/empilhadeira", department: "Armazenagem"),
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 6.0),
+            labels: {"linhas": Discrete([(1.0, 0.4), (2.0, 0.3), (3.0, 0.2), (5.0, 0.1)]), "sla": Const(1440.0)}),
+            shifts: Calendar("pedidos"), position: (0.0, -4.0, 0.0),
+            preset: "logistica/pedidos", department: "Expedição", symbol: "inicio"),
+        (name: "linhas", kind: Separator(mode: SplitBy(count: "linhas", group: "pedido"), process: Const(0.0)),
+            position: (3.0, -4.0, 0.0), preset: "logistica/linhas", department: "Separação", symbol: "operacao"),
+        (name: "separacao", kind: Processor(capacity: 4, process: Triangular(min: 1.0, mode: 2.0, max: 4.0),
+            operators: Some(OperatorUse(team: "separadores"))), position: (6.0, -4.0, 0.0),
+            visual: Some((asset: Some("bancada"))), preset: "logistica/separacao", department: "Separação", symbol: "operacao"),
+        (name: "consolidacao", kind: Queue(gather: Some((group: "pedido", count: "linhas"))), position: (9.0, -4.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "logistica/consolidacao", department: "Expedição", symbol: "espera"),
+        (name: "expedicao", kind: Sink, position: (12.0, -4.0, 0.0),
+            preset: "logistica/expedicao", department: "Expedição", symbol: "fim"),
+        (name: "separadores", kind: Dispatcher(team: ["separador_1", "separador_2"]), position: (6.0, -8.0, 0.0),
+            preset: "logistica/separadores", department: "Separação"),
+        (name: "separador_1", kind: Transporter(speed: 72.0), position: (5.0, -6.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+        (name: "separador_2", kind: Transporter(speed: 72.0), position: (7.0, -6.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+    ],
+    connections: [
+        ("caminhoes", "patio"),
+        ("patio", "doca_1"),
+        ("patio", "doca_2"),
+        ("doca_1", "porta_paletes"),
+        ("doca_2", "porta_paletes"),
+        ("porta_paletes", "saida_paletes"),
+        ("pedidos", "linhas"),
+        ("linhas", "separacao"),
+        ("separacao", "consolidacao"),
+        ("consolidacao", "expedicao"),
+    ],
+)

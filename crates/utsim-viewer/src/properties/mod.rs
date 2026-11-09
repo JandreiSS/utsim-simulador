@@ -418,6 +418,7 @@ mod tests {
             placement,
             bay_width,
             level_height,
+            ..
         } = object(&doc, "estante").kind
         else {
             unreachable!()

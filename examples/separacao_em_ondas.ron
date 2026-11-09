@@ -1,0 +1,68 @@
+// Separação em ondas (linha Logística e armazém): modelo pronto da linha, montado só com as
+// predefinições de linhas/logistica/biblioteca.ron.
+//
+// Pedidos de comércio eletrônico chegam o dia todo (um a cada 4 minutos, em média), com uma
+// a seis linhas. Eles esperam a próxima onda de separação (7h, 10h, 13h e 16h): na hora da
+// onda, todos os pedidos que esperam são liberados juntos. A divisão separa as linhas;
+// quatro pessoas, das 7h às 19h, separam até seis linhas ao mesmo tempo, e a consolidação
+// junta cada pedido. A transportadora passa às 18h (o corte): o pedido consolidado espera a
+// coleta, que também é uma onda, com um único horário. O prazo é de 24 horas: o pedido que
+// chega entre a onda das 16h e a coleta das 18h só sai na coleta do dia seguinte, atrasado.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha logistica relatorio examples/separacao_em_ondas.ron --html relatorio.html
+//
+//   pedidos -> onda -> linhas -> separacao -> consolidacao -> coleta -> expedicao
+Model(
+    name: "Separação em ondas",
+    description: "Logística e armazém: pedidos com várias linhas, ondas por horário, consolidação e corte da transportadora",
+    line: "logistica",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 73, replications: 5),
+    calendars: {
+        "separacao": (period: 1440.0, off: [
+            (start: 0.0, duration: 420.0),
+            (start: 1140.0, duration: 300.0),
+        ]),
+    },
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 4.0),
+            labels: {"linhas": Discrete([(1.0, 0.35), (2.0, 0.3), (3.0, 0.2), (4.0, 0.1), (6.0, 0.05)]), "sla": Const(1440.0)}),
+            position: (0.0, 0.0, 0.0), preset: "logistica/pedidos", department: "Comercial", symbol: "inicio"),
+        (name: "onda", kind: Queue(waves: Some((cycle: 1440.0, times: [420.0, 600.0, 780.0, 960.0]))), position: (2.5, 0.0, 0.0),
+            visual: Some((asset: Some("bandeja"))), preset: "logistica/onda", department: "Separação", symbol: "espera"),
+        (name: "linhas", kind: Separator(mode: SplitBy(count: "linhas", group: "pedido"), process: Const(0.0)),
+            position: (5.0, 0.0, 0.0), preset: "logistica/linhas", department: "Separação", symbol: "operacao"),
+        (name: "separacao", kind: Processor(capacity: 6, process: Triangular(min: 1.0, mode: 2.0, max: 4.0),
+            operators: Some(OperatorUse(team: "separadores"))), position: (7.5, 0.0, 0.0),
+            visual: Some((asset: Some("bancada"))), preset: "logistica/separacao", department: "Separação", symbol: "operacao"),
+        (name: "consolidacao", kind: Queue(gather: Some((group: "pedido", count: "linhas"))), position: (10.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "logistica/consolidacao", department: "Expedição", symbol: "espera"),
+        (name: "coleta", kind: Queue(waves: Some((cycle: 1440.0, times: [1080.0]))), position: (12.5, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "logistica/onda", department: "Expedição", symbol: "espera"),
+        (name: "expedicao", kind: Sink, position: (15.0, 0.0, 0.0),
+            preset: "logistica/expedicao", department: "Expedição", symbol: "fim"),
+        (name: "separadores", kind: Dispatcher(team: ["separador_1", "separador_2", "separador_3", "separador_4"]), position: (7.5, -4.0, 0.0),
+            preset: "logistica/separadores", department: "Separação"),
+        (name: "separador_1", kind: Transporter(speed: 72.0), position: (4.5, -2.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+        (name: "separador_2", kind: Transporter(speed: 72.0), position: (5.5, -2.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+        (name: "separador_3", kind: Transporter(speed: 72.0), position: (6.5, -2.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+        (name: "separador_4", kind: Transporter(speed: 72.0), position: (7.5, -2.0, 0.0),
+            shifts: Calendar("separacao", Finish), ppe: ["botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "logistica/separador", department: "Separação"),
+    ],
+    connections: [
+        ("pedidos", "onda"),
+        ("onda", "linhas"),
+        ("linhas", "separacao"),
+        ("separacao", "consolidacao"),
+        ("consolidacao", "coleta"),
+        ("coleta", "expedicao"),
+    ],
+)

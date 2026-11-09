@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
+use utsim_linhas::logistica::{self, Armazem, LOGISTICA};
 use utsim_linhas::servicos::{self, Atendimento, Meta, SERVICOS};
 use utsim_linhas::{Pack, Placement, builtin, find};
 use utsim_model::Model;
@@ -18,7 +19,8 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
 #[derive(Parser)]
 #[command(
     name = "utsim linha",
-    about = "Linhas especializadas (Lean Office, Serviços e atendimento): predefinições, \
+    about = "Linhas especializadas (Lean Office, Serviços e atendimento, Logística e \
+             armazém): predefinições, \
              vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
@@ -60,6 +62,9 @@ enum Acao {
         /// (padrão 0,8)
         #[arg(long)]
         alvo: Option<f64>,
+        /// Logística e armazém: meta do tempo de doca, em minutos (padrão 60)
+        #[arg(long)]
+        meta_doca: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -198,6 +203,16 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             ..
         }) if p.id() == SERVICOS => {
             servicos_cmd(&p, &model, reps, html, json, meta_de(meta, alvo)?)?
+        }
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
+            json,
+            meta_doca,
+            ..
+        }) if p.id() == LOGISTICA => {
+            logistica_cmd(&p, &model, reps, html, json, meta_doca_de(meta_doca)?)?
         }
         Some(Acao::Relatorio {
             model,
@@ -427,6 +442,47 @@ fn servicos_cmd(
     Ok(())
 }
 
+/// The dock-time target of Logística e armazém from the option.
+fn meta_doca_de(meta: Option<f64>) -> Result<logistica::Meta, String> {
+    let doca = meta.unwrap_or(logistica::Meta::default().doca);
+    if !(doca.is_finite() && doca > 0.0) {
+        return Err(format!(
+            "--meta-doca deve ser um número de minutos > 0, recebi {doca}"
+        ));
+    }
+    Ok(logistica::Meta { doca })
+}
+
+/// `utsim linha logistica relatorio`: the indicators of Logística e armazém.
+fn logistica_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: logistica::Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Armazem::rodar(&m, Some(p), meta)?;
+    print!("{}", logistica::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, logistica::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"doca": meta.doca},
+            "replicacoes": &k.reps,
+            "linhas_por_hora": &k.linhas_por_hora,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
@@ -434,6 +490,12 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
         let k = Atendimento::rodar(model, Some(&p), Meta::default())?;
         println!();
         print!("{}", servicos::relatorio::texto(&k));
+        return Ok(());
+    }
+    if p.id() == LOGISTICA {
+        let k = Armazem::rodar(model, Some(&p), logistica::Meta::default())?;
+        println!();
+        print!("{}", logistica::relatorio::texto(&k));
         return Ok(());
     }
     let k = Indicadores::rodar(model, Some(&p))?;

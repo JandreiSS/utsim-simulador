@@ -168,6 +168,8 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 | `batch` | nenhum: `Batch(size: n, max_wait: t, flush: b)` com `max_wait` padrão `0.0` e `flush` padrão `false` |
 | `order` | nenhuma: ordem por um rótulo numérico, `Desc("prioridade")` (maior primeiro) ou `Asc("prazo")` (menor primeiro). Tem precedência sobre `discipline` (não use com `Lifo`); empates e itens sem o rótulo ficam na ordem de chegada, os sem rótulo depois dos outros |
 | `patience` | nenhuma: ninguém desiste. `Some(Dist)`: paciência sorteada por item ao entrar; quem ainda estiver na fila quando ela acaba ganha o rótulo `abandonou = 1` e sai do modelo (`abandoned.count` e `abandon_wait` no relatório). Item já prometido a um transportador não desiste. Veja [Serviços e atendimento](linhas/servicos/index.md) |
+| `gather` | nenhum: `Some((group: "pedido", count: "linhas"))` segura os itens de mesmo valor do rótulo `group` até chegarem tantos quanto diz o rótulo `count` do primeiro, e solta um só item com os outros dentro (consolidação do pedido). Não combina com `batch` |
+| `waves` | nenhuma: `Some((cycle: 1440.0, times: [420.0, 600.0]))` segura os itens e solta todos os que esperam em cada horário de `times` (em `[0, cycle)`) de cada ciclo; `waves.count` no relatório. Não combina com `batch`. Veja [Logística e armazém](linhas/logistica/index.md) |
 
 ### `Processor`
 
@@ -191,7 +193,7 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 
 | Campo | Padrão |
 |---|---|
-| `mode` | `Unpack` (ou `Split(n)`, com `n` de 1 a 1.000.000) |
+| `mode` | `Unpack` (ou `Split(n)`, com `n` de 1 a 1.000.000, ou `SplitBy(count: "linhas", group: "pedido")`: o item vira tantos quanto diz o seu rótulo `count`, arredondado, de 1 a 10.000, todos com o número da divisão no rótulo `group` e o índice no rótulo `linha`) |
 | `process` | obrigatório |
 
 ### `Sink`
@@ -242,7 +244,8 @@ Sem campos. Escreva `kind: Sink`.
 | `bays` | obrigatório (mínimo 1) |
 | `levels` | obrigatório (mínimo 1) |
 | `dwell` | nenhum |
-| `placement` | `FirstFree` (ou `Random`) |
+| `placement` | `FirstFree` (ou `Random`, ou `Abc(a: 0.2, b: 0.3)`: as frações `a` e `b` das posições de acesso mais rápido são das classes A e B, pelo rótulo `classe` 1, 2 ou 3; sem rótulo, C) |
+| `access` | nenhum: `Some((per_bay: 0.2, per_level: 0.5))` soma `coluna × per_bay + nível × per_level` à permanência e grava `access_time` (e `access_time.A`, `.B`, `.C`) |
 | `bay_width` | `1.0` (maior que 0) |
 | `level_height` | `1.0` (maior que 0) |
 

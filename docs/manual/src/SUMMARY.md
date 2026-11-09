@@ -53,6 +53,7 @@
   - [Tutorial: do mapa ao modelo](linhas/lean-office/tutorial.md)
   - [Pacote da linha](linhas/lean-office/pacote.md)
 - [Serviços e atendimento](linhas/servicos/index.md)
+- [Logística e armazém](linhas/logistica/index.md)
 - [Pacotes transversais](linhas/pacotes-transversais.md)
 
 # Recursos avançados

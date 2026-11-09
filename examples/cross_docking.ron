@@ -1,0 +1,82 @@
+// Cross-docking (linha Logística e armazém): modelo pronto da linha, montado só com as
+// predefinições de linhas/logistica/biblioteca.ron.
+//
+// Dez caminhões por dia chegam em horários marcados (quatro às 5h, três às 7h e três ao
+// meio-dia) com 16 a 24 paletes.
+// Esperam no pátio por uma das três docas de entrada; a doca leva 10 minutos para encostar
+// e abrir e libera o caminhão quando sai o último palete. Três empilhadeiras levam cada
+// palete direto da doca para a área de carregamento, sem armazenar. Os caminhões de saída
+// partem às 16h, 18h e 21h: cada partida leva tudo o que está na área (uma onda com três
+// horários). As empilhadeiras quebram de vez em quando (campo downtime, aba Manutenção) e o
+// EPI fica no campo ppe (aba Segurança).
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha logistica relatorio examples/cross_docking.ron --meta-doca 45 --html relatorio.html
+//
+//   caminhoes -> patio -> doca_1 | doca_2 | doca_3 -> (empilhadeiras) -> carregamento -> expedicao
+Model(
+    name: "Cross-docking",
+    description: "Logística e armazém: paletes da doca de entrada direto à área de carregamento, sem armazenar, e saídas em horários fixos",
+    line: "logistica",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 79, replications: 5),
+    objects: [
+        (name: "caminhoes", kind: Source(interarrival: Exp(mean: 60.0), labels: {"paletes": Const(20.0)},
+            table: Some((
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 300.0, labels: {"paletes": 20.0, "classe": 1.0}),
+                    (at: 300.0, labels: {"paletes": 16.0, "classe": 2.0}),
+                    (at: 300.0, labels: {"paletes": 24.0, "classe": 1.0}),
+                    (at: 300.0, labels: {"paletes": 20.0, "classe": 3.0}),
+                    (at: 420.0, labels: {"paletes": 16.0, "classe": 2.0}),
+                    (at: 420.0, labels: {"paletes": 24.0, "classe": 1.0}),
+                    (at: 420.0, labels: {"paletes": 20.0, "classe": 2.0}),
+                    (at: 720.0, labels: {"paletes": 16.0, "classe": 3.0}),
+                    (at: 720.0, labels: {"paletes": 24.0, "classe": 1.0}),
+                    (at: 720.0, labels: {"paletes": 20.0, "classe": 2.0}),
+                ],
+            ))),
+            position: (0.0, 0.0, 0.0), preset: "logistica/caminhoes", department: "Recebimento", symbol: "inicio"),
+        (name: "patio", kind: Queue(), position: (3.0, 0.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/patio", department: "Recebimento", symbol: "espera"),
+        (name: "doca_1", kind: Separator(mode: SplitBy(count: "paletes", group: "caminhao"), process: Const(10.0)),
+            transport: "empilhadeiras", position: (6.0, 4.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/doca", department: "Recebimento", symbol: "transporte"),
+        (name: "doca_2", kind: Separator(mode: SplitBy(count: "paletes", group: "caminhao"), process: Const(10.0)),
+            transport: "empilhadeiras", position: (6.0, 0.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/doca", department: "Recebimento", symbol: "transporte"),
+        (name: "doca_3", kind: Separator(mode: SplitBy(count: "paletes", group: "caminhao"), process: Const(10.0)),
+            transport: "empilhadeiras", position: (6.0, -4.0, 0.0), visual: Some((asset: Some("area"))),
+            preset: "logistica/doca", department: "Recebimento", symbol: "transporte"),
+        (name: "carregamento", kind: Queue(waves: Some((cycle: 1440.0, times: [960.0, 1080.0, 1260.0]))), position: (24.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "logistica/onda", department: "Expedição", symbol: "espera"),
+        (name: "expedicao", kind: Sink, position: (27.0, 0.0, 0.0),
+            preset: "logistica/expedicao", department: "Expedição", symbol: "fim"),
+        (name: "empilhadeiras", kind: Dispatcher(team: ["empilhadeira_1", "empilhadeira_2", "empilhadeira_3"], rule: Nearest),
+            position: (14.0, 6.0, 0.0), preset: "logistica/empilhadeiras", department: "Movimentação"),
+        (name: "empilhadeira_1", kind: Transporter(speed: 120.0, load_time: Const(0.3), unload_time: Const(0.3)),
+            position: (12.0, 4.0, 0.0),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 60.0))), ppe: ["colete", "botina"],
+            visual: Some((asset: Some("empilhadeira"))), preset: "logistica/empilhadeira", department: "Movimentação"),
+        (name: "empilhadeira_2", kind: Transporter(speed: 120.0, load_time: Const(0.3), unload_time: Const(0.3)),
+            position: (12.0, 0.0, 0.0),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 60.0))), ppe: ["colete", "botina"],
+            visual: Some((asset: Some("empilhadeira"))), preset: "logistica/empilhadeira", department: "Movimentação"),
+        (name: "empilhadeira_3", kind: Transporter(speed: 120.0, load_time: Const(0.3), unload_time: Const(0.3)),
+            position: (12.0, -4.0, 0.0),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 60.0))), ppe: ["colete", "botina"],
+            visual: Some((asset: Some("empilhadeira"))), preset: "logistica/empilhadeira", department: "Movimentação"),
+    ],
+    connections: [
+        ("caminhoes", "patio"),
+        ("patio", "doca_1"),
+        ("patio", "doca_2"),
+        ("patio", "doca_3"),
+        ("doca_1", "carregamento"),
+        ("doca_2", "carregamento"),
+        ("doca_3", "carregamento"),
+        ("carregamento", "expedicao"),
+    ],
+)
