@@ -214,9 +214,9 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         _ => {}
     }
     Some(match (&obj.kind, key) {
-        (ObjectKind::Processor { operators, .. }, "operators") => ron::option(operators, |o| {
-            ron::operators_requiring(&o.team, o.count, o.setup, o.process, o.requires.as_deref())
-        }),
+        (ObjectKind::Processor { operators, .. }, "operators") => {
+            ron::option(operators, ron::operator_use)
+        }
         (ObjectKind::Transporter { speed, .. }, "speed") => ron::float(*speed),
         (ObjectKind::Transporter { acceleration, .. }, "acceleration") => {
             ron::option(acceleration, |v| ron::float(*v))
@@ -236,7 +236,12 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Rack { bays, .. }, "bays") => bays.to_string(),
         (ObjectKind::Rack { levels, .. }, "levels") => levels.to_string(),
         (ObjectKind::Rack { dwell, .. }, "dwell") => ron::option(dwell, ron::dist),
-        (ObjectKind::Rack { placement, .. }, "placement") => ron::debug(placement),
+        (ObjectKind::Rack { placement, .. }, "placement") => match placement {
+            utsim_objects::RackPlacement::Abc { a, b } => {
+                format!("Abc(a: {}, b: {})", ron::float(*a), ron::float(*b))
+            }
+            _ => ron::debug(placement),
+        },
         (ObjectKind::Rack { bay_width, .. }, "bay_width") => ron::float(*bay_width),
         (ObjectKind::Rack { level_height, .. }, "level_height") => ron::float(*level_height),
         (ObjectKind::Dispatcher { team, .. }, "team") => ron::strings(team),
@@ -264,7 +269,14 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         | (ObjectKind::Separator { process, .. }, "process") => ron::dist(process),
         (ObjectKind::Combiner { components, .. }, "components") => ron::usizes(components),
         (ObjectKind::Combiner { mode, .. }, "mode") => ron::debug(mode),
-        (ObjectKind::Separator { mode, .. }, "mode") => ron::debug(mode),
+        (ObjectKind::Separator { mode, .. }, "mode") => match mode {
+            utsim_objects::SeparateMode::SplitBy { count, group } => format!(
+                "SplitBy(count: {}, group: {})",
+                ron::string(count),
+                ron::string(group)
+            ),
+            _ => ron::debug(mode),
+        },
         _ => return None,
     })
 }
