@@ -94,6 +94,21 @@ Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de 
 
 O pacote `ensino/pacotes/qualidade_seguranca` fica fora da campanha e vem instalado com o programa. São seis casos de fábrica: onde inspecionar para o defeito não chegar ao cliente, quando a inspeção vira o gargalo, uma medição ruim, o cruzamento de pessoas com a empilhadeira, o posto de carga pesada (com a fadiga de cada pessoa) e o custo da qualidade. Os casos de segurança comparam cenários do mesmo modelo, com quase-conflitos simulados, entradas em zona sem EPI e fadiga. Eles não estimam a chance de um acidente real nem certificam conformidade com norma, e cada texto lembra isso ao aluno.
 
+### Pacote de estatística e qualidade na fábrica
+
+O pacote `ensino/pacotes/estatistica_qualidade` também vem instalado com o programa, fora da campanha. Ele faz a ponte entre os atos 1 a 7 e o caso Lean Seis Sigma do ato 8, com seis análises sobre dados da fábrica simulada:
+
+1. Quantas replicações bastam para a meia largura que o gerente pede.
+2. Se a furadeira nova vale a pena, com as duas opções rodadas com os mesmos números aleatórios e o teste t pareado.
+3. Em que subgrupo a carta X̄-R do torno dá o primeiro sinal.
+4. O Cpk da retífica antes e depois do ajuste.
+5. Se o erro do paquímetro vem do instrumento ou dos operadores.
+6. Qual torno desloca a média do comprimento.
+
+Cada aluno recebe os seus próprios dados, e o gabarito é recalculado pelas mesmas análises do UTSim Estatística e do UTSim Qualidade.
+
+Quando o UTSim Estatística ou o UTSim Qualidade está instalado pelo launcher, a missão mostra o botão "Analisar no UTSim Estatística" ou "Analisar no UTSim Qualidade". O botão grava os dados do aluno em `dados/<missão>/` do perfil, um `.csv` por conjunto, e abre o app com `--utsim-abrir=<arquivo>` para cada um. O aluno analisa lá e digita as respostas no jogo, que corrige pelos mesmos dados. Sem os apps, as ferramentas do jogo bastam: a média, o desvio, o intervalo, as amplitudes dos subgrupos e o estudo de R&R aparecem junto dos dados.
+
 ### Resultados
 
 A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo de 95 %, a meta e a situação:
