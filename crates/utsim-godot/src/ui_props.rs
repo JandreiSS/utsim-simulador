@@ -76,6 +76,8 @@ pub struct PropsView {
     pub abas: Vec<(utsim_edit::abas::Aba, Vec<utsim_edit::abas::Campo>)>,
     /// Who edits the model when it is not us ("Em edição por ..."): the tabs are read only.
     pub somente_leitura: Option<String>,
+    /// What the last run says about the object, by tab (`indicadores.rs`).
+    pub simulado: Option<crate::ui_abas::Simulado>,
 }
 
 /// What the user did in the panel.
@@ -1921,6 +1923,7 @@ mod tests {
             base_dir: None,
             abas: e.tab_fields(object),
             somente_leitura: None,
+            simulado: None,
         }
     }
 

@@ -834,6 +834,7 @@ mod tests {
                 base_dir: None,
                 abas: e.tab_fields(&name),
                 somente_leitura: None,
+                simulado: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
             assert!(meshes > 0);
@@ -893,6 +894,7 @@ mod tests {
                 base_dir: None,
                 abas: e.tab_fields(&name),
                 somente_leitura: None,
+                simulado: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
             assert!(meshes > 0);
