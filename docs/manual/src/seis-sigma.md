@@ -510,6 +510,40 @@ checklist, poka-yoke), responsável e plano de reação. Na coluna "Linha do FME
   modo de falha. Quando a lista fica vazia, o plano cobre todas: é a verificação do
   tollgate do Controlar.
 
+#### Controle em operação pelo gêmeo
+
+Embaixo do plano de controle, a seção "Controle em operação pelo gêmeo" acompanha cada
+característica depois do projeto, com o dado que o gêmeo digital recebe da fábrica.
+
+- **Painel ou gravações**: o endereço do painel do gêmeo nesta máquina
+  (`http://127.0.0.1:8080`; o programa lê a rota `/api/gemeo`), um JSON salvo do painel, a
+  pasta de gravações do gêmeo (a sessão mais recente) ou um arquivo `.jsonl` de observações.
+  Outros computadores não são lidos.
+- **Fonte no gêmeo**, por linha: `kpi:<id>` é um indicador que o painel calcula em cada
+  janela (por exemplo `kpi:vazao`); `tag:<tag>` é uma medição que chega pela tag (por
+  exemplo `tag:Torno1.diametro`). Só entram leituras de qualidade boa e com valor numérico.
+- **LIC, LC e LSC**: os limites congelados da fase II. "Do modelo" usa o que o modelo
+  validado espera do indicador na janela (a média simulada ± 3 desvios-padrão, como o
+  painel informa); "Fase I da série" estima os limites da carta de valores individuais com a
+  série lida, tirando os pontos fora em até três rodadas. Também podem ser digitados. Sem
+  limites, a primeira leitura congela os do modelo.
+- **Sinal de resposta**: o sinal do plano de resposta que a linha dispara.
+- **Ganho, linha de base, R$/mês por unidade e melhor**: ligam a linha a um ganho do
+  projeto. O realizado do mês é (média lida − linha de base) × valor por unidade, com o
+  sinal invertido quando menor é melhor.
+
+"Ler agora" lê o gêmeo e confere cada linha com as regras de Western Electric. Quando um
+ponto posterior à última leitura quebra uma regra, o sinal de resposta abre um cartão em "A
+fazer", com os limites, os pontos fora e os últimos valores no "por quê". Uma leitura
+repetida não abre outro cartão; se o gêmeo recomeçou do tempo zero, os pontos contam como
+novos. "Ler a cada minuto enquanto aberto" repete a leitura sozinho.
+
+Para cada linha lida aparecem a carta com os limites e os pontos fora, os alertas do próprio
+gêmeo para aquele indicador (modelo e fábrica se afastando), "Guardar como conjunto Gêmeo"
+(a série vira conjunto de dados de origem Gêmeo, para as análises) e "Lançar realizado",
+que grava o valor no mês escolhido do ganho, com o cálculo na observação, para a
+controladoria validar.
+
 ### Plano de resposta
 
 Uma linha por sinal (regra de carta violada, limite de especificação, alarme): ação imediata,
