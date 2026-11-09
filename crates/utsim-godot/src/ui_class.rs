@@ -55,7 +55,7 @@ pub struct UtsimUi {
     driver: i32,
     props_on: bool,
     /// The revision and object the cached view was built for.
-    props_key: Option<(u64, String)>,
+    props_key: Option<(u64, String, Option<String>)>,
     /// The texture of the miniature's `SubViewport` (owned by Godot, never freed here).
     miniature: Option<Rid>,
     /// The library icons: entry id to egui texture, and those textures to Godot's (owned
@@ -1152,7 +1152,8 @@ impl UtsimUi {
             return;
         };
         let d = doc.bind();
-        let key = (d.editor.doc.revision(), self.object.clone());
+        let notice = d.trava.aviso();
+        let key = (d.editor.doc.revision(), self.object.clone(), notice.clone());
         if self.props_key.as_ref() == Some(&key) && self.host.props.is_some() {
             return;
         }
@@ -1196,6 +1197,12 @@ impl UtsimUi {
             extra: self.extra.clone(),
             driver: self.driver,
             miniature: self.miniature.is_some(),
+            abas: if self.object == "run" {
+                Vec::new()
+            } else {
+                d.editor.tab_fields(&self.object)
+            },
+            somente_leitura: notice,
         });
         self.props_key = Some(key);
     }
@@ -1266,6 +1273,54 @@ impl UtsimUi {
                 }
             }
             PropAction::Miniature(asset) => self.emit(&format!("miniatura\t{asset}")),
+            PropAction::Aba(acao) => self.tab_action(acao),
+        }
+    }
+
+    /// An edit of the Qualidade, Segurança or Manutenção tab, through `utsim_edit::abas`
+    /// (one undo step); a refusal stays under the field.
+    fn tab_action(&mut self, acao: crate::ui_abas::AbaAcao) {
+        use crate::ui_abas::AbaAcao;
+        let Some(mut doc) = self.doc.clone() else {
+            return;
+        };
+        let object = self.object.clone();
+        let (caminho, shown, r) = {
+            let mut d = doc.bind_mut();
+            if let Some(quem) = d.trava.aviso() {
+                (
+                    String::new(),
+                    String::new(),
+                    Err(format!("{quem}: só leitura")),
+                )
+            } else {
+                match acao {
+                    AbaAcao::Editar { caminho, valor } => {
+                        let r = d.editor.tab_edit(&object, &caminho, &valor);
+                        (caminho, valor, r)
+                    }
+                    AbaAcao::Adicionar(lista) => {
+                        let r = d.editor.tab_add(&object, &lista);
+                        (lista, "adicionar".to_owned(), r)
+                    }
+                    AbaAcao::Remover(lista, i) => {
+                        let r = d.editor.tab_remove(&object, &lista, i);
+                        (format!("{lista}[{i}]"), "remover".to_owned(), r)
+                    }
+                }
+            }
+        };
+        self.props_key = None;
+        self.host.invalidate();
+        match r {
+            Ok(()) => {
+                self.host.props_state.abas.erro = None;
+                self.emit(&format!("prop_ok\t{object}\t{caminho}\t{shown}"));
+            }
+            Err(e) => {
+                self.host.props_state.abas.erro = Some((caminho.clone(), e.clone()));
+                self.emit(&format!("prop_erro\t{caminho}\t{e}"));
+            }
         }
     }
 

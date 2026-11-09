@@ -2341,6 +2341,8 @@ mod tests {
                 data: HashMap::new(),
                 data_families: Vec::new(),
                 base_dir: None,
+                abas: Vec::new(),
+                somente_leitura: None,
             }
         }
 

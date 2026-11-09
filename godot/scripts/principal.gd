@@ -138,6 +138,13 @@ func _ready() -> void:
 	add_child(editor)
 	editor.setup(self, _ui)
 	set_mode("editar")
+	# The one-writer lock of the open file (UTSim Qualidade and Segurança read it): renewed
+	# every minute; taken again when the other app lets it go.
+	var lock_timer := Timer.new()
+	lock_timer.wait_time = 60.0
+	lock_timer.autostart = true
+	lock_timer.timeout.connect(_renew_lock)
+	add_child(lock_timer)
 	camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
 	set_status("Arraste um objeto da Biblioteca para o chão, ou abra um modelo (Ctrl+O).")
 
@@ -697,11 +704,25 @@ func open_model(path: String) -> bool:
 	after_edit(true)
 	_frame_model()
 	var issues: Array = doc.issues()
-	if issues.is_empty():
+	var lock: String = doc.lock_notice()
+	if lock != "":
+		set_status("%s aberto, mas %s: Salvar fica para quando a pessoa fechar (ou use Salvar como)." % [path.get_file(), lock])
+	elif issues.is_empty():
 		set_status("%s aberto: %d objetos. Simular roda as replicações." % [path.get_file(), doc.objects().size()])
 	else:
 		set_status("%s aberto com %d problema(s): veja o painel de propriedades." % [path.get_file(), issues.size()])
 	return true
+
+
+func _renew_lock() -> void:
+	if doc == null:
+		return
+	var before: String = doc.lock_notice()
+	doc.renew_lock()
+	if before != "" and doc.lock_notice() == "":
+		set_status("O outro app fechou o modelo: as abas Qualidade, Segurança e Manutenção voltaram a editar.")
+		if ui != null:
+			ui.repaint()
 
 
 func save() -> bool:

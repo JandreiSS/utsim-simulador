@@ -166,6 +166,8 @@ fn playback_object(core: Playback) -> Gd<UtsimPlayback> {
 #[class(base = RefCounted, init)]
 pub struct UtsimDocument {
     pub(crate) editor: Editor,
+    /// The one-writer lock of the file (`trava_modelo`).
+    pub(crate) trava: crate::trava_modelo::TravaModelo,
     last_error: String,
     fits: FitCache,
     base: Base<RefCounted>,
@@ -249,6 +251,7 @@ impl UtsimDocument {
     #[func]
     fn new_model(&mut self, name: GString) {
         self.editor = Editor::new(&name.to_string());
+        self.trava.soltar();
         self.last_error.clear();
     }
 
@@ -256,24 +259,49 @@ impl UtsimDocument {
     /// `{ok, error}`; on error the current document stays.
     #[func]
     fn open(&mut self, path: GString) -> VarDictionary {
-        let r = Editor::open(&PathBuf::from(path.to_string())).map(|e| self.editor = e);
+        let file = PathBuf::from(path.to_string());
+        let r = Editor::open(&file).map(|e| self.editor = e);
+        if r.is_ok() {
+            self.trava.abrir(&file);
+        }
         self.file_result(r)
     }
 
+    /// Saves over the file; refused while another app or person holds its lock.
     #[func]
     fn save(&mut self) -> VarDictionary {
-        let r = self.editor.doc.save().map_err(|e| e.to_string());
+        let file = self.editor.doc.path().map(|p| p.to_path_buf());
+        let r = match file {
+            Some(f) => self.trava.antes_de_gravar(&f),
+            None => Ok(()),
+        }
+        .and_then(|()| self.editor.doc.save().map_err(|e| e.to_string()));
         self.file_result(r)
     }
 
     #[func]
     fn save_as(&mut self, path: GString) -> VarDictionary {
-        let r = self
-            .editor
-            .doc
-            .save_as(PathBuf::from(path.to_string()))
-            .map_err(|e| e.to_string());
+        let file = PathBuf::from(path.to_string());
+        let r = self.trava.antes_de_gravar(&file).and_then(|()| {
+            self.editor
+                .doc
+                .save_as(file.clone())
+                .map_err(|e| e.to_string())
+        });
         self.file_result(r)
+    }
+
+    /// Renews the lock of the file (every minute, from the main scene); takes it when the
+    /// other writer let it go.
+    #[func]
+    fn renew_lock(&mut self) {
+        self.trava.renovar();
+    }
+
+    /// "Em edição por ..." when another app or person holds the lock, else `""`.
+    #[func]
+    fn lock_notice(&self) -> GString {
+        GString::from(self.trava.aviso().unwrap_or_default().as_str())
     }
 
     /// File of the document, or `""` before the first save.
@@ -1015,6 +1043,16 @@ impl UtsimDocument {
             .iter()
             .find(|x| x.name == o)
             .and_then(|x| schema::read_field(x, &key.to_string()))
+            .or_else(|| {
+                // A field of the Qualidade, Segurança and Manutenção tabs, as they show it.
+                let k = key.to_string();
+                self.editor
+                    .tab_fields(&o)
+                    .into_iter()
+                    .flat_map(|(_, c)| c)
+                    .find(|c| c.caminho == k)
+                    .map(|c| c.valor)
+            })
             .map_or_else(GString::new, |t| GString::from(t.as_str()))
     }
 

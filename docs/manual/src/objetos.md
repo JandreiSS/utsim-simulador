@@ -19,6 +19,18 @@ Os tempos (`interarrival`, `process`, `setup` e outros) são [distribuições](d
 | `on_entry` | nenhum | script executado quando um item entra. Veja [Fluxos de tokens e scripts](fluxos-e-scripts.md) |
 | `visual` | nenhum | aparência no 3D. Veja [3D realista](visual-3d.md) |
 
+## Abas Qualidade, Segurança e Manutenção do nó
+
+No Editar do UTSim 3D, o painel de propriedades de um objeto termina com a seção "Qualidade, Segurança e Manutenção", com uma aba para cada área. São os mesmos campos que o [UTSim Qualidade](qualidade-app.md) e o [UTSim Segurança do Trabalho](seguranca-app.md) editam na tela "Modelo", gravados no mesmo `.ron`:
+
+- **Qualidade**: liga os defeitos e as características medidas do posto (`quality`), com o plano de controle, a inspeção e o retrabalho. Numa Saída, escolhe se ela é o cliente ou o refugo nos relatórios de qualidade. Veja [Defeitos e inspeção](defeitos-e-inspecao.md).
+- **Segurança**: o EPI exigido no posto (nomes separados por vírgula, como `oculos, luvas`), as zonas de risco que contêm o posto (só leitura) e os perigos e a ergonomia (`safety`). Veja [Zonas de risco e exposição](zonas-e-exposicao.md) e [Ergonomia](ergonomia.md).
+- **Manutenção**: as quebras do nó (`downtime`), as mesmas da seção "Quebras e turnos". Veja [Manutenção](manutencao.md).
+
+Num objeto novo tudo começa desligado: o modelo só muda quando você liga um bloco. Uma lista (defeitos, perigos...) cresce pelo "+ Adicionar" e cada item sai pelo "Remover". Números aceitam vírgula. Um valor recusado fica escrito em vermelho embaixo do campo, e o modelo não muda. Cada mudança é um passo de desfazer (Ctrl+Z).
+
+**Um escritor por vez.** Ao abrir ou salvar um modelo, o UTSim 3D marca que está editando o arquivo (um arquivo `.<nome>.trava` ao lado dele) e renova a marca a cada minuto. Os outros apps da família que abrirem o mesmo modelo ficam só de leitura e dizem quem edita. Do mesmo jeito, se o UTSim Qualidade ou o Segurança já estiver editando, o UTSim 3D abre o modelo, mostra "Em edição por ..." nas abas, deixa as abas só de leitura e não salva por cima do arquivo: use "Salvar como" ou espere a pessoa fechar. Quando ela fecha, as abas voltam a editar sozinhas em até um minuto. Uma marca que ninguém renova por cinco minutos (o programa fechou de repente) deixa de valer.
+
 ## Source (Chegada)
 
 Cria itens. É por aqui que o trabalho entra no modelo.

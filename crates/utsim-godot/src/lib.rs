@@ -57,6 +57,8 @@ pub mod seguranca;
 mod seguranca_class;
 pub mod shortcuts;
 pub mod tool_panels;
+pub mod trava_modelo;
+pub mod ui_abas;
 pub mod ui_arrivals;
 pub mod ui_bar;
 pub mod ui_bottom;

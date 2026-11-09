@@ -640,6 +640,15 @@ de Qualidade e Segurança: editar `Model.zones` no 3D.
   Zona; para caber a 1600 px os botões da barra perderam 1 px de margem de cada lado.
 - Roteiro `godot/roteiros/g4_zonas.json`; manual em `zonas-e-exposicao.md`.
 
+### Abas Qualidade, Segurança e Manutenção do nó (2026-11-08)
+
+Pedido do dono (`docs/plano_integracao_familia.md`, seção 3): o nó tem as abas Qualidade, Segurança e Manutenção no painel, e os apps dedicados editam os mesmos dados nos dois sentidos. Divisão combinada com a frente de Qualidade e Segurança: ela fez o lado do modelo (`utsim_edit::abas` com `campos`, `editar`, `adicionar` e `remover`, os comandos `Set*`, os blocos `safety` e `quality.control` e a trava `utsim_pasta::trava`); esta frente fez as abas e a trava do UTSim 3D.
+
+- `ui_abas.rs` (egui, puro, com testes): a faixa das três abas e os campos de `abas::Campo` nas duas colunas do painel, por tipo (bloco liga e desliga, booleano, escolha, conjunto como texto com vírgulas, números e distribuição como texto, lista com "+ Adicionar", item com abrir e fechar e "Remover", informação só leitura). Sai como `PropAction::Aba(AbaAcao)`; a ponte (`UtsimUi::tab_action`) chama `Editor::tab_edit`, `tab_add` e `tab_remove`, um passo de desfazer cada. Nomes para os roteiros: `Aba_<aba>`, `AbaCampo_<caminho>` (pontos e colchetes viram `_`), `AbaAdicionar_<lista>`, `AbaRemover_<item>`, `AbaItem_<item>`, `AbaTrava`, `AbaErro`.
+- `trava_modelo.rs` (puro, com testes): `TravaModelo` no `UtsimDocument` toma a trava ao abrir e ao salvar (app `utsim`, pessoa e máquina do ambiente), renova (`renew_lock`, um `Timer` de 60 s no `principal.gd`), solta no modelo novo, ao abrir outro e ao liberar o documento. Com a trava de outro, `lock_notice` diz quem edita, as abas ficam só de leitura e `save` recusa; `save_as` para outro arquivo continua.
+- `field_text` do documento também lê os campos das abas pelo caminho, para o `conferir` `campo` dos roteiros. Roteiro `g4_abas.json`.
+- A seção "Quebras e turnos" continua: a aba Manutenção edita o mesmo `downtime`.
+
 ### Plano original do passo 2b
 
 - O painel lê o esquema com `schema::properties` sobre o `utsim_edit::Document` do
