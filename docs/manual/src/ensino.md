@@ -10,6 +10,10 @@ Na primeira abertura o app pede o nome e o registro acadêmico. O registro ident
 
 Em computadores compartilhados, o perfil pode ficar numa pasta escolhida (um pen drive, por exemplo). Para isso, abra o app com a variável `UTSIM_ENSINO_PERFIL` apontando para a pasta.
 
+### Idioma
+
+O programa fala português, inglês e espanhol. A língua se escolhe em **Ajustes**, em "Idioma", vale na hora e fica guardada no perfil. Na linha de comando, `--idioma en` (ou `es`, `pt-BR`) escolhe a língua daquela abertura. A língua muda os textos do programa (telas, botões, mensagens, ajuda da linha de comando e o modo missão do UTSim 3D). As missões aparecem na língua em que o pacote foi escrito, informada no campo `idioma` do `pacote.ron` (português quando falta), e o mapa avisa quando ela é outra. A campanha embutida está em português. Os relatórios do construtor de casos e as mensagens que vêm do núcleo também continuam em português.
+
 ## A campanha
 
 A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida libera a próxima. A primeira missão de um ato abre quando todas as do ato anterior estão resolvidas.
