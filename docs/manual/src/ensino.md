@@ -107,7 +107,7 @@ O pacote `ensino/pacotes/estatistica_qualidade` também vem instalado com o prog
 
 Cada aluno recebe os seus próprios dados, e o gabarito é recalculado pelas mesmas análises do UTSim Estatística e do UTSim Qualidade.
 
-Quando o UTSim Estatística ou o UTSim Qualidade está instalado pelo launcher, a missão mostra o botão "Analisar no UTSim Estatística" ou "Analisar no UTSim Qualidade". O botão grava os dados do aluno em `dados/<missão>/` do perfil, um `.csv` por conjunto, e abre o app com `--utsim-abrir=<arquivo>` para cada um. O aluno analisa lá e digita as respostas no jogo, que corrige pelos mesmos dados. Sem os apps, as ferramentas do jogo bastam: a média, o desvio, o intervalo, as amplitudes dos subgrupos e o estudo de R&R aparecem junto dos dados.
+Quando o UTSim Estatística ou o UTSim Qualidade está instalado pelo launcher, a missão mostra o botão "Analisar no UTSim Estatística" ou "Analisar no UTSim Qualidade". O botão grava os dados do aluno em `dados/<missão>/` do perfil, um `.csv` por conjunto, e abre o app com `--utsim-abrir=<arquivo>` para cada um. O UTSim Qualidade recebe também a ferramenta da missão (carta, capacidade, R&R ou estratificação) e os limites da especificação, e abre um estudo com uma ferramenta por arquivo. O aluno analisa lá e digita as respostas no jogo, que corrige pelos mesmos dados. Sem os apps, as ferramentas do jogo bastam: a média, o desvio, o intervalo, as amplitudes dos subgrupos e o estudo de R&R aparecem junto dos dados.
 
 ### Resultados
 
