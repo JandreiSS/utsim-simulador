@@ -12,7 +12,8 @@
 // prioridade, para a enfermagem não ficar parada esperando por ele. Depois dos exames, 15 % são
 // internados e esperam um leito. O tomógrafo para de vez em quando (campo downtime do nó,
 // aba Manutenção); o EPI de cada profissional e da sala de procedimento fica no campo ppe
-// (aba Segurança).
+// (aba Segurança). Os pacientes andam entre as salas a 72 m por minuto (1,2 m/s, campo
+// transfer da execução): a distância entre as salas vira tempo de caminhada.
 //
 // Plantões: dois médicos e três profissionais de enfermagem das 7h às 19h, mais dois médicos
 // e um profissional de enfermagem o dia todo. A internação tem 30 leitos.
@@ -28,7 +29,7 @@ Model(
     description: "Saúde e hospital: cinco cores, consulta, exames com parada do tomógrafo, medicação, procedimento com médico e enfermagem juntos e internação",
     line: "saude",
     packs: ["seguranca"],
-    run: (stop_time: 11520.0, warmup: 1440.0, seed: 83, replications: 5),
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 83, replications: 5, transfer: (speed: 72.0)),
     calendars: {
         "dia": (period: 1440.0, off: [
             (start: 0.0, duration: 420.0),
