@@ -1255,6 +1255,7 @@ impl Editor<'_> {
                 setup,
                 process,
                 operators,
+                ..
             } => {
                 self.uint_field(ui, "Capacidade", "capacity", *capacity, 1);
                 self.opt_dist_field(

@@ -168,6 +168,8 @@ pub struct UtsimDocument {
     pub(crate) editor: Editor,
     /// The one-writer lock of the file (`trava_modelo`).
     pub(crate) trava: crate::trava_modelo::TravaModelo,
+    /// What the file held when we last read or wrote it (`disco.rs`).
+    marca: Option<crate::disco::Marca>,
     last_error: String,
     fits: FitCache,
     base: Base<RefCounted>,
@@ -236,6 +238,14 @@ impl UtsimDocument {
         }
     }
 
+    /// Refuses writing over `file` when another app wrote it after we read it.
+    fn unchanged_on_disk(&self, file: &std::path::Path) -> Result<(), String> {
+        match crate::disco::decidir(self.marca, crate::disco::marca(file), true) {
+            crate::disco::Disco::Igual => Ok(()),
+            _ => Err(crate::disco::RECUSA.into()),
+        }
+    }
+
     fn file_result(&mut self, r: Result<(), String>) -> VarDictionary {
         let ok = self.done(r);
         let mut d = VarDictionary::new();
@@ -252,6 +262,7 @@ impl UtsimDocument {
     fn new_model(&mut self, name: GString) {
         self.editor = Editor::new(&name.to_string());
         self.trava.soltar();
+        self.marca = None;
         self.last_error.clear();
     }
 
@@ -263,32 +274,87 @@ impl UtsimDocument {
         let r = Editor::open(&file).map(|e| self.editor = e);
         if r.is_ok() {
             self.trava.abrir(&file);
+            self.marca = crate::disco::marca(&file);
         }
         self.file_result(r)
     }
 
-    /// Saves over the file; refused while another app or person holds its lock.
+    /// Saves over the file; refused while another app or person holds its lock, and when
+    /// another app wrote the file after we read it.
     #[func]
     fn save(&mut self) -> VarDictionary {
         let file = self.editor.doc.path().map(|p| p.to_path_buf());
-        let r = match file {
-            Some(f) => self.trava.antes_de_gravar(&f),
+        let r = match &file {
+            Some(f) => self
+                .trava
+                .antes_de_gravar(f)
+                .and_then(|()| self.unchanged_on_disk(f)),
             None => Ok(()),
         }
         .and_then(|()| self.editor.doc.save().map_err(|e| e.to_string()));
+        if r.is_ok()
+            && let Some(f) = &file
+        {
+            self.marca = crate::disco::marca(f);
+        }
         self.file_result(r)
     }
 
     #[func]
     fn save_as(&mut self, path: GString) -> VarDictionary {
         let file = PathBuf::from(path.to_string());
-        let r = self.trava.antes_de_gravar(&file).and_then(|()| {
-            self.editor
-                .doc
-                .save_as(file.clone())
-                .map_err(|e| e.to_string())
-        });
+        let same = self.editor.doc.path() == Some(file.as_path());
+        let r = self
+            .trava
+            .antes_de_gravar(&file)
+            .and_then(|()| {
+                if same {
+                    self.unchanged_on_disk(&file)
+                } else {
+                    Ok(())
+                }
+            })
+            .and_then(|()| {
+                self.editor
+                    .doc
+                    .save_as(file.clone())
+                    .map_err(|e| e.to_string())
+            });
+        if r.is_ok() {
+            self.marca = crate::disco::marca(&file);
+        }
         self.file_result(r)
+    }
+
+    /// Whether the file changed on disk since we read or wrote it (another app saved
+    /// it): `""` (no), `recarregar` (no local change: read it again with `reload`) or
+    /// `conflito` (local changes too: "Salvar" over it is refused).
+    #[func]
+    fn disk_check(&self) -> GString {
+        let Some(f) = self.editor.doc.path() else {
+            return GString::new();
+        };
+        use crate::disco::Disco;
+        match crate::disco::decidir(
+            self.marca,
+            crate::disco::marca(f),
+            self.editor.doc.is_dirty(),
+        ) {
+            Disco::Igual => "",
+            Disco::Recarregar => "recarregar",
+            Disco::Conflito => "conflito",
+        }
+        .into()
+    }
+
+    /// Reads the file again (what another app saved), dropping local changes. `{ok,
+    /// error}`.
+    #[func]
+    fn reload(&mut self) -> VarDictionary {
+        match self.editor.doc.path().map(|p| p.to_path_buf()) {
+            Some(f) => self.open(GString::from(f.to_string_lossy().as_ref())),
+            None => self.file_result(Err("O modelo ainda não tem arquivo.".into())),
+        }
     }
 
     /// Renews the lock of the file (every minute, from the main scene); takes it when the
@@ -296,6 +362,41 @@ impl UtsimDocument {
     #[func]
     fn renew_lock(&mut self) {
         self.trava.renovar();
+    }
+
+    /// Opens `app` (`qualidade`, `seguranca`) on `node` of the saved model, handing it the
+    /// lock (`outro_app.rs`, `TravaModelo::ceder`). `""`, or why it did not open. The main
+    /// scene saves first: the other app reads the file.
+    #[func]
+    fn open_in_app(&mut self, app: GString, node: GString) -> GString {
+        let Some(a) = crate::outro_app::App::de(&app.to_string()) else {
+            return GString::from("App desconhecido.");
+        };
+        let Some(file) = self.editor.doc.path().map(|p| p.to_path_buf()) else {
+            return GString::from("Salve o modelo antes de abrir no outro app.");
+        };
+        let file = std::fs::canonicalize(&file)
+            .map(|p| {
+                // Without the `\\?\` prefix of Windows, which other programs may not read.
+                PathBuf::from(p.to_string_lossy().trim_start_matches(r"\\?\"))
+            })
+            .unwrap_or(file);
+        let had = self.trava.pode_gravar();
+        if had {
+            self.trava
+                .ceder(a.produto(), utsim_pasta::trava::agora_ms());
+        }
+        match crate::outro_app::abrir(a, &file, &node.to_string()) {
+            Ok(()) => GString::new(),
+            Err(e) => {
+                if had {
+                    // Nobody to hand it to: ours again.
+                    self.trava.soltar();
+                    self.trava.abrir(&file);
+                }
+                GString::from(e.as_str())
+            }
+        }
     }
 
     /// "Em edição por ..." when another app or person holds the lock, else `""`.

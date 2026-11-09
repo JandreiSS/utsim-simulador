@@ -38,6 +38,12 @@ pub enum Passo {
     Desempenho,
     Ensino,
     Analisar(String),
+    /// "Abrir no UTSim Qualidade / Segurança" of the node tabs: the app (`qualidade`,
+    /// `seguranca`) and the node.
+    AbrirApp {
+        app: String,
+        no: String,
+    },
     Resultados(String),
     Pert(String),
     // Editar.
@@ -167,6 +173,11 @@ impl Passo {
             Analisar(s) => {
                 a.s = s.clone();
                 "analisar"
+            }
+            AbrirApp { app, no } => {
+                a.s = app.clone();
+                a.s2 = no.clone();
+                "abrir_app"
             }
             Resultados(s) => {
                 a.s = s.clone();
@@ -426,6 +437,13 @@ pub fn rotear(what: &str, st: &Estado) -> Vec<Passo> {
             _ => return Vec::new(),
         },
         "analisar" => Analisar(arg.into()),
+        "abrir_app" => {
+            let (app, no) = arg.split_once(':').unwrap_or((arg, ""));
+            AbrirApp {
+                app: app.into(),
+                no: no.into(),
+            }
+        }
         "ensino" => Ensino,
         "resultados" => Resultados(arg.into()),
         "pert" => Pert(arg.into()),

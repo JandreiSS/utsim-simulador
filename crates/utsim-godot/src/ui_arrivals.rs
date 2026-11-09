@@ -2343,6 +2343,7 @@ mod tests {
                 base_dir: None,
                 abas: Vec::new(),
                 somente_leitura: None,
+                simulado: None,
             }
         }
 

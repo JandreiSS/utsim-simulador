@@ -1,0 +1,153 @@
+// Ambulatório com agenda (linha Saúde e hospital): modelo pronto da linha, montado só com as
+// predefinições de linhas/saude/biblioteca.ron.
+//
+// Duas agendas: clínica geral, dois pacientes a cada 20 minutos das 8h às 12h e das 13h às
+// 17h, e pediatria, um a cada 30 minutos das 8h às 12h e das 13h às 16h. 15 % dos marcados
+// faltam (rótulo presenca = 2): a agenda os manda pela saída 2 para a alta "faltas". Há
+// também encaixes, pacientes sem hora marcada (um a cada 40 minutos, em média, das 8h às
+// 16h), atendidos depois dos marcados (cor azul, os marcados são verdes). Depois da recepção,
+// a enfermagem faz a pré-consulta e o paciente segue pela especialidade (rótulo
+// especialidade, saída 1 clínica e 2 pediatria). A equipe médica é uma só: dois clínicos e
+// uma pediatra; cada consultório exige a habilidade da especialidade (requires), então a
+// pediatra não atende a clínica nem os clínicos a pediatria.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha saude relatorio examples/ambulatorio_agenda.ron --html relatorio.html
+//
+//   agenda_clinica, agenda_pediatria, encaixes -> espera_recepcao -> recepcao
+//     -> espera_pre_consulta -> pre_consulta -> espera_clinica -> clinica -> alta
+//                                             -> espera_pediatria -> pediatria -> alta
+Model(
+    name: "Ambulatório com agenda",
+    description: "Saúde e hospital: consultas marcadas com faltas, encaixes sem hora e especialidades por habilidade",
+    line: "saude",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 89, replications: 5),
+    calendars: {
+        "ambulatorio": (period: 1440.0, off: [
+            (start: 0.0, duration: 450.0),
+            (start: 1080.0, duration: 360.0),
+        ]),
+        "encaixes": (period: 1440.0, off: [
+            (start: 0.0, duration: 480.0),
+            (start: 960.0, duration: 480.0),
+        ]),
+    },
+    objects: [
+        (name: "agenda_clinica", kind: Source(interarrival: Const(1440.0),
+            labels: {"agendado": Const(1.0), "gravidade": Const(4.0), "especialidade": Const(1.0),
+                "presenca": Discrete([(1.0, 0.85), (2.0, 0.15)])},
+            table: Some((
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 480.0, count: 2),
+                    (at: 500.0, count: 2),
+                    (at: 520.0, count: 2),
+                    (at: 540.0, count: 2),
+                    (at: 560.0, count: 2),
+                    (at: 580.0, count: 2),
+                    (at: 600.0, count: 2),
+                    (at: 620.0, count: 2),
+                    (at: 640.0, count: 2),
+                    (at: 660.0, count: 2),
+                    (at: 680.0, count: 2),
+                    (at: 700.0, count: 2),
+                    (at: 780.0, count: 2),
+                    (at: 800.0, count: 2),
+                    (at: 820.0, count: 2),
+                    (at: 840.0, count: 2),
+                    (at: 860.0, count: 2),
+                    (at: 880.0, count: 2),
+                    (at: 900.0, count: 2),
+                    (at: 920.0, count: 2),
+                    (at: 940.0, count: 2),
+                    (at: 960.0, count: 2),
+                    (at: 980.0, count: 2),
+                    (at: 1000.0, count: 2),
+                ],
+            ))), output: ByLabel("presenca"), position: (0.0, 3.0, 0.0), preset: "saude/agenda", department: "Recepção",
+            symbol: "inicio"),
+        (name: "agenda_pediatria", kind: Source(interarrival: Const(1440.0),
+            labels: {"agendado": Const(1.0), "gravidade": Const(4.0), "especialidade": Const(2.0),
+                "presenca": Discrete([(1.0, 0.85), (2.0, 0.15)])},
+            table: Some((
+                mode: Times,
+                repeat: Cycle(1440.0),
+                rows: [
+                    (at: 480.0, count: 1),
+                    (at: 510.0, count: 1),
+                    (at: 540.0, count: 1),
+                    (at: 570.0, count: 1),
+                    (at: 600.0, count: 1),
+                    (at: 630.0, count: 1),
+                    (at: 660.0, count: 1),
+                    (at: 690.0, count: 1),
+                    (at: 780.0, count: 1),
+                    (at: 810.0, count: 1),
+                    (at: 840.0, count: 1),
+                    (at: 870.0, count: 1),
+                    (at: 900.0, count: 1),
+                    (at: 930.0, count: 1),
+                ],
+            ))), output: ByLabel("presenca"), position: (0.0, 0.0, 0.0), preset: "saude/agenda", department: "Recepção",
+            symbol: "inicio"),
+        (name: "encaixes", kind: Source(interarrival: Exp(mean: 40.0),
+            labels: {"gravidade": Const(5.0), "especialidade": Const(1.0)}), shifts: Calendar("encaixes"),
+            position: (0.0, -3.0, 0.0), preset: "saude/chegada", department: "Recepção", symbol: "inicio"),
+        (name: "faltas", kind: Sink, position: (3.0, 6.0, 0.0), preset: "saude/alta", department: "Recepção", symbol: "fim"),
+        (name: "espera_recepcao", kind: Queue(order: Some(Asc("gravidade"))), position: (3.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Recepção", symbol: "espera"),
+        (name: "recepcao", kind: Processor(capacity: 2, process: Triangular(min: 1.0, mode: 2.0, max: 4.0)),
+            position: (6.0, 0.0, 0.0), visual: Some((asset: Some("mesa"))), preset: "saude/recepcao", department: "Recepção",
+            symbol: "operacao"),
+        (name: "espera_pre_consulta", kind: Queue(order: Some(Asc("gravidade"))), position: (9.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Enfermagem", symbol: "espera"),
+        (name: "pre_consulta", kind: Processor(process: Triangular(min: 3.0, mode: 5.0, max: 8.0),
+            operators: Some(OperatorUse(team: "enfermagem"))), output: ByLabel("especialidade"), position: (12.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "saude/triagem", department: "Enfermagem", symbol: "inspecao"),
+        (name: "espera_clinica", kind: Queue(order: Some(Asc("gravidade"))), position: (15.0, 3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Clínica", symbol: "espera"),
+        (name: "clinica", kind: Processor(capacity: 2, process: Triangular(min: 10.0, mode: 15.0, max: 25.0),
+            operators: Some(OperatorUse(team: "medicos", requires: "clinica"))), position: (18.0, 3.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "saude/consultorio", department: "Clínica", symbol: "operacao"),
+        (name: "espera_pediatria", kind: Queue(order: Some(Asc("gravidade"))), position: (15.0, -3.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "saude/espera", department: "Pediatria", symbol: "espera"),
+        (name: "pediatria", kind: Processor(process: Triangular(min: 12.0, mode: 18.0, max: 30.0),
+            operators: Some(OperatorUse(team: "medicos", requires: "pediatria"))), position: (18.0, -3.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "saude/consultorio", department: "Pediatria", symbol: "operacao"),
+        (name: "alta", kind: Sink, position: (22.0, 0.0, 0.0), preset: "saude/alta", department: "Recepção", symbol: "fim"),
+        (name: "medicos", kind: Dispatcher(team: ["clinico_1", "clinico_2", "pediatra"], rule: FirstAvailable), position: (18.0, 7.0, 0.0),
+            preset: "saude/medicos", department: "Médicos"),
+        (name: "clinico_1", kind: Transporter(speed: 60.0), position: (17.0, 6.0, 0.0),
+            shifts: Calendar("ambulatorio", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Clínica"),
+        (name: "clinico_2", kind: Transporter(speed: 60.0), position: (18.0, 6.0, 0.0),
+            shifts: Calendar("ambulatorio", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["clinica"])), preset: "saude/medico", department: "Clínica"),
+        (name: "pediatra", kind: Transporter(speed: 60.0), position: (18.0, -6.0, 0.0),
+            shifts: Calendar("ambulatorio", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["pediatria"])), preset: "saude/medico", department: "Pediatria"),
+        (name: "enfermagem", kind: Dispatcher(team: ["enfermagem_1"], rule: FirstAvailable), position: (12.0, 4.0, 0.0),
+            preset: "saude/enfermagem", department: "Enfermagem"),
+        (name: "enfermagem_1", kind: Transporter(speed: 60.0), position: (12.0, 3.0, 0.0),
+            shifts: Calendar("ambulatorio", Finish), ppe: ["luvas", "mascara"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "saude/enfermeiro", department: "Enfermagem"),
+    ],
+    connections: [
+        ("agenda_clinica", "espera_recepcao"),
+        ("agenda_clinica", "faltas"),
+        ("agenda_pediatria", "espera_recepcao"),
+        ("agenda_pediatria", "faltas"),
+        ("encaixes", "espera_recepcao"),
+        ("espera_recepcao", "recepcao"),
+        ("recepcao", "espera_pre_consulta"),
+        ("espera_pre_consulta", "pre_consulta"),
+        ("pre_consulta", "espera_clinica"),
+        ("pre_consulta", "espera_pediatria"),
+        ("espera_clinica", "clinica"),
+        ("espera_pediatria", "pediatria"),
+        ("clinica", "alta"),
+        ("pediatria", "alta"),
+    ],
+)

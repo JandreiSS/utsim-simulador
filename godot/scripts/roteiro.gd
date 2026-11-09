@@ -50,10 +50,14 @@
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
 ##    - `{"esperar_valores": true}`: waits for the comparison of the "Valores reais…" window
+##    - `{"esperar_indicadores": true}`: waits for the simulated numbers of the node tabs
 ##    - `{"esperar_trabalho": 120}` (G3): waits until the run on the bridge's thread ends
 ##      (at most that many seconds; a failure if it does not). `modo` and the captures of
 ##      models wait by themselves.
 ##    - `{"tempo": 120.0}`: jumps the playback to that instant.
+##    - `{"outro_app": {"arquivo": "{saida}/m.ron", "trocar": ["de", "para"]}}`: another app
+##      (UTSim Qualidade, Segurança) saves the model: the text is replaced in the file, and
+##      the main scene looks at the disk as when the window gets the focus back.
 ##
 ##    A target (<alvo>) is one of: `{"ponto": [x, y]}` (pixels), `{"controle": "Nome"}`
 ##    (a control by node name, its centre), `{"chao": [x, y]}` (a floor point in model
@@ -411,6 +415,11 @@ func _step(s: Dictionary, k: int) -> void:
 		if _egui() == null or not _egui().fitwin_wait():
 			_fail("passo %d: a comparação dos valores reais não terminou" % k)
 		await _frames(4)
+	elif s.has("esperar_indicadores"):
+		# Quality and safety of the node tabs come from one more run on a thread.
+		if _egui() == null or not _egui().indicators_wait():
+			_fail("passo %d: os números da simulação nas abas não vieram" % k)
+		await _frames(4)
 	elif s.has("esperar_trabalho"):
 		if not await _wait_idle(float(s["esperar_trabalho"])):
 			_fail("passo %d: o trabalho não terminou em %s s" % [k, s["esperar_trabalho"]])
@@ -418,6 +427,19 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("tempo"):
 		_main.seek(float(s["tempo"]), true)
 		await _frames(3)
+	elif s.has("outro_app"):
+		var o: Dictionary = s["outro_app"]
+		var path := _resolve(_base, String(o["arquivo"]))
+		var text := FileAccess.get_file_as_string(path)
+		var swap: Array = o.get("trocar", [])
+		if text == "" or swap.size() != 2 or not text.contains(String(swap[0])):
+			_fail("passo %d: o outro app não achou \"%s\" em %s" % [k, swap[0] if swap.size() > 0 else "", path])
+		else:
+			var f := FileAccess.open(path, FileAccess.WRITE)
+			f.store_string(text.replace(String(swap[0]), String(swap[1])))
+			f.close()
+			_main._check_disk()
+		await _frames(5)
 	elif s.has("conferir"):
 		_check(s["conferir"], k)
 	else:
