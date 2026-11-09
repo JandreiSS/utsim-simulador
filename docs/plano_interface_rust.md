@@ -605,7 +605,11 @@ animação, câmera, testes por eventos) e podem ficar em GDScript.
   400 linhas) e a do Simular (cerca de 40 células de 1, 2 ou 5 × 10^k m) e as linhas;
   `UtsimUi.edit_grid` e `sim_grid` as entregam e o `principal.gd` as copia num `ArrayMesh`
   de linhas (sem laço por linha).
-- `principal.gd`: de 1871 para 1823 linhas.
+- `camera_follow.rs` (testes): o olho e a mira das câmeras Primeira pessoa e Do recurso
+  (altura dos olhos, posto do motorista entre 1,4 e 2,4 m, a cabeça do motorista da
+  empilhadeira); `UtsimUi.follow_view` os entrega e o `principal.gd` só põe a câmera e
+  esconde o que está na linha de visão. A câmera Seguir continua na órbita.
+- `principal.gd`: de 1871 para 1816 linhas.
 - Fica para as próximas rodadas: o relógio e a câmera do Simular (`_process`,
   `_drive_camera`), o fluxo dos trabalhos (`simulate`, `_poll_job`) e o despacho das ações da
   barra e dos painéis (`bar_action`, `_panel_action`, `_form_action`), que chamam o

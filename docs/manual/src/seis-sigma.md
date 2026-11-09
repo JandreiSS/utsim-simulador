@@ -853,6 +853,12 @@ decisão não é registrada e a mensagem diz o motivo.
   programa, limite próprio de projetos, se precisa de projeto para a certificação, ano de
   formação e data de certificação (a formação e a certificação da etapa L7 vão preencher esses
   dois).
+- **Importar pessoas (CSV do RH)**: um CSV com `nome` e `email` e, se houver, `unidade`
+  (pelo nome), `area`, `nivel` (yellow, green, black ou master, também "verde", "GB"...) e
+  `horas_semana`. A pessoa é achada pelo e-mail: quem já está tem os campos atualizados, e
+  quem falta é cadastrado. Ninguém é removido (quem saiu passa pela anonimização). O app
+  mostra quantas foram criadas, atualizadas e sem mudança, e cada linha com problema, com o
+  número e o motivo. Importar o mesmo arquivo de novo não muda nada.
 - **Ausências** com início, fim e motivo; cada pessoa registra as suas.
 - **Carga no programa inteiro**: horas por semana das designações ativas mais as horas por
   semana das tarefas abertas do cronograma em que a pessoa é responsável (campo
@@ -929,6 +935,10 @@ dos dados.
 - **Painel da liderança**: seis indicadores com meta e tendência em relação ao ano anterior
   (ganho validado, projetos encerrados, belts certificados, cobertura, oportunidades no funil e
   tollgates vencidos), sem dados pessoais de formação ou mentoria.
+
+O painel da liderança tem também "Relatório anual (PDF)": os seis indicadores do ano com a
+meta e o ano anterior, a comparação entre as unidades (tabela e gráficos do ganho validado e dos
+projetos encerrados) e, depois, o detalhe do painel do MBB.
 
 Os dois painéis têm "Exportar PDF" e "Exportar planilha (.xlsx)", com o filtro de unidade e o
 ano escolhidos. O PDF traz cada indicador em tabela, com a regra dele, o instante dos dados e os
@@ -1099,6 +1109,17 @@ entre os grupos e confirma.
   no sorteio); vale a melhor tentativa.
 - Sem servidor, a prova no app não impede consulta. A empresa decide se ela vale para a
   certificação (caixa "vale para certificação" de cada prova, decisão MB3).
+- **Análise dos itens**: depois da correção, a turma mostra cada questão com a dificuldade
+  (quantos acertaram) e a discriminação (acertos dos 27 % melhores menos os dos 27 % piores,
+  pelo resto da prova, e a correlação item-resto). O app aponta a questão fácil demais (mais
+  de 90 % acertam), difícil demais (menos de 20 %), que discrimina pouco (abaixo de 0,20) e a
+  que os mais fracos acertam mais que os mais fortes, sinal de enunciado confuso ou gabarito
+  errado. Com menos de 10 provas os números aparecem, mas o app não julga.
+- **Avaliação de reação**: em "Minha formação", cada aluno avalia a turma uma vez, de 1 a 5,
+  em cinco afirmações (utilidade, clareza do instrutor, exercícios, carga horária e se
+  recomendaria), com comentário opcional, na pasta da turma, como as respostas da prova. Na
+  tela Turma a equipe vê só o resumo (média, quantos concordam e os comentários em ordem
+  alfabética), a partir de três respostas, nunca a resposta de uma pessoa.
 
 ### Requisitos e registro de certificação
 
