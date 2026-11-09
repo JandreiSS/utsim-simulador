@@ -1065,15 +1065,40 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             let split = text
                 .strip_prefix("Split(")
                 .and_then(|r| r.strip_suffix(')'));
+            let by = match mode {
+                utsim_objects::SeparateMode::SplitBy { count, group } => Some((count, group)),
+                _ => None,
+            };
+            let chosen = if by.is_some() {
+                "SplitBy"
+            } else if split.is_some() {
+                "Split"
+            } else {
+                "Unpack"
+            };
             out.push(pick(
                 s,
                 "mode",
                 "Modo",
-                if split.is_some() { "Split" } else { "Unpack" },
-                &[("Unpack", "Desembalar"), ("Split", "Dividir em cópias")],
+                chosen,
+                &[
+                    ("Unpack", "Desembalar"),
+                    ("Split", "Dividir em cópias"),
+                    ("SplitBy", "Dividir pelo rótulo"),
+                ],
             ));
             if let Some(n) = split.and_then(|n| n.parse::<u64>().ok()) {
                 out.push(int(s, "mode.copies", "Cópias", n).min(1.0).depth(1));
+            }
+            if let Some((count, group)) = by {
+                for (key, label, v) in [
+                    ("mode.count", "Rótulo com quantas partes", count),
+                    ("mode.group", "Rótulo com o número da divisão", group),
+                ] {
+                    out.push(
+                        Field::new(s, key, label, FieldType::Text, Value::Text(v.clone())).depth(1),
+                    );
+                }
             }
             out.push(dist_field(s, "process", "Tempo de processamento", process));
         }
@@ -1183,13 +1208,38 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 "Permanência mínima",
                 dwell.as_ref(),
             ));
+            let abc = match placement {
+                utsim_objects::RackPlacement::Abc { a, b } => Some((*a, *b)),
+                _ => None,
+            };
             out.push(pick(
                 s,
                 "placement",
                 "Regra de ocupação",
-                &ron::debug(placement),
-                &[("FirstFree", "Primeira livre"), ("Random", "Aleatória")],
+                if abc.is_some() {
+                    "Abc".to_string()
+                } else {
+                    ron::debug(placement)
+                }
+                .as_str(),
+                &[
+                    ("FirstFree", "Primeira livre"),
+                    ("Random", "Aleatória"),
+                    ("Abc", "Curva ABC (rótulo classe)"),
+                ],
             ));
+            if let Some((a, b)) = abc {
+                out.push(
+                    float(s, "placement.a", "Fração das posições da classe A", a)
+                        .min(0.0)
+                        .depth(1),
+                );
+                out.push(
+                    float(s, "placement.b", "Fração das posições da classe B", b)
+                        .min(0.0)
+                        .depth(1),
+                );
+            }
             out.push(
                 float(s, "bay_width", "Largura da coluna", *bay_width)
                     .min(0.01)
@@ -1777,7 +1827,12 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Rack { bays, .. }, "bays") => bays.to_string(),
         (ObjectKind::Rack { levels, .. }, "levels") => levels.to_string(),
         (ObjectKind::Rack { dwell, .. }, "dwell") => ron::option(dwell, ron::dist),
-        (ObjectKind::Rack { placement, .. }, "placement") => ron::debug(placement),
+        (ObjectKind::Rack { placement, .. }, "placement") => match placement {
+            utsim_objects::RackPlacement::Abc { a, b } => {
+                format!("Abc(a: {}, b: {})", ron::float(*a), ron::float(*b))
+            }
+            _ => ron::debug(placement),
+        },
         (ObjectKind::Rack { bay_width, .. }, "bay_width") => ron::float(*bay_width),
         (ObjectKind::Rack { level_height, .. }, "level_height") => ron::float(*level_height),
         (ObjectKind::Dispatcher { team, .. }, "team") => ron::strings(team),
@@ -1811,7 +1866,14 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         | (ObjectKind::Separator { process, .. }, "process") => ron::dist(process),
         (ObjectKind::Combiner { components, .. }, "components") => ron::usizes(components),
         (ObjectKind::Combiner { mode, .. }, "mode") => ron::debug(mode),
-        (ObjectKind::Separator { mode, .. }, "mode") => ron::debug(mode),
+        (ObjectKind::Separator { mode, .. }, "mode") => match mode {
+            utsim_objects::SeparateMode::SplitBy { count, group } => format!(
+                "SplitBy(count: {}, group: {})",
+                ron::string(count),
+                ron::string(group)
+            ),
+            _ => ron::debug(mode),
+        },
         _ => return None,
     })
 }
@@ -2151,6 +2213,38 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
         }
         ("output", _) => return edit_output(model, obj, rest, value),
         ("shifts", "source") => return edit_shift_source(model, obj, value),
+        ("placement", _) if matches!(obj.kind, ObjectKind::Rack { .. }) => {
+            let (mut a, mut b) = match &obj.kind {
+                ObjectKind::Rack {
+                    placement: utsim_objects::RackPlacement::Abc { a, b },
+                    ..
+                } => (Some(*a), Some(*b)),
+                _ => (None, None),
+            };
+            let text = match (rest, value.as_text()) {
+                ("", Some("Abc")) => format!(
+                    "Abc(a: {}, b: {})",
+                    ron::float(a.unwrap_or(0.2)),
+                    ron::float(b.unwrap_or(0.3))
+                ),
+                ("", Some(t)) => t.to_string(),
+                ("a" | "b", _) => {
+                    let v = value.as_f64().ok_or("número esperado")?;
+                    if rest == "a" {
+                        a = Some(v);
+                    } else {
+                        b = Some(v);
+                    }
+                    format!(
+                        "Abc(a: {}, b: {})",
+                        ron::float(a.unwrap_or(0.2)),
+                        ron::float(b.unwrap_or(0.3))
+                    )
+                }
+                _ => return Err("regra: FirstFree, Random ou Abc".into()),
+            };
+            return Ok(set(&obj.name, head, text));
+        }
         ("mode", _) if matches!(obj.kind, ObjectKind::Separator { .. }) => {
             let current = read_field(obj, "mode").unwrap_or_default();
             let text = match (rest, value.as_text()) {
@@ -2158,7 +2252,33 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                 // Choosing "Split" again keeps the number of copies.
                 ("", Some("Split")) if current.starts_with("Split(") => current,
                 ("", Some("Split")) => "Split(2)".to_string(),
+                ("", Some("SplitBy")) if current.starts_with("SplitBy") => current,
+                ("", Some("SplitBy")) => {
+                    "SplitBy(count: \"linhas\", group: \"pedido\")".to_string()
+                }
                 ("copies", _) => format!("Split({})", usize_of(value, "cópias", 1)?),
+                ("count" | "group", Some(t)) => {
+                    let (mut count, mut group) = match &obj.kind {
+                        ObjectKind::Separator {
+                            mode: utsim_objects::SeparateMode::SplitBy { count, group },
+                            ..
+                        } => (count.clone(), group.clone()),
+                        _ => ("linhas".to_string(), "pedido".to_string()),
+                    };
+                    if t.trim().is_empty() {
+                        return Err("o rótulo não pode ficar vazio".into());
+                    }
+                    if rest == "count" {
+                        count = t.trim().to_string();
+                    } else {
+                        group = t.trim().to_string();
+                    }
+                    format!(
+                        "SplitBy(count: {}, group: {})",
+                        ron::string(&count),
+                        ron::string(&group)
+                    )
+                }
                 (_, Some(t)) => t.to_string(),
                 _ => return Err("modo: Unpack ou Split".into()),
             };
@@ -2856,6 +2976,21 @@ mod tests {
         assert_eq!(field(&d, "sep", "mode.copies").value, Value::Int(4));
         apply(&mut d, "sep", "mode", Value::Text("Unpack".into()));
         assert_eq!(field(&d, "sep", "mode").value, Value::Text("Unpack".into()));
+        apply(&mut d, "sep", "mode", Value::Text("SplitBy".into()));
+        apply(&mut d, "sep", "mode.count", Value::Text("paletes".into()));
+        apply(&mut d, "sep", "mode.group", Value::Text("caminhao".into()));
+        assert_eq!(
+            field(&d, "sep", "mode").value,
+            Value::Text("SplitBy".into())
+        );
+        assert_eq!(
+            field(&d, "sep", "mode.count").value,
+            Value::Text("paletes".into())
+        );
+        assert_eq!(
+            field(&d, "sep", "mode.group").value,
+            Value::Text("caminhao".into())
+        );
     }
 
     #[test]
