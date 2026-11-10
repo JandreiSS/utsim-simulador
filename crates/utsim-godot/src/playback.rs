@@ -1554,7 +1554,7 @@ mod tests {
         assert_eq!(fallback.unwrap().name, "maquina");
         assert_eq!(
             pb.blocks[cnc].clips,
-            ["ciclo", "porta_abrir", "quebra", "setup"]
+            ["ciclo", "ciclo_auto", "porta_abrir", "quebra", "setup"]
         );
         // The library's look still places it: same scale, turn and offset.
         let look = pb.blocks[cnc].look.as_ref().unwrap();
@@ -1606,7 +1606,7 @@ mod tests {
         let pb = blender_model(true);
         let cnc = index(&pb, "cnc_1");
         let ana = index(&pb, "ana");
-        // The CNC at (2, 0): its post at (-0.15, -1.2) and its door at (-0.15, -0.85) of
+        // The CNC at (2, 0): its post at (-0.15, -1.2) and its door at (-0.15, -1.8) of
         // its own frame, both looking at the machine (+y of the model).
         let (a, _) = pb.animados[cnc].as_ref().unwrap();
         let (post, yaw) = a.post.unwrap();
@@ -1615,7 +1615,7 @@ mod tests {
         assert_eq!(to.0, post);
         let near = |a: [f32; 3], b: [f32; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-3);
         assert!(near(post, to_godot([1.85, -1.2, 0.0])), "{post:?}");
-        assert!(near(door, to_godot([1.85, -0.85, 0.0])), "{door:?}");
+        assert!(near(door, to_godot([1.85, -1.8, 0.0])), "{door:?}");
         assert!((yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-5);
         let mid = [0.5 * (post[0] + door[0]), 0.0, 0.5 * (post[2] + door[2])];
         for (t, want) in [

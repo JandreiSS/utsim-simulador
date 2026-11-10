@@ -654,7 +654,7 @@ mod tests {
         let cnc = c.get("cnc").unwrap();
         assert_eq!(
             cnc.clip_names(),
-            ["ciclo", "porta_abrir", "quebra", "setup"]
+            ["ciclo", "ciclo_auto", "porta_abrir", "quebra", "setup"]
         );
         assert!(cnc.fixed_point("cnc", "ponto_operador").is_some());
         assert!(cnc.fixed_point("cnc_medio", "ponto_porta").is_some());
@@ -789,16 +789,16 @@ mod tests {
         let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT);
         let post = a.post.unwrap();
         assert!(close(post.0, [-0.15, 0.0, 1.2]));
-        let door = ([-0.15, 0.0, 0.85], FRAC_PI_2);
+        let door = ([-0.15, 0.0, 1.8], FRAC_PI_2);
         let at = |s: State, t: f64| {
             let runs = a.runs([(0.0, s), (4.0, State::Idle)]);
             a.operator(run_at(&runs, t), t).unwrap()
         };
         assert!(close(at(State::Entering, 0.0).0, door.0));
-        assert!(close(at(State::Entering, 2.0).0, [-0.15, 0.0, 1.025]));
+        assert!(close(at(State::Entering, 2.0).0, [-0.15, 0.0, 1.5]));
         assert!(close(at(State::Entering, 3.9999).0, post.0));
         assert!(close(at(State::Leaving, 0.0).0, post.0));
-        assert!(close(at(State::Leaving, 2.0).0, [-0.15, 0.0, 1.025]));
+        assert!(close(at(State::Leaving, 2.0).0, [-0.15, 0.0, 1.5]));
         assert!(close(at(State::Processing, 1.0).0, post.0));
         assert!((at(State::Processing, 1.0).1 - FRAC_PI_2).abs() < 1e-6);
         // No post and no walk (the conveyor): the caller keeps the front of the station.
