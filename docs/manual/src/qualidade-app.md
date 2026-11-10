@@ -60,7 +60,7 @@ Para comparar com o simulado, informe o modelo e a característica. O modelo rod
 
 A aba **Ferramentas** reúne os estudos da unidade. Um estudo junta as ferramentas aplicadas a um assunto: um nó do modelo, um posto ou um problema solto. Ele fica gravado na pasta de unidade (coleção `estudos`) e os dois apps o leem.
 
-As ferramentas são folha de verificação, estratificação, Pareto, histograma, diagrama de dispersão, carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u), capacidade, MSA (estudo de R&R), Ishikawa, 5 porquês, FMEA e A3. O UTSim Segurança do Trabalho oferece as que servem a acidentes e exposições: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA e A3.
+As ferramentas são folha de verificação, estratificação, Pareto, histograma, diagrama de dispersão, carta de controle (I-MR, X̄-R, X̄-S, p, np, c, u), capacidade, MSA (estudo de R&R), Ishikawa, 5 porquês, FMEA, A3, QFD (casa da qualidade), empilhamento de tolerâncias e poka-yoke. O UTSim Segurança do Trabalho oferece as que servem a acidentes e exposições: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA, A3 e poka-yoke.
 
 Toda ferramenta funciona com ou sem simulação. Os dados podem ser:
 
@@ -69,6 +69,12 @@ Toda ferramenta funciona com ou sem simulação. Os dados podem ser:
 - **Simulado:** puxados de uma rodada do modelo do nó (só no UTSim Qualidade), como os defeitos do nó por tipo, os defeitos do modelo, os defeitos por nó, as medições de uma característica ou duas características medidas na mesma peça.
 
 Editar à mão uma tabela importada ou simulada muda a origem para Manual, e a tela avisa.
+
+Três ferramentas de projeto e de prevenção têm tabelas próprias, explicadas acima da grade:
+
+- **QFD:** uma linha por necessidade do cliente, com a importância de 1 a 5 e, se quiser, a nota atual, a do concorrente, a meta e o ponto de venda. Cada coluna depois de "Ponto de venda" é um requisito técnico (use "+ coluna"), com a relação 0, 1, 3 ou 9 na célula. A tabela "Requisitos técnicos" dá a unidade, o sentido (maior, menor ou alvo) e o alvo de cada requisito pelo nome da coluna. O "Telhado" traz as correlações entre dois requisitos (++, +, - ou --). O resultado ordena os requisitos pelo peso, mostra a matriz com ● ○ △ e aponta a necessidade sem requisito, o requisito sem necessidade ou sem alvo e o conflito entre os mais importantes.
+- **Empilhamento de tolerâncias:** uma linha por cota, com o nominal, as tolerâncias, o coeficiente (1 soma, -1 subtrai) e a distribuição (normal, normal 4, uniforme ou triangular). Com o LIE e o LSE do resultado, a ferramenta dá o pior caso, a raiz da soma dos quadrados e 100 mil montagens simuladas sempre com a mesma semente, com PPM, Cp, Cpk e a contribuição de cada cota.
+- **Poka-yoke:** uma linha por dispositivo, com o tipo (contato, valor fixo ou sequência), a função (controle ou alerta), a etapa e o modo de falha do FMEA e as notas O e D antes e depois. A tabela "Verificações" guarda cada teste, com data e se funcionou. O resultado diz o que cada dispositivo baixou no FMEA, quando é a próxima verificação e quais pedem atenção (verificação atrasada ou que falhou).
 
 O resultado aparece ao lado dos dados, com os indicadores, os achados (o que o resultado mostra), os gráficos, as tabelas e os avisos. O relatório imprime o mesmo resultado. "Relatório desta ferramenta" gera um PDF e um HTML com capa. "Relatório do estudo" gera o consolidado com capa, sumário, resumo do estudo, uma seção por ferramenta escolhida e a conclusão. Os arquivos ficam em `relatorios/` da pasta de unidade.
 
