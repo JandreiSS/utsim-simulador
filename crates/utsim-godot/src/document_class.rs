@@ -364,6 +364,41 @@ impl UtsimDocument {
         self.trava.renovar();
     }
 
+    /// Opens `app` (`qualidade`, `seguranca`) on `node` of the saved model, handing it the
+    /// lock (`outro_app.rs`, `TravaModelo::ceder`). `""`, or why it did not open. The main
+    /// scene saves first: the other app reads the file.
+    #[func]
+    fn open_in_app(&mut self, app: GString, node: GString) -> GString {
+        let Some(a) = crate::outro_app::App::de(&app.to_string()) else {
+            return GString::from("App desconhecido.");
+        };
+        let Some(file) = self.editor.doc.path().map(|p| p.to_path_buf()) else {
+            return GString::from("Salve o modelo antes de abrir no outro app.");
+        };
+        let file = std::fs::canonicalize(&file)
+            .map(|p| {
+                // Without the `\\?\` prefix of Windows, which other programs may not read.
+                PathBuf::from(p.to_string_lossy().trim_start_matches(r"\\?\"))
+            })
+            .unwrap_or(file);
+        let had = self.trava.pode_gravar();
+        if had {
+            self.trava
+                .ceder(a.produto(), utsim_pasta::trava::agora_ms());
+        }
+        match crate::outro_app::abrir(a, &file, &node.to_string()) {
+            Ok(()) => GString::new(),
+            Err(e) => {
+                if had {
+                    // Nobody to hand it to: ours again.
+                    self.trava.soltar();
+                    self.trava.abrir(&file);
+                }
+                GString::from(e.as_str())
+            }
+        }
+    }
+
     /// "Em edição por ..." when another app or person holds the lock, else `""`.
     #[func]
     fn lock_notice(&self) -> GString {

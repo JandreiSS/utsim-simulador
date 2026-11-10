@@ -94,6 +94,21 @@ Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de 
 
 O pacote `ensino/pacotes/qualidade_seguranca` fica fora da campanha e vem instalado com o programa. São seis casos de fábrica: onde inspecionar para o defeito não chegar ao cliente, quando a inspeção vira o gargalo, uma medição ruim, o cruzamento de pessoas com a empilhadeira, o posto de carga pesada (com a fadiga de cada pessoa) e o custo da qualidade. Os casos de segurança comparam cenários do mesmo modelo, com quase-conflitos simulados, entradas em zona sem EPI e fadiga. Eles não estimam a chance de um acidente real nem certificam conformidade com norma, e cada texto lembra isso ao aluno.
 
+### Pacote de estatística e qualidade na fábrica
+
+O pacote `ensino/pacotes/estatistica_qualidade` também vem instalado com o programa, fora da campanha. Ele faz a ponte entre os atos 1 a 7 e o caso Lean Seis Sigma do ato 8, com seis análises sobre dados da fábrica simulada:
+
+1. Quantas replicações bastam para a meia largura que o gerente pede.
+2. Se a furadeira nova vale a pena, com as duas opções rodadas com os mesmos números aleatórios e o teste t pareado.
+3. Em que subgrupo a carta X̄-R do torno dá o primeiro sinal.
+4. O Cpk da retífica antes e depois do ajuste.
+5. Se o erro do paquímetro vem do instrumento ou dos operadores.
+6. Qual torno desloca a média do comprimento.
+
+Cada aluno recebe os seus próprios dados, e o gabarito é recalculado pelas mesmas análises do UTSim Estatística e do UTSim Qualidade.
+
+Quando o UTSim Estatística ou o UTSim Qualidade está instalado pelo launcher, a missão mostra o botão "Analisar no UTSim Estatística" ou "Analisar no UTSim Qualidade". O botão grava os dados do aluno em `dados/<missão>/` do perfil, um `.csv` por conjunto, e abre o app com `--utsim-abrir=<arquivo>` para cada um. O UTSim Qualidade recebe também a ferramenta da missão (carta, capacidade, R&R ou estratificação) e os limites da especificação, e abre um estudo com uma ferramenta por arquivo. O aluno analisa lá e digita as respostas no jogo, que corrige pelos mesmos dados. Sem os apps, as ferramentas do jogo bastam: a média, o desvio, o intervalo, as amplitudes dos subgrupos e o estudo de R&R aparecem junto dos dados.
+
 ### Resultados
 
 A tabela mostra cada indicador no estado inicial e na tentativa, com o intervalo de 95 %, a meta e a situação:
@@ -141,6 +156,8 @@ Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encad
 
 Quem está num programa Lean Seis Sigma no UTSim Seis Sigma pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim Seis Sigma do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
 
+O professor que é instrutor ou master black belt do programa também registra a turma inteira. Na aba Professor, depois da correção, a seção "Programa Lean Seis Sigma da empresa" recebe a pasta do programa, e "Registrar a turma no programa" grava "praticou", com origem "exercício", para cada aluno que resolveu missões. O aluno é ligado à pessoa do programa pelo e-mail da lista de alunos, sem diferença entre maiúsculas e minúsculas. Nomes e registros da turma não vão para o programa. A mensagem diz quantas competências foram enviadas e quais alunos ficaram de fora, seja por não haver pessoa com aquele e-mail, seja por aviso na entrega (cadeia quebrada ou assinatura inválida). Enviar de novo não repete as entradas.
+
 ## Modo professor
 
 Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do professor. O mesmo app serve para aluno e professor.
@@ -150,12 +167,12 @@ Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do prof
 Informe a pasta da turma (local ou dentro do Google Drive para computador), o nome, o período, a finalidade dos dados e, se quiser, a lista de alunos em CSV:
 
 ```text
-nome;registro;apelido
-Ana Lima;2027001;ana
-Beto Souza;2027002;beto
+nome;registro;apelido;email
+Ana Lima;2027001;ana;ana.lima@empresa.com
+Beto Souza;2027002;beto;
 ```
 
-O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome.
+O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome. O e-mail é opcional. Ele só serve para ligar o aluno a uma pessoa de um programa Lean Seis Sigma, como explica a seção seguinte.
 
 O app cria esta estrutura:
 
