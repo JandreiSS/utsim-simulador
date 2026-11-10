@@ -180,6 +180,7 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 | `process` | obrigatório |
 | `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None)`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
 | `also` | `[]`: outras equipes pedidas junto com `operators`, cada uma um `OperatorUse` (por exemplo `[OperatorUse(team: "enfermagem")]` para o médico e o enfermeiro na mesma sala). A etapa só começa quando chegam as pessoas de todas as equipes que ela usa (`setup` e `process` de cada uma); se as equipes da preparação e do processo forem diferentes, quem preparou é liberado e as do processo são chamadas. Precisa de `operators`, e cada equipe aparece uma vez. Quem chega primeiro espera os outros na estação. Veja [Saúde e hospital](linhas/saude/index.md) |
+| `changeover` | nenhum: preparação em toda peça. `Some((label: "produto", matrix: [(from: 1.0, to: 2.0, time: Const(15.0))]))`: o `setup` só acontece quando o rótulo `label` da peça muda em relação à peça anterior, com o tempo de cada troca (de `from` para `to`) na `matrix`; troca sem linha na matriz usa o `setup`, que é obrigatório. A máquina começa pronta para o primeiro produto; com `capacity` maior que 1 vale o último produto que começou. Conta `changeovers` no relatório do bloco. Veja [Manufatura discreta](linhas/manufatura/index.md) |
 
 ### `Combiner`
 
