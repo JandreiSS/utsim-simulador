@@ -18,6 +18,7 @@ Model(
     name: "Cozinha de delivery",
     description: "Alimentação e food service: pedidos de aplicativo com dois picos, preparo, embalagem, balcão de retirada onde a comida esfria e é descartada, e entregadores",
     line: "alimentacao",
+    packs: ["seguranca"],
     run: (stop_time: 11520.0, warmup: 1440.0, seed: 73, replications: 5),
     calendars: {
         "loja": (period: 1440.0, off: [

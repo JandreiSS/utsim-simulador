@@ -16,6 +16,7 @@ Model(
     name: "Restaurante: mesas no jantar",
     description: "Alimentação e food service: grupos que esperam mesa e desistem, salão com 25 mesas e o caixa com os garçons: giro de mesas e espera na porta",
     line: "alimentacao",
+    packs: ["seguranca"],
     run: (stop_time: 11520.0, warmup: 1440.0, seed: 72, replications: 5),
     calendars: {
         "porta": (period: 1440.0, off: [
