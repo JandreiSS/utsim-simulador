@@ -644,6 +644,7 @@ def gerar(sexo, saida):
         "pontos": {},
         "clipes": {},
         "estados": {},
+        "peca": {},
         "dados": {
             "altura_base": ALTURA_BASE,
             "alturas": ALTURAS[sexo],

@@ -25,10 +25,13 @@ import bpy
 FPS = 24
 QUADROS = FPS  # um clipe = 1 s
 
-# Estado do posto na simulação -> (clipe, fase no começo do estado, fase no fim, laço).
-# A ponte toca o clipe na fase `de + (ate - de) * fase`, com `fase` = (t - início) / (fim -
-# início) do estado; num clipe em laço, uma volta inteira cabe no estado (uma peça, um ciclo).
+# Estado na simulação -> (clipe, fase no começo do estado, fase no fim, laço). A ponte toca o
+# clipe na fase `de + (ate - de) * fase`, com `fase` = (t - início) / (fim - início) do estado;
+# num clipe em laço, uma volta inteira cabe no estado (uma peça, um ciclo). Um estado pode ter
+# mais de uma linha: vale a primeira cujo clipe o elemento tem. `"levante"` é a fase do clipe
+# que só tira a carga do chão (`dados["levante"]`, 1 se o elemento não diz).
 ESTADOS = (
+    # Posto (máquina, posto manual, robô, célula).
     ("entering", "porta_abrir", 0.0, 1.0, False),
     ("leaving", "porta_abrir", 1.0, 0.0, False),
     ("processing", "ciclo", 0.0, 1.0, True),
@@ -36,6 +39,13 @@ ESTADOS = (
     ("down", "quebra", 0.0, 1.0, False),
     ("waiting_repair", "quebra", 1.0, 1.0, False),
     ("maintenance", "quebra", 1.0, 1.0, False),
+    # Veículo (empilhadeira, AGV): ergue a carga ao carregar, leva erguida, baixa ao descarregar.
+    ("loading", "garfo_subir", 0.0, "levante", False),
+    ("loading", "mesa_subir", 0.0, "levante", False),
+    ("travel_loaded", "garfo_subir", "levante", "levante", False),
+    ("travel_loaded", "mesa_subir", "levante", "levante", False),
+    ("unloading", "garfo_subir", "levante", 0.0, False),
+    ("unloading", "mesa_subir", "levante", 0.0, False),
 )
 
 # O operador anda pela fase do estado: de `ponto_porta` a `ponto_operador` ao entrar e
@@ -45,18 +55,54 @@ CAMINHOS = {
     "leaving": ("ponto_operador", "ponto_porta"),
 }
 
+# Onde fica a peça (ou a carga) em cada estado: o ponto que ela segue. O ponto é um nó do
+# `.glb` e anda com o pai (a garra, o garfo, a mesa), então a peça vai junto com o clipe.
+PECA_POSTO = (
+    ("entering", "ponto_entrada"),
+    ("setup", "ponto_peca"),
+    ("processing", "ponto_peca"),
+    ("down", "ponto_peca"),
+    ("waiting_repair", "ponto_peca"),
+    ("maintenance", "ponto_peca"),
+    ("leaving", "ponto_saida"),
+    ("blocked", "ponto_saida"),
+)
+PECA_VEICULO = (
+    ("loading", "ponto_carga"),
+    ("travel_loaded", "ponto_carga"),
+    ("unloading", "ponto_carga"),
+)
 
-def estados(clipes, pontos):
+
+def estados(clipes, pontos, dados):
     """A tabela `estados` do catálogo: só os estados cujo clipe o elemento tem."""
+    def fase(v):
+        return dados.get("levante", 1.0) if v == "levante" else v
+
     out = {}
     for estado, clipe, de, ate, laco in ESTADOS:
-        if clipe not in clipes:
+        if clipe not in clipes or estado in out:
             continue
-        e = {"clipe": clipe, "de": de, "ate": ate, "laco": laco}
+        e = {"clipe": clipe, "de": fase(de), "ate": fase(ate), "laco": laco}
         a, b = CAMINHOS.get(estado, (None, None))
         if a in pontos and b in pontos:
             e["operador"] = [a, b]
         out[estado] = e
+    return out
+
+
+def pecas(pontos, proprio=None):
+    """A tabela `peca` do catálogo: estado -> trechos `[fase_de, fase_ate, ponto]`, só com os
+    pontos que o elemento tem. `proprio` (do elemento) troca a linha de um estado."""
+    out = {}
+    if "ponto_peca" in pontos:
+        for estado, ponto in PECA_POSTO:
+            if ponto in pontos:
+                out[estado] = [[0.0, 1.0, ponto]]
+    if "ponto_carga" in pontos:
+        for estado, ponto in PECA_VEICULO:
+            out[estado] = [[0.0, 1.0, ponto]]
+    out.update(proprio or {})
     return out
 
 
@@ -103,6 +149,7 @@ class Elemento:
         self.pontos = {}
         self.clipes = {}
         self.dados = {}
+        self.peca = {}  # trechos próprios da tabela `peca` (ver `pecas`)
         raiz = bpy.data.objects.new(nome, None)
         self.cena.collection.objects.link(raiz)
         self.nos[nome] = raiz
@@ -394,7 +441,8 @@ class Elemento:
             "pontos": dict(sorted(self.pontos.items())),
             "clipes": dict(sorted(self.clipes.items())),
             "dados": dict(sorted(self.dados.items())),
-            "estados": estados(self.clipes, self.pontos),
+            "estados": estados(self.clipes, self.pontos, self.dados),
+            "peca": pecas(self.pontos, self.peca),
         }
 
 

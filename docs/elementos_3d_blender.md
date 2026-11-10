@@ -100,12 +100,39 @@ simulação ao clipe. A ponte lê a tabela e não precisa saber de cada elemento
 | `setup` | `setup` | 0 → 1 | sim | |
 | `down` | `quebra` | 0 → 1 | não | |
 | `waiting_repair`, `maintenance` | `quebra` | 1 → 1 | não | |
+| `loading` | `garfo_subir` ou `mesa_subir` | 0 → `levante` | não | |
+| `travel_loaded` | idem | `levante` → `levante` | não | |
+| `unloading` | idem | `levante` → 0 | não | |
 
 A fase do clipe é `de + (ate - de) * fase`, com a fase do estado de 0 a 1. Num clipe em
 laço, uma volta cabe no estado: uma peça, um ciclo. Só entram os estados cujo clipe o
 elemento tem; a célula, por exemplo, só tem `entering` e `leaving`. O caminho
 `operador` só aparece quando o elemento tem os dois pontos. Sem ele, a ponte põe a pessoa
 de frente para a estação (`station_front`). Os pontos giram com a estação.
+
+`levante` é a fase que só tira a carga do chão: na empilhadeira, 0,05 do curso do garfo
+(0,10 m, em `dados.levante`); no AGV, a mesa sobe tudo (1). Para pôr o palete num vão
+alto do porta-paletes, a ponte usa a altura do vão (fase = altura / `garfo_curso`).
+
+### Tabela `peca`
+
+A tabela `peca` diz onde a peça (ou a carga) fica em cada estado do elemento. Cada estado
+tem trechos `[fase_de, fase_ate, ponto]`, que cobrem a fase de 0 a 1. A peça fica no ponto
+do trecho em que a fase está. O ponto é um nó do `.glb` e anda com o pai, então a peça
+presa na garra, no garfo ou na mesa vai junto com o clipe.
+
+| Elemento | Estado | Onde a peça fica |
+|---|---|---|
+| máquinas e posto | `entering` | `ponto_entrada` (o operador vai buscá-la) |
+| | `setup`, `processing`, `down`, `waiting_repair`, `maintenance` | `ponto_peca` |
+| | `leaving`, `blocked` | `ponto_saida` |
+| robo | `processing` | `ponto_entrada` até 1/3, `ponto_garra` até 3/4 e `ponto_saida` até o fim |
+| | `blocked` | `ponto_saida` |
+| empilhadeira, agv | `loading`, `travel_loaded`, `unloading` | `ponto_carga` |
+
+A passagem entre elementos fica com a ponte. A peça sai do `ponto_saida` de um posto e vai
+para o `ponto_carga` do veículo que a carrega, ou para o `ponto_entrada` do próximo posto.
+O teste confere que a garra do robô está mesmo sobre a peça em 1/3 e em 3/4 do `ciclo`.
 
 ### Interações
 

@@ -115,6 +115,9 @@ def empilhadeira(detalhe=0):
     _roda(e, "roda_td", -0.95, -0.40, 0.25, 0.18)
     e.ponto("ponto_operador", (-0.40, 0.0, 1.06), 0, pai="cabine")
     e.dados = {"garfo_repouso": GARFO_REPOUSO, "garfo_curso": GARFO_CURSO, "garfo_centro": GARFO_CENTRO}
+    # Ao carregar, o garfo tira o palete do chão (0,10 m); no porta-paletes a ponte usa a
+    # altura do vão (fase = altura / `garfo_curso`).
+    e.dados["levante"] = round(0.10 / GARFO_CURSO, 3)
     e.clipe("garfo_subir", False, {"carro": [(0, "location", 2, 0.0), (1, "location", 2, GARFO_CURSO)]})
     return e
 

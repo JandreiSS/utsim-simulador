@@ -13,7 +13,26 @@
    "mesa": 0.35,
    "mesa_curso": 0.06
   },
-  "estados": {},
+  "estados": {
+   "loading": {
+    "ate": 1.0,
+    "clipe": "mesa_subir",
+    "de": 0.0,
+    "laco": false
+   },
+   "travel_loaded": {
+    "ate": 1.0,
+    "clipe": "mesa_subir",
+    "de": 1.0,
+    "laco": false
+   },
+   "unloading": {
+    "ate": 0.0,
+    "clipe": "mesa_subir",
+    "de": 1.0,
+    "laco": false
+   }
+  },
   "minimo": [
    -0.57,
    -0.4,
@@ -27,6 +46,29 @@
    "roda_d",
    "roda_e"
   ],
+  "peca": {
+   "loading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "travel_loaded": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "unloading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_carga": {
     "giro": 0,
@@ -59,7 +101,26 @@
    "mesa": 0.35,
    "mesa_curso": 0.06
   },
-  "estados": {},
+  "estados": {
+   "loading": {
+    "ate": 1.0,
+    "clipe": "mesa_subir",
+    "de": 0.0,
+    "laco": false
+   },
+   "travel_loaded": {
+    "ate": 1.0,
+    "clipe": "mesa_subir",
+    "de": 1.0,
+    "laco": false
+   },
+   "unloading": {
+    "ate": 0.0,
+    "clipe": "mesa_subir",
+    "de": 1.0,
+    "laco": false
+   }
+  },
   "minimo": [
    -0.57,
    -0.4,
@@ -73,6 +134,29 @@
    "roda_d",
    "roda_e"
   ],
+  "peca": {
+   "loading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "travel_loaded": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "unloading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_carga": {
     "giro": 0,
@@ -105,6 +189,7 @@
    "caixa",
    "corpo"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.406,
@@ -127,6 +212,7 @@
    "caixa",
    "corpo"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.406,
@@ -179,6 +265,7 @@
    "luz",
    "portao"
   ],
+  "peca": {},
   "pontos": {
    "ponto_operador": {
     "giro": 90,
@@ -250,6 +337,7 @@
    "luz",
    "portao"
   ],
+  "peca": {},
   "pontos": {
    "ponto_operador": {
     "giro": 90,
@@ -373,6 +461,64 @@
    "tampa",
    "torre"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -523,6 +669,64 @@
    "tampa",
    "torre"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -590,9 +794,29 @@
   "dados": {
    "garfo_centro": 1.555,
    "garfo_curso": 2.0,
-   "garfo_repouso": 0.1
+   "garfo_repouso": 0.1,
+   "levante": 0.05
   },
-  "estados": {},
+  "estados": {
+   "loading": {
+    "ate": 0.05,
+    "clipe": "garfo_subir",
+    "de": 0.0,
+    "laco": false
+   },
+   "travel_loaded": {
+    "ate": 0.05,
+    "clipe": "garfo_subir",
+    "de": 0.05,
+    "laco": false
+   },
+   "unloading": {
+    "ate": 0.0,
+    "clipe": "garfo_subir",
+    "de": 0.05,
+    "laco": false
+   }
+  },
   "minimo": [
    -1.3,
    -0.55,
@@ -611,6 +835,29 @@
    "roda_te",
    "torre"
   ],
+  "peca": {
+   "loading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "travel_loaded": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "unloading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_carga": {
     "giro": 0,
@@ -651,9 +898,29 @@
   "dados": {
    "garfo_centro": 1.555,
    "garfo_curso": 2.0,
-   "garfo_repouso": 0.1
+   "garfo_repouso": 0.1,
+   "levante": 0.05
   },
-  "estados": {},
+  "estados": {
+   "loading": {
+    "ate": 0.05,
+    "clipe": "garfo_subir",
+    "de": 0.0,
+    "laco": false
+   },
+   "travel_loaded": {
+    "ate": 0.05,
+    "clipe": "garfo_subir",
+    "de": 0.05,
+    "laco": false
+   },
+   "unloading": {
+    "ate": 0.0,
+    "clipe": "garfo_subir",
+    "de": 0.05,
+    "laco": false
+   }
+  },
   "minimo": [
    -1.3,
    -0.55,
@@ -672,6 +939,29 @@
    "roda_te",
    "torre"
   ],
+  "peca": {
+   "loading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "travel_loaded": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ],
+   "unloading": [
+    [
+     0.0,
+     1.0,
+     "ponto_carga"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_carga": {
     "giro": 0,
@@ -713,6 +1003,7 @@
    "estante",
    "estrutura"
   ],
+  "peca": {},
   "pontos": {
    "ponto_vao_0_0": {
     "giro": -90,
@@ -772,6 +1063,7 @@
    "estante",
    "estrutura"
   ],
+  "peca": {},
   "pontos": {
    "ponto_vao_0_0": {
     "giro": -90,
@@ -880,6 +1172,7 @@
    "rolo_18",
    "rolo_19"
   ],
+  "peca": {},
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -970,6 +1263,7 @@
    "rolo_18",
    "rolo_19"
   ],
+  "peca": {},
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -1092,6 +1386,64 @@
    "tampa",
    "unidade"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 180,
@@ -1241,6 +1593,64 @@
    "tampa",
    "unidade"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 180,
@@ -1309,6 +1719,7 @@
    "corpo",
    "palete"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    1.2,
@@ -1331,6 +1742,7 @@
    "corpo",
    "palete"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    1.2,
@@ -1353,6 +1765,7 @@
    "corpo",
    "peca"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.13,
@@ -1375,6 +1788,7 @@
    "corpo",
    "peca"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.13,
@@ -1443,6 +1857,7 @@
    "epi_oculos",
    "epi_protetor_auricular"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.33,
@@ -1511,6 +1926,7 @@
    "epi_oculos",
    "epi_protetor_auricular"
   ],
+  "peca": {},
   "pontos": {},
   "tamanho": [
    0.374,
@@ -1533,6 +1949,7 @@
    "estrutura",
    "porta_paletes"
   ],
+  "peca": {},
   "pontos": {
    "ponto_vao_0_0": {
     "giro": -90,
@@ -1691,6 +2108,7 @@
    "estrutura",
    "porta_paletes"
   ],
+  "peca": {},
   "pontos": {
    "ponto_vao_0_0": {
     "giro": -90,
@@ -1877,6 +2295,64 @@
    "luz",
    "posto"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -1973,6 +2449,64 @@
    "luz",
    "posto"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -2124,6 +2658,64 @@
    "tampa",
    "volante"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -2275,6 +2867,64 @@
    "tampa",
    "volante"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 0,
@@ -2441,6 +3091,32 @@
    "pedestal",
    "robo"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     0.333333,
+     "ponto_entrada"
+    ],
+    [
+     0.333333,
+     0.75,
+     "ponto_garra"
+    ],
+    [
+     0.75,
+     1.0,
+     "ponto_saida"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 90,
@@ -2607,6 +3283,32 @@
    "pedestal",
    "robo"
   ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     0.333333,
+     "ponto_entrada"
+    ],
+    [
+     0.333333,
+     0.75,
+     "ponto_garra"
+    ],
+    [
+     0.75,
+     1.0,
+     "ponto_saida"
+    ]
+   ]
+  },
   "pontos": {
    "ponto_entrada": {
     "giro": 90,
