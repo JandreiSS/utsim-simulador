@@ -1,0 +1,75 @@
+// Xarope: batelada e envase contínuo. Modelo pronto da linha Processos contínuos e batelada,
+// com as predefinições de linhas/processos/biblioteca.ron e a rede de fluidos do modelo.
+//
+// Lotes de 2000 L de xarope de dois sabores (60 % do sabor 1 e 40 % do 2) são liberados em
+// média a cada 220 minutos. O reator leva o tempo da receita de cada sabor e limpa (CIP)
+// quando o sabor muda. Cada lote pronto descarrega de uma vez no tanque de xarope
+// (FromItems), de 20 000 L. Dali o envase contínuo puxa até 11 L por minuto e faz um fardo de
+// 12 L a cada 12 L envasados (ToItems); os fardos passam pela paletizadora e saem.
+//
+// O tanque é o pulmão entre a batelada, que entrega aos saltos, e o envase, que puxa sem
+// parar: quando ele esvazia, o envase para à espera do próximo lote.
+//
+// Experimentos: mudar o intervalo dos lotes, a vazão do envase (max_rate) ou o tamanho do
+// tanque, e ver o nível médio do tanque, os fardos por dia e os lotes por dia.
+//
+// Resultado: ver o capítulo da linha no manual (docs/manual/src/linhas/processos/index.md).
+//
+// Tempo em minutos, volume em litros. Rode com:
+//   utsim linha processos relatorio examples/xarope_envase.ron --html relatorio.html
+//
+//   programacao -> fila -> reator -> descarga  =(fluidos)=>  tanque_xarope -> envase
+//   envase (fardos) -> fila_fardos -> paletizadora -> expedicao
+Model(
+    name: "Xarope: batelada e envase contínuo",
+    description: "Processos contínuos e batelada: lotes que descarregam num tanque de produto e um envase contínuo que vira fardos",
+    line: "processos",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 223, replications: 5),
+    objects: [
+        (name: "programacao", kind: Source(interarrival: Exp(mean: 220.0),
+            labels: {"produto": Discrete([(1.0, 0.6), (2.0, 0.4)]), "volume": Const(2000.0),
+                "rendimento": Triangular(min: 0.95, mode: 0.97, max: 0.99)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "processos/lotes", department: "Xaroparia"),
+        (name: "fila", kind: Queue(), position: (3.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "processos/fila_lotes", department: "Xaroparia"),
+        (name: "reator", kind: Processor(setup: Some(Triangular(min: 35.0, mode: 45.0, max: 60.0)),
+            process: Triangular(min: 120.0, mode: 140.0, max: 170.0),
+            changeover: Some((label: "produto")),
+            recipe: Some((label: "produto", times: [
+                (value: 1.0, time: Triangular(min: 120.0, mode: 140.0, max: 170.0)),
+                (value: 2.0, time: Triangular(min: 140.0, mode: 160.0, max: 190.0)),
+            ]))),
+            downtime: Some((mtbf: Exp(mean: 4800.0), mttr: Exp(mean: 90.0))),
+            ppe: ["oculos", "luvas", "botina"], position: (6.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("tanque"))), preset: "processos/reator", department: "Xaroparia"),
+        (name: "descarga", kind: Sink, position: (9.0, 0.0, 0.0), symbol: "fim", preset: "processos/tanque_produto",
+            department: "Xaroparia"),
+        (name: "fila_fardos", kind: Queue(), position: (15.0, -3.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "processos/fila_lotes", department: "Envase"),
+        (name: "paletizadora", kind: Processor(process: Triangular(min: 0.6, mode: 0.8, max: 1.0)),
+            ppe: ["luvas"], position: (18.0, -3.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "processos/equipamento", department: "Envase"),
+        (name: "expedicao", kind: Sink, position: (21.0, -3.0, 0.0), symbol: "fim", preset: "processos/tanque_produto",
+            department: "Envase"),
+    ],
+    connections: [
+        ("programacao", "fila"),
+        ("fila", "reator"),
+        ("reator", "descarga"),
+        ("fila_fardos", "paletizadora"),
+        ("paletizadora", "expedicao"),
+    ],
+    fluids: Some((
+        name: "fluidos",
+        nodes: [
+            (name: "lote_para_tanque", kind: FromItems(object: "descarga", volume: 2000.0), position: (9.0, 2.0, 0.0)),
+            (name: "tanque_xarope", kind: Tank(capacity: 20000.0, initial: 2000.0), position: (12.0, 2.0, 0.0)),
+            (name: "envase", kind: ToItems(object: "fila_fardos", volume: 12.0, max_rate: Some(11.0)), position: (15.0, 2.0, 0.0)),
+        ],
+        links: [
+            ("lote_para_tanque", "tanque_xarope"),
+            ("tanque_xarope", "envase"),
+        ],
+    )),
+)

@@ -1,0 +1,85 @@
+// Batelada com limpeza entre produtos: modelo pronto da linha Processos contínuos e batelada,
+// montado só com as predefinições de linhas/processos/biblioteca.ron.
+//
+// Lotes de 2000 L de três produtos (50 % claro, 30 % médio e 20 % escuro) são liberados em
+// média a cada 150 minutos e esperam numa fila única pelos dois reatores. Cada produto tem a
+// sua receita (campo recipe): o claro leva cerca de 3 horas, o médio 3 h 40 e o escuro 4 h 20.
+// O reator só limpa (CIP, campo changeover) quando o produto muda, e o tempo da limpeza
+// depende da sequência: do claro para o escuro é curto, do escuro para o claro é longo. Os
+// reatores quebram de vez em quando (campo downtime do nó). Depois do reator, o lote espera no
+// tanque pulmão (cabem 2 lotes) pelo envase, que leva cerca de 80 minutos por lote; com o
+// pulmão cheio, o reator fica bloqueado com o lote pronto dentro.
+//
+// Experimentos: trocar a regra da fila por Some(Asc("produto")) (campanha: junta produtos
+// iguais e limpa menos), aumentar o pulmão, encurtar a limpeza do escuro para o claro ou
+// mudar a mistura dos produtos, e ver os lotes por dia, o tempo em limpeza e o bloqueio.
+//
+// Resultado: ver o capítulo da linha no manual (docs/manual/src/linhas/processos/index.md).
+//
+// Tempo em minutos, volume em litros. Rode com:
+//   utsim linha processos relatorio examples/batelada_cip.ron --html relatorio.html
+//
+//   programacao -> fila -> reator_1 | reator_2 -> pulmao -> envase -> produto
+Model(
+    name: "Batelada com limpeza entre produtos",
+    description: "Processos contínuos e batelada: dois reatores, três receitas, limpeza (CIP) que depende da sequência, tanque pulmão e envase",
+    line: "processos",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 211, replications: 5),
+    objects: [
+        (name: "programacao", kind: Source(interarrival: Exp(mean: 175.0),
+            labels: {"produto": Discrete([(1.0, 0.5), (2.0, 0.3), (3.0, 0.2)]), "volume": Const(2000.0),
+                "rendimento": Triangular(min: 0.92, mode: 0.96, max: 0.98)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "processos/lotes", department: "Produção"),
+        (name: "fila", kind: Queue(), position: (3.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "processos/fila_lotes", department: "Produção"),
+        (name: "reator_1", kind: Processor(setup: Some(Const(60.0)), process: Triangular(min: 150.0, mode: 180.0, max: 220.0),
+            changeover: Some((label: "produto", matrix: [
+                (from: 1.0, to: 2.0, time: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+                (from: 1.0, to: 3.0, time: Triangular(min: 30.0, mode: 40.0, max: 50.0)),
+                (from: 2.0, to: 3.0, time: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+                (from: 3.0, to: 1.0, time: Triangular(min: 100.0, mode: 120.0, max: 150.0)),
+                (from: 3.0, to: 2.0, time: Triangular(min: 70.0, mode: 90.0, max: 110.0)),
+            ])),
+            recipe: Some((label: "produto", times: [
+                (value: 1.0, time: Triangular(min: 150.0, mode: 180.0, max: 220.0)),
+                (value: 2.0, time: Triangular(min: 190.0, mode: 220.0, max: 260.0)),
+                (value: 3.0, time: Triangular(min: 230.0, mode: 260.0, max: 310.0)),
+            ]))),
+            downtime: Some((mtbf: Exp(mean: 4800.0), mttr: Exp(mean: 120.0))),
+            ppe: ["oculos", "luvas", "botina"], position: (6.0, 2.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("tanque"))), preset: "processos/reator", department: "Produção"),
+        (name: "reator_2", kind: Processor(setup: Some(Const(60.0)), process: Triangular(min: 150.0, mode: 180.0, max: 220.0),
+            changeover: Some((label: "produto", matrix: [
+                (from: 1.0, to: 2.0, time: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+                (from: 1.0, to: 3.0, time: Triangular(min: 30.0, mode: 40.0, max: 50.0)),
+                (from: 2.0, to: 3.0, time: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+                (from: 3.0, to: 1.0, time: Triangular(min: 100.0, mode: 120.0, max: 150.0)),
+                (from: 3.0, to: 2.0, time: Triangular(min: 70.0, mode: 90.0, max: 110.0)),
+            ])),
+            recipe: Some((label: "produto", times: [
+                (value: 1.0, time: Triangular(min: 150.0, mode: 180.0, max: 220.0)),
+                (value: 2.0, time: Triangular(min: 190.0, mode: 220.0, max: 260.0)),
+                (value: 3.0, time: Triangular(min: 230.0, mode: 260.0, max: 310.0)),
+            ]))),
+            downtime: Some((mtbf: Exp(mean: 4800.0), mttr: Exp(mean: 120.0))),
+            ppe: ["oculos", "luvas", "botina"], position: (6.0, -2.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("tanque"))), preset: "processos/reator", department: "Produção"),
+        (name: "pulmao", kind: Queue(capacity: Some(2)), position: (9.0, 0.0, 0.0), symbol: "armazenagem",
+            visual: Some((asset: Some("tanque"))), preset: "processos/pulmao", department: "Produção"),
+        (name: "envase", kind: Processor(process: Triangular(min: 60.0, mode: 80.0, max: 100.0)),
+            ppe: ["luvas"], position: (12.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("esteira"))), preset: "processos/envase", department: "Envase"),
+        (name: "produto", kind: Sink, position: (15.0, 0.0, 0.0), symbol: "fim", preset: "processos/tanque_produto",
+            department: "Envase"),
+    ],
+    connections: [
+        ("programacao", "fila"),
+        ("fila", "reator_1"),
+        ("fila", "reator_2"),
+        ("reator_1", "pulmao"),
+        ("reator_2", "pulmao"),
+        ("pulmao", "envase"),
+        ("envase", "produto"),
+    ],
+)

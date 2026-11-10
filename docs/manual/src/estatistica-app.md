@@ -15,7 +15,17 @@ O projeto fica na mesma pasta de unidade do UTSim Qualidade e do UTSim Seguranç
 
 ## Planilha
 
-Cada coluna tem um nome e um tipo: número, texto ou data. Clique no nome para selecionar a coluna e use o botão direito para renomear, ordenar ou remover. O tipo muda na caixa embaixo do nome. Numa coluna de números, `1,5` e `1.5` valem o mesmo; uma célula vazia é um valor ausente. Células que não combinam com o tipo ficam em vermelho e não entram nas contas.
+A planilha é uma grade de células sempre pronta para digitar, como numa planilha comum:
+
+- clique numa célula e digite; Enter grava e desce, Tab grava e vai para a direita (com Shift, sobe ou volta), Esc desiste. F2 ou duplo clique editam o que já está na célula;
+- as setas andam; com Shift, ou arrastando o mouse, a seleção cresce. Clique no cabeçalho para pegar a coluna inteira, no número para pegar a linha, no canto para pegar tudo (ou Ctrl+A);
+- Ctrl+C copia a seleção com tabulações (cola direto no Excel); Ctrl+V cola o que veio do Excel a partir da célula ativa, e um valor só colado numa área preenche a área toda; Ctrl+X recorta; Delete apaga;
+- escrever ou colar além do fim cria as linhas e colunas que faltam;
+- Ctrl+Z desfaz e Ctrl+Y (ou Ctrl+Shift+Z) refaz, também as operações do menu Dados. Os botões da barra fazem o mesmo;
+- duplo clique no cabeçalho renomeia a variável;
+- o botão direito abre copiar, recortar, colar, apagar, inserir e remover linhas e colunas, renomear, o tipo da coluna e ordenar.
+
+Cada coluna tem um nome e um tipo: número, texto ou data. O tipo é deduzido dos valores enquanto você digita; para escolher, use o botão direito › Tipo da coluna, e o cabeçalho mostra "(fixo)". "Automático" volta a deduzir. Numa coluna de números, `1,5` e `1.5` valem o mesmo; uma célula vazia é um valor ausente. Células que não combinam com o tipo ficam em vermelho e não entram nas contas. O rodapé mostra a célula ativa, o tamanho da seleção, a contagem, a soma e a média dos números selecionados.
 
 "Gravar" guarda a planilha na unidade. Rodar uma análise grava a planilha antes, porque o histórico guarda o hash (SHA-256) dos dados usados.
 
