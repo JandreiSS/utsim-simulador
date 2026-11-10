@@ -156,6 +156,8 @@ Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encad
 
 Quem está num programa Lean Seis Sigma no UTSim Seis Sigma pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim Seis Sigma do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
 
+O professor que é instrutor ou master black belt do programa também registra a turma inteira. Na aba Professor, depois da correção, a seção "Programa Lean Seis Sigma da empresa" recebe a pasta do programa, e "Registrar a turma no programa" grava "praticou", com origem "exercício", para cada aluno que resolveu missões. O aluno é ligado à pessoa do programa pelo e-mail da lista de alunos, sem diferença entre maiúsculas e minúsculas. Nomes e registros da turma não vão para o programa. A mensagem diz quantas competências foram enviadas e quais alunos ficaram de fora, seja por não haver pessoa com aquele e-mail, seja por aviso na entrega (cadeia quebrada ou assinatura inválida). Enviar de novo não repete as entradas.
+
 ## Modo professor
 
 Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do professor. O mesmo app serve para aluno e professor.
@@ -165,12 +167,12 @@ Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do prof
 Informe a pasta da turma (local ou dentro do Google Drive para computador), o nome, o período, a finalidade dos dados e, se quiser, a lista de alunos em CSV:
 
 ```text
-nome;registro;apelido
-Ana Lima;2027001;ana
-Beto Souza;2027002;beto
+nome;registro;apelido;email
+Ana Lima;2027001;ana;ana.lima@empresa.com
+Beto Souza;2027002;beto;
 ```
 
-O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome.
+O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome. O e-mail é opcional. Ele só serve para ligar o aluno a uma pessoa de um programa Lean Seis Sigma, como explica a seção seguinte.
 
 O app cria esta estrutura:
 
