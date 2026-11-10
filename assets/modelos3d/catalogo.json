@@ -1,0 +1,2154 @@
+{
+ "agv": {
+  "arquivo": "agv.glb",
+  "clipes": {
+   "mesa_subir": {
+    "laco": false,
+    "nos": [
+     "mesa"
+    ]
+   }
+  },
+  "dados": {
+   "mesa": 0.35,
+   "mesa_curso": 0.06
+  },
+  "minimo": [
+   -0.57,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "agv",
+   "chassi",
+   "luz",
+   "mesa",
+   "roda_d",
+   "roda_e"
+  ],
+  "pontos": {
+   "ponto_carga": {
+    "giro": 0,
+    "pai": "mesa",
+    "pos": [
+     0.0,
+     0.0,
+     0.35
+    ]
+   }
+  },
+  "tamanho": [
+   1.14,
+   0.8,
+   0.353
+  ],
+  "triangulos": 364
+ },
+ "agv_medio": {
+  "arquivo": "agv_medio.glb",
+  "clipes": {
+   "mesa_subir": {
+    "laco": false,
+    "nos": [
+     "mesa"
+    ]
+   }
+  },
+  "dados": {
+   "mesa": 0.35,
+   "mesa_curso": 0.06
+  },
+  "minimo": [
+   -0.57,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "agv",
+   "chassi",
+   "luz",
+   "mesa",
+   "roda_d",
+   "roda_e"
+  ],
+  "pontos": {
+   "ponto_carga": {
+    "giro": 0,
+    "pai": "mesa",
+    "pos": [
+     0.0,
+     0.0,
+     0.35
+    ]
+   }
+  },
+  "tamanho": [
+   1.14,
+   0.8,
+   0.353
+  ],
+  "triangulos": 684
+ },
+ "caixa": {
+  "arquivo": "caixa.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.203,
+   -0.15,
+   0.0
+  ],
+  "nos": [
+   "caixa",
+   "corpo"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.406,
+   0.3,
+   0.303
+  ],
+  "triangulos": 24
+ },
+ "caixa_medio": {
+  "arquivo": "caixa_medio.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.203,
+   -0.15,
+   0.0
+  ],
+  "nos": [
+   "caixa",
+   "corpo"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.406,
+   0.3,
+   0.303
+  ],
+  "triangulos": 88
+ },
+ "celula": {
+  "arquivo": "celula.glb",
+  "clipes": {
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "portao"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -1.53,
+   -1.6,
+   0.0
+  ],
+  "nos": [
+   "celula",
+   "cerca",
+   "luz",
+   "portao"
+  ],
+  "pontos": {
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "celula",
+    "pos": [
+     0.0,
+     -0.9,
+     0.0
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "celula",
+    "pos": [
+     0.0,
+     -2.0,
+     0.0
+    ]
+   }
+  },
+  "tamanho": [
+   3.06,
+   3.13,
+   2.3
+  ],
+  "triangulos": 360
+ },
+ "celula_medio": {
+  "arquivo": "celula_medio.glb",
+  "clipes": {
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "portao"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -1.53,
+   -1.6,
+   0.0
+  ],
+  "nos": [
+   "celula",
+   "cerca",
+   "luz",
+   "portao"
+  ],
+  "pontos": {
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "celula",
+    "pos": [
+     0.0,
+     -0.9,
+     0.0
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "celula",
+    "pos": [
+     0.0,
+     -2.0,
+     0.0
+    ]
+   }
+  },
+  "tamanho": [
+   3.06,
+   3.13,
+   2.3
+  ],
+  "triangulos": 1144
+ },
+ "cnc": {
+  "arquivo": "cnc.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "fuso",
+     "torre"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "torre"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -1.0,
+   -0.84,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "cnc",
+   "fuso",
+   "luz",
+   "porta",
+   "tampa",
+   "torre"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     -1.3,
+     -0.95,
+     0.9
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "cnc",
+    "pos": [
+     -0.15,
+     -1.2,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     -0.3,
+     -0.45,
+     1.1
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "cnc",
+    "pos": [
+     -0.15,
+     -0.85,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     1.3,
+     -0.95,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   2.0,
+   1.84,
+   2.3
+  ],
+  "triangulos": 488
+ },
+ "cnc_medio": {
+  "arquivo": "cnc_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "fuso",
+     "torre"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "torre"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -1.0,
+   -0.84,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "cnc",
+   "fuso",
+   "luz",
+   "porta",
+   "tampa",
+   "torre"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     -1.3,
+     -0.95,
+     0.9
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "cnc",
+    "pos": [
+     -0.15,
+     -1.2,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     -0.3,
+     -0.45,
+     1.1
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "cnc",
+    "pos": [
+     -0.15,
+     -0.85,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "cnc",
+    "pos": [
+     1.3,
+     -0.95,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   2.0,
+   1.84,
+   2.3
+  ],
+  "triangulos": 1288
+ },
+ "empilhadeira": {
+  "arquivo": "empilhadeira.glb",
+  "clipes": {
+   "garfo_subir": {
+    "laco": false,
+    "nos": [
+     "carro"
+    ]
+   }
+  },
+  "dados": {
+   "garfo_centro": 1.555,
+   "garfo_curso": 2.0,
+   "garfo_repouso": 0.1
+  },
+  "minimo": [
+   -1.3,
+   -0.55,
+   -0.0
+  ],
+  "nos": [
+   "cabine",
+   "carro",
+   "chassi",
+   "empilhadeira",
+   "garfos",
+   "luz",
+   "roda_dd",
+   "roda_de",
+   "roda_td",
+   "roda_te",
+   "torre"
+  ],
+  "pontos": {
+   "ponto_carga": {
+    "giro": 0,
+    "pai": "garfos",
+    "pos": [
+     1.555,
+     0.0,
+     0.1
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "cabine",
+    "pos": [
+     -0.4,
+     0.0,
+     1.06
+    ]
+   }
+  },
+  "tamanho": [
+   3.43,
+   1.1,
+   2.25
+  ],
+  "triangulos": 792
+ },
+ "empilhadeira_medio": {
+  "arquivo": "empilhadeira_medio.glb",
+  "clipes": {
+   "garfo_subir": {
+    "laco": false,
+    "nos": [
+     "carro"
+    ]
+   }
+  },
+  "dados": {
+   "garfo_centro": 1.555,
+   "garfo_curso": 2.0,
+   "garfo_repouso": 0.1
+  },
+  "minimo": [
+   -1.3,
+   -0.55,
+   -0.0
+  ],
+  "nos": [
+   "cabine",
+   "carro",
+   "chassi",
+   "empilhadeira",
+   "garfos",
+   "luz",
+   "roda_dd",
+   "roda_de",
+   "roda_td",
+   "roda_te",
+   "torre"
+  ],
+  "pontos": {
+   "ponto_carga": {
+    "giro": 0,
+    "pai": "garfos",
+    "pos": [
+     1.555,
+     0.0,
+     0.1
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "cabine",
+    "pos": [
+     -0.4,
+     0.0,
+     1.06
+    ]
+   }
+  },
+  "tamanho": [
+   3.43,
+   1.1,
+   2.25
+  ],
+  "triangulos": 1848
+ },
+ "estante": {
+  "arquivo": "estante.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.5,
+   -0.25,
+   0.0
+  ],
+  "nos": [
+   "estante",
+   "estrutura"
+  ],
+  "pontos": {
+   "ponto_vao_0_0": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     0.125
+    ]
+   },
+   "ponto_vao_0_1": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     0.5875
+    ]
+   },
+   "ponto_vao_0_2": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     1.05
+    ]
+   },
+   "ponto_vao_0_3": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     1.5125
+    ]
+   }
+  },
+  "tamanho": [
+   1.0,
+   0.5,
+   2.0
+  ],
+  "triangulos": 108
+ },
+ "estante_medio": {
+  "arquivo": "estante_medio.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.5,
+   -0.25,
+   0.0
+  ],
+  "nos": [
+   "estante",
+   "estrutura"
+  ],
+  "pontos": {
+   "ponto_vao_0_0": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     0.125
+    ]
+   },
+   "ponto_vao_0_1": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     0.5875
+    ]
+   },
+   "ponto_vao_0_2": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     1.05
+    ]
+   },
+   "ponto_vao_0_3": {
+    "giro": -90,
+    "pai": "estante",
+    "pos": [
+     0.0,
+     0.0,
+     1.5125
+    ]
+   }
+  },
+  "tamanho": [
+   1.0,
+   0.5,
+   2.0
+  ],
+  "triangulos": 396
+ },
+ "esteira": {
+  "arquivo": "esteira.glb",
+  "clipes": {
+   "rolar": {
+    "laco": true,
+    "nos": [
+     "rolo_00",
+     "rolo_01",
+     "rolo_02",
+     "rolo_03",
+     "rolo_04",
+     "rolo_05",
+     "rolo_06",
+     "rolo_07",
+     "rolo_08",
+     "rolo_09",
+     "rolo_10",
+     "rolo_11",
+     "rolo_12",
+     "rolo_13",
+     "rolo_14",
+     "rolo_15",
+     "rolo_16",
+     "rolo_17",
+     "rolo_18",
+     "rolo_19"
+    ]
+   }
+  },
+  "dados": {
+   "passo_rolo": 0.15,
+   "raio_rolo": 0.03
+  },
+  "minimo": [
+   -1.5,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "esteira",
+   "estrutura",
+   "rolo_00",
+   "rolo_01",
+   "rolo_02",
+   "rolo_03",
+   "rolo_04",
+   "rolo_05",
+   "rolo_06",
+   "rolo_07",
+   "rolo_08",
+   "rolo_09",
+   "rolo_10",
+   "rolo_11",
+   "rolo_12",
+   "rolo_13",
+   "rolo_14",
+   "rolo_15",
+   "rolo_16",
+   "rolo_17",
+   "rolo_18",
+   "rolo_19"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "esteira",
+    "pos": [
+     -1.5,
+     0.0,
+     0.76
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "esteira",
+    "pos": [
+     1.5,
+     0.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   3.0,
+   0.8,
+   0.76
+  ],
+  "triangulos": 604
+ },
+ "esteira_medio": {
+  "arquivo": "esteira_medio.glb",
+  "clipes": {
+   "rolar": {
+    "laco": true,
+    "nos": [
+     "rolo_00",
+     "rolo_01",
+     "rolo_02",
+     "rolo_03",
+     "rolo_04",
+     "rolo_05",
+     "rolo_06",
+     "rolo_07",
+     "rolo_08",
+     "rolo_09",
+     "rolo_10",
+     "rolo_11",
+     "rolo_12",
+     "rolo_13",
+     "rolo_14",
+     "rolo_15",
+     "rolo_16",
+     "rolo_17",
+     "rolo_18",
+     "rolo_19"
+    ]
+   }
+  },
+  "dados": {
+   "passo_rolo": 0.15,
+   "raio_rolo": 0.03
+  },
+  "minimo": [
+   -1.5,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "esteira",
+   "estrutura",
+   "rolo_00",
+   "rolo_01",
+   "rolo_02",
+   "rolo_03",
+   "rolo_04",
+   "rolo_05",
+   "rolo_06",
+   "rolo_07",
+   "rolo_08",
+   "rolo_09",
+   "rolo_10",
+   "rolo_11",
+   "rolo_12",
+   "rolo_13",
+   "rolo_14",
+   "rolo_15",
+   "rolo_16",
+   "rolo_17",
+   "rolo_18",
+   "rolo_19"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "esteira",
+    "pos": [
+     -1.5,
+     0.0,
+     0.76
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "esteira",
+    "pos": [
+     1.5,
+     0.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   3.0,
+   0.8,
+   0.76
+  ],
+  "triangulos": 1308
+ },
+ "injetora": {
+  "arquivo": "injetora.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "molde"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "unidade"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -2.0,
+   -0.64,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "injetora",
+   "luz",
+   "molde",
+   "porta",
+   "tampa",
+   "unidade"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 180,
+    "pai": "injetora",
+    "pos": [
+     2.3,
+     0.0,
+     1.0
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "injetora",
+    "pos": [
+     -0.8,
+     -1.05,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "injetora",
+    "pos": [
+     -0.15,
+     0.0,
+     1.35
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "injetora",
+    "pos": [
+     -0.8,
+     -0.75,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": -90,
+    "pai": "injetora",
+    "pos": [
+     -0.2,
+     -0.85,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   4.0,
+   1.19,
+   1.98
+  ],
+  "triangulos": 700
+ },
+ "injetora_medio": {
+  "arquivo": "injetora_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "molde"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "unidade"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -2.0,
+   -0.64,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "injetora",
+   "luz",
+   "molde",
+   "porta",
+   "tampa",
+   "unidade"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 180,
+    "pai": "injetora",
+    "pos": [
+     2.3,
+     0.0,
+     1.0
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "injetora",
+    "pos": [
+     -0.8,
+     -1.05,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "injetora",
+    "pos": [
+     -0.15,
+     0.0,
+     1.35
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "injetora",
+    "pos": [
+     -0.8,
+     -0.75,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": -90,
+    "pai": "injetora",
+    "pos": [
+     -0.2,
+     -0.85,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   4.0,
+   1.19,
+   1.98
+  ],
+  "triangulos": 1356
+ },
+ "palete": {
+  "arquivo": "palete.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.6,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "palete"
+  ],
+  "pontos": {},
+  "tamanho": [
+   1.2,
+   1.0,
+   0.144
+  ],
+  "triangulos": 264
+ },
+ "palete_medio": {
+  "arquivo": "palete_medio.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.6,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "palete"
+  ],
+  "pontos": {},
+  "tamanho": [
+   1.2,
+   1.0,
+   0.144
+  ],
+  "triangulos": 968
+ },
+ "peca": {
+  "arquivo": "peca.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.06,
+   -0.06,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "peca"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.13,
+   0.12,
+   0.12
+  ],
+  "triangulos": 88
+ },
+ "peca_medio": {
+  "arquivo": "peca_medio.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -0.06,
+   -0.06,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "peca"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.13,
+   0.12,
+   0.12
+  ],
+  "triangulos": 120
+ },
+ "pessoa_homem": {
+  "arquivo": "pessoa_homem.glb",
+  "clipes": {},
+  "dados": {
+   "altura_base": 1.82,
+   "alturas": [
+    1.65,
+    1.9
+   ],
+   "cabelos": [
+    "#1f1a17",
+    "#3b2a20",
+    "#6b4a2b",
+    "#a07040",
+    "#c9a36a",
+    "#8c8c8c"
+   ],
+   "epis": [
+    "avental",
+    "botina",
+    "capacete",
+    "colete",
+    "luvas",
+    "mascara",
+    "oculos",
+    "protetor_auricular"
+   ],
+   "esqueleto": "UAL1",
+   "peles": [
+    "#f1c7a5",
+    "#e0ac84",
+    "#c68e6b",
+    "#a86f4c",
+    "#8a5638",
+    "#5f3a25"
+   ],
+   "recolorir": [
+    "cabelo",
+    "calca",
+    "camisa",
+    "pele"
+   ]
+  },
+  "minimo": [
+   -0.126,
+   -0.897,
+   0.002
+  ],
+  "nos": [
+   "corpo",
+   "epi_avental",
+   "epi_botina",
+   "epi_capacete",
+   "epi_colete",
+   "epi_luvas",
+   "epi_mascara",
+   "epi_oculos",
+   "epi_protetor_auricular"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.33,
+   1.793,
+   1.816
+  ],
+  "triangulos": 5592
+ },
+ "pessoa_mulher": {
+  "arquivo": "pessoa_mulher.glb",
+  "clipes": {},
+  "dados": {
+   "altura_base": 1.82,
+   "alturas": [
+    1.55,
+    1.78
+   ],
+   "cabelos": [
+    "#1f1a17",
+    "#3b2a20",
+    "#6b4a2b",
+    "#a07040",
+    "#c9a36a",
+    "#8c8c8c"
+   ],
+   "epis": [
+    "avental",
+    "botina",
+    "capacete",
+    "colete",
+    "luvas",
+    "mascara",
+    "oculos",
+    "protetor_auricular"
+   ],
+   "esqueleto": "UAL1",
+   "peles": [
+    "#f1c7a5",
+    "#e0ac84",
+    "#c68e6b",
+    "#a86f4c",
+    "#8a5638",
+    "#5f3a25"
+   ],
+   "recolorir": [
+    "cabelo",
+    "calca",
+    "camisa",
+    "pele"
+   ]
+  },
+  "minimo": [
+   -0.17,
+   -0.881,
+   0.002
+  ],
+  "nos": [
+   "corpo",
+   "epi_avental",
+   "epi_botina",
+   "epi_capacete",
+   "epi_colete",
+   "epi_luvas",
+   "epi_mascara",
+   "epi_oculos",
+   "epi_protetor_auricular"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.374,
+   1.762,
+   1.814
+  ],
+  "triangulos": 5557
+ },
+ "porta_paletes": {
+  "arquivo": "porta_paletes.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -2.17,
+   -0.57,
+   0.0
+  ],
+  "nos": [
+   "estrutura",
+   "porta_paletes"
+  ],
+  "pontos": {
+   "ponto_vao_0_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_0_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_0_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_0_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_0_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     6.08
+    ]
+   },
+   "ponto_vao_1_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_1_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_1_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_1_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_1_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     6.08
+    ]
+   },
+   "ponto_vao_2_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_2_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_2_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_2_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_2_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     6.08
+    ]
+   }
+  },
+  "tamanho": [
+   4.34,
+   1.14,
+   6.08
+  ],
+  "triangulos": 576
+ },
+ "porta_paletes_medio": {
+  "arquivo": "porta_paletes_medio.glb",
+  "clipes": {},
+  "dados": {},
+  "minimo": [
+   -2.17,
+   -0.57,
+   0.0
+  ],
+  "nos": [
+   "estrutura",
+   "porta_paletes"
+  ],
+  "pontos": {
+   "ponto_vao_0_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_0_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_0_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_0_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_0_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     -1.4,
+     0.0,
+     6.08
+    ]
+   },
+   "ponto_vao_1_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_1_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_1_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_1_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_1_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     0.0,
+     0.0,
+     6.08
+    ]
+   },
+   "ponto_vao_2_0": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_vao_2_1": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     1.58
+    ]
+   },
+   "ponto_vao_2_2": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     3.08
+    ]
+   },
+   "ponto_vao_2_3": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     4.58
+    ]
+   },
+   "ponto_vao_2_4": {
+    "giro": -90,
+    "pai": "porta_paletes",
+    "pos": [
+     1.4,
+     0.0,
+     6.08
+    ]
+   }
+  },
+  "tamanho": [
+   4.34,
+   1.14,
+   6.08
+  ],
+  "triangulos": 2112
+ },
+ "posto": {
+  "arquivo": "posto.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "grampo"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.75,
+   -0.375,
+   0.0
+  ],
+  "nos": [
+   "estrutura",
+   "grampo",
+   "luz",
+   "posto"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     -0.55,
+     0.1,
+     1.02
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.7,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.1,
+     0.94
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.7,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     0.55,
+     0.1,
+     1.02
+    ]
+   }
+  },
+  "tamanho": [
+   1.5,
+   0.765,
+   1.92
+  ],
+  "triangulos": 228
+ },
+ "posto_medio": {
+  "arquivo": "posto_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "grampo"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.75,
+   -0.375,
+   0.0
+  ],
+  "nos": [
+   "estrutura",
+   "grampo",
+   "luz",
+   "posto"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     -0.55,
+     0.1,
+     1.02
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.7,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.1,
+     0.94
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "posto",
+    "pos": [
+     0.0,
+     -0.7,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "posto",
+    "pos": [
+     0.55,
+     0.1,
+     1.02
+    ]
+   }
+  },
+  "tamanho": [
+   1.5,
+   0.765,
+   1.92
+  ],
+  "triangulos": 660
+ },
+ "prensa": {
+  "arquivo": "prensa.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "martelo",
+     "volante"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "matriz"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.7,
+   -0.6,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "luz",
+   "martelo",
+   "matriz",
+   "porta",
+   "prensa",
+   "tampa",
+   "volante"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     -1.0,
+     -0.4,
+     0.95
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -0.1,
+     1.06
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -0.75,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     1.0,
+     -0.4,
+     0.95
+    ]
+   }
+  },
+  "tamanho": [
+   1.7,
+   1.25,
+   2.9
+  ],
+  "triangulos": 556
+ },
+ "prensa_medio": {
+  "arquivo": "prensa_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "martelo",
+     "volante"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "matriz"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.7,
+   -0.6,
+   0.0
+  ],
+  "nos": [
+   "chassi",
+   "luz",
+   "martelo",
+   "matriz",
+   "porta",
+   "prensa",
+   "tampa",
+   "volante"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     -1.0,
+     -0.4,
+     0.95
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -0.1,
+     1.06
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "prensa",
+    "pos": [
+     0.0,
+     -0.75,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "prensa",
+    "pos": [
+     1.0,
+     -0.4,
+     0.95
+    ]
+   }
+  },
+  "tamanho": [
+   1.7,
+   1.25,
+   2.9
+  ],
+  "triangulos": 1436
+ },
+ "robo": {
+  "arquivo": "robo.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "levar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "pegar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "soltar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.35,
+   -0.35,
+   0.0
+  ],
+  "nos": [
+   "antebraco",
+   "base",
+   "braco",
+   "dedo_d",
+   "dedo_e",
+   "garra",
+   "pedestal",
+   "robo"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 90,
+    "pai": "robo",
+    "pos": [
+     0.0,
+     1.0,
+     0.76
+    ]
+   },
+   "ponto_garra": {
+    "giro": 0,
+    "pai": "garra",
+    "pos": [
+     0.65,
+     0.0,
+     1.26
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "robo",
+    "pos": [
+     -1.2,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_porta": {
+    "giro": 0,
+    "pai": "robo",
+    "pos": [
+     -1.2,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": -90,
+    "pai": "robo",
+    "pos": [
+     0.0,
+     -1.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   1.06,
+   0.7,
+   1.56
+  ],
+  "triangulos": 304
+ },
+ "robo_medio": {
+  "arquivo": "robo_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "levar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "pegar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   },
+   "soltar": {
+    "laco": false,
+    "nos": [
+     "antebraco",
+     "base",
+     "braco",
+     "dedo_d",
+     "dedo_e",
+     "garra"
+    ]
+   }
+  },
+  "dados": {},
+  "minimo": [
+   -0.35,
+   -0.35,
+   0.0
+  ],
+  "nos": [
+   "antebraco",
+   "base",
+   "braco",
+   "dedo_d",
+   "dedo_e",
+   "garra",
+   "pedestal",
+   "robo"
+  ],
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 90,
+    "pai": "robo",
+    "pos": [
+     0.0,
+     1.0,
+     0.76
+    ]
+   },
+   "ponto_garra": {
+    "giro": 0,
+    "pai": "garra",
+    "pos": [
+     0.65,
+     0.0,
+     1.26
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "robo",
+    "pos": [
+     -1.2,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_porta": {
+    "giro": 0,
+    "pai": "robo",
+    "pos": [
+     -1.2,
+     0.0,
+     0.0
+    ]
+   },
+   "ponto_saida": {
+    "giro": -90,
+    "pai": "robo",
+    "pos": [
+     0.0,
+     -1.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   1.06,
+   0.7,
+   1.56
+  ],
+  "triangulos": 608
+ }
+}

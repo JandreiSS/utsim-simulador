@@ -23,6 +23,10 @@ Cada coluna tem um nome e um tipo: número, texto ou data. Clique no nome para s
 
 Em Arquivo › Importar CSV ou xlsx, escreva o caminho do arquivo. No CSV, o separador `;` usa vírgula decimal e o `,` usa ponto. No xlsx, escolha a aba quando houver mais de uma; o valor gravado das fórmulas é o que vale. A primeira linha com texto vira o cabeçalho, e o tipo de cada coluna é deduzido. A planilha importada guarda o nome do arquivo e o hash dos bytes como origem.
 
+### Exportar
+
+Arquivo › Exportar planilha em xlsx grava `estatistica/exportados/<nome>.xlsx` na unidade. A aba "Dados" tem o cabeçalho e as células (números como números); a aba "Origem" tem a origem dos dados, o hash e a data.
+
 ### Operações de dados (menu Dados)
 
 - **Empilhar:** junta várias colunas numa só e cria uma coluna de rótulos com o nome da coluna de origem.
@@ -56,7 +60,8 @@ O TOST responde se duas médias são iguais na prática, isto é, se a diferenç
 "Abrir replicações ou experimento do UTSim" roda um arquivo `.ron` do UTSim pela mesma biblioteca do simulador e abre o resultado como planilha:
 
 - **um modelo:** uma linha por replicação, com a coluna `replicacao` e uma coluna por indicador do relatório (`objeto.medida.estatística`, por exemplo `fila.content.mean`). O número de replicações pode ser trocado na hora; vazio usa o do modelo;
-- **um experimento** (o arquivo de cenários do UTSim): uma linha por cenário e replicação, com as colunas `cenario`, uma por fator alterado (`base` quando o cenário não muda aquele fator) e `replicacao`.
+- **um experimento** (o arquivo de cenários do UTSim): uma linha por cenário e replicação, com as colunas `cenario`, uma por fator alterado (`base` quando o cenário não muda aquele fator) e `replicacao`;
+- **as medições de qualidade de um modelo:** escolha "Medições de qualidade" para ter uma linha por característica medida em cada peça (`replicacao`, `item`, `objeto`, `caracteristica`, `instante`, `valor`), a mesma fonte do UTSim Qualidade. O modelo precisa de características no campo `quality` dos nós.
 
 A planilha fica com a origem "Simulado", o caminho do modelo, as replicações, a semente e o SHA-256 do arquivo do modelo. Rodar o mesmo modelo de novo dá os mesmos números. A simulação roda em segundo plano; a janela segue respondendo.
 
@@ -96,9 +101,9 @@ A tela Histórico lista as análises da unidade, de todas as pessoas. "Rodar de 
 
 Todo relatório mostra a origem dos dados (manual, importado com o hash, simulado) e o autor.
 
-## Capacidade, cartas de controle e MSA
+## Capacidade, cartas de controle, MSA e Pareto
 
-Essas ferramentas ficam no UTSim Qualidade, a tela única da família para elas. O menu Qualidade do Estatística grava as colunas escolhidas num CSV em `estatistica/para_qualidade/` e abre o UTSim Qualidade, se ele estiver instalado pelo launcher. Por enquanto o resultado não volta sozinho ao Estatística. Isso chega com o pedido entre apps, numa próxima versão.
+Essas ferramentas ficam no UTSim Qualidade, a tela única da família para elas. O menu Qualidade do Estatística grava as colunas escolhidas num CSV em `estatistica/para_qualidade/` e abre o UTSim Qualidade, se ele estiver instalado pelo launcher. Para o Pareto, escolha a coluna das categorias (defeito, posto) e, se quiser, uma coluna de números para somar no lugar de contar: o CSV sai já contado, `categoria;contagem`, da maior para a menor. Por enquanto o resultado não volta sozinho ao Estatística. Isso chega com o pedido entre apps, numa próxima versão.
 
 ## O que vem depois
 
