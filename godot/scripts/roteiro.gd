@@ -1174,6 +1174,20 @@ func _check(c: Dictionary, k: int) -> void:
 						var node_name := String(want["aberto"] if want_open else want["fechado"])
 						var moved = cena.element_node_moved(i, node_name)
 						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"item_em_ponto":
+				# {"objeto", "t", "ponto", "altura_entre": [a, b]}: an item sits on that point
+				# of the block's Blender element (the part it works on, the load on its forks
+				# or deck), and the point's height.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				var n: int = cena.items_at_point(i, String(want["ponto"]))
+				report.call("item em %s de %s" % [want["ponto"], want["objeto"]], n > 0, "%d item(ns)" % n)
+				if want.has("altura_entre"):
+					# The point itself (the forks past the clip's travel reach the cell).
+					var h: float = cena.point_height(i, String(want["ponto"]))
+					report.call("altura de %s de %s" % [want["ponto"], want["objeto"]], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.2f m" % h)
 			"pessoa3d":
 				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true}: a person
 				# drawn with a Blender body, the protective equipment shown, and a clip playing.
