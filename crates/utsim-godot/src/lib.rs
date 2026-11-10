@@ -51,6 +51,7 @@ pub mod indicadores;
 pub mod jobs;
 mod jobs_class;
 pub mod linha;
+pub mod modelos3d;
 pub mod network_edit;
 pub mod outro_app;
 pub mod overlay_mesh;
@@ -545,10 +546,16 @@ impl UtsimPlayback {
     /// The layout: `{end, bounds_min, bounds_max, pallets, fork_size, blocks, network,
     /// network_controlled, connections, fluids}`. Each block is a dictionary with `name,
     /// kind, role, mobile, position, size, yaw, shape` (`size` in the block's own frame,
-    /// `yaw` its turn about `+Y` in radians, by which the root turns; 0 for the mobiles)
-    /// and, when it has a realistic look, `asset {source, name, key, path}, scale,
-    /// asset_yaw, offset, color, carry, skeletal`, and for a forklift with a seat `driver {position, yaw, scale, eye, hip}` (the
-    /// mannequin's root, the camera eye and the hip on the seat, in the block root's frame).
+    /// `yaw` its turn about `+Y` in radians, by which the root turns; 0 for the mobiles),
+    /// `clips` (the clips of its Blender element, sorted, indexed by the frame's
+    /// `anim_clip`; empty for the others) and, when it has a realistic look, `asset
+    /// {source, name, key, path, fallback}, scale, asset_yaw, offset, color, carry,
+    /// skeletal` (`source: "modelos3d"` for a Blender element of `assets/modelos3d/`, with
+    /// the library asset as `fallback`; a person's fallback mannequin has its own `scale`
+    /// and `offset`), for a person with a Blender body `pessoa
+    /// {arquivo, epis, cores {material: "#rrggbb"}, altura, escala}`, and for a forklift
+    /// with a seat `driver {position, yaw, scale, eye, hip}` (the mannequin's root, the
+    /// camera eye and the hip on the seat, in the block root's frame).
     #[func]
     fn static_scene(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
@@ -589,13 +596,20 @@ impl UtsimPlayback {
                 }
                 put(&mut e, "type_mix", mix);
             }
-            if let Some(l) = &v.look {
-                let a = AssetInfo::of(&l.source);
-                let mut asset = VarDictionary::new();
-                put(&mut asset, "source", a.source);
-                put(&mut asset, "name", GString::from(a.name.as_str()));
-                put(&mut asset, "key", GString::from(a.key.as_str()));
-                put(&mut asset, "path", GString::from(a.path.as_str()));
+            put(&mut e, "clips", strings(&v.clips));
+            if let Some(l) = &v.look
+                && let Some((a, fallback)) = c.asset_of(i)
+            {
+                let mut asset = asset_dict(&a);
+                if let Some(f) = &fallback {
+                    let mut fd = asset_dict(f);
+                    if let Some(p) = &v.pessoa {
+                        // The mannequin the body replaces keeps its own size.
+                        put(&mut fd, "scale", p.escala_boneco);
+                        put(&mut fd, "offset", v3(p.offset_boneco));
+                    }
+                    put(&mut asset, "fallback", fd);
+                }
                 put(&mut e, "asset", asset);
                 put(&mut e, "scale", l.scale);
                 // Under the root, which is already turned by `yaw`.
@@ -607,6 +621,19 @@ impl UtsimPlayback {
                 }
                 put(&mut e, "carry", l.carry.name());
                 put(&mut e, "skeletal", l.skeletal);
+                if let Some(p) = &v.pessoa {
+                    let mut body = VarDictionary::new();
+                    put(&mut body, "arquivo", GString::from(p.arquivo.as_str()));
+                    put(&mut body, "epis", strings(&p.epis));
+                    let mut cores = VarDictionary::new();
+                    for (material, hex) in &p.cores {
+                        put(&mut cores, material, GString::from(hex.as_str()));
+                    }
+                    put(&mut body, "cores", cores);
+                    put(&mut body, "altura", p.altura);
+                    put(&mut body, "escala", p.escala);
+                    put(&mut e, "pessoa", body);
+                }
             }
             if let Some(m) = &v.driver {
                 let mut driver = VarDictionary::new();
@@ -774,7 +801,9 @@ impl UtsimPlayback {
     }
 
     /// Everything that changes at `t`, as packed arrays: per block `position, yaw, lift,
-    /// motion, param, color, rolled, clip, clip_time, label`; per drawn item `item_id,
+    /// motion, param, color, rolled, clip, clip_time, label, anim_clip, anim_fase` (the
+    /// clip of a Blender element, index into the block's `clips` or -1, and its phase from
+    /// 0 to 1); per drawn item `item_id,
     /// item_position, item_yaw, item_scale, item_color, item_carrier, item_stack`.
     #[func]
     fn frame(&self, t: f64) -> VarDictionary {
@@ -810,6 +839,16 @@ impl UtsimPlayback {
             PackedFloat32Array::from(f.clip_time.as_slice()),
         );
         put(&mut d, "label", strings(&f.label));
+        put(
+            &mut d,
+            "anim_clip",
+            PackedInt32Array::from(f.anim_clip.as_slice()),
+        );
+        put(
+            &mut d,
+            "anim_fase",
+            PackedFloat32Array::from(f.anim_fase.as_slice()),
+        );
         put(
             &mut d,
             "item_id",
@@ -868,6 +907,16 @@ impl UtsimPlayback {
         }
         out
     }
+}
+
+/// An asset as the scene's dictionary: `{source, name, key, path}`.
+fn asset_dict(a: &AssetInfo) -> VarDictionary {
+    let mut d = VarDictionary::new();
+    put(&mut d, "source", a.source);
+    put(&mut d, "name", GString::from(a.name.as_str()));
+    put(&mut d, "key", GString::from(a.key.as_str()));
+    put(&mut d, "path", GString::from(a.path.as_str()));
+    d
 }
 
 fn vectors(list: &[[f32; 3]]) -> PackedVector3Array {

@@ -2,7 +2,8 @@
 # Prepara a interface Godot (pasta godot/):
 #   1. compila a ponte em Rust (crates/utsim-godot) e copia a biblioteca para godot/bin/;
 #   2. copia os modelos .glb do repositório para godot/importados/ (a biblioteca de
-#      assets/modelos e o boneco animado de assets/terceiros/quaternius_ual*);
+#      assets/modelos, os elementos do Blender de assets/modelos3d e o boneco animado de
+#      assets/terceiros/quaternius_ual*);
 #   3. roda a importação do Godot (gera o cache em godot/.godot/).
 # As cópias e o cache ficam fora do git (godot/.gitignore): os originais continuam só em
 # assets/, e o Godot pode escrever seus arquivos .import sem tocar neles.
@@ -66,6 +67,8 @@ cp "target/$PERFIL/$LIB" "godot/bin/$LIB" ||
 echo "==> 2/3 copiando os modelos para godot/importados"
 mkdir -p godot/importados/modelos
 cp -u assets/modelos/*.glb godot/importados/modelos/ || falha "cópia de assets/modelos"
+mkdir -p godot/importados/modelos3d
+cp -u assets/modelos3d/*.glb godot/importados/modelos3d/ || falha "cópia de assets/modelos3d"
 for pacote in quaternius_ual quaternius_ual2; do
     mkdir -p "godot/importados/terceiros/$pacote"
     cp -u "assets/terceiros/$pacote/"*.glb "assets/terceiros/$pacote/"LICENCA*.txt \

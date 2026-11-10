@@ -1152,6 +1152,44 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("clipe"):
 						var clip: String = (cena.rigs[i]["driver"] as Pessoa).clip_name()
 						report.call("clipe do motorista de %s" % want["objeto"], clip == String(want["clipe"]), clip)
+			"elemento":
+				# {"objeto", "t", "clipe", "fase_entre": [a, b], "aberto"/"fechado": "no"}: the
+				# clip a Blender element plays at `t` ("" for none), its phase, and whether a
+				# node is out of its rest pose.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var playing: Array = cena.element_clip(i)
+					if want.has("clipe"):
+						report.call("clipe de %s" % want["objeto"], String(playing[0]) == String(want["clipe"]), str(playing))
+					if want.has("fase_entre"):
+						var fase := float(playing[1])
+						report.call("fase de %s entre %s e %s" % [want["objeto"], want["fase_entre"][0], want["fase_entre"][1]], fase >= float(want["fase_entre"][0]) and fase <= float(want["fase_entre"][1]), "%.3f" % fase)
+					if want.has("aberto") or want.has("fechado"):
+						# {"aberto": "porta"} / {"fechado": "porta"}: that node out of / at rest.
+						var want_open: bool = want.has("aberto")
+						var node_name := String(want["aberto"] if want_open else want["fechado"])
+						var moved = cena.element_node_moved(i, node_name)
+						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"pessoa3d":
+				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true}: a person
+				# drawn with a Blender body, the protective equipment shown, and a clip playing.
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var rig: Dictionary = cena.rigs[i]
+					if want.has("corpo_blender"):
+						report.call("corpo do Blender em %s" % want["objeto"], rig.has("pessoa") == bool(want["corpo_blender"]), str(rig.get("pessoa", {})))
+					if want.has("epis") and rig.has("asset"):
+						var shown := Pessoa.epis_visiveis(rig["asset"])
+						report.call("EPI de %s" % want["objeto"], Array(shown) == Array(want["epis"]), str(shown))
+					if want.get("animada", false):
+						var clip: String = (rig["person"] as Pessoa).clip_name() if rig.has("person") else ""
+						report.call("%s animada" % want["objeto"], clip != "", clip)
 			"camera_nos_olhos":
 				var cena: CenaUtsim = _main.cena
 				var eye = cena.driver_eye(cena.block_index(String(want)))

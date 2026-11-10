@@ -65,6 +65,27 @@ Uma fila (`Queue`) com `visual: (asset: "esteira")` é desenhada como uma esteir
 
 Os itens aparecem como um palete com caixas numa cena com paletes (porta-paletes ou empilhadeiras), e como uma caixa nas demais. Veículos e pessoas param na borda das máquinas, e a empilhadeira que opera um porta-paletes vai ao corredor em frente a ele.
 
+### Elementos do Blender (UTSim 3D)
+
+O UTSim 3D procura primeiro os elementos de `assets/modelos3d/`, feitos no Blender, e usa a biblioteca como reserva. A máquina padrão é desenhada como o `cnc` e a bancada como o `posto`. A empilhadeira e o AGV também vêm de lá, no mesmo tamanho. Os itens que circulam continuam as caixas e os paletes da biblioteca. O porta-paletes, a esteira e a faixa da fila continuam da biblioteca, porque as medidas deles vêm do modelo. Para outro elemento, escreva o nome dele em `visual.asset`: `cnc`, `prensa`, `injetora`, `posto`, `robo`, `celula`, `estante`, ou a versão `_medio` de cada um, com mais detalhe. Em `agv_medio` e `empilhadeira_medio` o veículo continua o da biblioteca, só com o desenho mais detalhado; `esteira_medio` e `porta_paletes_medio` ficam com a esteira e o porta-paletes nas medidas do modelo.
+
+As máquinas se mexem conforme o estado delas na simulação:
+
+| Estado do posto | O que aparece |
+|---|---|
+| entrando (`entering`) | a porta abre durante o tempo de entrar |
+| processando | um ciclo da máquina por peça, com a porta ainda aberta |
+| em setup | o ajuste da máquina |
+| saindo (`leaving`) | a porta fecha durante o tempo de sair |
+| quebrado | a tampa de manutenção abre |
+| à espera do reparo, em manutenção | a tampa fica aberta |
+
+Cada elemento traz essa tabela no próprio catálogo (`estados`), então um posto simples ou uma célula mostram só o que têm. Nos outros estados a máquina fica em repouso.
+
+Os tempos de entrar e sair são os da regra de operação do nó (aba Segurança). O operador fica no lugar de operar do elemento, olhando para a máquina. Enquanto o posto está entrando, ele anda da porta até esse lugar, e na saída faz o caminho de volta.
+
+As pessoas usam os corpos `pessoa_homem` e `pessoa_mulher`, com as mesmas animações do boneco. O corpo, os tons de pele e de cabelo e a altura são escolhidos pelo nome da pessoa, então ficam iguais em toda reprodução. Ela veste os EPIs da lista `ppe` do próprio nó e os dos postos que ela opera, os mesmos que a análise de exposição considera (nomes como `respirador`, `luva` e `bota` também valem), e a camisa pega a cor de `visual.color`. Para escolher o corpo, escreva `visual: (asset: "pessoa_mulher")` ou `"pessoa_homem"`.
+
 ## Movimento
 
 - **Pessoas animadas.** As pessoas usam o boneco CC0 da Universal Animation Library, com roupa azul de trabalho, capacete amarelo e colete laranja com faixas. Cada situação tem a sua animação: parada, andando, correndo (acima de 2 m/s), andando com a caixa nas mãos, de pé segurando a caixa, pegando ou entregando o item e trabalhando no painel da máquina. A passada acompanha a velocidade, então o pé não desliza, e a troca de uma animação para outra leva um quarto de segundo. A pose depende só do instante: saltar para um tempo mostra a mesma pose que chegar lá reproduzindo. O item carregado fica entre as mãos. Para usar a pessoa de blocos, escreva `visual: (asset: "operador_simples")`.

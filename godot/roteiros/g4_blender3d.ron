@@ -1,0 +1,34 @@
+// Ponto de partida do roteiro g4_blender3d.json: os elementos feitos no Blender
+// (assets/modelos3d) na reprodução. A máquina padrão vira o CNC, com a porta que abre
+// enquanto a operadora entra (4 s), o ciclo enquanto processa e a porta que fecha enquanto
+// ela sai (4 s); a prensa (visual.asset) faz setup e ciclo sozinha. A operadora é uma
+// pessoa do Blender, com o EPI do nó dela (capacete, óculos e luvas) mais o do posto
+// que ela opera (protetor auricular), e a camisa da cor dela.
+Model(
+    format: 2,
+    name: "elementos do Blender",
+    run: (stop_time: 400.0, seed: 3, replications: 1),
+    objects: [
+        (name: "fonte", kind: Source(interarrival: Const(100.0), first_at_zero: true, max_arrivals: Some(3)),
+         position: (-6.0, 0.0, 0.0)),
+        (name: "fila", kind: Queue(), position: (-3.0, 0.0, 0.0)),
+        (name: "cnc_1", kind: Processor(process: Const(10.0), operators: Some(OperatorUse(team: "ana"))),
+         position: (2.0, 0.0, 0.0), ppe: ["protetor auricular"],
+         operation: Some((entrar: Const(4.0), sair: Const(4.0)))),
+        (name: "saida", kind: Sink, position: (7.0, 0.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.0), position: (2.0, -4.0, 0.0),
+         visual: (asset: "pessoa", color: "#2e7d32"), ppe: ["capacete", "Óculos", "luvas"]),
+        (name: "fonte_2", kind: Source(interarrival: Const(100.0), first_at_zero: true, max_arrivals: Some(3)),
+         position: (-6.0, 6.0, 0.0)),
+        (name: "prensa_1", kind: Processor(setup: Some(Const(5.0)), process: Const(20.0)),
+         position: (2.0, 6.0, 0.0), visual: (asset: "prensa")),
+        (name: "saida_2", kind: Sink, position: (7.0, 6.0, 0.0)),
+    ],
+    connections: [
+        ("fonte", "fila"),
+        ("fila", "cnc_1"),
+        ("cnc_1", "saida"),
+        ("fonte_2", "prensa_1"),
+        ("prensa_1", "saida_2"),
+    ],
+)
