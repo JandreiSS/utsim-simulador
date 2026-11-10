@@ -1931,7 +1931,7 @@
   "arquivo": "pessoa_homem.glb",
   "clipes": {},
   "dados": {
-   "altura_base": 1.82,
+   "altura_base": 1.76,
    "alturas": [
     1.65,
     1.9
@@ -1972,9 +1972,9 @@
   },
   "estados": {},
   "minimo": [
-   -0.136,
-   -0.993,
-   0.0
+   -0.188,
+   -0.961,
+   -0.008
   ],
   "nos": [
    "corpo",
@@ -1990,17 +1990,17 @@
   "peca": {},
   "pontos": {},
   "tamanho": [
-   0.343,
-   1.985,
-   1.848
+   0.367,
+   1.923,
+   1.76
   ],
-  "triangulos": 8916
+  "triangulos": 18616
  },
  "pessoa_mulher": {
   "arquivo": "pessoa_mulher.glb",
   "clipes": {},
   "dados": {
-   "altura_base": 1.82,
+   "altura_base": 1.75,
    "alturas": [
     1.55,
     1.78
@@ -2041,9 +2041,9 @@
   },
   "estados": {},
   "minimo": [
-   -0.132,
-   -0.992,
-   0.0
+   -0.209,
+   -0.929,
+   -0.001
   ],
   "nos": [
    "corpo",
@@ -2059,11 +2059,11 @@
   "peca": {},
   "pontos": {},
   "tamanho": [
-   0.339,
-   1.984,
-   1.846
+   0.37,
+   1.858,
+   1.749
   ],
-  "triangulos": 9348
+  "triangulos": 19600
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",
