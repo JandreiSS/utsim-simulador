@@ -1117,6 +1117,140 @@
   ],
   "triangulos": 120
  },
+ "pessoa_homem": {
+  "arquivo": "pessoa_homem.glb",
+  "clipes": {},
+  "dados": {
+   "altura_base": 1.82,
+   "alturas": [
+    1.65,
+    1.9
+   ],
+   "cabelos": [
+    "#1f1a17",
+    "#3b2a20",
+    "#6b4a2b",
+    "#a07040",
+    "#c9a36a",
+    "#8c8c8c"
+   ],
+   "epis": [
+    "avental",
+    "botina",
+    "capacete",
+    "colete",
+    "luvas",
+    "mascara",
+    "oculos",
+    "protetor_auricular"
+   ],
+   "esqueleto": "UAL1",
+   "peles": [
+    "#f1c7a5",
+    "#e0ac84",
+    "#c68e6b",
+    "#a86f4c",
+    "#8a5638",
+    "#5f3a25"
+   ],
+   "recolorir": [
+    "cabelo",
+    "calca",
+    "camisa",
+    "pele"
+   ]
+  },
+  "minimo": [
+   -0.126,
+   -0.897,
+   0.002
+  ],
+  "nos": [
+   "corpo",
+   "epi_avental",
+   "epi_botina",
+   "epi_capacete",
+   "epi_colete",
+   "epi_luvas",
+   "epi_mascara",
+   "epi_oculos",
+   "epi_protetor_auricular"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.33,
+   1.793,
+   1.816
+  ],
+  "triangulos": 5592
+ },
+ "pessoa_mulher": {
+  "arquivo": "pessoa_mulher.glb",
+  "clipes": {},
+  "dados": {
+   "altura_base": 1.82,
+   "alturas": [
+    1.55,
+    1.78
+   ],
+   "cabelos": [
+    "#1f1a17",
+    "#3b2a20",
+    "#6b4a2b",
+    "#a07040",
+    "#c9a36a",
+    "#8c8c8c"
+   ],
+   "epis": [
+    "avental",
+    "botina",
+    "capacete",
+    "colete",
+    "luvas",
+    "mascara",
+    "oculos",
+    "protetor_auricular"
+   ],
+   "esqueleto": "UAL1",
+   "peles": [
+    "#f1c7a5",
+    "#e0ac84",
+    "#c68e6b",
+    "#a86f4c",
+    "#8a5638",
+    "#5f3a25"
+   ],
+   "recolorir": [
+    "cabelo",
+    "calca",
+    "camisa",
+    "pele"
+   ]
+  },
+  "minimo": [
+   -0.17,
+   -0.881,
+   0.002
+  ],
+  "nos": [
+   "corpo",
+   "epi_avental",
+   "epi_botina",
+   "epi_capacete",
+   "epi_colete",
+   "epi_luvas",
+   "epi_mascara",
+   "epi_oculos",
+   "epi_protetor_auricular"
+  ],
+  "pontos": {},
+  "tamanho": [
+   0.374,
+   1.762,
+   1.814
+  ],
+  "triangulos": 5557
+ },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",
   "clipes": {},

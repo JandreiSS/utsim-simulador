@@ -45,13 +45,15 @@ fn opt_summary(s: &Option<Summary>) -> Value {
     s.as_ref().map_or(Value::Null, summary)
 }
 
-const STATES: [State; 21] = [
+const STATES: [State; 23] = [
     State::Idle,
     State::Empty,
     State::Generating,
     State::Releasing,
     State::Collecting,
     State::Setup,
+    State::Entering,
+    State::Leaving,
     State::Processing,
     State::Blocked,
     State::WaitingOperator,
@@ -631,6 +633,13 @@ pub fn object(entries: &[(&str, Value)]) -> Value {
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn the_crew_getting_in_and_out_has_names() {
+        assert_eq!(state_label("entering"), "operador entrando");
+        assert_eq!(state_label("leaving"), "operador saindo");
+        assert_eq!(state_named("leaving"), Some(State::Leaving));
+    }
 
     pub(crate) fn example(name: &str) -> Model {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))

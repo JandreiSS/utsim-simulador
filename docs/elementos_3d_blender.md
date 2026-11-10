@@ -72,12 +72,12 @@ pular no tempo.
 |---|---|---|---|
 | cnc, prensa, injetora | `ciclo` | sim | processando |
 | | `setup` | sim | em setup |
-| | `porta_abrir` | não | operador entrando (0 → 1) e saindo (1 → 0) |
+| | `porta_abrir` | não | posto em `entering` (fase 0 → 1) e em `leaving` (1 → 0), da regra de operação do nó |
 | | `quebra` | não | quebrado (abre a tampa de manutenção) |
 | posto | `ciclo` | sim | processando |
 | robo | `pegar`, `levar`, `soltar` | não | carregar, transportar e descarregar a peça |
 | | `ciclo` | sim | os três seguidos, para um robô sempre ocupado |
-| celula | `porta_abrir` | não | pessoa entrando ou saindo da célula |
+| celula | `porta_abrir` | não | posto da célula em `entering` (0 → 1) e em `leaving` (1 → 0) |
 | esteira | `rolar` | sim | fase = distância / (2π · `raio_rolo`) |
 | empilhadeira | `garfo_subir` | não | altura do garfo / `garfo_curso` |
 | agv | `mesa_subir` | não | carregando ou descarregando |
@@ -96,3 +96,44 @@ O palete vai no `ponto_carga` do garfo e fica no `ponto_vao_*` do porta-paletes.
 operador anda até `ponto_porta`, abre a porta, vai a `ponto_operador`, opera e sai pelo
 mesmo caminho. Fazer a peça, o palete e a pessoa seguirem esses pontos no 3D é da ponte
 e da interface (próximas etapas).
+
+## Pessoas
+
+`tools/blender/pessoas.py` (chamado pelo `gerar.py`) gera `pessoa_homem.glb` e
+`pessoa_mulher.glb`. Elas são feitas sem nada baixado: o corpo é de metaball, por famílias
+(tronco, cada braço, cada perna), convertido em malha leve. Os arquivos têm:
+
+- o esqueleto do boneco livre UAL1 (`assets/terceiros/quaternius_ual`), com os mesmos ossos
+  e a mesma pose de repouso, e sem animações próprias. O 3D toca nelas as animações do UAL1
+  e do UAL2 (andar, operar, carregar, pegar, interagir), como faz hoje no boneco;
+- `corpo`: corpo liso com rosto simples (olhos, sobrancelhas, nariz, orelhas e boca),
+  cabelo, camisa de manga curta, calça e calçado. A cor vem dos materiais `pele`, `cabelo`,
+  `camisa`, `calca`, `calcado`, `olho` e `labio`, sem textura;
+- `epi_<nome>`: uma malha por EPI do modelo (`capacete`, `oculos`, `protetor_auricular`,
+  `luvas`, `botina`, `colete`, `mascara`, `avental`). O 3D mostra só as do EPI que a pessoa
+  veste (o `ppe` do nó dela).
+
+Os pesos de pele vêm do boneco UAL1, pelo ponto mais próximo. Há dois cuidados:
+
+- cada família só pode seguir os próprios ossos (o tronco não segue o braço);
+- perto do ombro, o peso passa aos poucos da clavícula para o braço.
+
+As peças da cabeça, o capacete, os óculos, o protetor e a máscara ficam presos ao osso
+`Head`, e as luvas à mão.
+
+Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
+
+| Campo | O que é |
+|---|---|
+| `recolorir` | materiais que o 3D recolore |
+| `peles`, `cabelos` | tons sugeridos (sRGB) |
+| `alturas` | faixa de altura do sexo, em metros |
+| `altura_base` | altura do esqueleto (1,82 m); a escala é altura / `altura_base` |
+
+O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
+
+- os ossos e a pose de repouso batem com os do UAL1;
+- há um nó por EPI;
+- todo vértice tem peso;
+- o corpo tem os materiais recoloríveis.
+

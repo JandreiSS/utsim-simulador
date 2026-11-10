@@ -10,6 +10,7 @@ use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
 use utsim_linhas::logistica::{self, Armazem, LOGISTICA};
 use utsim_linhas::manufatura::{self, MANUFATURA, Manufatura};
+use utsim_linhas::processos::{self, PROCESSOS, Processos};
 use utsim_linhas::saude::{self, SAUDE, Saude};
 use utsim_linhas::servicos::{self, Atendimento, Meta, SERVICOS};
 use utsim_linhas::{Pack, Placement, builtin, find};
@@ -22,8 +23,8 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
 #[command(
     name = "utsim linha",
     about = "Linhas especializadas (Lean Office, Serviços e atendimento, Logística e \
-             armazém, Saúde e hospital, Manufatura discreta): predefinições, \
-             vocabulário, modelos prontos, indicadores e relatório da linha"
+             armazém, Saúde e hospital, Manufatura discreta, Processos contínuos e \
+             batelada): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
     /// Linha (por exemplo lean_office), ou "lista" para ver as linhas instaladas
@@ -77,6 +78,9 @@ enum Acao {
         /// Manufatura discreta: OEE-alvo das máquinas, de 0 a 1 (padrão 0,85)
         #[arg(long)]
         oee_alvo: Option<f64>,
+        /// Processos contínuos e batelada: rendimento-alvo dos lotes, de 0 a 1 (padrão 0,95)
+        #[arg(long)]
+        rendimento_alvo: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -252,6 +256,21 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
         }) if p.id() == MANUFATURA => {
             manufatura_cmd(&p, &model, reps, html, json, meta_oee_de(oee_alvo)?)?
         }
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
+            json,
+            rendimento_alvo,
+            ..
+        }) if p.id() == PROCESSOS => processos_cmd(
+            &p,
+            &model,
+            reps,
+            html,
+            json,
+            meta_rendimento_de(rendimento_alvo)?,
+        )?,
         Some(Acao::Relatorio {
             model,
             reps,
@@ -613,6 +632,46 @@ fn manufatura_cmd(
     Ok(())
 }
 
+/// The yield target of Processos contínuos e batelada from the option.
+fn meta_rendimento_de(r: Option<f64>) -> Result<processos::Meta, String> {
+    let r = r.unwrap_or(processos::Meta::default().rendimento);
+    if !(r.is_finite() && r > 0.0 && r <= 1.0) {
+        return Err(format!(
+            "--rendimento-alvo deve ser uma fração entre 0 e 1, recebi {r}"
+        ));
+    }
+    Ok(processos::Meta { rendimento: r })
+}
+
+/// `utsim linha processos relatorio`: the indicators of Processos contínuos e batelada.
+fn processos_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: processos::Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Processos::rodar(&m, Some(p), meta)?;
+    print!("{}", processos::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, processos::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"rendimento": meta.rendimento},
+            "replicacoes": &k.reps,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
@@ -638,6 +697,12 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
         let k = Manufatura::rodar(model, Some(&p), manufatura::Meta::default())?;
         println!();
         print!("{}", manufatura::relatorio::texto(&k));
+        return Ok(());
+    }
+    if p.id() == PROCESSOS {
+        let k = Processos::rodar(model, Some(&p), processos::Meta::default())?;
+        println!();
+        print!("{}", processos::relatorio::texto(&k));
         return Ok(());
     }
     let k = Indicadores::rodar(model, Some(&p))?;

@@ -1,0 +1,90 @@
+// Tintas: lotes com ajuste de cor. Modelo pronto da linha Processos contínuos e batelada,
+// montado com as predefinições de linhas/processos/biblioteca.ron e as de inspeção,
+// reprocesso e refugo do pacote Qualidade.
+//
+// Lotes de 1000 L de três cores (branco 50 %, cinza 30 % e azul 20 %) são liberados em média a
+// cada 115 minutos. O dispersor leva o tempo da receita de cada cor e limpa quando a cor muda
+// (do branco para o azul é rápido; do azul para o branco, demorado). O tanque de completagem
+// ajusta a viscosidade. O laboratório confere a cor: o lote fora de tom (defeito no campo
+// quality do dispersor) volta para o ajuste de cor e é conferido de novo; depois de dois
+// ajustes vai para o descarte. Dois operadores, cada um com as suas habilidades: o dispersor
+// exige quem sabe dispersar e o ajuste de cor, quem sabe tingir.
+//
+// Experimentos: trocar a regra da fila por campanha (Some(Asc("produto"))), reduzir o defeito
+// de tom ou dar a habilidade de tingir aos dois operadores, e ver os lotes por dia, o descarte
+// e a ocupação dos operadores.
+//
+// Resultado: ver o capítulo da linha no manual (docs/manual/src/linhas/processos/index.md).
+//
+// Tempo em minutos, volume em litros. Rode com:
+//   utsim linha processos relatorio examples/tintas_lotes.ron --html relatorio.html
+//
+//   programacao -> fila -> dispersor -> completagem -> fila_laboratorio -> laboratorio
+//     -> produto | ajuste_cor | descarte;  ajuste_cor -> fila_laboratorio
+Model(
+    name: "Tintas: lotes com ajuste de cor",
+    description: "Processos contínuos e batelada: receita por cor, limpeza entre cores, conferência de cor com ajuste e descarte, operadores com habilidades",
+    line: "processos",
+    packs: ["qualidade", "seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 227, replications: 5),
+    objects: [
+        (name: "programacao", kind: Source(interarrival: Exp(mean: 115.0),
+            labels: {"produto": Discrete([(1.0, 0.5), (2.0, 0.3), (3.0, 0.2)]), "volume": Const(1000.0),
+                "rendimento": Triangular(min: 0.94, mode: 0.97, max: 0.99)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "processos/lotes", department: "Fábrica de tintas"),
+        (name: "fila", kind: Queue(), position: (3.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "processos/fila_lotes", department: "Fábrica de tintas"),
+        (name: "dispersor", kind: Processor(setup: Some(Const(30.0)), process: Triangular(min: 50.0, mode: 60.0, max: 75.0),
+            operators: Some(OperatorUse(team: "operadores", requires: Some("dispersao"))),
+            changeover: Some((label: "produto", matrix: [
+                (from: 1.0, to: 2.0, time: Triangular(min: 10.0, mode: 15.0, max: 20.0)),
+                (from: 1.0, to: 3.0, time: Triangular(min: 15.0, mode: 20.0, max: 25.0)),
+                (from: 2.0, to: 3.0, time: Triangular(min: 10.0, mode: 15.0, max: 20.0)),
+                (from: 3.0, to: 1.0, time: Triangular(min: 40.0, mode: 50.0, max: 65.0)),
+                (from: 3.0, to: 2.0, time: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+            ])),
+            recipe: Some((label: "produto", times: [
+                (value: 1.0, time: Triangular(min: 50.0, mode: 60.0, max: 75.0)),
+                (value: 2.0, time: Triangular(min: 55.0, mode: 65.0, max: 80.0)),
+                (value: 3.0, time: Triangular(min: 60.0, mode: 75.0, max: 90.0)),
+            ]))),
+            quality: Some((defects: [(name: "fora_de_tom", probability: 0.12)])),
+            ppe: ["oculos", "luvas", "respirador", "botina"], position: (6.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("tanque"))), preset: "processos/reator", department: "Fábrica de tintas"),
+        (name: "completagem", kind: Processor(process: Triangular(min: 25.0, mode: 30.0, max: 40.0)),
+            ppe: ["oculos", "luvas"], position: (9.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("tanque"))), preset: "processos/equipamento", department: "Fábrica de tintas"),
+        (name: "fila_laboratorio", kind: Queue(), position: (12.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "processos/fila_lotes", department: "Laboratório"),
+        (name: "laboratorio", kind: Processor(process: Triangular(min: 10.0, mode: 15.0, max: 20.0)), output: ByLabel("inspecao"),
+            inspection: Some((every: 1, detect: 0.95, false_reject: 0.01, on_reject: Rework, max_rework: Some(2))),
+            position: (15.0, 0.0, 0.0), symbol: "inspecao", preset: "qualidade/estacao_inspecao", department: "Laboratório"),
+        (name: "ajuste_cor", kind: Processor(process: Triangular(min: 20.0, mode: 30.0, max: 45.0),
+            operators: Some(OperatorUse(team: "operadores", requires: Some("tingimento")))), rework: Some((fix: 0.7)),
+            ppe: ["oculos", "luvas", "respirador"], position: (15.0, -3.0, 0.0), symbol: "operacao",
+            preset: "qualidade/retrabalho", department: "Laboratório"),
+        (name: "produto", kind: Sink, position: (18.0, 0.0, 0.0), symbol: "fim", preset: "processos/tanque_produto",
+            department: "Envase"),
+        (name: "descarte", kind: Sink, sink_role: Some(Scrap), position: (18.0, -3.0, 0.0), symbol: "fim",
+            preset: "qualidade/refugo", department: "Laboratório"),
+        (name: "operadores", kind: Dispatcher(team: ["operadores_1", "operadores_2"], rule: FirstAvailable),
+            position: (9.0, 4.0, 0.0), preset: "processos/operadores", department: "Fábrica de tintas"),
+        (name: "operadores_1", kind: Transporter(speed: 60.0), position: (6.0, 4.0, 0.0),
+            ppe: ["oculos", "luvas", "botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["dispersao", "tingimento"])), preset: "processos/operador", department: "Fábrica de tintas"),
+        (name: "operadores_2", kind: Transporter(speed: 60.0), position: (12.0, 4.0, 0.0),
+            ppe: ["oculos", "luvas", "botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["dispersao"])), preset: "processos/operador", department: "Fábrica de tintas"),
+    ],
+    connections: [
+        ("programacao", "fila"),
+        ("fila", "dispersor"),
+        ("dispersor", "completagem"),
+        ("completagem", "fila_laboratorio"),
+        ("fila_laboratorio", "laboratorio"),
+        ("laboratorio", "produto"),
+        ("laboratorio", "ajuste_cor"),
+        ("laboratorio", "descarte"),
+        ("ajuste_cor", "fila_laboratorio"),
+    ],
+)

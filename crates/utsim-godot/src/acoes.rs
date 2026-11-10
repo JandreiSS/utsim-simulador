@@ -66,6 +66,8 @@ pub enum Passo {
     Excluir,
     CancelarEditor,
     Mover(i64, i64),
+    /// Turns the selection by these degrees (counter-clockwise seen from above).
+    Girar(i64),
     FecharZona,
     FecharCorredor,
     // Simular.
@@ -229,6 +231,10 @@ impl Passo {
                 a.n = *x;
                 a.n2 = *z;
                 "mover"
+            }
+            Girar(g) => {
+                a.n = *g;
+                "girar"
             }
             FecharZona => "fechar_zona",
             FecharCorredor => "fechar_corredor",
@@ -601,6 +607,10 @@ pub fn rotear_tecla(what: &str, st: &Estado) -> Vec<Passo> {
             nome: arg.into(),
             id: String::new(),
         },
+        "girar" => match int(arg) {
+            Some(g) => Girar(g),
+            None => return Vec::new(),
+        },
         "zona_fechar" => FecharZona,
         "corredor_fechar" => FecharCorredor,
         "grade" => Encaixe {
@@ -772,6 +782,8 @@ mod tests {
         let s = st();
         assert_eq!(rotear_tecla("modo:alternar", &s), vec![AlternarModo]);
         assert_eq!(rotear_tecla("mover:-1:0", &s), vec![Mover(-1, 0)]);
+        assert_eq!(rotear_tecla("girar:-90", &s), vec![Girar(-90)]);
+        assert!(rotear_tecla("girar:x", &s).is_empty());
         assert_eq!(
             rotear_tecla("organizar:colar", &s),
             vec![Organizar("colar".into())]
@@ -797,5 +809,7 @@ mod tests {
         assert_eq!((op, a.b, a.x), ("encaixe", true, 0.25));
         let (op, a) = Mover(1, -1).campos();
         assert_eq!((op, a.n, a.n2), ("mover", 1, -1));
+        let (op, a) = Girar(15).campos();
+        assert_eq!((op, a.n), ("girar", 15));
     }
 }

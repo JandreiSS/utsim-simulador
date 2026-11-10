@@ -57,6 +57,7 @@
 - [Logística e armazém](linhas/logistica/index.md)
 - [Saúde e hospital](linhas/saude/index.md)
 - [Manufatura discreta](linhas/manufatura/index.md)
+- [Processos contínuos e batelada](linhas/processos/index.md)
 - [Pacotes transversais](linhas/pacotes-transversais.md)
 
 # Recursos avançados
