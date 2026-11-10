@@ -375,6 +375,14 @@
      "torre"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "fuso",
+     "porta",
+     "torre"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -433,6 +441,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -502,6 +516,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
@@ -583,6 +614,14 @@
      "torre"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "fuso",
+     "porta",
+     "torre"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -641,6 +680,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -710,6 +755,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
@@ -1300,6 +1362,13 @@
      "molde"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "molde",
+     "porta"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -1358,6 +1427,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -1427,6 +1502,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
@@ -1507,6 +1599,13 @@
      "molde"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "molde",
+     "porta"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -1565,6 +1664,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -1634,6 +1739,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
@@ -2571,6 +2693,14 @@
      "volante"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "martelo",
+     "porta",
+     "volante"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -2629,6 +2759,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -2699,6 +2835,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
@@ -2780,6 +2933,14 @@
      "volante"
     ]
    },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "martelo",
+     "porta",
+     "volante"
+    ]
+   },
    "porta_abrir": {
     "laco": false,
     "nos": [
@@ -2838,6 +2999,12 @@
     "clipe": "ciclo",
     "de": 0.0,
     "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
    },
    "setup": {
     "ate": 1.0,
@@ -2908,6 +3075,23 @@
      0.0,
      1.0,
      "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
     ]
    ],
    "setup": [
