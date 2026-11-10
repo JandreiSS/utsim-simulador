@@ -6,6 +6,11 @@
 ## as the animation library "ual2"; both files share the skeleton and the node paths, so
 ## its tracks drive this mannequin as they are.
 ##
+## The bodies made in Blender (`pessoa_homem.glb`, `pessoa_mulher.glb`,
+## `docs/elementos_3d_blender.md`) have the UAL1 skeleton and no clips: [method bind] takes
+## the UAL1 clips too and names the skeleton's path as the tracks expect, and
+## [method vestir] shows the person's protective equipment and puts its colours on.
+##
 ## An AnimationTree in manual mode, every clip seeked to the time the scene gives, so
 ## jumping to `t` gives the pose of `t`:
 ##   slot a and slot b: clip (TimeSeek) blended, with a filter on the upper body, with
@@ -43,17 +48,28 @@ static var _materials := {}
 
 
 ## Binds the mannequin instance `asset` (the imported scene of UAL1); `clips2` is the
-## AnimationLibrary of UAL2; `names` the clip names in index order. Returns false when
-## the scene is not the expected one (no skeleton or animation player).
-func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray) -> bool:
+## AnimationLibrary of UAL2; `names` the clip names in index order. `clips1`: the
+## AnimationLibrary of UAL1, for a body without clips of its own (a Blender body); then
+## the mannequin is not dressed (the body has its own clothes and equipment). Returns
+## false when the scene is not the expected one (no skeleton, or no clips).
+func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray, clips1: AnimationLibrary = null) -> bool:
 	_names = names
 	var player := _find(asset, "AnimationPlayer") as AnimationPlayer
 	skeleton = _find(asset, "Skeleton3D") as Skeleton3D
-	if player == null or skeleton == null:
+	if skeleton == null:
 		return false
-	var root := player.get_node(player.root_node)
-	var lib := player.get_animation_library(&"")
-	player.active = false
+	var root: Node = null
+	var lib: AnimationLibrary = null
+	var own_clips := player != null and player.has_animation_library(&"")
+	if own_clips:
+		root = player.get_node(player.root_node)
+		lib = player.get_animation_library(&"")
+		player.active = false
+	elif clips1 != null:
+		lib = clips1
+		root = _align(asset, clips1)
+	if root == null or lib == null:
+		return false
 	tree = AnimationTree.new()
 	tree.name = "Clipes"
 	root.add_child(tree)
@@ -70,7 +86,8 @@ func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray) -> 
 		if resolved == "":
 			push_warning("pessoa: clipe %s não encontrado; o boneco fica sem animação" % names[k])
 			tree.queue_free()
-			player.active = true
+			if own_clips:
+				player.active = true
 			return false
 		_names.append(resolved)
 		durations[k] = tree.get_animation(StringName(resolved)).length
@@ -87,8 +104,65 @@ func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray) -> 
 	tree.active = true
 	hand_l = skeleton.find_bone("hand_l")
 	hand_r = skeleton.find_bone("hand_r")
-	_dress(asset)
+	if own_clips:
+		_dress(asset)
 	return true
+
+
+## A body without clips: names the skeleton and its parents as the bone tracks of `clips`
+## address them (`Armature/Skeleton3D:pelvis` in the UAL files) and returns the node they
+## are relative to, or null when the path does not fit inside `asset`.
+func _align(asset: Node3D, clips: AnimationLibrary) -> Node:
+	var prefix := ""
+	for clip_name in clips.get_animation_list():
+		var anim := clips.get_animation(clip_name)
+		for k in anim.get_track_count():
+			var path := anim.track_get_path(k)
+			if path.get_subname_count() > 0:
+				prefix = String(path.get_concatenated_names())
+				break
+		if prefix != "":
+			break
+	if prefix == "":
+		return null
+	var parts := prefix.split("/")
+	var n: Node = skeleton
+	for k in range(parts.size() - 1, -1, -1):
+		if n == null or not (n == asset or asset.is_ancestor_of(n)):
+			push_warning("pessoa: o caminho %s dos clipes não cabe no corpo" % prefix)
+			return null
+		if String(n.name) != parts[k]:
+			n.name = parts[k]
+		if k > 0:
+			n = n.get_parent()
+	return n.get_parent()
+
+
+## Dresses a Blender body (`block.pessoa` of the static scene): only the `epi_<name>`
+## meshes of its `epis` are shown, and the materials of `cores` (`pele`, `cabelo`,
+## `camisa`...) get those colours.
+static func vestir(asset: Node3D, info: Dictionary) -> void:
+	var epis: PackedStringArray = info.get("epis", PackedStringArray())
+	var cores: Dictionary = info.get("cores", {})
+	for mi in _meshes(asset):
+		var nm := String(mi.name)
+		if nm.begins_with("epi_"):
+			mi.visible = epis.has(nm.trim_prefix("epi_"))
+		for s in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(s)
+			if m != null and cores.has(m.resource_name):
+				mi.set_surface_override_material(s, _tint(m, Color.html(String(cores[m.resource_name]))))
+
+
+## Names of the protective equipment shown on a Blender body (the visible `epi_*` meshes).
+static func epis_visiveis(asset: Node3D) -> PackedStringArray:
+	var out := PackedStringArray()
+	for mi in _meshes(asset):
+		var nm := String(mi.name)
+		if nm.begins_with("epi_") and mi.visible:
+			out.append(nm.trim_prefix("epi_"))
+	out.sort()
+	return out
 
 
 ## The animation name of a glTF clip name (`[library/]name`) in this tree, or "".
