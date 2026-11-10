@@ -50,3 +50,5 @@ godot = { version = "=0.5.5", default-features = false, features = ["api-4-7"] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"
+# Pictures of the panels without a window (`UTSIM_CAPTURAS=<pasta>`).
+utsim-ui-tema = { workspace = true, features = ["captura"] }

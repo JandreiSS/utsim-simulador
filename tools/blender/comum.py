@@ -35,6 +35,9 @@ ESTADOS = (
     ("entering", "porta_abrir", 0.0, 1.0, False),
     ("leaving", "porta_abrir", 1.0, 0.0, False),
     ("processing", "ciclo", 0.0, 1.0, True),
+    # Estação sem operador (ninguém entra antes do processo): a porta abre para a peça entrar
+    # e sair. A ponte usa esta linha no lugar de `processing` quando o elemento a tem.
+    ("processing_auto", "ciclo_auto", 0.0, 1.0, False),
     ("setup", "setup", 0.0, 1.0, True),
     ("down", "quebra", 0.0, 1.0, False),
     ("waiting_repair", "quebra", 1.0, 1.0, False),
