@@ -55,6 +55,8 @@ var _clips2: AnimationLibrary
 var _clips1: AnimationLibrary
 ## Blocks whose Blender element plays clips (rig `anim`).
 var _animated := PackedInt32Array()
+## Items of the last frame put on a point of a Blender element: [block, point, node].
+var _anchored: Array = []
 var labels_visible := true
 ## A camada de segurança e qualidade (camada_seguranca.gd), quando a reprodução tem uma.
 var camada: CamadaSeguranca
@@ -111,6 +113,7 @@ func clear(keep_templates := false) -> void:
 	_item_spare.clear()
 	mobiles.clear()
 	_animated.clear()
+	_anchored.clear()
 	_last_color.clear()
 	_last_label.clear()
 	fluid_nodes.clear()
@@ -182,6 +185,8 @@ func build(pb: Object, keep_templates := false) -> void:
 			var clips: PackedStringArray = b.get("clips", PackedStringArray())
 			if not fell_back and not clips.is_empty() and _bind_clips(rig, asset, clips):
 				_animated.append(i)
+			if not fell_back:
+				_bind_points(rig, asset, b.get("pontos", PackedStringArray()))
 			if b.get("skeletal", false):
 				var p := Pessoa.new()
 				# A Blender body has no clips of its own: the UAL1 ones drive its skeleton.
@@ -296,12 +301,31 @@ func _bind_clips(rig: Dictionary, asset: Node3D, clips: PackedStringArray) -> bo
 					seen[node] = true
 					nodes.append([node, (node as Node3D).transform])
 			rest[String(clip_name)] = nodes
+	# A clip that moves the forks (`garfo_subir`) is their only driver: the frame's lift
+	# no longer moves the `carro` node too.
+	for nodes in rest.values():
+		for r in nodes:
+			if String((r[0] as Node3D).name) == "carro":
+				rig.erase("carro")
+				rig.erase("carro_rest")
+				rig["anim_carro"] = r[0]
 	rig["anim"] = player
 	rig["anim_clips"] = clips
 	rig["anim_rest"] = rest
 	rig["anim_cur"] = -1
 	rig["anim_fase"] = 0.0
 	return true
+
+
+## The nodes of the points where a Blender element holds a part or a load (`block.pontos`,
+## indexed by the frame's `item_ancora_ponto`), found once; null where the file lacks one.
+func _bind_points(rig: Dictionary, asset: Node3D, names: PackedStringArray) -> void:
+	if names.is_empty():
+		return
+	var nodes: Array = []
+	for n in names:
+		nodes.append(asset.find_child(n, true, false))
+	rig["pontos"] = nodes
 
 
 ## Removes the tracks of `anim` whose keys all hold the same value: the exported clips key
@@ -730,9 +754,14 @@ func apply(t: float, dt: float, snap := false) -> void:
 	var clip_time: PackedFloat32Array = f["clip_time"]
 	var anim_clip: PackedInt32Array = f.get("anim_clip", PackedInt32Array())
 	var anim_fase: PackedFloat32Array = f.get("anim_fase", PackedFloat32Array())
+	var anim_extra: PackedFloat32Array = f.get("anim_extra", PackedFloat32Array())
 	for i in _animated:
 		if i < anim_clip.size():
 			_drive_clip(rigs[i], anim_clip[i], anim_fase[i])
+			# A rack cell above the fork clip's travel: the clip ends at its top and the
+			# carriage goes on up by the rest (the seek above put it back every frame).
+			if i < anim_extra.size() and anim_extra[i] > 0.0 and rigs[i].has("anim_carro"):
+				(rigs[i]["anim_carro"] as Node3D).position.y += anim_extra[i]
 	for i in mobiles:
 		var rig: Dictionary = rigs[i]
 		var root: Node3D = rig["root"]
@@ -792,6 +821,9 @@ func _apply_items(f: Dictionary) -> void:
 	var icolor: PackedColorArray = f["item_color"]
 	var carrier: PackedInt32Array = f["item_carrier"]
 	var stack: PackedInt32Array = f["item_stack"]
+	var anchor_block: PackedInt32Array = f.get("item_ancora_bloco", PackedInt32Array())
+	var anchor_point: PackedInt32Array = f.get("item_ancora_ponto", PackedInt32Array())
+	_anchored.clear()
 	var seen := {}
 	for k in ids.size():
 		var id := ids[k]
@@ -815,6 +847,15 @@ func _apply_items(f: Dictionary) -> void:
 				local.y += stack[k] * size
 				p = root.global_transform * local
 				basis = root.global_transform.basis.orthonormalized().scaled(Vector3.ONE * s)
+		var at := _anchor_node(anchor_block, anchor_point, k)
+		if at != null:
+			# On a point of a Blender element, posed by the clip already (the gripper, the
+			# forks, the deck): the item's base on the point, the stack on top.
+			var g := at.global_transform
+			var size := s * ITEM_SIZE
+			p = g.origin + Vector3.UP * (size * 0.5 + stack[k] * size)
+			basis = g.basis.orthonormalized().scaled(Vector3.ONE * s)
+			_anchored.append([anchor_block[k], anchor_point[k], node])
 		node.transform = Transform3D(basis, p)
 		node.visible = _item_near(p)
 	for id in items.keys():
@@ -823,6 +864,49 @@ func _apply_items(f: Dictionary) -> void:
 			n.visible = false
 			items.erase(id)
 			n.queue_free()
+
+
+## How many items of the last frame sit on point `point_name` of block `i` (anchored to
+## it and drawn within 0.6 m of its node).
+func items_at_point(i: int, point_name: String) -> int:
+	if i < 0 or i >= rigs.size() or not rigs[i].has("pontos"):
+		return 0
+	var names: PackedStringArray = blocks[i].get("pontos", PackedStringArray())
+	var nodes: Array = rigs[i]["pontos"]
+	var n := 0
+	for a in _anchored:
+		if int(a[0]) != i or int(a[1]) >= names.size() or names[int(a[1])] != point_name:
+			continue
+		var at := nodes[int(a[1])] as Node3D
+		if at != null and (a[2] as Node3D).global_position.distance_to(at.global_position) < 0.6:
+			n += 1
+	return n
+
+
+## Height (global y) of point `point_name` of block `i`'s Blender element, or NAN.
+func point_height(i: int, point_name: String) -> float:
+	if i < 0 or i >= rigs.size() or not rigs[i].has("pontos"):
+		return NAN
+	var names: PackedStringArray = blocks[i].get("pontos", PackedStringArray())
+	var k := names.find(point_name)
+	var nodes: Array = rigs[i]["pontos"]
+	if k < 0 or k >= nodes.size() or nodes[k] == null:
+		return NAN
+	return (nodes[k] as Node3D).global_position.y
+
+
+## The point node item `k` of the frame goes to, or null.
+func _anchor_node(blocks_of: PackedInt32Array, points_of: PackedInt32Array, k: int) -> Node3D:
+	if k >= blocks_of.size() or k >= points_of.size():
+		return null
+	var b := blocks_of[k]
+	var pt := points_of[k]
+	if b < 0 or b >= rigs.size() or pt < 0 or not rigs[b].has("pontos"):
+		return null
+	var nodes: Array = rigs[b]["pontos"]
+	if pt >= nodes.size():
+		return null
+	return nodes[pt] as Node3D
 
 
 ## The ring of a source's item types (C7): a flat ring around `at`, one slice per type

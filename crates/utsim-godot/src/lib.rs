@@ -548,7 +548,8 @@ impl UtsimPlayback {
     /// kind, role, mobile, position, size, yaw, shape` (`size` in the block's own frame,
     /// `yaw` its turn about `+Y` in radians, by which the root turns; 0 for the mobiles),
     /// `clips` (the clips of its Blender element, sorted, indexed by the frame's
-    /// `anim_clip`; empty for the others) and, when it has a realistic look, `asset
+    /// `anim_clip`; empty for the others), `pontos` (the points of its element where a part
+    /// or a load goes, indexed by the frame's `item_ancora_ponto`) and, when it has a realistic look, `asset
     /// {source, name, key, path, fallback}, scale, asset_yaw, offset, color, carry,
     /// skeletal` (`source: "modelos3d"` for a Blender element of `assets/modelos3d/`, with
     /// the library asset as `fallback`; a person's fallback mannequin has its own `scale`
@@ -597,6 +598,7 @@ impl UtsimPlayback {
                 put(&mut e, "type_mix", mix);
             }
             put(&mut e, "clips", strings(&v.clips));
+            put(&mut e, "pontos", strings(&c.anchor_points(i)));
             if let Some(l) = &v.look
                 && let Some((a, fallback)) = c.asset_of(i)
             {
@@ -803,7 +805,9 @@ impl UtsimPlayback {
     /// Everything that changes at `t`, as packed arrays: per block `position, yaw, lift,
     /// motion, param, color, rolled, clip, clip_time, label, anim_clip, anim_fase` (the
     /// clip of a Blender element, index into the block's `clips` or -1, and its phase from
-    /// 0 to 1); per drawn item `item_id,
+    /// 0 to 1), `anim_extra` (the forks' rise past the clip's travel, asset units, added to
+    /// the `carro` node); per drawn item `item_ancora_bloco, item_ancora_ponto` (the block and point
+    /// of its element where the item goes, -1 for none), `item_id,
     /// item_position, item_yaw, item_scale, item_color, item_carrier, item_stack`.
     #[func]
     fn frame(&self, t: f64) -> VarDictionary {
@@ -848,6 +852,21 @@ impl UtsimPlayback {
             &mut d,
             "anim_fase",
             PackedFloat32Array::from(f.anim_fase.as_slice()),
+        );
+        put(
+            &mut d,
+            "anim_extra",
+            PackedFloat32Array::from(f.anim_extra.as_slice()),
+        );
+        put(
+            &mut d,
+            "item_ancora_bloco",
+            PackedInt32Array::from(f.item_ancora_bloco.as_slice()),
+        );
+        put(
+            &mut d,
+            "item_ancora_ponto",
+            PackedInt32Array::from(f.item_ancora_ponto.as_slice()),
         );
         put(
             &mut d,
