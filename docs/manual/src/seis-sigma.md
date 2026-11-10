@@ -105,6 +105,43 @@ A regra vale também para quem digitava enquanto a mudança do colega chegava: o
 lembra a versão que você viu quando começou a digitar, e se ela mudou nesse meio tempo o
 caso vai para a lista.
 
+### Assinaturas e integridade do diário
+
+Na primeira vez que você informa nome e e-mail, o programa cria uma **chave de assinatura**
+só sua, guardada neste computador, ao lado da configuração (`chave_assinatura.txt`). A tela de
+identidade mostra a chave pública em grupos de quatro caracteres e o caminho do arquivo. A
+chave nunca vai para a pasta do projeto: lá fica só a parte pública, gravada por você mesmo
+na primeira mudança que fizer em cada projeto.
+
+- **Cada mudança é assinada.** Ao gravar, o programa escreve também um elo da sua cadeia em
+  `cadeia/<pessoa>-<chave>/`, com o resumo (SHA-256) de cada arquivo de mudança e o resumo do
+  elo anterior, tudo assinado com a sua chave.
+- **A conferência fica na tela Equipe e RACI**, na seção **Integridade do diário**. Ela mostra,
+  por pessoa, quantas mudanças estão assinadas, quantas são de antes da chave e quantos elos
+  há na cadeia. Abaixo vêm os sinais encontrados: uma mudança editada depois de assinada, um
+  elo editado ou removido, dois elos com o mesmo número (uma cópia antiga da pasta restaurada
+  e usada) e uma chave registrada por outra pessoa no seu nome, que é ignorada. Também
+  aparecem avisos mais brandos: uma mudança assinada que ainda não chegou (o Drive pode estar
+  sincronizando), uma mudança sem assinatura em nome de quem já assina (gravada por uma versão
+  antiga, por outro app ou por outra pessoa) e o conteúdo apagado por uma anonimização.
+- **Ao abrir um projeto** com sinais de alteração, a barra de baixo avisa. Use "Conferir de
+  novo" depois que o Drive terminar de sincronizar.
+- **Aprovações assinadas.** Em **Fases e tollgates**, cada decisão do histórico mostra se está
+  assinada por quem decidiu, e quem decidiu vê o botão **Assinar**. Em **Ganhos**, o mesmo vale
+  para a validação de um ganho, assinada por quem validou. A assinatura cobre a decisão e o
+  conteúdo decidido (o resumo congelado do tollgate, ou o valor, a memória de cálculo e o
+  acompanhamento do ganho). Se o conteúdo mudar depois, a tela mostra que a assinatura é de
+  outra versão.
+- **Dois computadores.** Cada computador cria a própria chave, e cada chave tem a sua cadeia,
+  então as duas convivem sem conflito. A tela Equipe mostra quando uma pessoa passou a usar
+  mais uma chave. Para usar a mesma chave nos dois, copie `chave_assinatura.txt` antes de
+  abrir os projetos no segundo computador.
+
+A conferência revela alterações, mas não as impede: quem tem acesso aos arquivos pode
+editá-los, e o programa só mostra que isso aconteceu. A primeira chave que uma pessoa registra
+num projeto é a que vale. Estas assinaturas não têm a validade jurídica de uma assinatura
+digital certificada.
+
 ## Telas do projeto
 
 A navegação à esquerda tem a **Carteira** e as telas do projeto.
@@ -134,6 +171,9 @@ programa de implantação; essa estrutura (programa, unidade, carteira, projeto)
 programa do master black belt vai usar mais adiante (etapa L6). Abrir a pasta da carteira
 diretamente, pela tela inicial, também leva à tela Carteira.
 
+- **Minhas ações**: no alto da tela, a lista dos cartões em aberto com você como responsável
+  em todos os projetos da pasta, com o projeto, o prazo (em vermelho quando atrasado) e a
+  coluna do quadro. **Abrir** leva ao projeto do cartão.
 - **Ideias**: qualquer pessoa registra uma oportunidade (título, processo, problema observado,
   dados disponíveis, ganho grosseiro). Outros apps da família também mandam ideias: o **8D do
   UTSim Qualidade**, quando o problema pede um projeto Lean Seis Sigma, envia a ideia com o
@@ -1337,7 +1377,10 @@ trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o plane
 experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
 exportação dos painéis. A P6 trouxe a seleção de soluções (ponderada e Pugh), a auditoria 5S, o SMED, o
 trabalho padronizado com o balanceamento, o evento kaizen e os ciclos PDCA. Ficam para depois
-Plackett-Burman, superfície de resposta e desejabilidade no DOE (no UTSim Estatística), o espaguete desenhado sem modelo e, do programa, a lista de papéis
-assinada. Da gestão do projeto ficam para
-depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
-capacidade dos belts em horas.
+Plackett-Burman, superfície de resposta e desejabilidade no DOE (no UTSim Estatística) e o espaguete desenhado sem modelo. A P7 trouxe
+as assinaturas da equipe: a chave de cada pessoa, a cadeia assinada do diário conferida na
+tela Equipe e ao abrir o projeto, as aprovações assinadas de tollgates e ganhos, e a visão
+"minhas ações" de toda a carteira. Ficam para depois o conflito por parágrafo nos textos
+longos, o acesso pela rede local com token, a lista de papéis do programa assinada pelo master
+black belt e os certificados assinados. Da gestão do projeto ficam para depois raias no quadro,
+reuniões recorrentes e a capacidade dos belts em horas.
