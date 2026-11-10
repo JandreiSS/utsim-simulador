@@ -74,6 +74,7 @@ pular no tempo.
 | | `setup` | sim | em setup |
 | | `porta_abrir` | não | posto em `entering` (fase 0 → 1) e em `leaving` (1 → 0), da regra de operação do nó |
 | | `quebra` | não | quebrado (abre a tampa de manutenção) |
+| | `ciclo_auto` | não | processando sem operador: a porta abre para a peça entrar, fecha durante o `ciclo` e abre para ela sair |
 | posto | `ciclo` | sim | processando |
 | | `setup` | sim | em setup (o grampo abre todo e volta) |
 | robo | `pegar`, `levar`, `soltar` | não | carregar, transportar e descarregar a peça |
@@ -97,9 +98,13 @@ simulação ao clipe. A ponte lê a tabela e não precisa saber de cada elemento
 | `entering` | `porta_abrir` | 0 → 1 | não | `ponto_porta` → `ponto_operador` |
 | `leaving` | `porta_abrir` | 1 → 0 | não | `ponto_operador` → `ponto_porta` |
 | `processing` | `ciclo` | 0 → 1 | sim | |
+| `processing_auto` | `ciclo_auto` | 0 → 1 | não | |
 | `setup` | `setup` | 0 → 1 | sim | |
 | `down` | `quebra` | 0 → 1 | não | |
 | `waiting_repair`, `maintenance` | `quebra` | 1 → 1 | não | |
+| `loading` | `garfo_subir` ou `mesa_subir` | 0 → `levante` | não | |
+| `travel_loaded` | idem | `levante` → `levante` | não | |
+| `unloading` | idem | `levante` → 0 | não | |
 
 A fase do clipe é `de + (ate - de) * fase`, com a fase do estado de 0 a 1. Num clipe em
 laço, uma volta cabe no estado: uma peça, um ciclo. Só entram os estados cujo clipe o
@@ -107,18 +112,56 @@ elemento tem; a célula, por exemplo, só tem `entering` e `leaving`. O caminho
 `operador` só aparece quando o elemento tem os dois pontos. Sem ele, a ponte põe a pessoa
 de frente para a estação (`station_front`). Os pontos giram com a estação.
 
+`processing_auto` não é um estado da simulação. É o `processing` de uma estação que
+ninguém opera, como uma máquina carregada por robô ou por esteira. A ponte usa essa
+linha no lugar de `processing` quando o nó não pede operador (o `Processor` não tem
+`operators` nem `also`) e o elemento tem a linha. O critério é do modelo, não do trace,
+então vale igual em qualquer instante e para qualquer peça.
+A porta fica toda aberta até 2/24 da fase, fecha até 4/24, fica fechada enquanto o
+`ciclo` roda até 20/24 e abre de novo até 22/24.
+
+`levante` é a fase que só tira a carga do chão: na empilhadeira, 0,05 do curso do garfo
+(0,10 m, em `dados.levante`); no AGV, a mesa sobe tudo (1). Para pôr o palete num vão
+alto do porta-paletes, a ponte usa a altura do vão (fase = altura / `garfo_curso`).
+
+### Tabela `peca`
+
+A tabela `peca` diz onde a peça (ou a carga) fica em cada estado do elemento. Cada estado
+tem trechos `[fase_de, fase_ate, ponto]`, que cobrem a fase de 0 a 1. A peça fica no ponto
+do trecho em que a fase está. O ponto é um nó do `.glb` e anda com o pai, então a peça
+presa na garra, no garfo ou na mesa vai junto com o clipe.
+
+| Elemento | Estado | Onde a peça fica |
+|---|---|---|
+| máquinas e posto | `entering` | `ponto_entrada` (o operador vai buscá-la) |
+| | `setup`, `processing`, `down`, `waiting_repair`, `maintenance` | `ponto_peca` |
+| | `leaving`, `blocked` | `ponto_saida` |
+| cnc, prensa, injetora | `processing_auto` | `ponto_entrada` até 2/24, `ponto_peca` até 22/24 e `ponto_saida` até o fim |
+| robo | `processing` | `ponto_entrada` até 1/3, `ponto_garra` até 3/4 e `ponto_saida` até o fim |
+| | `blocked` | `ponto_saida` |
+| empilhadeira, agv | `loading`, `travel_loaded`, `unloading` | `ponto_carga` |
+
+A passagem entre elementos fica com a ponte. A peça sai do `ponto_saida` de um posto e vai
+para o `ponto_carga` do veículo que a carrega, ou para o `ponto_entrada` do próximo posto.
+O teste confere que a garra do robô está mesmo sobre a peça em 1/3 e em 3/4 do `ciclo`.
+Também confere que, no `ciclo_auto`, a porta está toda aberta quando a peça entra e
+quando sai.
+
 ### Interações
 
 A peça passa de um elemento a outro pelos pontos:
 
 - da esteira, sai em `ponto_saida`;
 - na garra, vai presa em `ponto_garra` entre `pegar` e `soltar`;
-- na máquina, entra em `ponto_entrada` e fica em `ponto_peca`.
+- na máquina, entra em `ponto_entrada` e fica em `ponto_peca`;
+- na máquina sem operador, a porta abre sozinha para a peça entrar e sair
+  (`processing_auto`). Com o `ponto_saida` do robô sobre o `ponto_entrada` da máquina,
+  o robô carrega a máquina.
 
 O palete vai no `ponto_carga` do garfo e fica no `ponto_vao_*` do porta-paletes. O
 operador chega por `ponto_porta` e anda até `ponto_operador` enquanto a porta abre
 (`entering`), opera e volta pelo mesmo caminho enquanto ela fecha (`leaving`). Fazer a peça, o palete e a pessoa seguirem esses pontos no 3D é da ponte
-e da interface (próximas etapas).
+e da interface.
 
 ## Pessoas
 

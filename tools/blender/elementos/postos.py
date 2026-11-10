@@ -145,6 +145,14 @@ def robo(detalhe=0):
     tudo = [(f / 3, p) for f, p in pegar] + [((1 + f) / 3, p) for f, p in levar[1:]] + [
         ((2 + f) / 3, p) for f, p in soltar[1:]]
     e.clipe("ciclo", True, chaves(tudo))
+    # A peça no ciclo: parada na entrada até a garra fechar (1/3), presa na garra até ela
+    # abrir na saída (2/3 + 1/4 do `soltar`), e na saída até o fim.
+    solta = round((2 + soltar[1][0]) / 3, 6)
+    e.peca = {
+        "processing": [[0.0, round(1 / 3, 6), "ponto_entrada"], [round(1 / 3, 6), solta, "ponto_garra"],
+                       [solta, 1.0, "ponto_saida"]],
+        "blocked": [[0.0, 1.0, "ponto_saida"]],
+    }
     # Só os eixos que os outros clipes já usam (o exportador completa os outros eixos de
     # um nó com o valor de outro clipe).
     e.clipe("setup", True, {
