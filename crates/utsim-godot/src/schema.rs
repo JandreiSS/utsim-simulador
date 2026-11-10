@@ -978,6 +978,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             operators,
             also,
             changeover,
+            recipe,
         } => {
             out.push(
                 int(s, "capacity", "Capacidade", *capacity as u64)
@@ -1001,6 +1002,16 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .help("Preparação só quando o produto muda: o rótulo do produto e, se quiser, o tempo de cada troca (de, para); sem linha na matriz vale a preparação acima. Exemplo: (label: \"produto\", matrix: [(from: 1, to: 2, time: Const(30.0))]). None: preparação em toda peça."),
             );
             out.push(dist_field(s, "process", "Tempo de processamento", process));
+            out.push(
+                Field::new(
+                    s,
+                    "recipe",
+                    "Tempo por receita",
+                    FieldType::Ron,
+                    Value::Text(ron::option(recipe, ron::recipe)),
+                )
+                .help("Tempo de processamento que depende do item: o rótulo da receita e o tempo de cada valor; os itens sem receita na tabela usam o tempo acima. Exemplo: (label: \"produto\", times: [(value: 1, time: Const(90.0)), (value: 2, time: Const(120.0))]). None: o mesmo tempo para todos."),
+            );
             out.push(
                 group(s, "operators", "Operadores", operators.is_some())
                     .help("Quem opera esta máquina: marque e escolha abaixo, ou arraste do nó laranja do operador (ou da equipe) até a máquina. O processo espera um deles livre."),
@@ -1832,6 +1843,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Processor { changeover, .. }, "changeover") => {
             ron::option(changeover, ron::changeover)
         }
+        (ObjectKind::Processor { recipe, .. }, "recipe") => ron::option(recipe, ron::recipe),
         (ObjectKind::Transporter { speed, .. }, "speed") => ron::float(*speed),
         (ObjectKind::Transporter { acceleration, .. }, "acceleration") => {
             ron::option(acceleration, |v| ron::float(*v))
@@ -2949,6 +2961,24 @@ mod tests {
             unreachable!()
         };
         assert!(changeover.is_none());
+    }
+
+    #[test]
+    fn processor_with_a_recipe() {
+        let mut d = doc();
+        assert_eq!(field(&d, "p", "recipe").value, Value::Text("None".into()));
+        let text = "(label: \"produto\", times: [(value: 1.0, time: Const(90.0))])";
+        apply(&mut d, "p", "recipe", Value::Text(text.into()));
+        let ObjectKind::Processor { recipe, .. } = &object(&d, "p").kind else {
+            unreachable!()
+        };
+        assert_eq!(recipe.as_ref().unwrap().times.len(), 1);
+        assert_eq!(field(&d, "p", "recipe").value, Value::Text(text.into()));
+        apply(&mut d, "p", "recipe", Value::Text("None".into()));
+        let ObjectKind::Processor { recipe, .. } = &object(&d, "p").kind else {
+            unreachable!()
+        };
+        assert!(recipe.is_none());
     }
 
     #[test]
