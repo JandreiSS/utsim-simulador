@@ -253,11 +253,18 @@ O editor de missões faz o mesmo que o construtor, mas tudo na tela, sem abrir o
 2. **Missão nova.** Escolha o modelo `.ron` e o título e clique em "Criar o rascunho". O editor sugere as mesmas alavancas e métricas do construtor e escreve um enunciado inicial. O identificador nasce do título (`prof/<título>`) e pode ser trocado.
 3. **Alavancas.** Cada linha tem uma caixa para usar ou não a alavanca, o rótulo que o aluno vê, a faixa (de, até, e o passo nas alavancas de valor) e o custo por unidade acima do valor inicial. O orçamento é opcional. Embaixo aparece quantas combinações a calibragem vai simular. O limite é o da busca exaustiva, 400.
 4. **Métricas.** Para cada métrica há o rótulo, se ela é melhor quando menor ou maior, a meta, a tolerância (em % ou na unidade da métrica) e o peso na nota. Peso zero mostra a métrica ao aluno sem contar na nota.
-5. **Enunciado.** O texto em Markdown que o aluno lê.
+5. **Enunciado e perguntas.** O texto em Markdown que o aluno lê, com a prévia desenhada do mesmo jeito que na tela do aluno. Embaixo ficam:
+   - **Conceitos do glossário**: marque os termos que a missão ensina ou usa. O pacote leva um `glossario.ron` com os termos marcados, copiados do glossário da campanha, e mantém os termos próprios que já tinha.
+   - **Medições antes da previsão**: valores do estado inicial que o aluno pode ver antes de responder, cada um com a métrica do modelo, a unidade e as casas.
+   - **Perguntas de previsão**, respondidas antes de rodar. A de escolha tem a resposta fixa ou a opção de maior ou menor valor no estado inicial. A de valor compara a resposta com a métrica do modelo, dentro da tolerância. A de cálculo usa uma das receitas de medida do trabalho (máquinas por operador, tempo normal, tempo padrão e número de ciclos).
+   - **Perguntas de justificativa**, objetivas, sobre o porquê, com a opção certa marcada.
+   - **Dicas**, até três níveis: a pergunta que guia, a ferramenta e o caminho.
+
+   A métrica de uma medição ou de uma pergunta se escolhe numa lista com as métricas que o modelo produz, o custo das decisões e o número de cada alavanca em uso.
 6. **Calibrar.** Simula todas as combinações em segundo plano. Mostra quantas cabem no orçamento e nas restrições, quantas batem todas as metas e uma tabela com a situação inicial, a referência e a meta sugerida de cada métrica (5 % de folga em torno da referência). Os avisos do conferidor aparecem embaixo. "Usar a referência e as metas sugeridas" leva os valores para a missão. As metas são arredondadas para o lado da folga, então a referência sempre as bate. Se nenhuma combinação cabe no orçamento, a calibragem avisa e não sugere nada.
 7. **Gravar no pacote.** Confere os campos e grava a missão na pasta. Uma missão aberta da lista volta para o lugar dela, mesmo com o identificador trocado. Uma missão nova com o identificador de outra é recusada. Para mudar o ato de uma missão gravada, use as setas da lista. "Conferir o pacote" faz a mesma conferência que o app do aluno faz ao abrir o pacote, e "Gravar o .utse" empacota a pasta para publicar na turma.
 
-Ao abrir de novo uma missão gravada, as alavancas e as métricas que ela não usa voltam como sugestões desmarcadas. Os campos que o editor ainda não mostra (perguntas, dicas, rodadas) são mantidos como estavam. Missões de modelagem, de peças e de dados ainda não abrem no editor.
+Ao abrir de novo uma missão gravada, as alavancas e as métricas que ela não usa voltam como sugestões desmarcadas. Os campos que o editor ainda não mostra (rodadas, perguntas sobre dados) são mantidos como estavam. Missões de modelagem, de peças e de dados ainda não abrem no editor.
 
 ## Dados com efeito plantado
 
