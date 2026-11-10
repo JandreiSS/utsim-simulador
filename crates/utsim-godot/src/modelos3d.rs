@@ -45,11 +45,26 @@ pub const CLIP_SECONDS: f64 = 1.0;
 /// A place in the layout (Godot, Y up) and a heading about `+Y` (radians).
 pub type Pose = ([f32; 3], f32);
 
-/// The runs of a block's states: the start of each and its line of the state table.
-pub type Runs = Vec<(f64, Option<usize>)>;
+/// The runs of a block's states: the start of each, its line of the state table and its
+/// line of the part table ([`Animado::pecas`]).
+pub type Runs = Vec<(f64, Option<usize>, Option<usize>)>;
 
-/// The run containing an instant: its line, start and end.
-pub type Run = (Option<usize>, f64, f64);
+/// The run containing an instant ([`run_at`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Run {
+    /// Line of the state table ([`Animado::estados`]).
+    pub line: Option<usize>,
+    /// Line of the part table ([`Animado::pecas`]).
+    pub peca: Option<usize>,
+    pub start: f64,
+    pub end: f64,
+}
+
+/// A segment of a part line: `(phase from, phase to, index into Animado::pontos)`.
+pub type Trecho = (f32, f32, usize);
+
+/// The line of the state table that stands for `processing` at a station nobody operates.
+pub const PROCESSING_AUTO: &str = "processing_auto";
 
 /// A point of an element (an empty node): its place and where its `+x` looks.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -101,6 +116,9 @@ pub struct Elemento {
     pub clipes: BTreeMap<String, Clipe>,
     #[serde(default)]
     pub estados: BTreeMap<String, Estado>,
+    /// Where the part (or the load) is in each state: `[phase from, phase to, point]`.
+    #[serde(default)]
+    pub peca: BTreeMap<String, Vec<(f32, f32, String)>>,
     #[serde(default)]
     pub dados: serde_json::Value,
     #[serde(default)]
@@ -295,16 +313,46 @@ pub struct Animado {
     pub estados: Vec<(String, Passo)>,
     /// Where the operator works (`ponto_operador`), when the element has it.
     pub post: Option<Pose>,
+    /// The points the part tables name that the element has (the indices of the frame's
+    /// `item_ancora_ponto`), and, for those hanging from the root, their place in the
+    /// layout (`None` for the moving ones: the garra, the forks, the deck).
+    pub pontos: Vec<(String, Option<Pose>)>,
+    /// State name and its part line: `(phase from, phase to, index into pontos)`.
+    pub pecas: Vec<(String, Vec<Trecho>)>,
+    /// The forks follow the scene's lift (`garfo_subir` over `dados.garfo_curso`), not the
+    /// state table: `(clip, rest height, travel)`.
+    pub garfo: Option<(i32, f32, f32)>,
+    /// The deck rises `dados.mesa_curso` metres at the end of its clip (`mesa_subir`).
+    pub mesa: Option<(i32, f32)>,
 }
 
 impl Animado {
-    /// Resolves element `e` (file `stem`) placed at `at`.
-    pub fn resolve(e: &Elemento, stem: &str, at: &Placement) -> Animado {
+    /// Resolves element `e` (file `stem`) placed at `at`. `auto`: a station nobody
+    /// operates, whose `processing` plays the `processing_auto` lines when it has them.
+    pub fn resolve(e: &Elemento, stem: &str, at: &Placement, auto: bool) -> Animado {
         let clips = e.clip_names();
         let point = |name: &str| e.fixed_point(stem, name).map(|p| point_to_layout(p, at));
+        // `processing_auto` is not a state of the simulation: it replaces `processing`.
+        // The automatic line counts only when its clip is in the file; else `processing`.
+        let auto = auto
+            && e.estados
+                .get(PROCESSING_AUTO)
+                .is_some_and(|l| clips.contains(&l.clipe));
+        let pick = |state: &String| -> Option<String> {
+            if state == PROCESSING_AUTO {
+                return None;
+            }
+            let auto_key = (auto && state == "processing").then_some(PROCESSING_AUTO);
+            Some(auto_key.unwrap_or(state).to_string())
+        };
         let estados = e
             .estados
-            .iter()
+            .keys()
+            .filter_map(|state| {
+                let key = pick(state)?;
+                let line = e.estados.get(&key).or_else(|| e.estados.get(state))?;
+                Some((state, line))
+            })
             .filter_map(|(state, line)| {
                 let clip = clips.iter().position(|c| *c == line.clipe)? as i32;
                 let caminho = line
@@ -323,11 +371,94 @@ impl Animado {
                 ))
             })
             .collect();
+        let mut pontos: Vec<(String, Option<Pose>)> = Vec::new();
+        let mut pecas = Vec::new();
+        for state in e.peca.keys() {
+            let Some(key) = pick(state) else { continue };
+            let Some(line) = e.peca.get(&key).or_else(|| e.peca.get(state)) else {
+                continue;
+            };
+            let mut segs = Vec::new();
+            for (f0, f1, name) in line {
+                if !e.pontos.contains_key(name) {
+                    continue;
+                }
+                let k = match pontos.iter().position(|(n, _)| n == name) {
+                    Some(k) => k,
+                    None => {
+                        pontos.push((name.clone(), point(name)));
+                        pontos.len() - 1
+                    }
+                };
+                segs.push((*f0, *f1, k));
+            }
+            if !segs.is_empty() {
+                pecas.push((state.clone(), segs));
+            }
+        }
+        let garfo = clips
+            .iter()
+            .position(|c| c == "garfo_subir")
+            .zip(e.dados["garfo_curso"].as_f64())
+            .map(|(k, travel)| {
+                let rest = e.dados["garfo_repouso"].as_f64().unwrap_or(0.0);
+                (k as i32, rest as f32, travel.max(1e-3) as f32)
+            });
+        let mesa = clips
+            .iter()
+            .position(|c| c == "mesa_subir")
+            .zip(e.dados["mesa_curso"].as_f64())
+            .map(|(k, curso)| (k as i32, curso as f32));
         Animado {
             clips,
             estados,
             post: point("ponto_operador"),
+            pontos,
+            pecas,
+            garfo,
+            mesa,
         }
+    }
+
+    /// The part line of `state`, as an index into [`Animado::pecas`].
+    pub fn peca_line(&self, state: State) -> Option<usize> {
+        self.pecas.iter().position(|(s, _)| s == state.name())
+    }
+
+    /// The point (index into [`Animado::pontos`]) where the part of run `run` is at `t`:
+    /// the segment of the part line that holds the state's phase (the same phase as the
+    /// clip's, before `de` and `ate`).
+    pub fn anchor(&self, run: Option<Run>, t: f64) -> Option<usize> {
+        let run = run?;
+        let segs = &self.pecas[run.peca?].1;
+        let looping = run.line.is_some_and(|k| self.estados[k].1.laco);
+        let s = if looping && !(run.end - run.start).is_finite() {
+            ((t - run.start).max(0.0) / CLIP_SECONDS).fract() as f32
+        } else {
+            state_phase(run.start, run.end, t)
+        };
+        segs.iter()
+            .find(|(f0, f1, _)| s >= *f0 && s < *f1)
+            .or(segs.last().filter(|(_, f1, _)| s >= *f1 - 1e-6))
+            .or(segs.first())
+            .map(|seg| seg.2)
+    }
+
+    /// The fork clip, its phase and the rise past the clip's travel, for a fork `lift`
+    /// (top of the forks above the floor, metres, as the scene gives it, world size) on an
+    /// asset at `scale`, when the element has forks. The phase is the carriage's rise over
+    /// the travel; a rack cell higher than the travel keeps the clip at 1 and the rest of
+    /// the rise is returned (asset units), for the engine to add to the `carro` node.
+    pub fn fork(&self, lift: f32, scale: f32) -> Option<(i32, f32, f32)> {
+        let (clip, rest, travel) = self.garfo?;
+        let scale = scale.max(1e-3);
+        // Both in the asset's own units: the world lift over the scale, the file's rest.
+        let rise = (lift / scale - rest).max(0.0);
+        Some((
+            clip,
+            (rise / travel).clamp(0.0, 1.0),
+            (rise - travel).max(0.0),
+        ))
     }
 
     /// The line of `state`, as an index into [`Animado::estados`].
@@ -335,28 +466,35 @@ impl Animado {
         self.estados.iter().position(|(s, _)| s == state.name())
     }
 
-    /// The runs of the block's states (`(t, state)` in time order) as its table sees them:
-    /// the start of each run and its line. A state set again does not restart a clip that
-    /// does not loop, nor do consecutive states with the same line (`waiting_repair` then
-    /// `maintenance`); a looping clip starts a new loop at every record (one loop per
-    /// piece). States without a line are one run.
-    pub fn runs(
-        &self,
-        states: impl IntoIterator<Item = (f64, State)>,
-    ) -> Vec<(f64, Option<usize>)> {
-        let mut out: Vec<(f64, Option<usize>)> = Vec::new();
+    /// The runs of the block's states (`(t, state)` in time order) as its tables see
+    /// them: the start of each run, its state line and its part line. A state set again
+    /// does not restart a clip that does not loop, nor do consecutive states with the same
+    /// lines (`waiting_repair` then `maintenance`); a looping clip starts a new loop at
+    /// every record (one loop per piece). States without lines are one run.
+    pub fn runs(&self, states: impl IntoIterator<Item = (f64, State)>) -> Runs {
+        let mut out: Runs = Vec::new();
         for (t, s) in states {
-            let line = self.line(s);
-            let same = out.last().is_some_and(|&(_, last)| match (last, line) {
+            let (line, peca) = (self.line(s), self.peca_line(s));
+            let same_peca = |last: Option<usize>| match (last, peca) {
                 (None, None) => true,
-                (Some(a), Some(b)) => {
-                    let (pa, pb) = (&self.estados[a].1, &self.estados[b].1);
-                    !pb.laco && pa == pb
-                }
+                (Some(a), Some(b)) => self.pecas[a].1 == self.pecas[b].1,
                 _ => false,
+            };
+            let same = out.last().is_some_and(|&(_, last, last_peca)| {
+                same_peca(last_peca)
+                    && match (last, line) {
+                        (None, None) => true,
+                        (Some(a), Some(b)) => {
+                            let (pa, pb) = (&self.estados[a].1, &self.estados[b].1);
+                            // Every `processing` record starts a run: one cycle per piece,
+                            // also for the automatic cycle of an unmanned station.
+                            !pb.laco && pa == pb && s != State::Processing
+                        }
+                        _ => false,
+                    }
             });
             if !same {
-                out.push((t, line));
+                out.push((t, line, peca));
             }
         }
         out
@@ -366,7 +504,12 @@ impl Animado {
     /// run `run` ([`run_at`]).
     pub fn anim(&self, run: Option<Run>, t: f64) -> (i32, f32) {
         match run {
-            Some((Some(k), start, end)) => {
+            Some(Run {
+                line: Some(k),
+                start,
+                end,
+                ..
+            }) => {
                 let p = &self.estados[k].1;
                 (p.clip, clip_phase(p, start, end, t))
             }
@@ -377,7 +520,12 @@ impl Animado {
     /// Where the operator stands at `t`: along the line's walk by the state's phase,
     /// else at the post; `None` without a post or a walk.
     pub fn operator(&self, run: Option<Run>, t: f64) -> Option<Pose> {
-        if let Some((Some(k), start, end)) = run
+        if let Some(Run {
+            line: Some(k),
+            start,
+            end,
+            ..
+        }) = run
             && let Some((a, b)) = self.estados[k].1.caminho
         {
             return Some(walk(a, b, state_phase(start, end, t)));
@@ -386,22 +534,31 @@ impl Animado {
     }
 }
 
-/// The run containing `t`: its line, start and end.
-pub fn run_at(runs: &[(f64, Option<usize>)], t: f64) -> Option<Run> {
+/// The run containing `t`.
+pub fn run_at(runs: &[(f64, Option<usize>, Option<usize>)], t: f64) -> Option<Run> {
     let k = runs.partition_point(|r| r.0 <= t).checked_sub(1)?;
     let end = runs.get(k + 1).map_or(f64::INFINITY, |r| r.0);
-    Some((runs[k].1, runs[k].0, end))
+    Some(Run {
+        line: runs[k].1,
+        peca: runs[k].2,
+        start: runs[k].0,
+        end,
+    })
 }
 
-/// Phase of a state at `t` in its interval `start..end`, 0 to 1 (`end` infinite: the last
-/// state of the run, one clip length).
+/// Phase of a state at `t` in its interval `start..end`, 0 to 1 (`end` infinite: the run
+/// goes past the end of the trace, and the phase holds at 0.5).
 pub fn state_phase(start: f64, end: f64, t: f64) -> f32 {
     let span = end - start;
-    let elapsed = (t - start).max(0.0);
-    let p = if span.is_finite() && span > 1e-9 {
-        elapsed / span
+    if !span.is_finite() {
+        // The run goes past the end of the trace: its length is unknown, so the phase
+        // holds at the middle (a door half open, the part at the work point).
+        return 0.5;
+    }
+    let p = if span > 1e-9 {
+        (t - start).max(0.0) / span
     } else {
-        elapsed / CLIP_SECONDS
+        1.0
     };
     p.clamp(0.0, 1.0) as f32
 }
@@ -705,7 +862,7 @@ mod tests {
     #[test]
     fn the_state_table_gives_the_clip_and_its_phase() {
         let c = cat();
-        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT);
+        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT, false);
         let clip = |n: &str| a.clips.iter().position(|c| c == n).unwrap() as i32;
         let at = |s: State, start: f64, end: f64, t: f64| {
             let runs = a.runs([(start, s), (end, State::Idle)]);
@@ -745,18 +902,18 @@ mod tests {
         assert_eq!(at(State::Idle, 0.0, 1.0, 0.5), (-1, 0.0));
         assert_eq!(a.anim(None, 0.5), (-1, 0.0));
         // The cell has only the door: processing plays nothing.
-        let cell = Animado::resolve(c.get("celula").unwrap(), "celula", &AT);
+        let cell = Animado::resolve(c.get("celula").unwrap(), "celula", &AT, false);
         let runs = cell.runs([(0.0, State::Processing)]);
         assert_eq!(cell.anim(run_at(&runs, 0.5), 0.5), (-1, 0.0));
         // The station posts have setup now.
-        let posto = Animado::resolve(c.get("posto").unwrap(), "posto", &AT);
+        let posto = Animado::resolve(c.get("posto").unwrap(), "posto", &AT, false);
         assert!(posto.line(State::Setup).is_some() && posto.line(State::Entering).is_none());
     }
 
     #[test]
     fn runs_merge_only_the_same_line_of_a_clip_that_does_not_loop() {
         let c = cat();
-        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT);
+        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT, false);
         let r = a.runs([
             (0.0, State::Idle),
             (1.0, State::Blocked),
@@ -770,12 +927,16 @@ mod tests {
             (20.0, State::Idle),
         ]);
         let starts: Vec<f64> = r.iter().map(|x| x.0).collect();
-        // Idle and blocked have no line: one run. The door does not restart; each
-        // processing record is a loop; waiting and maintenance are the same line.
-        assert_eq!(starts, [0.0, 2.0, 5.0, 7.0, 9.0, 10.0, 20.0]);
-        assert_eq!(run_at(&r, 6.0).map(|x| (x.1, x.2)), Some((5.0, 7.0)));
-        assert_eq!(run_at(&r, 15.0).map(|x| (x.1, x.2)), Some((10.0, 20.0)));
-        assert_eq!(run_at(&r, 40.0).unwrap().2, f64::INFINITY);
+        // Blocked has a part line of its own (the part waits at the exit). The door does
+        // not restart; each processing record is a loop; waiting and maintenance are the
+        // same lines.
+        assert_eq!(starts, [0.0, 1.0, 2.0, 5.0, 7.0, 9.0, 10.0, 20.0]);
+        assert_eq!(run_at(&r, 6.0).map(|x| (x.start, x.end)), Some((5.0, 7.0)));
+        assert_eq!(
+            run_at(&r, 15.0).map(|x| (x.start, x.end)),
+            Some((10.0, 20.0))
+        );
+        assert_eq!(run_at(&r, 40.0).unwrap().end, f64::INFINITY);
         assert_eq!(run_at(&r, -1.0), None);
         // A loop with no end: one loop per clip length.
         let open = a.runs([(0.0, State::Processing)]);
@@ -786,7 +947,7 @@ mod tests {
     #[test]
     fn the_operator_walks_the_table_path_and_stands_at_the_post() {
         let c = cat();
-        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT);
+        let a = Animado::resolve(c.get("cnc").unwrap(), "cnc", &AT, false);
         let post = a.post.unwrap();
         assert!(close(post.0, [-0.15, 0.0, 1.2]));
         let door = ([-0.15, 0.0, 1.8], FRAC_PI_2);
@@ -802,7 +963,7 @@ mod tests {
         assert!(close(at(State::Processing, 1.0).0, post.0));
         assert!((at(State::Processing, 1.0).1 - FRAC_PI_2).abs() < 1e-6);
         // No post and no walk (the conveyor): the caller keeps the front of the station.
-        let belt = Animado::resolve(c.get("esteira").unwrap(), "esteira", &AT);
+        let belt = Animado::resolve(c.get("esteira").unwrap(), "esteira", &AT, false);
         assert_eq!(belt.operator(None, 0.0), None);
         // Turning the short way round (from 170° to -170° passes by 180°).
         let (_, yaw) = walk(
@@ -814,6 +975,144 @@ mod tests {
             (yaw.rem_euclid(std::f32::consts::TAU) - PI).abs() < 1e-5,
             "{yaw}"
         );
+    }
+
+    fn point_name(a: &Animado, k: Option<usize>) -> &str {
+        k.map_or("", |k| a.pontos[k].0.as_str())
+    }
+
+    #[test]
+    fn a_station_nobody_operates_plays_the_automatic_cycle() {
+        let c = cat();
+        let cnc = c.get("cnc").unwrap();
+        let auto = Animado::resolve(cnc, "cnc", &AT, true);
+        let manned = Animado::resolve(cnc, "cnc", &AT, false);
+        let clip = |a: &Animado, n: &str| a.clips.iter().position(|c| c == n).unwrap() as i32;
+        let at = |a: &Animado, t: f64| {
+            let runs = a.runs([(0.0, State::Processing), (24.0, State::Idle)]);
+            let run = run_at(&runs, t);
+            (a.anim(run, t), point_name(a, a.anchor(run, t)).to_string())
+        };
+        // The door opens for the part to come in, closes over the cycle, opens to let it
+        // out: the part goes from the entry to the work point to the exit.
+        let ((k, p), at_point) = at(&auto, 1.0);
+        assert_eq!(k, clip(&auto, "ciclo_auto"));
+        assert!((p - 1.0 / 24.0).abs() < 1e-5);
+        assert_eq!(at_point, "ponto_entrada");
+        assert_eq!(at(&auto, 12.0).1, "ponto_peca");
+        assert_eq!(at(&auto, 23.0).1, "ponto_saida");
+        // Operated: the looping cycle, the part at the work point all along.
+        let ((k, _), at_point) = at(&manned, 1.0);
+        assert_eq!(k, clip(&manned, "ciclo"));
+        assert_eq!(at_point, "ponto_peca");
+        // An element without the automatic line keeps its cycle.
+        let posto = Animado::resolve(c.get("posto").unwrap(), "posto", &AT, true);
+        assert_eq!(at(&posto, 12.0).0.0, clip(&posto, "ciclo"));
+        // Points of the root are already in the layout.
+        let k = auto
+            .pontos
+            .iter()
+            .position(|(n, _)| n == "ponto_peca")
+            .unwrap();
+        assert!(close(
+            auto.pontos[k].1.unwrap().0,
+            to_godot([-0.3, -0.45, 1.1])
+        ));
+    }
+
+    #[test]
+    fn the_robot_takes_the_part_from_the_entry_to_the_exit_in_its_gripper() {
+        let c = cat();
+        let robo = Animado::resolve(c.get("robo").unwrap(), "robo", &AT, true);
+        let runs = robo.runs([(0.0, State::Processing), (12.0, State::Blocked)]);
+        let at = |t: f64| point_name(&robo, robo.anchor(run_at(&runs, t), t)).to_string();
+        assert_eq!(at(2.0), "ponto_entrada");
+        assert_eq!(at(6.0), "ponto_garra");
+        assert_eq!(at(10.0), "ponto_saida");
+        assert_eq!(at(15.0), "ponto_saida");
+        // The gripper moves: its place comes from the engine, after the clip.
+        let k = robo
+            .pontos
+            .iter()
+            .position(|(n, _)| n == "ponto_garra")
+            .unwrap();
+        assert_eq!(robo.pontos[k].1, None);
+        // The cycle and the part share the phase.
+        assert_eq!(robo.anim(run_at(&runs, 6.0), 6.0).1, 0.5);
+        // Idle: no part line, no anchor.
+        let idle = robo.runs([(0.0, State::Idle)]);
+        assert_eq!(robo.anchor(run_at(&idle, 1.0), 1.0), None);
+    }
+
+    #[test]
+    fn vehicles_lift_their_load_by_the_table_or_by_the_forks_height() {
+        let c = cat();
+        let agv = Animado::resolve(c.get("agv").unwrap(), "agv", &AT, false);
+        let runs = agv.runs([
+            (0.0, State::Loading),
+            (2.0, State::TravelLoaded),
+            (10.0, State::Unloading),
+            (12.0, State::TravelEmpty),
+        ]);
+        let mesa = agv.clips.iter().position(|c| c == "mesa_subir").unwrap() as i32;
+        assert_eq!(agv.anim(run_at(&runs, 1.0), 1.0), (mesa, 0.5));
+        assert_eq!(agv.anim(run_at(&runs, 5.0), 5.0), (mesa, 1.0));
+        assert_eq!(agv.anim(run_at(&runs, 11.5), 11.5), (mesa, 0.25));
+        assert_eq!(agv.anim(run_at(&runs, 13.0), 13.0), (-1, 0.0));
+        assert_eq!(
+            point_name(&agv, agv.anchor(run_at(&runs, 5.0), 5.0)),
+            "ponto_carga"
+        );
+        assert_eq!(agv.anchor(run_at(&runs, 13.0), 13.0), None);
+        assert_eq!(agv.fork(1.0, 1.0), None);
+        assert_eq!(agv.mesa.map(|m| m.1), Some(0.06));
+        // The forks follow the lift: rest 0.10 m, 2 m of travel; a high bay goes up.
+        let fork = Animado::resolve(c.get("empilhadeira").unwrap(), "empilhadeira", &AT, false);
+        let garfo = fork.clips.iter().position(|c| c == "garfo_subir").unwrap() as i32;
+        assert_eq!(fork.fork(0.10, 1.0), Some((garfo, 0.0, 0.0)));
+        let (_, p, _) = fork.fork(0.20, 1.0).unwrap();
+        assert!((p - 0.05).abs() < 1e-6, "{p}");
+        assert_eq!(fork.fork(1.60, 1.0), Some((garfo, 0.75, 0.0)));
+        // A cell above the travel: the clip at its end, the rest added to the carriage.
+        let (_, p, extra) = fork.fork(4.6, 1.0).unwrap();
+        assert_eq!(p, 1.0);
+        assert!((extra - 2.5).abs() < 1e-5, "{extra}");
+        // At half size: the rest (0.10 in the file) is 0.05 m in the world.
+        assert_eq!(fork.fork(0.05, 0.5), Some((garfo, 0.0, 0.0)));
+        let (_, p, _) = fork.fork(0.55, 0.5).unwrap();
+        assert!((p - 0.5).abs() < 1e-5, "{p}");
+    }
+
+    #[test]
+    fn each_piece_of_an_unmanned_station_gets_its_own_cycle() {
+        let c = cat();
+        let cnc = c.get("cnc").unwrap();
+        let auto = Animado::resolve(cnc, "cnc", &AT, true);
+        // Capacity two: processing is set again at every entry and exit, and each record
+        // starts an automatic cycle (one piece), not one cycle for the busy period.
+        let r = auto.runs([
+            (0.0, State::Processing),
+            (4.0, State::Processing),
+            (10.0, State::Processing),
+            (14.0, State::Idle),
+        ]);
+        let starts: Vec<f64> = r.iter().map(|x| x.0).collect();
+        assert_eq!(starts, [0.0, 4.0, 10.0, 14.0]);
+        assert_eq!(auto.anim(run_at(&r, 2.0), 2.0).1, 0.5);
+        // The run past the end of the trace has no length: the phase holds at the middle
+        // (the door shut, the part at the work point), it does not run to 1 in a second.
+        let open = auto.runs([(0.0, State::Processing)]);
+        assert_eq!(auto.anim(run_at(&open, 100.0), 100.0).1, 0.5);
+        assert_eq!(
+            point_name(&auto, auto.anchor(run_at(&open, 100.0), 100.0)),
+            "ponto_peca"
+        );
+        // A file without the automatic clip: the station keeps the cycle of `processing`.
+        let mut bare = cnc.clone();
+        bare.clipes.remove("ciclo_auto");
+        let fallback = Animado::resolve(&bare, "cnc", &AT, true);
+        let k = fallback.line(State::Processing).unwrap();
+        assert_eq!(fallback.clips[fallback.estados[k].1.clip as usize], "ciclo");
     }
 
     #[test]

@@ -242,6 +242,16 @@ pub struct FrameData {
     /// [`BlockView::clips`], -1 for none) and its phase, 0 to 1 ([`Animado::anim`]).
     pub anim_clip: Vec<i32>,
     pub anim_fase: Vec<f32>,
+    /// Rise of the forks past the fork clip's travel (a rack cell above it), asset units,
+    /// for the engine to add to the `carro` node; 0 for the others.
+    pub anim_extra: Vec<f32>,
+    /// Per drawn item: the block whose element holds it at one of its points (the part a
+    /// station works on, the load on the forks or the deck), -1 for none, and the point
+    /// (index into that block's static `pontos`). The engine puts the item there after
+    /// the clip (it rides the gripper, the forks, the deck); `item_position` already has
+    /// it for a point of the root.
+    pub item_ancora_bloco: Vec<i32>,
+    pub item_ancora_ponto: Vec<i32>,
 }
 
 /// How far outside a station's footprint an operator working there may stand (its access
@@ -537,7 +547,11 @@ impl Playback {
                 }
                 let stem = v.modelo3d.as_deref()?;
                 let e = self.modelos3d.as_ref()?.get(stem)?;
-                Some((Animado::resolve(e, stem, &self.placement(i)?), Vec::new()))
+                let auto = self.unmanned(i);
+                Some((
+                    Animado::resolve(e, stem, &self.placement(i)?, auto),
+                    Vec::new(),
+                ))
             })
             .collect();
         let mut states: HashMap<usize, Vec<(f64, utsim_core::State)>> = HashMap::new();
@@ -605,10 +619,57 @@ impl Playback {
         a.operator(run, t)
     }
 
-    /// The clip of block `i` at `t` and its phase, or `(-1, 0)`.
-    pub fn anim_at(&self, i: usize, t: f64) -> (i32, f32) {
-        self.animado(i, t)
-            .map_or((-1, 0.0), |(a, run)| a.anim(run, t))
+    /// Whether block `i` is a `Processor` nobody operates (no `operators`, no `also`): its
+    /// `processing` plays the element's `processing_auto` lines. Decided by the model, so
+    /// it is the same at every instant.
+    pub fn unmanned(&self, i: usize) -> bool {
+        let name = &self.blocks[i].name;
+        self.model
+            .as_ref()
+            .and_then(|m| m.objects.iter().find(|o| &o.name == name))
+            .is_some_and(|o| {
+                // Operators only for the setup (`process: false`) leave the process
+                // unmanned too.
+                matches!(o.kind, utsim_model::ObjectKind::Processor { .. })
+                    && o.kind.operator_uses().all(|u| !u.process)
+            })
+    }
+
+    /// The clip of block `i` at `t` and its phase, or `(-1, 0)`. `lift`: the block's fork
+    /// height in this frame; the forks of an element with `garfo_subir` follow it (the
+    /// same height the loads on them get), not the state table.
+    /// The third number is the rise of the forks past the clip's travel (asset units;
+    /// 0 for everything else): the engine adds it to the `carro` node after the clip.
+    pub fn anim_at(&self, i: usize, t: f64, lift: f32) -> (i32, f32, f32) {
+        let Some((a, run)) = self.animado(i, t) else {
+            return (-1, 0.0, 0.0);
+        };
+        if a.garfo.is_some() {
+            let scale = self.blocks[i].look.as_ref().map_or(1.0, |l| l.scale);
+            return match a.fork(lift, scale) {
+                Some((k, p, extra)) if p > 1e-4 => (k, p, extra),
+                _ => (-1, 0.0, 0.0),
+            };
+        }
+        let (k, p) = a.anim(run, t);
+        (k, p, 0.0)
+    }
+
+    /// Where the part block `i` works on (or carries) is at `t`: an index into its
+    /// element's points ([`Animado::pontos`]), from the part table of its state.
+    pub fn anchor_at(&self, i: usize, t: f64) -> Option<usize> {
+        let (a, run) = self.animado(i, t)?;
+        a.anchor(run, t)
+    }
+
+    /// The points block `i`'s part table names (the frame's `item_ancora_ponto` indices).
+    pub fn anchor_points(&self, i: usize) -> Vec<String> {
+        self.animados
+            .get(i)
+            .and_then(Option::as_ref)
+            .map_or_else(Vec::new, |(a, _)| {
+                a.pontos.iter().map(|(n, _)| n.clone()).collect()
+            })
     }
 
     /// Lengths of the person clips, seconds, in [`Clip::ALL`] order (read by the engine
@@ -783,6 +844,8 @@ impl Playback {
         };
         f.position.reserve(n);
         let mut poses: Vec<Option<utsim_scene::MobilePose>> = Vec::with_capacity(n);
+        // Where the part each block works on (or carries) goes, from its part table.
+        let mut anchors: Vec<Option<usize>> = Vec::with_capacity(n);
         for v in &self.blocks {
             let b = v.b;
             let state = s.timeline.block_state(b, t);
@@ -874,7 +937,9 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
-            let (anim_clip, anim_fase) = self.anim_at(f.anim_clip.len(), t);
+            let (anim_clip, anim_fase, anim_extra) = self.anim_at(f.anim_clip.len(), t, lift);
+            f.anim_extra.push(anim_extra);
+            anchors.push(self.anchor_at(f.anim_clip.len(), t));
             f.anim_clip.push(anim_clip);
             f.anim_fase.push(anim_fase);
             let mut shown = if v.stack {
@@ -913,6 +978,7 @@ impl Playback {
         }
         // Items: where the scene puts them, moved onto forks, hands and decks.
         let mut stacked: HashMap<usize, usize> = HashMap::new();
+
         let mut resting: HashMap<usize, usize> = HashMap::new();
         // Queues drawn as conveyors: an item flying in or out does not sink into the belt.
         let belts: Vec<([f32; 3], looks::QueueBelt)> = (0..self.blocks.len())
@@ -923,6 +989,22 @@ impl Playback {
             })
             .collect();
         let items = s.items_at(t);
+        // The part each station with a part point works on: the item that got there last
+        // (with capacity above one, the one whose processing started last).
+        let mut working: HashMap<usize, (f64, u64)> = HashMap::new();
+        for p in items.iter().filter(|p| p.drawn) {
+            if let Some(EntityId::Block(b)) = p.parent
+                && let Some(i) = self.index_of.get(b as usize).copied().flatten()
+                && poses[i].is_none()
+                && anchors[i].is_some()
+            {
+                let since = s.timeline.item_pos_since(p.item, t).1;
+                let w = working.entry(i).or_insert((since, p.id));
+                if since > w.0 {
+                    *w = (since, p.id);
+                }
+            }
+        }
         // Items held by a source (it is blocked, or a batch waits to leave): how many each.
         let mut held: HashMap<usize, usize> = HashMap::new();
         for p in items.iter().filter(|p| p.drawn) {
@@ -977,11 +1059,14 @@ impl Playback {
                 f.item_color.push(style::origin_color(origin));
                 f.item_carrier.push(-1);
                 f.item_stack.push(0);
+                f.item_ancora_bloco.push(-1);
+                f.item_ancora_ponto.push(-1);
                 continue;
             }
             let mut scale = p.scale;
             let mut carrier = -1;
             let mut stack = 0;
+            let mut anchor: Option<(usize, usize)> = None;
             if let Some(EntityId::Block(b)) = p.parent
                 && let Some(i) = self.index_of.get(b as usize).copied().flatten()
                 && let Some(look) = &self.blocks[i].look
@@ -1003,6 +1088,20 @@ impl Playback {
                     ];
                 } else if v.kind == "Queue" {
                     center[1] -= looks::queue_drop();
+                } else if poses[i].is_none()
+                    && let Some(k) = anchors[i]
+                {
+                    // A station working on its part: that one at the point of its part
+                    // table (the others keep the scene's slots). A point of the root is
+                    // placed here; a moving one by the engine, after the clip.
+                    if working.get(&i).is_some_and(|w| w.1 == p.id) {
+                        anchor = Some((i, k));
+                        if let Some(Some((a, _))) = self.animados.get(i)
+                            && let Some((at, _)) = a.pontos[k].1
+                        {
+                            center = [at[0], at[1] + scale * ITEM_SIZE / 2.0, at[2]];
+                        }
+                    }
                 } else if let Some(pose) = poses[i] {
                     if let Carry::Forks { .. } = look.carry {
                         scale = self.fork_size / ITEM_SIZE;
@@ -1021,6 +1120,20 @@ impl Playback {
                     if look.skeletal {
                         carrier = i as i32;
                         stack = *k as i32;
+                    }
+                    // A vehicle with a part table: on its load point (forks, deck), the
+                    // stack on top.
+                    if let Some(point) = anchors[i] {
+                        anchor = Some((i, point));
+                        stack = *k as i32;
+                        // The deck of the AGV rises with its clip: the load with it, as
+                        // the engine puts it on the deck's point.
+                        if let Some(Some((a, _))) = self.animados.get(i)
+                            && let Some((clip, curso)) = a.mesa
+                            && f.anim_clip[i] == clip
+                        {
+                            center[1] += f.anim_fase[i] * curso * look.scale;
+                        }
                     }
                     *k += 1;
                 }
@@ -1045,6 +1158,8 @@ impl Playback {
             f.item_color.push(style::origin_color(origin));
             f.item_carrier.push(carrier);
             f.item_stack.push(stack);
+            f.item_ancora_bloco.push(anchor.map_or(-1, |a| a.0 as i32));
+            f.item_ancora_ponto.push(anchor.map_or(-1, |a| a.1 as i32));
         }
         f
     }
@@ -1593,12 +1708,76 @@ mod tests {
         assert_eq!(k, clip("ciclo"));
         assert!((p - 0.525).abs() < 1e-3, "{p}");
         assert_eq!(at(30.0), (-1, 0.0));
-        // The press sets up (0..5) and then processes, with no operator.
+        // The press sets up (0..5) and then processes (5..25) with no operator: the
+        // automatic cycle, one per piece (the door opens, closes and opens again).
         let press = index(&pb, "prensa_1");
+        assert!(pb.unmanned(press) && !pb.unmanned(cnc));
+        // Operators only for the setup (`process: false`): nobody runs the process.
+        let setup_only = playback("tutorial_03_operadores.ron", true);
+        let maq = setup_only
+            .blocks
+            .iter()
+            .position(|v| v.name == "maq1")
+            .unwrap();
+        assert!(setup_only.unmanned(maq));
         let f = pb.frame(2.5);
         assert_eq!(pb.blocks[press].clips[f.anim_clip[press] as usize], "setup");
         let f = pb.frame(10.0);
-        assert_eq!(pb.blocks[press].clips[f.anim_clip[press] as usize], "ciclo");
+        assert_eq!(
+            pb.blocks[press].clips[f.anim_clip[press] as usize],
+            "ciclo_auto"
+        );
+        assert!((f.anim_fase[press] - 0.25).abs() < 1e-4);
+    }
+
+    #[test]
+    fn parts_ride_the_points_of_the_element_working_on_them() {
+        let pb = blender_model(true);
+        let press = index(&pb, "prensa_1");
+        let cnc = index(&pb, "cnc_1");
+        let names = |i: usize| pb.anchor_points(i);
+        let anchored = |t: f64, i: usize| {
+            let f = pb.frame(t);
+            (0..f.item_id.len())
+                .find(|&k| f.item_ancora_bloco[k] == i as i32)
+                .map(|k| {
+                    (
+                        names(i)[f.item_ancora_ponto[k] as usize].clone(),
+                        f.item_position[k],
+                    )
+                })
+        };
+        // The press without an operator: the work point, then the exit along `ciclo_auto`
+        // (the entry segment, the first 2/24, passes while the part still flies in from
+        // the source: the hand-over keeps the scene's flight).
+        let (a, _) = pb.animados[press].as_ref().unwrap();
+        let place = |n: &str| a.pontos.iter().find(|p| p.0 == n).unwrap().1.unwrap().0;
+        assert_eq!(
+            names(press)[pb.anchor_at(press, 5.4).unwrap()],
+            "ponto_entrada"
+        );
+        for (t, want) in [(15.0, "ponto_peca"), (24.6, "ponto_saida")] {
+            let (got, at) = anchored(t, press).unwrap_or_else(|| panic!("t={t}"));
+            assert_eq!(got, want, "t={t}");
+            // A point of the root: already placed here, the part's base on it.
+            let p = place(want);
+            assert!(
+                (at[0] - p[0]).abs() < 1e-4 && (at[2] - p[2]).abs() < 1e-4,
+                "t={t}"
+            );
+            assert!((at[1] - p[1] - ITEM_SIZE / 2.0).abs() < 1e-4, "t={t}");
+        }
+        // The CNC: at the entry while the crew gets in (the part is still flying in from
+        // the queue then), at the work point while it runs, at the exit while the crew
+        // gets out.
+        assert_eq!(
+            names(cnc)[pb.anchor_at(cnc, 4.45).unwrap()],
+            "ponto_entrada"
+        );
+        assert_eq!(anchored(11.7, cnc).unwrap().0, "ponto_peca");
+        assert_eq!(anchored(18.45, cnc).unwrap().0, "ponto_saida");
+        // Idle: no part, no anchor anywhere.
+        assert!(pb.frame(60.0).item_ancora_bloco.iter().all(|&b| b == -1));
     }
 
     #[test]
@@ -1687,6 +1866,110 @@ mod tests {
         let bare = blender_model(false);
         assert!(bare.blocks[ana].pessoa.is_none());
         assert_eq!(bare.asset_of(ana).unwrap().0.source, "library");
+    }
+
+    #[test]
+    fn the_forks_follow_the_lift_once_and_carry_the_pallet_on_their_point() {
+        let pb = playback("centro_de_distribuicao.ron", true);
+        let forklifts: Vec<usize> = (0..pb.blocks.len())
+            .filter(|&i| pb.blocks[i].role == Some(MobileRole::Forklift))
+            .collect();
+        assert!(!forklifts.is_empty());
+        let (mut high, mut carried) = (0.0f32, 0);
+        let mut k = 0.0;
+        while k <= pb.end() {
+            let f = pb.frame(k);
+            for &i in &forklifts {
+                // The Blender forklift, with the library's seat and forks.
+                assert_eq!(pb.blocks[i].modelo3d.as_deref(), Some("empilhadeira"));
+                assert!(pb.blocks[i].driver.is_some());
+                let (a, _) = pb.animados[i].as_ref().unwrap();
+                let lift = f.lift[i];
+                if lift > 0.1 + 1e-3 {
+                    // One source for the forks: the clip, at the carriage's rise over
+                    // the travel (the engine then leaves the `carro` node alone).
+                    assert_eq!(a.clips[f.anim_clip[i] as usize], "garfo_subir");
+                    assert!((f.anim_fase[i] - ((lift - 0.1) / 2.0).min(1.0)).abs() < 1e-4);
+                    high = high.max(f.anim_fase[i]);
+                } else {
+                    assert_eq!(f.anim_clip[i], -1, "t={k}");
+                }
+                // A load on the forks goes to the fork point.
+                for j in 0..f.item_id.len() {
+                    if f.item_ancora_bloco[j] == i as i32 {
+                        assert_eq!(
+                            pb.anchor_points(i)[f.item_ancora_ponto[j] as usize],
+                            "ponto_carga"
+                        );
+                        carried += 1;
+                    }
+                }
+            }
+            k += pb.end() / 300.0;
+        }
+        assert!(carried > 0);
+        // A high rack bay lifts the forks well past the 0.05 that only clears the floor.
+        assert!(high > 0.3, "{high}");
+    }
+
+    #[test]
+    fn the_robot_and_the_agv_carry_their_parts_on_their_points() {
+        // The model of the roteiro `g4_blender3d_pecas.json`.
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../godot/roteiros/g4_blender3d_pecas.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), true);
+        let at = |name: &str, t: f64| {
+            let i = index(&pb, name);
+            let f = pb.frame(t);
+            let points = pb.anchor_points(i);
+            let on: Vec<String> = (0..f.item_id.len())
+                .filter(|&k| f.item_ancora_bloco[k] == i as i32)
+                .map(|k| points[f.item_ancora_ponto[k] as usize].clone())
+                .collect();
+            let clip =
+                (f.anim_clip[i] >= 0).then(|| pb.blocks[i].clips[f.anim_clip[i] as usize].clone());
+            (clip, f.anim_fase[i], on)
+        };
+        // The robot (no operator, no automatic line: its cycle) processes 20..26: the part
+        // in the gripper in the middle third, at the exit at the end.
+        let (clip, p, on) = at("robo_1", 23.0);
+        assert_eq!(
+            (clip.as_deref(), on.as_slice()),
+            (Some("ciclo"), ["ponto_garra".to_string()].as_slice())
+        );
+        assert!((p - 0.5).abs() < 1e-4);
+        assert_eq!(at("robo_1", 25.0).2, ["ponto_saida"]);
+        // The AGV: the deck goes up while loading (1.45..4.45), stays up with the load on
+        // its point while travelling, and comes down while unloading (16.45..19.45).
+        let (clip, p, _) = at("agv_1", 2.95);
+        assert_eq!(clip.as_deref(), Some("mesa_subir"));
+        assert!((p - 0.5).abs() < 1e-3, "{p}");
+        let (_, p, on) = at("agv_1", 10.0);
+        assert_eq!(
+            (p, on.as_slice()),
+            (1.0, ["ponto_carga".to_string()].as_slice())
+        );
+        assert!((at("agv_1", 17.95).1 - 0.5).abs() < 1e-3);
+        // The fourth pallet goes to the top cell (4.5 m, past the 2 m of the fork clip):
+        // the clip at its end, the rest of the rise added to the carriage, and the pallet
+        // on the forks at the cell's height.
+        let i = index(&pb, "empilhadeira_1");
+        let f = pb.frame(198.0);
+        assert!(f.lift[i] >= 4.5, "{}", f.lift[i]);
+        assert_eq!(f.anim_fase[i], 1.0);
+        assert!((0.1 + 2.0 + f.anim_extra[i] - f.lift[i]).abs() < 1e-4);
+        let k = (0..f.item_id.len())
+            .find(|&k| f.item_ancora_bloco[k] == i as i32)
+            .expect("the pallet on the forks");
+        let half = f.item_scale[k] * ITEM_SIZE / 2.0;
+        assert!((f.item_position[k][1] - half - f.lift[i]).abs() < 1e-3);
+        // The third one goes in the bay at 3 m.
+        let (clip, p, on) = at("empilhadeira_1", 138.0);
+        assert_eq!(clip.as_deref(), Some("garfo_subir"));
+        assert!(p > 0.9, "{p}");
+        assert_eq!(on, ["ponto_carga"]);
     }
 
     #[test]

@@ -82,6 +82,8 @@ As máquinas se mexem conforme o estado delas na simulação:
 
 Cada elemento traz essa tabela no próprio catálogo (`estados`), então um posto simples ou uma célula mostram só o que têm. Nos outros estados a máquina fica em repouso.
 
+Uma máquina que ninguém opera (sem `operators`) faz um ciclo automático por peça: a porta abre para a peça entrar, fecha enquanto ela é trabalhada e abre de novo para ela sair. A peça aparece onde o elemento a segura: na entrada, no lugar de trabalho e na saída da máquina; na garra do robô, que a leva da entrada à saída; na mesa do AGV, que sobe ao carregar e desce ao descarregar; e no garfo da empilhadeira, que sobe até o vão do porta-paletes.
+
 Os tempos de entrar e sair são os da regra de operação do nó (aba Segurança). O operador fica no lugar de operar do elemento, olhando para a máquina. Enquanto o posto está entrando, ele anda da porta até esse lugar, e na saída faz o caminho de volta.
 
 As pessoas usam os corpos `pessoa_homem` e `pessoa_mulher`, com as mesmas animações do boneco. O corpo, os tons de pele e de cabelo e a altura são escolhidos pelo nome da pessoa, então ficam iguais em toda reprodução. Ela veste os EPIs da lista `ppe` do próprio nó e os dos postos que ela opera, os mesmos que a análise de exposição considera (nomes como `respirador`, `luva` e `bota` também valem), e a camisa pega a cor de `visual.color`. Para escolher o corpo, escreva `visual: (asset: "pessoa_mulher")` ou `"pessoa_homem"`.
