@@ -106,6 +106,11 @@ escreveu cada um.
 - **Restaurar o outro**: volta o valor substituído (como uma alteração nova) e o conflito sai
   da lista.
 
+Textos de várias linhas (atas, descrições, observações) são comparados linha a linha. Se as
+duas pessoas mexeram em linhas diferentes do mesmo texto, as duas mudanças ficam e não há
+conflito; só vira conflito quando as duas mudaram a mesma linha ou acrescentaram linhas no
+mesmo ponto.
+
 A regra vale também para quem digitava enquanto a mudança do colega chegava: o programa
 lembra a versão que você viu quando começou a digitar, e se ela mudou nesse meio tempo o
 caso vai para a lista.
