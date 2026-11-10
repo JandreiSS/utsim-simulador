@@ -20,6 +20,7 @@ import maquinas  # noqa: E402
 import movimentacao  # noqa: E402
 import armazenagem  # noqa: E402
 import postos  # noqa: E402
+import pessoas  # noqa: E402
 
 ELEMENTOS = {
     "cnc": maquinas.cnc,
@@ -40,6 +41,9 @@ ELEMENTOS = {
 
 DETALHES = {0: "", 1: "_medio"}
 
+# Pessoas (`pessoas.py`): um nível de detalhe só, no esqueleto do boneco UAL1.
+PESSOAS = {"pessoa_homem": "homem", "pessoa_mulher": "mulher"}
+
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -49,7 +53,7 @@ def main():
     a = p.parse_args(argv)
     pasta = os.path.abspath(a.saida)
     os.makedirs(pasta, exist_ok=True)
-    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS)
+    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS) + list(PESSOAS)
     caminho_cat = os.path.join(pasta, "catalogo.json")
     catalogo = {}
     if a.so and os.path.exists(caminho_cat):
@@ -58,6 +62,11 @@ def main():
         with open(caminho_cat, encoding="utf-8") as f:
             catalogo = json.load(f)
     for nome in nomes:
+        if nome in PESSOAS:
+            item = pessoas.gerar(PESSOAS[nome], pasta)
+            catalogo[nome] = item
+            print(f"utsim-blender: {item['arquivo']} {item['triangulos']} triângulos, {item['tamanho']} m")
+            continue
         for detalhe, sufixo in DETALHES.items():
             e = ELEMENTOS[nome](detalhe)
             item = e.gravar(pasta, nome + sufixo)
