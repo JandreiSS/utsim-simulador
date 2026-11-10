@@ -1,0 +1,90 @@
+// Linha com CONWIP: modelo pronto da linha Manufatura discreta, montado só com as
+// predefinições de linhas/manufatura/biblioteca.ron.
+//
+// A carteira de ordens está sempre cheia: a liberação cria a próxima ordem assim que a fila
+// conwip (capacidade 1) tem vaga. Dois produtos, prazo de 1 hora. As ordens passam por corte,
+// dobra (o gargalo), solda e pintura (duas cabines), numa célula em U: a entrada e a saída
+// ficam lado a lado. O laço de cartões (CONWIP) deixa no máximo 6 ordens dentro da linha: a
+// ordem pega um cartão no quadro para entrar (conwip_liberar) e devolve no fim
+// (conwip_devolver), e o cartão volta ao quadro. A solda quebra de vez em quando (campo
+// downtime do nó).
+//
+// Experimento: mudar o número de cartões (max_arrivals de conwip_cartoes). Resultado (5
+// replicações, média): com 1 cartão, 63 ordens por dia e 91 min de atravessamento; com 4, 241
+// por dia e 42 min; com 6, 264 por dia e 49 min; com 8, 266 por dia e 60 min; com 12, 269 por
+// dia e 80 min. A vazão para perto do ritmo do gargalo (cerca de 270 por dia) e cada cartão a
+// mais só aumenta o material em processo e o atravessamento, e as ordens começam a sair fora do
+// prazo. O material em processo conta também as três ordens da carteira que esperam cartão
+// (na liberação, na fila conwip e em conwip_liberar).
+//
+// Tempo em minutos. Rode com:
+//   utsim linha manufatura relatorio examples/linha_conwip.ron --html relatorio.html
+//
+//   liberacao -> conwip -> conwip_liberar -> fila_corte -> corte -> fila_dobra -> dobra
+//     -> fila_solda -> solda -> fila_pintura -> pintura -> conwip_devolver -> expedicao
+//   conwip_cartoes -> conwip_quadro -> conwip_liberar;  conwip_devolver -> conwip_quadro
+Model(
+    name: "Linha com CONWIP",
+    description: "Manufatura discreta: cartões que limitam as ordens dentro de uma linha em U com gargalo",
+    line: "manufatura",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 103, replications: 5),
+    objects: [
+        (name: "liberacao", kind: Source(interarrival: Const(0.01),
+            labels: {"produto": Discrete([(1.0, 0.6), (2.0, 0.4)]), "prazo": Const(60.0)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "manufatura/liberacao", department: "Planejamento"),
+        (name: "conwip", kind: Queue(capacity: Some(1)), position: (3.0, 0.0, 0.0), symbol: "espera",
+            on_entry: Some("if label(item, \"vence\", -1.0) < 0.0 { item.vence = now + label(item, \"prazo\", 1.0e9); }"),
+            visual: Some((asset: Some("area"))), preset: "manufatura/cartoes", department: "Planejamento"),
+        (name: "conwip_liberar", kind: Combiner(components: [1], mode: Pack, process: Const(0.0)),
+            position: (6.0, 0.0, 0.0), symbol: "operacao", preset: "manufatura/cartoes", department: "Planejamento"),
+        (name: "conwip_cartoes", kind: Source(interarrival: Const(0.01), first_at_zero: true, max_arrivals: Some(6),
+            labels: {"cartao": Const(1.0)}), position: (3.0, -2.0, 0.0), symbol: "inicio",
+            preset: "manufatura/cartoes", department: "Planejamento"),
+        (name: "conwip_quadro", kind: Queue(), position: (6.0, -2.0, 0.0), symbol: "armazenagem",
+            visual: Some((asset: Some("bandeja"))), preset: "manufatura/cartoes", department: "Planejamento"),
+        (name: "conwip_devolver", kind: Separator(mode: Unpack, process: Const(0.0)), position: (6.0, -4.0, 0.0),
+            output: Script("if label(item, \"cartao\", 0.0) == 1.0 { 1 } else { 2 }"), symbol: "operacao",
+            preset: "manufatura/cartoes", department: "Planejamento"),
+        (name: "fila_corte", kind: Queue(), position: (9.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Linha"),
+        (name: "corte", kind: Processor(process: Triangular(min: 3.0, mode: 4.0, max: 5.5)),
+            ppe: ["oculos", "protetor_auricular"], position: (12.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Linha"),
+        (name: "fila_dobra", kind: Queue(), position: (15.0, 0.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Linha"),
+        (name: "dobra", kind: Processor(process: Triangular(min: 4.2, mode: 5.2, max: 6.4)),
+            ppe: ["oculos", "protetor_auricular"], position: (18.0, 0.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Linha"),
+        (name: "fila_solda", kind: Queue(), position: (18.0, -4.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Linha"),
+        (name: "solda", kind: Processor(process: Triangular(min: 3.5, mode: 4.5, max: 5.5)),
+            downtime: Some((mtbf: Exp(mean: 720.0), mttr: Exp(mean: 30.0))),
+            ppe: ["oculos", "luvas", "protetor_auricular"], position: (15.0, -4.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Linha"),
+        (name: "fila_pintura", kind: Queue(), position: (12.0, -4.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Linha"),
+        (name: "pintura", kind: Processor(capacity: 2, process: Triangular(min: 6.0, mode: 8.0, max: 10.0)),
+            ppe: ["mascara", "luvas"], position: (9.0, -4.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Linha"),
+        (name: "expedicao", kind: Sink, position: (3.0, -5.0, 0.0), symbol: "fim", preset: "manufatura/expedicao",
+            department: "Expedição"),
+    ],
+    connections: [
+        ("liberacao", "conwip"),
+        ("conwip", "conwip_liberar"),
+        ("conwip_cartoes", "conwip_quadro"),
+        ("conwip_quadro", "conwip_liberar"),
+        ("conwip_devolver", "conwip_quadro"),
+        ("conwip_liberar", "fila_corte"),
+        ("fila_corte", "corte"),
+        ("corte", "fila_dobra"),
+        ("fila_dobra", "dobra"),
+        ("dobra", "fila_solda"),
+        ("fila_solda", "solda"),
+        ("solda", "fila_pintura"),
+        ("fila_pintura", "pintura"),
+        ("pintura", "conwip_devolver"),
+        ("conwip_devolver", "expedicao"),
+    ],
+)
