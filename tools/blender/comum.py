@@ -25,6 +25,40 @@ import bpy
 FPS = 24
 QUADROS = FPS  # um clipe = 1 s
 
+# Estado do posto na simulação -> (clipe, fase no começo do estado, fase no fim, laço).
+# A ponte toca o clipe na fase `de + (ate - de) * fase`, com `fase` = (t - início) / (fim -
+# início) do estado; num clipe em laço, uma volta inteira cabe no estado (uma peça, um ciclo).
+ESTADOS = (
+    ("entering", "porta_abrir", 0.0, 1.0, False),
+    ("leaving", "porta_abrir", 1.0, 0.0, False),
+    ("processing", "ciclo", 0.0, 1.0, True),
+    ("setup", "setup", 0.0, 1.0, True),
+    ("down", "quebra", 0.0, 1.0, False),
+    ("waiting_repair", "quebra", 1.0, 1.0, False),
+    ("maintenance", "quebra", 1.0, 1.0, False),
+)
+
+# O operador anda pela fase do estado: de `ponto_porta` a `ponto_operador` ao entrar e
+# de volta ao sair (os dois pontos girados com a estação).
+CAMINHOS = {
+    "entering": ("ponto_porta", "ponto_operador"),
+    "leaving": ("ponto_operador", "ponto_porta"),
+}
+
+
+def estados(clipes, pontos):
+    """A tabela `estados` do catálogo: só os estados cujo clipe o elemento tem."""
+    out = {}
+    for estado, clipe, de, ate, laco in ESTADOS:
+        if clipe not in clipes:
+            continue
+        e = {"clipe": clipe, "de": de, "ate": ate, "laco": laco}
+        a, b = CAMINHOS.get(estado, (None, None))
+        if a in pontos and b in pontos:
+            e["operador"] = [a, b]
+        out[estado] = e
+    return out
+
 
 def hex_cor(rgb):
     """A cor `0xRRGGBB` como fator do glTF (os mesmos números do `utsim-assets`)."""
@@ -360,6 +394,7 @@ class Elemento:
             "pontos": dict(sorted(self.pontos.items())),
             "clipes": dict(sorted(self.clipes.items())),
             "dados": dict(sorted(self.dados.items())),
+            "estados": estados(self.clipes, self.pontos),
         }
 
 
