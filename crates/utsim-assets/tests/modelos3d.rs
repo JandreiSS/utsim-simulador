@@ -449,11 +449,13 @@ fn o_operador_fica_fora_da_maquina_e_olha_para_ela() {
             90.0,
             "{nome}: operador olha para +y"
         );
-        // A porta fica entre o operador e a máquina.
+        // Nas máquinas, a porta (por onde o operador chega) fica 0,6 m além do operador, para
+        // ele andar da porta até o posto ao entrar. No posto, os dois pontos são o mesmo.
         let porta = v3(&item["pontos"]["ponto_porta"]["pos"]);
+        let recuo = if nome == "posto" { 0.0 } else { 0.6 };
         assert!(
-            porta[1] >= pos[1] && (porta[0] - pos[0]).abs() < 0.3,
-            "{nome}: porta"
+            (pos[1] - porta[1] - recuo).abs() < 1e-3 && (porta[0] - pos[0]).abs() < 1e-3,
+            "{nome}: porta em {porta:?}, operador em {pos:?}"
         );
     }
     // Na célula, o operador entra: a porta fica fora da cerca e o posto dentro.
