@@ -15,7 +15,7 @@ use std::path::Path;
 use utsim_assets::Spec;
 use utsim_model::Model;
 use utsim_model::replay::Replay;
-use utsim_scene::compose::ITEM_SIZE;
+use utsim_scene::compose::{ITEM_SIZE, turned};
 use utsim_scene::style::{self, Shape};
 use utsim_scene::{EntityId, EntityKind, LinkKind, MobileRole, Motion, Scene, SceneOptions};
 
@@ -523,6 +523,29 @@ impl Playback {
         (to_godot(v.position), size_to_godot(v.size))
     }
 
+    /// How block `i` is turned about Godot's `+Y` (radians): the turn of a fixed block
+    /// ([`Scene::turn`]: its `visual.yaw`, a belt's heading), 0 for the mobiles. The engine
+    /// turns the block's root by it, so the asset, the simple shape and the editor's box
+    /// and nodes turn together.
+    pub fn turn(&self, i: usize) -> f32 {
+        yaw_to_godot(self.scene.turn(self.blocks[i].b))
+    }
+
+    /// Size of block `i` in its own frame (Godot extents), before [`Self::turn`]: a belt's
+    /// length and width, not the box of the turned belt.
+    pub fn local_size(&self, i: usize) -> [f32; 3] {
+        let h = self.scene.geoms[self.blocks[i].b].local_half();
+        [2.0 * h[0], 2.0 * h[1], 2.0 * h[2]]
+    }
+
+    /// The asset's rotation and offset under the block's root, which is already turned
+    /// by [`Self::turn`]: the look's own (`Look::yaw`, `Look::offset`) without that turn.
+    pub fn asset_pose(&self, i: usize) -> Option<(f32, [f32; 3])> {
+        let look = self.blocks[i].look.as_ref()?;
+        let turn = self.turn(i);
+        Some((look.yaw - turn, turned(look.offset, -turn)))
+    }
+
     /// Segments of the path network, Godot coordinates.
     pub fn network(&self) -> Vec<([f32; 3], [f32; 3], bool)> {
         self.scene
@@ -577,8 +600,14 @@ impl Playback {
             _ => 0.6,
         };
         for &st in &self.stations {
-            p.position =
-                looks::keep_outside(p.position, p.yaw, s.positions[st], s.geoms[st].half, reach);
+            p.position = looks::keep_outside(
+                p.position,
+                p.yaw,
+                s.positions[st],
+                s.geoms[st].half,
+                s.turn(st),
+                reach,
+            );
         }
         if look.carry == Carry::Hands && p.motion == Motion::Working {
             let station = self.stations.iter().copied().find(|&st| {
@@ -587,7 +616,8 @@ impl Playback {
                     .all(|&k| (original[k] - s.positions[st][k]).abs() <= s.geoms[st].half[k])
             });
             if let Some(st) = station {
-                (p.position, p.yaw) = looks::station_front(s.positions[st], s.geoms[st].half);
+                (p.position, p.yaw) =
+                    looks::station_front(s.positions[st], s.geoms[st].half, s.turn(st));
             }
         }
         Some(p)
@@ -777,14 +807,19 @@ impl Playback {
             {
                 // C7: at the mouth of the output port, side by side.
                 let k = at_port.entry(i).or_default();
-                let (base, size) = self.static_pose(i);
-                let o = port_slot([size[0] / 2.0, size[1], size[2] / 2.0], *k, n);
+                let (base, _) = self.static_pose(i);
+                let size = self.local_size(i);
+                // At the output side of its own frame, turned with it.
+                let o = turned(
+                    port_slot([size[0] / 2.0, size[1], size[2] / 2.0], *k, n),
+                    self.turn(i),
+                );
                 *k += 1;
                 center = [base[0] + o[0], base[1] + o[1], base[2] + o[2]];
                 let origin = s.timeline.item_origin(p.item).unwrap_or(0);
                 f.item_id.push(p.id as i64);
                 f.item_position.push(layout_to_godot(center));
-                f.item_yaw.push(0.0);
+                f.item_yaw.push(self.turn(i));
                 f.item_scale.push(1.0);
                 f.item_color.push(style::origin_color(origin));
                 f.item_carrier.push(-1);
@@ -803,7 +838,7 @@ impl Playback {
                     // On top of the belt, in a line (the scene's slots are the simple
                     // queue's: their base is the block's).
                     let k = resting.entry(i).or_default();
-                    let simple = style::slot_offset(Shape::LongBox, *k);
+                    let simple = turned(style::slot_offset(Shape::LongBox, *k), self.turn(i));
                     let Some(at) = belt.slot(*k, ITEM_SIZE) else {
                         continue;
                     };
@@ -891,6 +926,45 @@ mod tests {
         let (model, path) = example(name);
         let replay = model.replay(0).expect("replay");
         Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    #[test]
+    fn a_turned_object_turns_its_root_and_the_items_resting_on_it() {
+        use std::f32::consts::FRAC_PI_2;
+        let (mut model, path) = example("tutorial_01_caixa.ron");
+        for o in model.objects.iter_mut().filter(|o| o.name == "fila") {
+            o.visual = Some(utsim_model::VisualDef {
+                yaw: Some(90.0),
+                ..Default::default()
+            });
+        }
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), false);
+        let i = pb.blocks.iter().position(|v| v.name == "fila").unwrap();
+        let k = pb.blocks.iter().position(|v| v.name == "caixa").unwrap();
+        assert!((pb.turn(i) - FRAC_PI_2).abs() < 1e-6);
+        assert_eq!(pb.turn(k), 0.0);
+        // The root turns: the asset under it does not turn again.
+        if let Some((yaw, _)) = pb.asset_pose(i) {
+            assert!(yaw.abs() < 1e-6, "{yaw}");
+        }
+        // The items waiting in the queue lie along its own x, turned: in its frame they
+        // are in the lanes (|z| <= 0.4), and they face its way.
+        let b = pb.blocks[i].b;
+        let base = pb.scene.positions[b];
+        let mut seen = 0;
+        for t in (1..200).map(|s| s as f64 * 5.0) {
+            for p in pb.scene.items_at(t) {
+                if p.drawn && p.parent == Some(EntityId::Block(b as u32)) {
+                    let d = [p.center[0] - base[0], 0.0, p.center[2] - base[2]];
+                    let local = turned(d, -pb.turn(i));
+                    assert!(local[2].abs() <= 0.41, "{local:?}");
+                    assert!((p.yaw - FRAC_PI_2).abs() < 1e-6);
+                    seen += 1;
+                }
+            }
+        }
+        assert!(seen > 0, "items waited in the queue");
     }
 
     #[test]

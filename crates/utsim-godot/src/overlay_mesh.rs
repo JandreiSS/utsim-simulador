@@ -24,6 +24,7 @@ pub const PRIMARY: Rgba = [1.0, 1.0, 1.0, 1.0];
 pub const OTHERS: Rgba = [0.35, 0.65, 1.0, 1.0];
 pub const PROBLEM: Rgba = [1.0, 0.35, 0.30, 1.0];
 pub const CRITICAL: Rgba = [1.0, 0.30, 0.22, 1.0];
+pub const ROTATE: Rgba = [0.78, 0.52, 1.0, 1.0];
 
 /// Triangles: three vertices each, one colour per vertex.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -94,14 +95,15 @@ impl Tris {
         }
     }
 
-    /// The outline of a box's footprint.
-    pub fn rect(&mut self, lo: V3, hi: V3, color: Rgba, width: f64) {
+    /// The outline of a box's footprint, turned by `yaw` about its centre.
+    pub fn rect(&mut self, lo: V3, hi: V3, yaw: f64, color: Rgba, width: f64) {
         let y = 0.03;
+        let at = footprint(lo, hi, yaw, y);
         let p = [
-            [lo[0], y, lo[2]],
-            [hi[0], y, lo[2]],
-            [hi[0], y, hi[2]],
-            [lo[0], y, hi[2]],
+            at(lo[0], lo[2]),
+            at(hi[0], lo[2]),
+            at(hi[0], hi[2]),
+            at(lo[0], hi[2]),
         ];
         for k in 0..4 {
             let (a, b) = (p[k], p[(k + 1) % 4]);
@@ -110,31 +112,64 @@ impl Tris {
         }
     }
 
-    /// L marks at the four corners of a footprint.
-    pub fn corners(&mut self, lo: V3, hi: V3, color: Rgba, width: f64) {
+    /// L marks at the four corners of a footprint, turned by `yaw` about its centre.
+    pub fn corners(&mut self, lo: V3, hi: V3, yaw: f64, color: Rgba, width: f64) {
         let y = 0.03;
         let arm = ((hi[0] - lo[0]).min(hi[2] - lo[2]) * 0.3).clamp(0.25, 0.8);
+        let at = footprint(lo, hi, yaw, y);
         for (x, z, sx, sz) in [
             (lo[0], lo[2], 1.0, 1.0),
             (hi[0], lo[2], -1.0, 1.0),
             (hi[0], hi[2], -1.0, -1.0),
             (lo[0], hi[2], 1.0, -1.0),
         ] {
-            let p = [x, y, z];
-            self.ribbon(p, add(p, [sx * arm, 0.0, 0.0]), width, color);
-            self.ribbon(p, add(p, [0.0, 0.0, sz * arm]), width, color);
+            let p = at(x, z);
+            self.ribbon(p, at(x + sx * arm, z), width, color);
+            self.ribbon(p, at(x, z + sz * arm), width, color);
         }
     }
 
-    /// A node: a disc with a dark rim and a stub to the block's side (`edge_x`); bigger
+    /// A node: a disc with a dark rim and a stub to the block's side (`edge`); bigger
     /// and white-rimmed when lit.
-    pub fn node(&mut self, at: V3, color: Rgba, lit: bool, edge_x: f64) {
+    pub fn node(&mut self, at: V3, color: Rgba, lit: bool, edge: V3) {
         let mut stub = color;
         stub[3] = 0.8;
-        self.ribbon([edge_x, at[1], at[2]], at, 0.04, stub);
+        self.ribbon([edge[0], at[1], edge[2]], at, 0.04, stub);
         let r = if lit { 0.17 } else { 0.12 };
         self.disc(at, r + 0.035, if lit { PORT_HOVER } else { PORT_RING });
         self.disc(at, r, if lit { lighten(color, 0.25) } else { color });
+    }
+
+    /// The rotate handle: a stub from the block's back edge (`anchor`), a round knob with
+    /// a curved arrow on it; bigger and white-rimmed when lit.
+    pub fn rotate_handle(&mut self, at: V3, anchor: V3, lit: bool) {
+        let mut stub = ROTATE;
+        stub[3] = 0.8;
+        self.ribbon([anchor[0], at[1], anchor[2]], at, 0.04, stub);
+        let r = if lit { 0.2 } else { 0.16 };
+        self.disc(at, r + 0.035, if lit { PORT_HOVER } else { PORT_RING });
+        self.disc(at, r, if lit { lighten(ROTATE, 0.25) } else { ROTATE });
+        // A three-quarter arc and its head, dark over the knob.
+        let up = [at[0], at[1] + 0.005, at[2]];
+        let ra = r * 0.55;
+        let point = |a: f64| add(up, [a.cos() * ra, 0.0, a.sin() * ra]);
+        let n = 9;
+        let (a0, a1) = (0.0, 1.5 * std::f64::consts::PI);
+        for k in 0..n {
+            let t0 = a0 + (a1 - a0) * k as f64 / n as f64;
+            let t1 = a0 + (a1 - a0) * (k + 1) as f64 / n as f64;
+            self.ribbon(point(t0), point(t1), 0.035, PORT_RING);
+        }
+        let end = point(a1);
+        let tangent = [-(a1.sin()), 0.0, a1.cos()];
+        let side = [a1.cos(), 0.0, a1.sin()];
+        let h = ra * 0.6;
+        self.tri(
+            add(end, mul(side, h * 0.6)),
+            sub(end, mul(side, h * 0.6)),
+            add(end, mul(tangent, h)),
+            PORT_RING,
+        );
     }
 
     /// A polygon on the floor at height `y`, triangulated (concave allowed).
@@ -147,6 +182,15 @@ impl Tris {
     }
 }
 
+/// The floor point `(x, z)` of a footprint `lo`..`hi` turned by `yaw` about its centre,
+/// at height `y`.
+fn footprint(lo: V3, hi: V3, yaw: f64, y: f64) -> impl Fn(f64, f64) -> V3 {
+    let c = [(lo[0] + hi[0]) / 2.0, (lo[2] + hi[2]) / 2.0];
+    move |x, z| {
+        let t = crate::editor3d::turn([x - c[0], 0.0, z - c[1]], yaw);
+        [c[0] + t[0], y, c[1] + t[2]]
+    }
+}
 fn lighten(c: Rgba, k: f32) -> Rgba {
     [
         c[0] + (1.0 - c[0]) * k,
@@ -240,27 +284,31 @@ pub fn draw(e: &Editor3d, critical: &[String]) -> Drawing {
     let t = &mut d.lines;
     let grow =
         |lo: V3, hi: V3, g: f64| ([lo[0] - g, lo[1], lo[2] - g], [hi[0] + g, hi[1], hi[2] + g]);
-    for (lo, hi, m) in &o.corners {
+    for (lo, hi, m, yaw) in &o.corners {
         match m {
             Mark::Primary | Mark::Other => {
                 let (a, b) = grow(*lo, *hi, 0.1);
                 t.corners(
                     a,
                     b,
+                    *yaw,
                     if *m == Mark::Primary { PRIMARY } else { OTHERS },
                     0.09,
                 );
             }
             Mark::Problem => {
                 let (a, b) = grow(*lo, *hi, 0.04);
-                t.corners(a, b, PROBLEM, 0.04);
+                t.corners(a, b, *yaw, PROBLEM, 0.04);
             }
         }
     }
     for b in e.blocks.iter().filter(|b| critical.contains(&b.name)) {
         let (lo, hi) = b.pick_box();
         let (a, c) = grow(lo, hi, 0.3);
-        t.rect(a, c, CRITICAL, 0.1);
+        t.rect(a, c, b.yaw, CRITICAL, 0.1);
+    }
+    if let Some(r) = &o.rotate {
+        t.rotate_handle(r.at, r.anchor, r.lit);
     }
     // Connections; the port number on the lines of an object with several outputs.
     let segs = e.segments();
@@ -403,8 +451,10 @@ mod tests {
         t.ribbon([0.0; 3], [1.0, 0.0, 0.0], 0.1, LINK);
         t.arrow([0.0; 3], [2.0, 0.0, 0.0], LINK, 0.06);
         t.disc([0.0; 3], 0.2, REMOVE);
-        t.corners([0.0; 3], [2.0, 1.0, 2.0], PRIMARY, 0.05);
-        t.node([1.0, 0.06, 0.0], PORT_OUT, true, 0.5);
+        t.corners([0.0; 3], [2.0, 1.0, 2.0], 0.3, PRIMARY, 0.05);
+        t.rect([0.0; 3], [2.0, 1.0, 2.0], 0.3, CRITICAL, 0.05);
+        t.rotate_handle([1.0, 0.06, -1.0], [1.0, 0.06, 0.0], false);
+        t.node([1.0, 0.06, 0.0], PORT_OUT, true, [0.5, 0.06, 0.0]);
         assert!(t.verts.len().is_multiple_of(3));
         assert_eq!(t.verts.len(), t.colors.len());
         // A zero-length ribbon draws nothing.
@@ -422,6 +472,7 @@ mod tests {
             kind: k.into(),
             pos: [x, 0.0, 0.0],
             size: [1.0; 3],
+            yaw: 0.0,
             skeletal: false,
             problems: n == "saida",
         };
@@ -466,6 +517,8 @@ mod tests {
         assert!(d.lines.colors.contains(&PRIMARY));
         assert!(d.lines.colors.contains(&PROBLEM));
         assert!(d.lines.colors.contains(&CRITICAL));
+        // The only one selected is fixed: its rotate handle shows.
+        assert!(d.lines.colors.contains(&ROTATE));
         // The zone: a translucent triangle and its label.
         assert_eq!(d.fill.verts.len(), 3);
         assert!(d.fill.colors.iter().all(|c| c[3] < 1.0));

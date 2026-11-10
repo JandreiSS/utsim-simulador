@@ -2,7 +2,8 @@
 //! conversion over [`crate::editor3d`] (step 6 of `docs/plano_interface_rust.md`). The
 //! script hands it the camera, the scene and the mouse; it answers with effects (as
 //! dictionaries, `op` = `ligar`, `desligar`, `equipe`, `selecao`, `status`, `mover_inicio`,
-//! `mover`, `mover_fim`, `remover`) and with what to draw ([`UtsimEditor::overlay`]).
+//! `mover`, `mover_fim`, `girar_inicio`, `girar`, `girar_fim`, `remover`) and with what to
+//! draw ([`UtsimEditor::overlay`]).
 
 use godot::prelude::*;
 
@@ -98,6 +99,16 @@ fn effects(list: Vec<Effect>) -> VarArray {
                 d.set("delta", g3(delta));
             }
             Effect::MoveEnd => d.set("op", &GString::from("mover_fim")),
+            Effect::RotateBegin(name) => {
+                d.set("op", &GString::from("girar_inicio"));
+                d.set("name", &GString::from(name.as_str()));
+            }
+            Effect::Rotate { name, degrees } => {
+                d.set("op", &GString::from("girar"));
+                d.set("name", &GString::from(name.as_str()));
+                d.set("degrees", degrees);
+            }
+            Effect::RotateEnd => d.set("op", &GString::from("girar_fim")),
             Effect::Remove(n) => {
                 d.set("op", &GString::from("remover"));
                 d.set("names", &names(&n));
@@ -207,7 +218,7 @@ impl UtsimEditor {
         };
     }
 
-    /// The scene: `blocks` ({name, kind, pos, size, skeletal, problems}), `conns` ({from,
+    /// The scene: `blocks` ({name, kind, pos, size, yaw, skeletal, problems}), `conns` ({from,
     /// to, port, logical}), `teams` ({kind, from, to}) and the team kinds hidden.
     #[func]
     fn set_scene(
@@ -234,6 +245,10 @@ impl UtsimEditor {
                     .get("pos")
                     .and_then(|v| v.try_to::<Vector3>().ok())
                     .map_or([0.0; 3], v3),
+                yaw: d
+                    .get("yaw")
+                    .and_then(|v| v.try_to::<f64>().ok())
+                    .unwrap_or(0.0),
                 size: d
                     .get("size")
                     .and_then(|v| v.try_to::<Vector3>().ok())
@@ -566,6 +581,40 @@ impl UtsimEditor {
         self.ed.set_position(&name.to_string(), v3(pos));
     }
 
+    /// How block `name` is turned now (radians about `+Y`, during a turn of the handle).
+    #[func]
+    fn set_yaw(&mut self, name: GString, yaw: f64) {
+        self.ed.set_yaw(&name.to_string(), yaw);
+    }
+
+    /// Shift is held (the rotate handle snaps to 90°).
+    #[func]
+    fn set_shift(&mut self, on: bool) {
+        self.ed.shift = on;
+    }
+
+    /// The rotate handle is under the mouse (the script shows a hand).
+    #[func]
+    fn over_rotate_handle(&self) -> bool {
+        self.ed.hover_rotate || self.ed.turning().is_some()
+    }
+
+    /// A turn of the rotate handle is under way.
+    #[func]
+    fn is_turning(&self) -> bool {
+        self.ed.turning().is_some()
+    }
+
+    /// The rotate handle of the selected object on screen, or null (none shows).
+    #[func]
+    fn rotate_handle_screen(&self) -> Variant {
+        opt2(
+            self.ed
+                .rotate_target()
+                .and_then(|b| self.ed.camera.project(b.rotate_handle())),
+        )
+    }
+
     #[func]
     fn set_tool(&mut self, tool: GString) {
         if self.ed.tool.is_empty() {
@@ -822,7 +871,7 @@ impl UtsimEditor {
         out
     }
 
-    /// What to draw: `nodes` ([pos, side, lit, edge_x]), `corners` ([min, max, mark]:
+    /// What to draw: `nodes` ([pos, side, lit, edge]), `corners` ([min, max, mark]:
     /// `primary`, `other`, `problem`), `remove` (pos or null), `preview` ([a, b, kind] or
     /// empty: `flow`, `service`), `box` (Rect2 or null).
     #[func]
@@ -835,12 +884,12 @@ impl UtsimEditor {
             a.push(&g3(n.at).to_variant());
             a.push(&GString::from(n.side.key()).to_variant());
             a.push(&n.lit.to_variant());
-            a.push(&(n.edge as f32).to_variant());
+            a.push(&g3(n.edge).to_variant());
             nodes.push(&a.to_variant());
         }
         d.set("nodes", &nodes);
         let mut corners = VarArray::new();
-        for (lo, hi, m) in &o.corners {
+        for (lo, hi, m, _) in &o.corners {
             let mut a = VarArray::new();
             a.push(&g3(*lo).to_variant());
             a.push(&g3(*hi).to_variant());

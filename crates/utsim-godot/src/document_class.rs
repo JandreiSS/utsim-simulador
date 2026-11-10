@@ -578,6 +578,36 @@ impl UtsimDocument {
         self.done(r)
     }
 
+    /// Turns the fixed objects of `names` by `degrees` (counter-clockwise seen from above),
+    /// each about its centre, in one undo step; how many turned (0: none, see `last_error`).
+    #[func]
+    fn rotate_by(&mut self, names: PackedStringArray, degrees: f64) -> i64 {
+        match self.editor.rotate_by(&names_of(&names), degrees) {
+            Ok(n) => {
+                self.done(Ok(()));
+                n as i64
+            }
+            Err(e) => {
+                self.last_error = e;
+                0
+            }
+        }
+    }
+
+    /// A turn of the rotate handle begins (its steps merge into one undo step until
+    /// `end_drag`).
+    #[func]
+    fn begin_rotate(&mut self) {
+        self.editor.begin_rotate();
+    }
+
+    /// The rotate handle turned `name` to `degrees` (`visual.yaw`).
+    #[func]
+    fn rotate_drag(&mut self, name: GString, degrees: f64) -> bool {
+        let r = self.editor.rotate_drag(&name.to_string(), degrees);
+        self.done(r)
+    }
+
     #[func]
     fn copy(&mut self, names: PackedStringArray) -> i64 {
         self.editor.copy(&names_of(&names)) as i64
