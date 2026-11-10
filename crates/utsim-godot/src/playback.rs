@@ -23,6 +23,7 @@ use crate::coords::{layout_to_godot, size_to_godot, to_godot, yaw_to_godot};
 use utsim_look::driver::{self, DriverClip, DriverMount};
 
 use crate::looks::{self, Carry, Clip, Context, Look, Source};
+use crate::modelos3d::{self, Animado, Catalogo, Pedido};
 
 /// Clips of the bridge's list: the person clips, then the driver's.
 pub const CLIPS: usize = Clip::ALL.len() + DriverClip::ALL.len();
@@ -72,6 +73,14 @@ pub struct BlockView {
     /// The item types a source creates, with their colours and shares (C7: the ring over
     /// it); empty when it does not name types.
     pub type_mix: Vec<([f32; 3], f64)>,
+    /// The Blender element it is drawn with (`assets/modelos3d/<stem>.glb`), when there is
+    /// one ([`modelos3d`]): it replaces the library file of the look, whose scale, turn and
+    /// offset still apply.
+    pub modelo3d: Option<String>,
+    /// The clips of that element, sorted (the indices of the frame's `anim_clip`).
+    pub clips: Vec<String>,
+    /// A person drawn with a Blender body: file, protective equipment, colours, height.
+    pub pessoa: Option<modelos3d::Pessoa>,
 }
 
 /// The item types `name` creates (`item_type`, or the weights of `item_type_mix`) with the
@@ -229,7 +238,15 @@ pub struct FrameData {
     /// A source that just lost an item (`on_blocked: Drop`): 1 at the loss, falling to 0
     /// over [`FLASH_SECONDS`] of simulated time; 0 for everything else (C7).
     pub flash: Vec<f32>,
+    /// Blocks drawn with a Blender element: the clip playing (index into
+    /// [`BlockView::clips`], -1 for none) and its phase, 0 to 1 ([`Animado::anim`]).
+    pub anim_clip: Vec<i32>,
+    pub anim_fase: Vec<f32>,
 }
+
+/// How far outside a station's footprint an operator working there may stand (its access
+/// point) and still be put at the station's `ponto_operador`, metres.
+pub const POST_REACH: f32 = 2.0;
 
 /// How long (simulated seconds) a source blinks after losing an item.
 pub const FLASH_SECONDS: f64 = 1.0;
@@ -333,6 +350,12 @@ pub struct Playback {
     created: Vec<Vec<f64>>,
     /// The instants each source lost an item (created and destroyed without leaving).
     dropped: Vec<Vec<f64>>,
+    /// The catalogue of the Blender elements, when its folder was found.
+    pub modelos3d: Option<Catalogo>,
+    /// Per drawn block, its Blender element resolved once (clips, state table, operator
+    /// post and walks in the layout) and the runs of its states as the table sees them
+    /// ([`Animado::runs`]); `None` for the others.
+    pub animados: Vec<Option<(Animado, modelos3d::Runs)>>,
 }
 
 impl Playback {
@@ -359,6 +382,7 @@ impl Playback {
             }),
             skeletal_people,
         };
+        let catalogo = Catalogo::find(model_dir);
         let mut blocks = Vec::new();
         let mut index_of = vec![None; n];
         for e in &static_scene.entities {
@@ -371,14 +395,20 @@ impl Playback {
                 }
                 _ => continue,
             };
-            let look = looks::look_of(
-                &kind,
-                role,
-                scene.visual(b),
-                &scene.geoms[b],
-                ctx,
-                model_dir,
-            );
+            let visual = scene.visual(b);
+            let mut look = looks::look_of(&kind, role, visual, &scene.geoms[b], ctx, model_dir);
+            let (modelo3d, pessoa) = match &catalogo {
+                Some(cat) => blender_look(cat, &mut look, &name, visual, model, |v| {
+                    looks::look_of(&kind, role, Some(v), &scene.geoms[b], ctx, model_dir)
+                }),
+                None => (None, None),
+            };
+            let clips = modelo3d
+                .as_deref()
+                .zip(catalogo.as_ref())
+                .and_then(|(s, c)| c.get(s))
+                .map(modelos3d::Elemento::clip_names)
+                .unwrap_or_default();
             index_of[b] = Some(blocks.len());
             let driver = look
                 .as_ref()
@@ -397,6 +427,9 @@ impl Playback {
             };
             blocks.push(BlockView {
                 b,
+                modelo3d,
+                clips,
+                pessoa,
                 stack,
                 badge,
                 type_mix,
@@ -487,7 +520,95 @@ impl Playback {
             teams,
             created,
             dropped,
+            modelos3d: catalogo,
+            animados: Vec::new(),
         }
+        .with_blender(replay)
+    }
+
+    /// Resolves the Blender element of every block once (clips, state table, operator
+    /// post and walks in the layout) and the runs of its states in the trace.
+    fn with_blender(mut self, replay: &Replay) -> Playback {
+        let mut animados: Vec<Option<(Animado, modelos3d::Runs)>> = (0..self.blocks.len())
+            .map(|i| {
+                let v = &self.blocks[i];
+                if v.pessoa.is_some() {
+                    return None;
+                }
+                let stem = v.modelo3d.as_deref()?;
+                let e = self.modelos3d.as_ref()?.get(stem)?;
+                Some((Animado::resolve(e, stem, &self.placement(i)?), Vec::new()))
+            })
+            .collect();
+        let mut states: HashMap<usize, Vec<(f64, utsim_core::State)>> = HashMap::new();
+        for r in &replay.records {
+            if let utsim_core::TraceEvent::State { block, state } = r.event
+                && let Some(i) = self.drawn_index(block)
+                && animados[i].is_some()
+            {
+                states.entry(i).or_default().push((r.t, state));
+            }
+        }
+        for (i, list) in states {
+            if let Some((a, runs)) = animados[i].as_mut() {
+                *runs = a.runs(list);
+            }
+        }
+        self.animados = animados;
+        self
+    }
+
+    /// The asset of block `i` as the engine loads it, and the library asset to fall back
+    /// on when it is a Blender element (`source: "modelos3d"`).
+    pub fn asset_of(&self, i: usize) -> Option<(AssetInfo, Option<AssetInfo>)> {
+        let v = &self.blocks[i];
+        let base = AssetInfo::of(&v.look.as_ref()?.source);
+        match (&v.modelo3d, &self.modelos3d) {
+            (Some(stem), Some(cat)) => Some((
+                AssetInfo {
+                    source: "modelos3d",
+                    name: stem.clone(),
+                    key: stem.clone(),
+                    path: cat.path(stem).to_string_lossy().replace('\\', "/"),
+                },
+                Some(base),
+            )),
+            _ => Some((base, None)),
+        }
+    }
+
+    /// How the asset of block `i` is placed: its scale, turn and offset under the root,
+    /// and the root.
+    pub fn placement(&self, i: usize) -> Option<modelos3d::Placement> {
+        let look = self.blocks[i].look.as_ref()?;
+        let (asset_yaw, offset) = self.asset_pose(i)?;
+        Some(modelos3d::Placement {
+            scale: look.scale,
+            asset_yaw,
+            offset,
+            root: self.static_pose(i).0,
+            turn: self.turn(i),
+        })
+    }
+
+    /// The Blender element of block `i` and the run of its states at `t`.
+    fn animado(&self, i: usize, t: f64) -> Option<(&Animado, Option<modelos3d::Run>)> {
+        let (a, runs) = self.animados.get(i)?.as_ref()?;
+        Some((a, modelos3d::run_at(runs, t)))
+    }
+
+    /// Where the operator of station `i` (drawn index) stands at `t`, from its Blender
+    /// element: along the walk of the state's line (`entering`: door to post; `leaving`:
+    /// back), else at its `ponto_operador`. `None`: no such point.
+    pub fn operator_post(&self, i: usize, t: f64) -> Option<([f32; 3], f32)> {
+        let (a, run) = self.animado(i, t)?;
+        a.operator(run, t)
+    }
+
+    /// The clip of block `i` at `t` and its phase, or `(-1, 0)`.
+    pub fn anim_at(&self, i: usize, t: f64) -> (i32, f32) {
+        self.animado(i, t)
+            .map_or((-1, 0.0), |(a, run)| a.anim(run, t))
     }
 
     /// Lengths of the person clips, seconds, in [`Clip::ALL`] order (read by the engine
@@ -615,12 +736,41 @@ impl Playback {
                     .iter()
                     .all(|&k| (original[k] - s.positions[st][k]).abs() <= s.geoms[st].half[k])
             });
-            if let Some(st) = station {
+            // The Blender element's operator point (and the walk from its door), else the
+            // front of the footprint. An operator working at the station's access point
+            // (outside the footprint) goes to the element's point too.
+            let post = match station {
+                Some(st) => self.drawn_index(st).and_then(|i| self.operator_post(i, t)),
+                None => self.near_post(original, t),
+            };
+            if let Some(post) = post {
+                (p.position, p.yaw) = post;
+            } else if let Some(st) = station {
                 (p.position, p.yaw) =
                     looks::station_front(s.positions[st], s.geoms[st].half, s.turn(st));
             }
         }
         Some(p)
+    }
+
+    /// The operator post of the nearest station (machine or bench) whose footprint, grown
+    /// by [`POST_REACH`], holds `at` (layout): where an operator working at that station's
+    /// access point stands. `None` when that station has no Blender post: an operator is
+    /// never sent to a neighbour's post.
+    fn near_post(&self, at: [f32; 3], t: f64) -> Option<([f32; 3], f32)> {
+        let s = &self.scene;
+        self.stations
+            .iter()
+            .filter_map(|&st| {
+                let i = self.drawn_index(st)?;
+                let c = s.positions[st];
+                let d = turned([at[0] - c[0], 0.0, at[2] - c[2]], -s.turn(st));
+                let h = s.geoms[st].half;
+                let inside = d[0].abs() <= h[0] + POST_REACH && d[2].abs() <= h[2] + POST_REACH;
+                inside.then(|| (d[0] * d[0] + d[2] * d[2], i))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .and_then(|(_, i)| self.operator_post(i, t))
     }
 
     /// Everything that changes at `t`.
@@ -724,6 +874,9 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
+            let (anim_clip, anim_fase) = self.anim_at(f.anim_clip.len(), t);
+            f.anim_clip.push(anim_clip);
+            f.anim_fase.push(anim_fase);
             let mut shown = if v.stack {
                 format!("{} · LIFO", v.name)
             } else {
@@ -895,6 +1048,77 @@ impl Playback {
         }
         f
     }
+}
+
+/// The Blender element a block is drawn with, and the body of a person ([`modelos3d`]):
+/// `visual.asset` naming an element draws that file (`relook` builds the look of a
+/// `.glb`); a person with the default skeletal mannequin gets a Blender body (its scale is
+/// the person's height, its offset follows); a library asset of fixed size gets the
+/// element made to replace it. The look is adjusted in place.
+fn blender_look(
+    cat: &Catalogo,
+    look: &mut Option<Look>,
+    name: &str,
+    visual: Option<&utsim_model::VisualDef>,
+    model: Option<&Model>,
+    relook: impl Fn(&utsim_model::VisualDef) -> Option<Look>,
+) -> (Option<String>, Option<modelos3d::Pessoa>) {
+    let asset = visual.and_then(|v| v.asset.as_deref());
+    match modelos3d::pedido(cat, asset) {
+        Some(Pedido::Elemento(stem)) => {
+            let v = utsim_model::VisualDef {
+                asset: Some(cat.path(&stem).to_string_lossy().into_owned()),
+                ..visual.cloned().unwrap_or_default()
+            };
+            *look = relook(&v);
+            return (look.as_ref().map(|_| stem), None);
+        }
+        Some(Pedido::Biblioteca { base, stem }) => {
+            // `agv_medio`: the library AGV (deck, light, wheels) with the `_medio` file;
+            // `esteira_medio`: the library conveyor of the model's length.
+            let v = utsim_model::VisualDef {
+                asset: Some(base),
+                ..visual.cloned().unwrap_or_default()
+            };
+            *look = relook(&v);
+            return (look.as_ref().and(stem), None);
+        }
+        None => {}
+    }
+    let Some(l) = look.as_mut() else {
+        return (None, None);
+    };
+    let word = asset.map(|a| a.trim().to_lowercase());
+    let default_body = match word.as_deref() {
+        None | Some("pessoa" | "operador" | "person") => true,
+        Some(w) => modelos3d::PESSOAS.contains(&w),
+    };
+    if l.skeletal && default_body {
+        // What the person wears, as the exposure analysis counts it: its own `ppe` and
+        // that of the objects it serves.
+        let ppe: Vec<String> = model
+            .and_then(|m| Some(m.worn_ppe(m.objects.iter().find(|o| o.name == name)?)))
+            .map_or_else(Vec::new, |set| set.into_iter().collect());
+        let color = visual.and_then(|v| v.color.as_deref());
+        let Some(mut p) = modelos3d::pessoa(cat, name, word.as_deref(), &ppe, color) else {
+            return (None, None);
+        };
+        p.escala_boneco = l.scale;
+        p.offset_boneco = l.offset;
+        // The mannequin's scale is its catalogue scale times the user's; the body is at
+        // real size (its skeleton is `altura_base` tall).
+        let mannequin = crate::catalogue::by_name(looks::PERSON).map_or(1.0, |e| e.escala_real);
+        let old = l.scale;
+        l.scale = old / mannequin.max(1e-6) * p.escala;
+        let k = l.scale / old.max(1e-6);
+        l.offset = l.offset.map(|v| v * k);
+        return (Some(p.arquivo.clone()), Some(p));
+    }
+    let stem = match &l.source {
+        Source::Library(spec) => modelos3d::stem_for_spec(spec).filter(|s| cat.get(s).is_some()),
+        _ => None,
+    };
+    (stem.map(String::from), None)
 }
 
 /// Simple shape of a block without a realistic look, as the Bevy viewer draws it
@@ -1165,6 +1389,8 @@ mod tests {
                 f.clip.len(),
                 f.clip_time.len(),
                 f.label.len(),
+                f.anim_clip.len(),
+                f.anim_fase.len(),
             ] {
                 assert_eq!(len, n);
             }
@@ -1301,6 +1527,166 @@ mod tests {
         let bare = playback("centro_de_distribuicao.ron", false);
         assert!(bare.blocks.iter().all(|v| v.driver.is_none()));
         assert!(bare.frame(10.0).clip.iter().all(|&c| c == -1));
+    }
+
+    /// The model of the roteiro `g4_blender3d.json`: a CNC (the default machine) whose
+    /// operator gets in for 4 s and out for 4 s around a 10 s process, a press by
+    /// `visual.asset` with setup, and a person with protective equipment.
+    fn blender_model(skeletal: bool) -> Playback {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../godot/roteiros/g4_blender3d.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        Playback::new(&replay, Some(&model), path.parent(), skeletal)
+    }
+
+    fn index(pb: &Playback, name: &str) -> usize {
+        pb.blocks.iter().position(|v| v.name == name).unwrap()
+    }
+
+    #[test]
+    fn blender_elements_replace_the_fixed_library_assets() {
+        let pb = blender_model(true);
+        let cnc = index(&pb, "cnc_1");
+        let (a, fallback) = pb.asset_of(cnc).unwrap();
+        assert_eq!((a.source, a.name.as_str()), ("modelos3d", "cnc"));
+        assert!(Path::new(&a.path).is_file(), "{}", a.path);
+        assert_eq!(fallback.unwrap().name, "maquina");
+        assert_eq!(
+            pb.blocks[cnc].clips,
+            ["ciclo", "ciclo_auto", "porta_abrir", "quebra", "setup"]
+        );
+        // The library's look still places it: same scale, turn and offset.
+        let look = pb.blocks[cnc].look.as_ref().unwrap();
+        assert_eq!((look.scale, look.offset), (1.0, [0.0; 3]));
+        // Named by `visual.asset`.
+        let press = index(&pb, "prensa_1");
+        assert_eq!(pb.asset_of(press).unwrap().0.name, "prensa");
+        // A queue keeps its floor area (sized by the model), with no clips.
+        let queue = index(&pb, "fila");
+        assert_eq!(pb.asset_of(queue).unwrap().0.source, "library");
+        assert!(pb.blocks[queue].clips.is_empty());
+        let f = pb.frame(10.0);
+        assert_eq!((f.anim_clip[queue], f.anim_fase[queue]), (-1, 0.0));
+    }
+
+    #[test]
+    fn stations_play_the_clip_of_their_state() {
+        let pb = blender_model(true);
+        let cnc = index(&pb, "cnc_1");
+        let clip = |name: &str| pb.blocks[cnc].clips.iter().position(|c| c == name).unwrap() as i32;
+        // The trace: entering 2.45..6.45, processing 6.45..16.45, leaving 16.45..20.45.
+        let at = |t: f64| {
+            let f = pb.frame(t);
+            (f.anim_clip[cnc], f.anim_fase[cnc])
+        };
+        let (k, p) = at(4.45);
+        assert_eq!(k, clip("porta_abrir"));
+        assert!((p - 0.5).abs() < 1e-3, "the door half open: {p}");
+        assert!(at(2.46).1 < 0.01 && at(6.44).1 > 0.99);
+        let (k, p) = at(18.45);
+        assert_eq!(k, clip("porta_abrir"));
+        assert!((p - 0.5).abs() < 1e-3, "the door half closed: {p}");
+        assert!(at(16.46).1 > 0.99 && at(20.44).1 < 0.01);
+        // One loop of the cycle over the 10 s of processing (one piece).
+        let (k, p) = at(11.7);
+        assert_eq!(k, clip("ciclo"));
+        assert!((p - 0.525).abs() < 1e-3, "{p}");
+        assert_eq!(at(30.0), (-1, 0.0));
+        // The press sets up (0..5) and then processes, with no operator.
+        let press = index(&pb, "prensa_1");
+        let f = pb.frame(2.5);
+        assert_eq!(pb.blocks[press].clips[f.anim_clip[press] as usize], "setup");
+        let f = pb.frame(10.0);
+        assert_eq!(pb.blocks[press].clips[f.anim_clip[press] as usize], "ciclo");
+    }
+
+    #[test]
+    fn the_operator_walks_between_the_door_and_the_post_of_the_element() {
+        let pb = blender_model(true);
+        let cnc = index(&pb, "cnc_1");
+        let ana = index(&pb, "ana");
+        // The CNC at (2, 0): its post at (-0.15, -1.2) and its door at (-0.15, -1.8) of
+        // its own frame, both looking at the machine (+y of the model).
+        let (a, _) = pb.animados[cnc].as_ref().unwrap();
+        let (post, yaw) = a.post.unwrap();
+        let entering = a.line(utsim_core::State::Entering).unwrap();
+        let ((door, _), to) = a.estados[entering].1.caminho.unwrap();
+        assert_eq!(to.0, post);
+        let near = |a: [f32; 3], b: [f32; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-3);
+        assert!(near(post, to_godot([1.85, -1.2, 0.0])), "{post:?}");
+        assert!(near(door, to_godot([1.85, -1.8, 0.0])), "{door:?}");
+        assert!((yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-5);
+        let mid = [0.5 * (post[0] + door[0]), 0.0, 0.5 * (post[2] + door[2])];
+        for (t, want) in [
+            (2.46, door),
+            (4.45, mid),
+            (10.0, post),
+            (18.45, mid),
+            (20.44, door),
+        ] {
+            let f = pb.frame(t);
+            assert_eq!(f.motion[ana], motion_code(Motion::Working).0, "t={t}");
+            let got = f.position[ana];
+            assert!(
+                (got[0] - want[0]).abs() < 0.01 && (got[2] - want[2]).abs() < 0.01,
+                "t={t}: {got:?} vs {want:?}"
+            );
+            assert!((f.yaw[ana] - yaw).abs() < 1e-5);
+        }
+        // A station without a Blender post: the operator stays where the scene puts it (the
+        // access point, outside the machine), and is not sent to another station's post.
+        let mut bare = blender_model(true);
+        bare.animados[cnc] = None;
+        assert!(bare.operator_post(cnc, 10.0).is_none());
+        let f = bare.frame(10.0);
+        assert!(
+            (f.position[ana][2] - post[2]).abs() > 0.2,
+            "{:?}",
+            f.position[ana]
+        );
+    }
+
+    #[test]
+    fn people_get_a_blender_body_with_their_equipment_and_height() {
+        let pb = blender_model(true);
+        let ana = index(&pb, "ana");
+        let v = &pb.blocks[ana];
+        let body = v.pessoa.as_ref().expect("a Blender body");
+        assert_eq!(pb.asset_of(ana).unwrap().0.name, body.arquivo);
+        assert_eq!(pb.asset_of(ana).unwrap().1.unwrap().name, looks::PERSON);
+        // What it wears, as the exposure analysis counts it: its own (by the catalogue's
+        // names, "Óculos" → oculos) and the station's it operates.
+        assert_eq!(
+            body.epis,
+            ["capacete", "luvas", "oculos", "protetor_auricular"]
+        );
+        // Falling back on the mannequin, it keeps the mannequin's own scale.
+        let mannequin = crate::catalogue::by_name(looks::PERSON)
+            .unwrap()
+            .escala_real;
+        assert!((body.escala_boneco - mannequin).abs() < 1e-5);
+        assert!(
+            body.cores
+                .contains(&("camisa".to_string(), "#2e7d32".to_string()))
+        );
+        // Real size: the height over the skeleton's, and the same every run.
+        let look = v.look.as_ref().unwrap();
+        assert!(look.skeletal);
+        assert!(
+            (look.scale - body.escala).abs() < 1e-5,
+            "{} {}",
+            look.scale,
+            body.escala
+        );
+        assert_eq!(blender_model(true).blocks[ana].pessoa, v.pessoa);
+        // No clips of its own and no state runs: the UAL clips drive it.
+        assert!(v.clips.is_empty());
+        assert_eq!(pb.frame(10.0).anim_clip[ana], -1);
+        // Without the mannequin files the person keeps the procedural operator.
+        let bare = blender_model(false);
+        assert!(bare.blocks[ana].pessoa.is_none());
+        assert_eq!(bare.asset_of(ana).unwrap().0.source, "library");
     }
 
     #[test]
