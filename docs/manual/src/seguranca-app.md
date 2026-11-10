@@ -96,7 +96,7 @@ A tela Incidentes tem quatro abas:
 
 ## Ferramentas e estudos
 
-A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA e A3. Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo.
+A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA, A3 e poka-yoke (os dispositivos à prova de erro que também protegem as pessoas, com as verificações). Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo.
 
 ## Abrir pelo UTSim
 
