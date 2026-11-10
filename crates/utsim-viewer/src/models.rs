@@ -332,6 +332,7 @@ pub fn drawn_pose(data: &Data, b: usize, t: f64, look: &Look) -> Option<utsim_sc
                 p.yaw,
                 data.positions[s],
                 data.geoms[s].half,
+                data.turn(s),
                 reach,
             );
         }
@@ -347,7 +348,8 @@ pub fn drawn_pose(data: &Data, b: usize, t: f64, look: &Look) -> Option<utsim_sc
                 .all(|k| (original[k] - data.positions[s][k]).abs() <= data.geoms[s].half[k])
         });
         if let Some(s) = station {
-            (p.position, p.yaw) = visual::station_front(data.positions[s], data.geoms[s].half);
+            (p.position, p.yaw) =
+                visual::station_front(data.positions[s], data.geoms[s].half, data.turn(s));
         }
     }
     Some(p)

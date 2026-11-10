@@ -140,6 +140,9 @@ func build(pb: Object, keep_templates := false) -> void:
 		root.name = "b%d_%s" % [i, b["name"]]
 		add_child(root)
 		root.position = b["position"]
+		# A fixed object turned by the user (`visual.yaw`) or a belt along its heading: the
+		# root turns, so the asset, the simple shape and the editor's box turn together.
+		root.rotation = Vector3(0, float(b.get("yaw", 0.0)), 0)
 		rig["root"] = root
 		var asset: Node3D = null
 		if b.has("asset"):

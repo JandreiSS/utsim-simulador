@@ -544,9 +544,10 @@ impl UtsimPlayback {
 
     /// The layout: `{end, bounds_min, bounds_max, pallets, fork_size, blocks, network,
     /// network_controlled, connections, fluids}`. Each block is a dictionary with `name,
-    /// kind, role, mobile, position, size, shape` and, when it has a realistic look,
-    /// `asset {source, name, key, path}, scale, asset_yaw, offset, color, carry,
-    /// skeletal`, and for a forklift with a seat `driver {position, yaw, scale, eye, hip}` (the
+    /// kind, role, mobile, position, size, yaw, shape` (`size` in the block's own frame,
+    /// `yaw` its turn about `+Y` in radians, by which the root turns; 0 for the mobiles)
+    /// and, when it has a realistic look, `asset {source, name, key, path}, scale,
+    /// asset_yaw, offset, color, carry, skeletal`, and for a forklift with a seat `driver {position, yaw, scale, eye, hip}` (the
     /// mannequin's root, the camera eye and the hip on the seat, in the block root's frame).
     #[func]
     fn static_scene(&self) -> VarDictionary {
@@ -562,7 +563,8 @@ impl UtsimPlayback {
         put(&mut d, "fork_size", c.fork_size);
         let mut blocks = VarArray::new();
         for (i, v) in c.blocks.iter().enumerate() {
-            let (position, size) = c.static_pose(i);
+            let (position, _) = c.static_pose(i);
+            let size = c.local_size(i);
             let mut e = VarDictionary::new();
             put(&mut e, "name", GString::from(v.name.as_str()));
             put(&mut e, "kind", GString::from(v.kind.as_str()));
@@ -570,6 +572,7 @@ impl UtsimPlayback {
             put(&mut e, "mobile", v.role.is_some());
             put(&mut e, "position", v3(position));
             put(&mut e, "size", v3(size));
+            put(&mut e, "yaw", c.turn(i));
             put(&mut e, "shape", simple_shape(&v.kind));
             put(&mut e, "stack", v.stack);
             if v.kind == "Source" {
@@ -595,8 +598,10 @@ impl UtsimPlayback {
                 put(&mut asset, "path", GString::from(a.path.as_str()));
                 put(&mut e, "asset", asset);
                 put(&mut e, "scale", l.scale);
-                put(&mut e, "asset_yaw", l.yaw);
-                put(&mut e, "offset", v3(l.offset));
+                // Under the root, which is already turned by `yaw`.
+                let (asset_yaw, offset) = c.asset_pose(i).unwrap_or((l.yaw, l.offset));
+                put(&mut e, "asset_yaw", asset_yaw);
+                put(&mut e, "offset", v3(offset));
                 if let Some(col) = l.color {
                     put(&mut e, "color", rgb(col));
                 }
