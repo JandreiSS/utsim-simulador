@@ -155,6 +155,44 @@ esperando para sempre) e quando há menos qualificados que o `count` pedido. Com
 sendo um único `Transporter` (sem despachante), não há escolha: o aviso diz que a tarefa
 vai para ele assim mesmo.
 
+## Regra de operação do posto
+
+O campo `operation` (ou `operacao`) de um `Processor` diz quem pode operar o posto e quanto
+tempo o operador leva para entrar e sair dele (porta, proteção, célula):
+
+```ron
+(name: "torno", kind: Processor(process: Const(60.0),
+    operators: Some(OperatorUse(team: "equipe"))),
+    ppe: ["capacete"],
+    operation: Some((
+        skills: ["torno"],      // habilidades, além do `requires` de cada equipe
+        require_ppe: true,      // exigir o EPI do posto e das zonas em que ele está
+        enter: Some(Const(5.0)),
+        leave: Some(Const(4.0)),
+    ))),
+(name: "ana", kind: Transporter(speed: 1.2), ppe: ["capacete", "oculos"],
+    person: Some((skills: ["torno"]))),
+```
+
+| Campo | Padrão | O que faz |
+|---|---|---|
+| `skills` (`habilidades`) | `[]` | habilidades que todo operador precisa ter |
+| `require_ppe` (`exigir_epi`) | `false` | só opera quem veste o EPI do posto (`ppe` do nó) e o das zonas de risco que contêm o posto |
+| `enter` (`entrar`) | nenhum | tempo para a equipe entrar antes do trabalho; o posto fica em `entering` |
+| `leave` (`sair`) | nenhum | tempo para a equipe sair depois do trabalho; o posto fica em `leaving` |
+
+O EPI que uma pessoa veste é o `ppe` do próprio nó dela. O despachante só entrega a tarefa
+a quem atende à regra inteira, e `utsim check` avisa quando ninguém da equipe atende.
+
+A equipe entra quando chega completa para o primeiro estágio que precisa dela e sai depois
+do último. Com setup e processo feitos pela mesma equipe, ela entra uma vez e sai uma vez.
+Se as equipes forem diferentes, a do setup sai antes de a do processo entrar. O operador
+fica no posto (`utilize`) da entrada até o fim da saída. Quebra ou turno pausam a entrada e
+a saída como pausam o trabalho. Um operador tirado para um trabalho mais urgente durante a
+entrada faz a entrada recomeçar do ponto em que parou quando a equipe volta a estar
+completa. Durante a saída, ele simplesmente vai embora. Sem `operation`, o posto funciona
+como antes.
+
 ## Ritmo individual
 
 `variation: (dist: Normal(mean: 1.0, sd: 0.1), min: 0.7, max: 1.3)` (os padrões) sorteia,
