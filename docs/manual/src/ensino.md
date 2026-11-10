@@ -156,6 +156,8 @@ Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encad
 
 Quem está num programa Lean Seis Sigma no UTSim Seis Sigma pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim Seis Sigma do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
 
+O professor que é instrutor ou master black belt do programa também registra a turma inteira. Na aba Professor, depois da correção, a seção "Programa Lean Seis Sigma da empresa" recebe a pasta do programa, e "Registrar a turma no programa" grava "praticou", com origem "exercício", para cada aluno que resolveu missões. O aluno é ligado à pessoa do programa pelo e-mail da lista de alunos, sem diferença entre maiúsculas e minúsculas. Nomes e registros da turma não vão para o programa. A mensagem diz quantas competências foram enviadas e quais alunos ficaram de fora, seja por não haver pessoa com aquele e-mail, seja por aviso na entrega (cadeia quebrada ou assinatura inválida). Enviar de novo não repete as entradas.
+
 ## Modo professor
 
 Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do professor. O mesmo app serve para aluno e professor.
@@ -165,12 +167,12 @@ Em **Ajustes**, "Modo professor" liga a aba **Professor** e cria a chave do prof
 Informe a pasta da turma (local ou dentro do Google Drive para computador), o nome, o período, a finalidade dos dados e, se quiser, a lista de alunos em CSV:
 
 ```text
-nome;registro;apelido
-Ana Lima;2027001;ana
-Beto Souza;2027002;beto
+nome;registro;apelido;email
+Ana Lima;2027001;ana;ana.lima@empresa.com
+Beto Souza;2027002;beto;
 ```
 
-O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome.
+O separador pode ser `;` ou `,`. O registro só aceita letras, números, `-` e `_`, porque vira o nome da pasta do aluno. O apelido aparece nos placares, nunca o nome. O e-mail é opcional. Ele só serve para ligar o aluno a uma pessoa de um programa Lean Seis Sigma, como explica a seção seguinte.
 
 O app cria esta estrutura:
 
@@ -242,6 +244,20 @@ utsim-ensino pacote pacote_pulmao pulmao.utse
 ```
 
 O conferidor avisa quando a referência e o estado inicial empatam (a missão não ensina nada), quando nenhuma combinação bate as metas e quando mais de 30 % batem (missão fácil). A busca exaustiva aceita até 400 combinações de alavancas.
+
+## Editor de missões
+
+O editor de missões faz o mesmo que o construtor, mas tudo na tela, sem abrir os arquivos da pasta. Ele fica na aba **Editor de missões**, que aparece no modo professor.
+
+1. **Seu pacote.** Indique a pasta do pacote e clique em "Abrir ou criar". Uma pasta com `pacote.ron` abre o pacote que já está lá. Uma pasta vazia começa um pacote novo, gravado junto com a primeira missão. Uma pasta com outros arquivos e sem `pacote.ron` é recusada, para nada ser sobrescrito. A lista mostra as missões por ato, com "Editar", as setas para mudar a ordem (descer a última missão de um ato a leva para o ato seguinte) e "Remover", que apaga a missão e os arquivos que só ela usa.
+2. **Missão nova.** Escolha o modelo `.ron` e o título e clique em "Criar o rascunho". O editor sugere as mesmas alavancas e métricas do construtor e escreve um enunciado inicial. O identificador nasce do título (`prof/<título>`) e pode ser trocado.
+3. **Alavancas.** Cada linha tem uma caixa para usar ou não a alavanca, o rótulo que o aluno vê, a faixa (de, até, e o passo nas alavancas de valor) e o custo por unidade acima do valor inicial. O orçamento é opcional. Embaixo aparece quantas combinações a calibragem vai simular. O limite é o da busca exaustiva, 400.
+4. **Métricas.** Para cada métrica há o rótulo, se ela é melhor quando menor ou maior, a meta, a tolerância (em % ou na unidade da métrica) e o peso na nota. Peso zero mostra a métrica ao aluno sem contar na nota.
+5. **Enunciado.** O texto em Markdown que o aluno lê.
+6. **Calibrar.** Simula todas as combinações em segundo plano. Mostra quantas cabem no orçamento e nas restrições, quantas batem todas as metas e uma tabela com a situação inicial, a referência e a meta sugerida de cada métrica (5 % de folga em torno da referência). Os avisos do conferidor aparecem embaixo. "Usar a referência e as metas sugeridas" leva os valores para a missão. As metas são arredondadas para o lado da folga, então a referência sempre as bate. Se nenhuma combinação cabe no orçamento, a calibragem avisa e não sugere nada.
+7. **Gravar no pacote.** Confere os campos e grava a missão na pasta. Uma missão aberta da lista volta para o lugar dela, mesmo com o identificador trocado. Uma missão nova com o identificador de outra é recusada. Para mudar o ato de uma missão gravada, use as setas da lista. "Conferir o pacote" faz a mesma conferência que o app do aluno faz ao abrir o pacote, e "Gravar o .utse" empacota a pasta para publicar na turma.
+
+Ao abrir de novo uma missão gravada, as alavancas e as métricas que ela não usa voltam como sugestões desmarcadas. Os campos que o editor ainda não mostra (perguntas, dicas, rodadas) são mantidos como estavam. Missões de modelagem, de peças e de dados ainda não abrem no editor.
 
 ## Dados com efeito plantado
 

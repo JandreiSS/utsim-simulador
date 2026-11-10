@@ -33,8 +33,13 @@ na sua pasta de usuário, e nunca dentro dos projetos:
 - Windows: `%APPDATA%\UTSim\seis-sigma\config.json`;
 - Linux: `~/.config/utsim/seis-sigma/config.json`.
 
-Ali também ficam a lista de projetos recentes e o tema (sistema, claro ou escuro). "Trocar",
-na tela inicial, corrige o nome ou o e-mail.
+Ali também ficam a lista de projetos recentes, o tema (sistema, claro ou escuro) e o
+**idioma** da interface: português do Brasil, inglês ou espanhol. A troca vale na hora, e cada
+pessoa da equipe pode usar o seu idioma no mesmo projeto, porque o que se grava no diário são
+os dados, não os textos das telas. Os textos que a própria equipe escreve (títulos, descrições,
+atas) ficam como foram escritos. Por enquanto, números, datas e o símbolo da moeda seguem o
+formato brasileiro em todos os idiomas, e alguns textos gerados pelas análises e relatórios
+ainda saem em português. "Trocar", na tela inicial, corrige o nome ou o e-mail.
 
 Não há senha: sem servidor, não há como conferir quem é quem. Qualquer pessoa com acesso à
 pasta pode gravar no projeto em nome de outra. Para aprovações com valor de registro, o plano
@@ -105,6 +110,43 @@ A regra vale também para quem digitava enquanto a mudança do colega chegava: o
 lembra a versão que você viu quando começou a digitar, e se ela mudou nesse meio tempo o
 caso vai para a lista.
 
+### Assinaturas e integridade do diário
+
+Na primeira vez que você informa nome e e-mail, o programa cria uma **chave de assinatura**
+só sua, guardada neste computador, ao lado da configuração (`chave_assinatura.txt`). A tela de
+identidade mostra a chave pública em grupos de quatro caracteres e o caminho do arquivo. A
+chave nunca vai para a pasta do projeto: lá fica só a parte pública, gravada por você mesmo
+na primeira mudança que fizer em cada projeto.
+
+- **Cada mudança é assinada.** Ao gravar, o programa escreve também um elo da sua cadeia em
+  `cadeia/<pessoa>-<chave>/`, com o resumo (SHA-256) de cada arquivo de mudança e o resumo do
+  elo anterior, tudo assinado com a sua chave.
+- **A conferência fica na tela Equipe e RACI**, na seção **Integridade do diário**. Ela mostra,
+  por pessoa, quantas mudanças estão assinadas, quantas são de antes da chave e quantos elos
+  há na cadeia. Abaixo vêm os sinais encontrados: uma mudança editada depois de assinada, um
+  elo editado ou removido, dois elos com o mesmo número (uma cópia antiga da pasta restaurada
+  e usada) e uma chave registrada por outra pessoa no seu nome, que é ignorada. Também
+  aparecem avisos mais brandos: uma mudança assinada que ainda não chegou (o Drive pode estar
+  sincronizando), uma mudança sem assinatura em nome de quem já assina (gravada por uma versão
+  antiga, por outro app ou por outra pessoa) e o conteúdo apagado por uma anonimização.
+- **Ao abrir um projeto** com sinais de alteração, a barra de baixo avisa. Use "Conferir de
+  novo" depois que o Drive terminar de sincronizar.
+- **Aprovações assinadas.** Em **Fases e tollgates**, cada decisão do histórico mostra se está
+  assinada por quem decidiu, e quem decidiu vê o botão **Assinar**. Em **Ganhos**, o mesmo vale
+  para a validação de um ganho, assinada por quem validou. A assinatura cobre a decisão e o
+  conteúdo decidido (o resumo congelado do tollgate, ou o valor, a memória de cálculo e o
+  acompanhamento do ganho). Se o conteúdo mudar depois, a tela mostra que a assinatura é de
+  outra versão.
+- **Dois computadores.** Cada computador cria a própria chave, e cada chave tem a sua cadeia,
+  então as duas convivem sem conflito. A tela Equipe mostra quando uma pessoa passou a usar
+  mais uma chave. Para usar a mesma chave nos dois, copie `chave_assinatura.txt` antes de
+  abrir os projetos no segundo computador.
+
+A conferência revela alterações, mas não as impede: quem tem acesso aos arquivos pode
+editá-los, e o programa só mostra que isso aconteceu. A primeira chave que uma pessoa registra
+num projeto é a que vale. Estas assinaturas não têm a validade jurídica de uma assinatura
+digital certificada.
+
 ## Telas do projeto
 
 A navegação à esquerda tem a **Carteira** e as telas do projeto.
@@ -134,6 +176,9 @@ programa de implantação; essa estrutura (programa, unidade, carteira, projeto)
 programa do master black belt vai usar mais adiante (etapa L6). Abrir a pasta da carteira
 diretamente, pela tela inicial, também leva à tela Carteira.
 
+- **Minhas ações**: no alto da tela, a lista dos cartões em aberto com você como responsável
+  em todos os projetos da pasta, com o projeto, o prazo (em vermelho quando atrasado) e a
+  coluna do quadro. **Abrir** leva ao projeto do cartão.
 - **Ideias**: qualquer pessoa registra uma oportunidade (título, processo, problema observado,
   dados disponíveis, ganho grosseiro). Outros apps da família também mandam ideias: o **8D do
   UTSim Qualidade**, quando o problema pede um projeto Lean Seis Sigma, envia a ideia com o
@@ -326,8 +371,9 @@ A tela **Ferramentas** reúne as ferramentas qualitativas das fases (etapa L2 do
 ferramenta é um **entregável** de uma fase: escolha a ferramenta em "Novo entregável" e
 clique em "Criar". Ela entra na fase onde costuma ser usada no DMAIC (VOC, SIPOC, Pareto e
 A3 no Definir; plano de coleta no Medir; Ishikawa, 5 porquês, matriz causa-efeito e FMEA no
-Analisar; planos de controle e de resposta no Controlar) e pode ser mudada de fase no alto
-do entregável. Um projeto pode ter mais de um entregável da mesma ferramenta (dois Paretos,
+Analisar; seleção de soluções, 5S, SMED e trabalho padronizado no Melhorar; planos de
+controle e de resposta no Controlar; o evento kaizen e os ciclos PDCA nas fases da própria
+abordagem) e pode ser mudada de fase no alto do entregável. Um projeto pode ter mais de um entregável da mesma ferramenta (dois Paretos,
 por exemplo).
 
 No alto de cada entregável ficam o nome, a fase, o estado (em elaboração ou concluído) e
@@ -588,6 +634,81 @@ do quadro com coluna, prazo e responsável; as linhas do plano de controle, os s
 de resposta e as características críticas sem controle. Cada bloco tem uma nota da equipe,
 para o que não está em nenhum entregável. A impressão em PDF chega na etapa L5.
 
+
+### Seleção de soluções
+
+Escolhe entre soluções (no Melhorar) ou conceitos (no Analisar do DMADV). Os critérios têm
+peso de 1 a 10. Há dois métodos, escolhidos no alto:
+
+- **Matriz ponderada:** cada opção recebe de 1 a 5 em cada critério; o total soma peso ×
+  nota e aparece também como percentual do máximo possível.
+- **Matriz de Pugh:** marque uma opção como referência (o conceito atual ou o mais
+  conhecido); as outras são comparadas com ela em cada critério como melhor (+), igual (S) ou
+  pior (−). O total soma peso × sinal, e a tabela mostra quantos +, S e − cada opção teve.
+
+A melhor opção aparece quando todas as células dela têm nota. Impacto e esforço (1 a 10) de
+cada opção montam a grade de prioridade: fazer já, planejar, se sobrar tempo ou descartar.
+
+### Auditoria 5S
+
+A lista de verificação tem perguntas por senso (utilização, organização, limpeza,
+padronização e disciplina). "Lista inicial" acrescenta duas perguntas por senso, para a
+equipe adaptar à área; a lista é da empresa. "Nova auditoria" abre uma coluna com a data de
+hoje e o auditor; cada pergunta recebe de 0 a 4. Embaixo ficam o percentual de cada senso e
+o total, o senso mais fraco da última auditoria, o radar (a última auditoria cheia, a
+primeira em contorno) e a evolução do total entre as auditorias. As fotos de antes e depois
+vão como anexos do projeto.
+
+### SMED (troca rápida)
+
+Cada atividade da troca entra com o tempo em minutos e a classe de hoje: **interna** (feita
+com a máquina parada) ou **externa** (feita com a máquina rodando). Na coluna "Depois" diga
+o que a atividade vira com o estudo (interna, externa ou eliminada) e, se mudou, o tempo
+novo e como. O tempo de setup é a soma das internas; a tela mostra antes e depois, as
+atividades convertidas e a redução do setup, com o gráfico das duas situações. Para ver o
+efeito na linha, mude o tempo de setup no modelo e rode o estudo de cenários.
+
+### Trabalho padronizado
+
+O takt vem do tempo disponível e da demanda do mesmo período (por exemplo 27 000 s e 450
+peças: 60 s), ou é digitado. Cada elemento de trabalho tem o operador, os tempos manual,
+automático (a máquina trabalha sozinha) e de deslocamento, em segundos, e o estoque padrão
+em processo. A tela mostra:
+
+- o conteúdo de trabalho de cada operador (manual mais deslocamento) e o total;
+- o número mínimo de operadores, ⌈conteúdo total / takt⌉, e a eficiência do balanceamento
+  (conteúdo total sobre operadores × o maior ciclo);
+- o gráfico de balanceamento, com os operadores acima do takt em laranja;
+- a tabela de combinação de cada operador: o trabalho manual em barra cheia, a máquina em
+  barra clara (laranja quando ela ainda trabalha quando o operador volta, no ciclo seguinte)
+  e o deslocamento em linha, com o takt em vermelho.
+
+### Evento kaizen
+
+Para o kaizen rápido. No alto ficam o primeiro dia e a duração (3 a 5 dias).
+"Preencher preparo e pauta" traz o preparo (escopo e meta com o patrocinador, dados, equipe
+liberada, logística) e a pauta, com os seis temas distribuídos pelos dias: entender, medir,
+analisar, melhorar, padronizar e apresentar. Itens marcados como feitos ficam registrados.
+
+As pendências têm responsável e prazo; "Mandar ao quadro" cria o cartão no quadro de ações
+com origem kaizen, ligado à pendência. A pendência fica feita quando o cartão chega a
+"Feito". O acompanhamento mostra as datas de 30, 60 e 90 dias depois do evento, as
+pendências atrasadas em cada uma e o que a equipe viu em cada revisão. O tollgate de
+abertura do kaizen confere que o evento existe.
+
+### Ciclos PDCA
+
+Cada ciclo registra a hipótese, o plano (Planejar), o que foi feito (Fazer), o que se
+verificou com dados (Verificar), o resultado da hipótese (confirmada ou refutada) e o que se
+padronizou ou ajustou (Agir). A tela diz em que etapa cada ciclo está e conta os ciclos
+confirmados, refutados e em andamento. Um ciclo novo mostra o que o anterior padronizou,
+para partir dali.
+
+### Ferramentas da qualidade do DMADV
+
+A casa da qualidade (QFD), as tolerâncias por Monte Carlo e o poka-yoke ligado ao FMEA são
+ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o Seis Sigma guarda o
+resultado como entregável quando elas forem abertas de lá.
 
 ## Roteiro DMAIC
 
@@ -934,6 +1055,8 @@ uma vez. O próprio registro é a única coisa que o Ensino grava. Ele nunca dá
 de projeto real) nem "demonstrou" (que só o MBB confirma), e a conferência do diário recusa
 qualquer tentativa nesse sentido.
 
+O instrutor também registra uma turma inteira a partir do Ensino. Depois de corrigir a turma, ele indica a pasta do programa, e o Ensino grava **P** praticou com origem "exercício" para cada belt que resolveu as missões. O belt é achado pelo e-mail da lista de alunos, comparado com o e-mail do cadastro do programa. Só o instrutor e o MBB podem fazer isso, porque o e-mail é dado pessoal, e uma pessoa anonimizada não é achada.
+
 ### Revisões de tollgate
 
 A **fila de revisões** tem todos os tollgates do programa em revisão sem parecer do MBB na
@@ -1013,8 +1136,16 @@ compartilhamento das pastas, que o app não confere (não usa a API do Drive):
   e do MBB; banco de questões, gabaritos e notas nas pastas restritas da formação (veja
   Formação e certificação).
 
-Até a lista de papéis assinada (etapa P7), quem edita os arquivos à mão consegue gravar uma
-alteração, mas o app a ignora se o autor não tiver o perfil.
+Quem edita os arquivos à mão consegue gravar uma alteração, mas o app a ignora se o autor não
+tiver o perfil.
+
+**Assinatura da lista de papéis.** Abaixo da lista, o MBB vê **Assinar a lista**. A assinatura
+cobre todos os papéis do momento, com a pessoa, o perfil e a unidade. Depois dela, a tela
+mostra "Lista assinada por ... sem mudanças desde então" ou, se alguém incluiu ou retirou um
+papel, quais papéis estão fora da lista assinada, até um MBB assinar de novo. Assim um papel
+gravado à mão nos arquivos aparece. A primeira assinatura vale quando é do criador do
+programa, e as seguintes quando são de um MBB da lista assinada antes. Uma assinatura de
+outra pessoa aparece como inválida.
 
 ### Dados pessoais
 
@@ -1204,6 +1335,14 @@ nível":
 
 O botão "PDF" de cada certificação do registro grava o certificado em `certificacoes/`.
 
+**Certificados assinados.** Ao lado de cada certificação emitida aparece se ela está assinada
+pelo emissor. O emissor, no computador com a sua chave, vê **Assinar**. A assinatura cobre o
+número, a pessoa, o nível, as datas, os requisitos com as evidências e a observação: se algo
+mudar depois, a tela mostra que a assinatura é de outra versão. O PDF de um certificado
+assinado traz a linha da assinatura eletrônica, com o emissor, a data, o início da chave e o
+selo, e diz onde conferi-la. Como as demais assinaturas do app, ela revela alterações, mas não
+tem a validade jurídica de uma assinatura digital certificada.
+
 ### Pastas restritas da formação
 
 ```
@@ -1257,8 +1396,12 @@ Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com
 UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
 trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
 experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
-exportação dos painéis. Ficam para depois Plackett-Burman, superfície de resposta e
-desejabilidade no DOE, o espaguete desenhado sem modelo e, do programa, a lista de papéis
-assinada. Da gestão do projeto ficam para
-depois a visão "minhas ações" de toda a carteira, raias no quadro, reuniões recorrentes e a
-capacidade dos belts em horas.
+exportação dos painéis. A P6 trouxe a seleção de soluções (ponderada e Pugh), a auditoria 5S, o SMED, o
+trabalho padronizado com o balanceamento, o evento kaizen e os ciclos PDCA. Ficam para depois
+Plackett-Burman, superfície de resposta e desejabilidade no DOE (no UTSim Estatística) e o espaguete desenhado sem modelo. A P7 trouxe
+as assinaturas da equipe: a chave de cada pessoa, a cadeia assinada do diário conferida na
+tela Equipe e ao abrir o projeto, as aprovações assinadas de tollgates e ganhos, e a visão
+"minhas ações" de toda a carteira. Ficam para depois o conflito por parágrafo nos textos
+longos e o acesso pela rede local com token. A P9 completou o programa com a lista de papéis
+assinada pelo master black belt e os certificados assinados pelo emissor. Da gestão do projeto ficam para depois raias no quadro,
+reuniões recorrentes e a capacidade dos belts em horas.

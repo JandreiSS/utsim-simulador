@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 use utsim_edit::{Command, Document};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
 use utsim_linhas::logistica::{self, Armazem, LOGISTICA};
+use utsim_linhas::manufatura::{self, MANUFATURA, Manufatura};
 use utsim_linhas::saude::{self, SAUDE, Saude};
 use utsim_linhas::servicos::{self, Atendimento, Meta, SERVICOS};
 use utsim_linhas::{Pack, Placement, builtin, find};
@@ -21,7 +22,7 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
 #[command(
     name = "utsim linha",
     about = "Linhas especializadas (Lean Office, Serviços e atendimento, Logística e \
-             armazém, Saúde e hospital): predefinições, \
+             armazém, Saúde e hospital, Manufatura discreta): predefinições, \
              vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
@@ -73,6 +74,9 @@ enum Acao {
         /// Saúde e hospital: ocupação-alvo dos leitos, de 0 a 1 (padrão 0,85)
         #[arg(long)]
         ocupacao_leitos: Option<f64>,
+        /// Manufatura discreta: OEE-alvo das máquinas, de 0 a 1 (padrão 0,85)
+        #[arg(long)]
+        oee_alvo: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -238,6 +242,16 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             json,
             meta_saude_de(alvos, ocupacao_leitos)?,
         )?,
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
+            json,
+            oee_alvo,
+            ..
+        }) if p.id() == MANUFATURA => {
+            manufatura_cmd(&p, &model, reps, html, json, meta_oee_de(oee_alvo)?)?
+        }
         Some(Acao::Relatorio {
             model,
             reps,
@@ -559,6 +573,46 @@ fn saude_cmd(
     Ok(())
 }
 
+/// The OEE target of Manufatura discreta from the option.
+fn meta_oee_de(oee: Option<f64>) -> Result<manufatura::Meta, String> {
+    let oee = oee.unwrap_or(manufatura::Meta::default().oee);
+    if !(oee.is_finite() && oee > 0.0 && oee <= 1.0) {
+        return Err(format!(
+            "--oee-alvo deve ser uma fração entre 0 e 1, recebi {oee}"
+        ));
+    }
+    Ok(manufatura::Meta { oee })
+}
+
+/// `utsim linha manufatura relatorio`: the indicators of Manufatura discreta.
+fn manufatura_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: manufatura::Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Manufatura::rodar(&m, Some(p), meta)?;
+    print!("{}", manufatura::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, manufatura::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"oee": meta.oee},
+            "replicacoes": &k.reps,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
@@ -578,6 +632,12 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
         let k = Saude::rodar(model, Some(&p), saude::Meta::default())?;
         println!();
         print!("{}", saude::relatorio::texto(&k));
+        return Ok(());
+    }
+    if p.id() == MANUFATURA {
+        let k = Manufatura::rodar(model, Some(&p), manufatura::Meta::default())?;
+        println!();
+        print!("{}", manufatura::relatorio::texto(&k));
         return Ok(());
     }
     let k = Indicadores::rodar(model, Some(&p))?;
