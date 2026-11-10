@@ -33,8 +33,13 @@ na sua pasta de usuário, e nunca dentro dos projetos:
 - Windows: `%APPDATA%\UTSim\seis-sigma\config.json`;
 - Linux: `~/.config/utsim/seis-sigma/config.json`.
 
-Ali também ficam a lista de projetos recentes e o tema (sistema, claro ou escuro). "Trocar",
-na tela inicial, corrige o nome ou o e-mail.
+Ali também ficam a lista de projetos recentes, o tema (sistema, claro ou escuro) e o
+**idioma** da interface: português do Brasil, inglês ou espanhol. A troca vale na hora, e cada
+pessoa da equipe pode usar o seu idioma no mesmo projeto, porque o que se grava no diário são
+os dados, não os textos das telas. Os textos que a própria equipe escreve (títulos, descrições,
+atas) ficam como foram escritos. Por enquanto, números, datas e o símbolo da moeda seguem o
+formato brasileiro em todos os idiomas, e alguns textos gerados pelas análises e relatórios
+ainda saem em português. "Trocar", na tela inicial, corrige o nome ou o e-mail.
 
 Não há senha: sem servidor, não há como conferir quem é quem. Qualquer pessoa com acesso à
 pasta pode gravar no projeto em nome de outra. Para aprovações com valor de registro, o plano
