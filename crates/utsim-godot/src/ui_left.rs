@@ -1,8 +1,10 @@
 //! The left panel of the Godot interface, in egui (pure: no Godot types, unit tested).
 //!
-//! In Editar: the object library ("Biblioteca", the entries of [`crate::document::palette`]
-//! by category, with their icons), the list of the model's objects with a search field, and
-//! "Mostrar obstáculos e folgas". In Simular: the replications and "Simular de novo", the
+//! In Editar: the object library ("Biblioteca": a search over every entry, then a rail of
+//! [`GROUPS`] on the left, which joins the core categories and the lines' presets in a few
+//! groups plus "Recentes", and the entries of the chosen group beside it; a click on the open
+//! group folds the library to a row of group icons), the list of the model's objects with a
+//! search field, and "Mostrar obstáculos e folgas". In Simular: the replications and "Simular de novo", the
 //! status line, the blocks (click to focus or to follow), the camera, "Fluxos" and "Gravar
 //! replay", the labels and shadows switches and the results summary with the bottleneck.
 //!
@@ -15,7 +17,8 @@
 //! `Objetos_Busca`, `Objetos_Lista`, `Ver_Obstaculos`, `Simular_Replicacoes`,
 //! `Botao_RodarDeNovo`, `Simular_Blocos`, `Simular_Camera`, `Botao_Fluxos`,
 //! `Botao_GravarReplay`); new ones: `Objeto_<nome>`, `Bloco_<k>`, `Simular_Status`,
-//! `Simular_Rotulos`, `Simular_Sombras`, `Simular_Resumo`.
+//! `Simular_Rotulos`, `Simular_Sombras`, `Simular_Resumo`, `Biblioteca_Busca`,
+//! `Biblioteca_Grupo_<id>`.
 //!
 //! A library entry is armed by a click (then a click on the floor places it) and dragged
 //! out of the panel to place it where the button is released: the drag starts here
@@ -139,6 +142,96 @@ pub struct LeftMemory {
     reps: Option<String>,
     /// The library entry being dragged (its drag action already went out).
     dragging: Option<String>,
+    /// The library search (all groups).
+    pub library_search: String,
+    /// The library group shown (`None`: "fluxo").
+    pub group: Option<String>,
+    /// The library folded to a row of group icons (a click on the open group).
+    pub folded: bool,
+    /// The entries used last, newest first (at most [`RECENT_MAX`]).
+    pub recent: Vec<String>,
+}
+
+/// How many entries "Recentes" keeps.
+pub const RECENT_MAX: usize = 8;
+/// Width of the rail of library groups.
+pub const RAIL: f32 = 64.0;
+
+/// One group of the library rail: id (in `Biblioteca_Grupo_<id>`), short label, title,
+/// and the entry whose icon stands for it.
+pub struct Group {
+    pub id: &'static str,
+    pub short: &'static str,
+    pub title: &'static str,
+    pub icon_of: &'static str,
+}
+
+/// The library groups, in rail order: "Recentes", then the core categories and the lines'
+/// categories joined in six (see [`group_of`]).
+pub const GROUPS: [Group; 7] = [
+    Group {
+        id: "recentes",
+        short: "Recentes",
+        title: "Usados por último",
+        icon_of: "",
+    },
+    Group {
+        id: "fluxo",
+        short: "Fluxo",
+        title: "Fluxo de itens e montagem",
+        icon_of: "Processor",
+    },
+    Group {
+        id: "movimento",
+        short: "Mover",
+        title: "Movimentação, recursos e logística",
+        icon_of: "Forklift",
+    },
+    Group {
+        id: "fabrica",
+        short: "Fábrica",
+        title: "Manufatura",
+        icon_of: "Combiner",
+    },
+    Group {
+        id: "servicos",
+        short: "Serviços",
+        title: "Serviços e saúde",
+        icon_of: "Operator",
+    },
+    Group {
+        id: "escritorio",
+        short: "Escritório",
+        title: "Escritório e processos",
+        icon_of: "Dispatcher",
+    },
+    Group {
+        id: "qs",
+        short: "Q e S",
+        title: "Qualidade e segurança",
+        icon_of: "Separator",
+    },
+];
+
+/// The group of a library entry: the core categories by name, the lines' presets by the
+/// line (the part of the id before `/`).
+pub fn group_of(e: &Entry) -> &'static str {
+    match e.id.split_once('/') {
+        Some((line, _)) => match line {
+            "manufatura" => "fabrica",
+            "logistica" => "movimento",
+            "servicos" | "saude" => "servicos",
+            "qualidade" | "seguranca" => "qs",
+            _ => "escritorio",
+        },
+        None => {
+            if utsim_edit::CATEGORIES[..2].contains(&e.category.as_str()) {
+                "fluxo"
+            } else {
+                "movimento"
+            }
+        }
+    }
 }
 
 /// Draws the panel in `rect` (points): Editar when `editing`, Simular otherwise.
@@ -222,15 +315,9 @@ fn edit_panel(
     out: &mut Vec<String>,
 ) {
     heading(ui, "Biblioteca");
-    // The library takes what it needs, up to 60 % of the panel; the object list gets the
-    // rest.
-    let lib_h = (ui.available_height() * 0.6).max(150.0);
-    let area = ScrollArea::vertical()
-        .id_salt("utsim_biblioteca")
-        .max_height(lib_h)
-        .auto_shrink([false, true])
-        .show(ui, |ui| library(ui, v, mem, reg, out));
-    named_area(ui, reg, "Biblioteca", area.inner_rect);
+    let before = out.len();
+    library(ui, v, mem, reg, out);
+    remember_used(mem, &out[before..]);
     ui.separator();
     heading(ui, "Objetos");
     search(ui, mem, reg);
@@ -272,6 +359,12 @@ fn edit_panel(
     }
 }
 
+/// Height of one item of the library rail.
+const RAIL_ITEM: f32 = 46.0;
+
+/// The library: a search over every entry, then a rail of groups on the left and the
+/// entries of the chosen group beside it. A click on the open group folds the library to a
+/// row of group icons (more room for the object list); a click on an icon opens it again.
 fn library(
     ui: &mut Ui,
     v: &EditView,
@@ -279,27 +372,284 @@ fn library(
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) {
-    let gap = 4.0;
-    let w = ((ui.available_width() - gap) / 2.0).floor();
     // The drag ends when the button is up again (the drop is the 3D view's).
     if mem.dragging.is_some() && !ui.input(|i| i.pointer.primary_down()) {
         mem.dragging = None;
     }
-    for cat in &v.categories {
-        ui.add_space(2.0);
-        ui.label(RichText::new(cat).small().strong().color(colors::TEXT_WEAK));
-        let entries: Vec<&Entry> = v.library.iter().filter(|e| &e.category == cat).collect();
-        // The presets of a specialised line ("lean_office/posto") have longer names: one per
-        // row, so they are not cut.
-        let line = entries.iter().any(|e| e.id.contains('/'));
-        let (per_row, width) = if line { (1, w * 2.0 + gap) } else { (2, w) };
-        for row in entries.chunks(per_row) {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = gap;
-                for e in row {
-                    entry_button(ui, e, width, v.armed == e.id, mem, reg, out);
+    library_search(ui, mem, reg);
+    let wanted = mem.library_search.trim().to_lowercase();
+    if !wanted.is_empty() {
+        let found: Vec<&Entry> = v
+            .library
+            .iter()
+            .filter(|e| {
+                e.label.to_lowercase().contains(&wanted)
+                    || e.category.to_lowercase().contains(&wanted)
+            })
+            .collect();
+        let h = (ui.available_height() * 0.5).max(120.0);
+        let area = ScrollArea::vertical()
+            .id_salt("utsim_biblioteca")
+            .max_height(h)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                if found.is_empty() {
+                    ui.label(RichText::new("Nada com esse nome.").color(colors::TEXT_WEAK));
+                }
+                let w = ui.available_width() - 4.0;
+                for e in found {
+                    entry_button(ui, e, w, v.armed == e.id, mem, reg, out);
                 }
             });
+        named_area(ui, reg, "Biblioteca", area.inner_rect);
+        return;
+    }
+    let current = mem.group.clone().unwrap_or_else(|| "fluxo".to_string());
+    if mem.folded {
+        let (row, _) =
+            ui.allocate_exact_size(Vec2::new(ui.available_width(), 34.0), Sense::hover());
+        let mut x = row.left();
+        for g in &GROUPS {
+            let r = Rect::from_min_size(egui::pos2(x, row.top()), Vec2::splat(34.0));
+            let resp = ui
+                .interact(r, Id::new(("utsim_grupo_dobrado", g.id)), Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(g.title);
+            let fill = if resp.hovered() {
+                colors::HOVER
+            } else {
+                colors::BUTTON
+            };
+            ui.painter().rect_filled(r, sizes::RADIUS as f32, fill);
+            group_icon(ui, r.center(), 20.0, g, v);
+            named(
+                ui,
+                reg,
+                &format!("Biblioteca_Grupo_{}", g.id),
+                &resp,
+                g.short,
+            );
+            if resp.clicked() {
+                mem.group = Some(g.id.to_string());
+                mem.folded = false;
+            }
+            x += 38.0;
+        }
+        named_area(ui, reg, "Biblioteca", row);
+        return;
+    }
+    let h = GROUPS.len() as f32 * RAIL_ITEM;
+    let (all, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), h), Sense::hover());
+    let rail = Rect::from_min_size(all.min, Vec2::new(RAIL, h));
+    let side = Rect::from_min_max(egui::pos2(rail.right() + 8.0, all.top()), all.max);
+    ui.painter().rect_filled(
+        rail,
+        sizes::RADIUS as f32,
+        colors::BUTTON.gamma_multiply(0.6),
+    );
+    for (k, g) in GROUPS.iter().enumerate() {
+        let r = Rect::from_min_size(
+            egui::pos2(rail.left(), rail.top() + k as f32 * RAIL_ITEM),
+            Vec2::new(RAIL, RAIL_ITEM),
+        );
+        let on = g.id == current;
+        let resp = ui
+            .interact(r, Id::new(("utsim_grupo", g.id)), Sense::click())
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .on_hover_text(if on {
+                format!("{}. Clique de novo para recolher.", g.title)
+            } else {
+                g.title.to_string()
+            });
+        if on {
+            ui.painter()
+                .rect_filled(r.shrink(2.0), sizes::RADIUS as f32, colors::SELECTED);
+            ui.painter().rect_filled(
+                Rect::from_min_size(
+                    r.min + Vec2::new(0.0, 8.0),
+                    Vec2::new(3.0, r.height() - 16.0),
+                ),
+                2.0,
+                colors::ACCENT,
+            );
+        } else if resp.hovered() {
+            ui.painter()
+                .rect_filled(r.shrink(2.0), sizes::RADIUS as f32, colors::HOVER);
+        }
+        group_icon(ui, egui::pos2(r.center().x, r.top() + 16.0), 20.0, g, v);
+        ui.painter().text(
+            egui::pos2(r.center().x, r.bottom() - 10.0),
+            egui::Align2::CENTER_CENTER,
+            g.short,
+            egui::FontId::proportional(10.5),
+            if on { colors::TEXT } else { colors::TEXT_WEAK },
+        );
+        named(
+            ui,
+            reg,
+            &format!("Biblioteca_Grupo_{}", g.id),
+            &resp,
+            g.short,
+        );
+        if resp.clicked() {
+            if on {
+                mem.folded = true;
+            } else {
+                mem.group = Some(g.id.to_string());
+            }
+        }
+    }
+    let group = GROUPS
+        .iter()
+        .find(|g| g.id == current)
+        .unwrap_or(&GROUPS[1]);
+    let entries: Vec<&Entry> = if group.id == "recentes" {
+        mem.recent
+            .iter()
+            .filter_map(|id| v.library.iter().find(|e| &e.id == id))
+            .collect()
+    } else {
+        v.library
+            .iter()
+            .filter(|e| group_of(e) == group.id)
+            .collect()
+    };
+    let mut child = ui.new_child(
+        UiBuilder::new()
+            .max_rect(side)
+            .layout(Layout::top_down(Align::Min)),
+    );
+    child.spacing_mut().item_spacing.y = 4.0;
+    child.label(
+        RichText::new(group.title)
+            .small()
+            .strong()
+            .color(colors::TEXT_WEAK),
+    );
+    let area = ScrollArea::vertical()
+        .id_salt("utsim_biblioteca")
+        .auto_shrink([false, false])
+        .show(&mut child, |ui| {
+            if entries.is_empty() {
+                ui.label(
+                    RichText::new("Os elementos que você usar aparecem aqui.")
+                        .small()
+                        .color(colors::TEXT_WEAK),
+                );
+            }
+            // The categories inside a group (a line's name) as small titles, when there
+            // are more than one.
+            let mut cats: Vec<&str> = entries.iter().map(|e| e.category.as_str()).collect();
+            cats.dedup();
+            let titles = group.id != "recentes" && cats.len() > 1;
+            let w = ui.available_width() - 4.0;
+            let mut last: Option<&str> = None;
+            for e in &entries {
+                if titles && last != Some(e.category.as_str()) {
+                    if last.is_some() {
+                        ui.add_space(4.0);
+                    }
+                    ui.label(
+                        RichText::new(short_category(&e.category))
+                            .size(10.5)
+                            .color(colors::TEXT_WEAK),
+                    );
+                    last = Some(e.category.as_str());
+                }
+                entry_button(ui, e, w, v.armed == e.id, mem, reg, out);
+            }
+        });
+    named_area(ui, reg, "Biblioteca", area.inner_rect);
+}
+
+/// A line's category without the part in parentheses ("Lean Office (processos
+/// administrativos)" → "Lean Office"), to fit the narrow column.
+fn short_category(c: &str) -> &str {
+    c.split(" (").next().unwrap_or(c).trim()
+}
+
+/// The icon of a group: the icon of its entry, a clock for "Recentes", or its initial.
+fn group_icon(ui: &Ui, center: egui::Pos2, size: f32, g: &Group, v: &EditView) {
+    let p = ui.painter();
+    if g.id == "recentes" {
+        let r = size * 0.42;
+        p.circle_stroke(center, r, Stroke::new(1.6, colors::TEXT));
+        p.line_segment(
+            [center, center + Vec2::new(0.0, -r * 0.65)],
+            Stroke::new(1.6, colors::TEXT),
+        );
+        p.line_segment(
+            [center, center + Vec2::new(r * 0.5, r * 0.2)],
+            Stroke::new(1.6, colors::TEXT),
+        );
+        return;
+    }
+    match v
+        .library
+        .iter()
+        .find(|e| e.id == g.icon_of)
+        .and_then(|e| e.icon)
+    {
+        Some(tex) => {
+            p.image(
+                tex,
+                Rect::from_center_size(center, Vec2::splat(size)),
+                Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+        None => {
+            p.rect_filled(
+                Rect::from_center_size(center, Vec2::splat(size)),
+                4.0,
+                colors::HOVER,
+            );
+            p.text(
+                center,
+                egui::Align2::CENTER_CENTER,
+                g.short.chars().next().unwrap_or('?'),
+                egui::FontId::proportional(12.0),
+                colors::TEXT,
+            );
+        }
+    }
+}
+
+/// The library search: filters every entry by name or line (`×` clears it).
+fn library_search(ui: &mut Ui, mem: &mut LeftMemory, reg: &mut Registry) {
+    ui.horizontal(|ui| {
+        let clear_w = if mem.library_search.is_empty() {
+            0.0
+        } else {
+            30.0
+        };
+        let r = ui.add(
+            TextEdit::singleline(&mut mem.library_search)
+                .id(Id::new("utsim_biblioteca_busca"))
+                .hint_text("Buscar elemento")
+                .desired_width(ui.available_width() - clear_w),
+        );
+        named(ui, reg, "Biblioteca_Busca", &r, &mem.library_search.clone());
+        if !mem.library_search.is_empty() {
+            let x = ui.button("×").on_hover_text("Limpa a busca");
+            named(ui, reg, "Biblioteca_Limpar", &x, "×");
+            if x.clicked() {
+                mem.library_search.clear();
+            }
+        }
+    });
+}
+
+/// The entries just armed or dragged go to the front of "Recentes".
+fn remember_used(mem: &mut LeftMemory, actions: &[String]) {
+    for a in actions {
+        let id = a
+            .strip_prefix("biblioteca_arrastar:")
+            .or_else(|| a.strip_prefix("biblioteca:"));
+        if let Some(id) = id {
+            mem.recent.retain(|r| r != id);
+            mem.recent.insert(0, id.to_string());
+            mem.recent.truncate(RECENT_MAX);
         }
     }
 }
@@ -1076,5 +1426,115 @@ mod tests {
             out.extend(p.frame(false, &e, &s, vec![ev]));
         }
         assert_eq!(out, vec!["bloco:4".to_owned()]);
+    }
+
+    /// The whole library (the core entries and every line's presets), as the bridge
+    /// builds it.
+    fn full_view() -> EditView {
+        let mut e = edit_view();
+        e.library
+            .extend(crate::linha::entries().into_iter().map(|l| Entry {
+                id: l.id,
+                label: l.label,
+                category: l.category,
+                icon: None,
+            }));
+        e.categories.extend(crate::linha::categories());
+        e
+    }
+
+    /// With `UTSIM_CAPTURAS=<pasta>`: pictures of the Editar panel with the whole library.
+    #[test]
+    fn library_pictures() {
+        let Some(d) = std::env::var_os("UTSIM_CAPTURAS") else {
+            return;
+        };
+        let d = std::path::PathBuf::from(d);
+        std::fs::create_dir_all(&d).unwrap();
+        let e = full_view();
+        let s = SimView::default();
+        for (file, setup) in PICTURES {
+            let ctx = Context::default();
+            utsim_ui_tema::install(&ctx);
+            let size = Vec2::new(WIDTH, 820.0);
+            let mut cap = utsim_ui_tema::captura::Captura::new(ctx, size);
+            let mut reg = Registry::default();
+            let mut mem = LeftMemory::default();
+            setup(&mut mem);
+            let rect = Rect::from_min_size(Pos2::ZERO, size);
+            let img = cap.imagem(3, |ui| {
+                reg.begin_frame();
+                let mut out = Vec::new();
+                show(ui, rect, true, &e, &s, &mut mem, &mut reg, &mut out);
+            });
+            img.salvar_png(&d.join(file)).unwrap();
+        }
+    }
+
+    type Setup = fn(&mut LeftMemory);
+    const PICTURES: [(&str, Setup); 5] = [
+        ("godot_biblioteca_fluxo.png", |_| {}),
+        ("godot_biblioteca_escritorio.png", |m| {
+            m.group = Some("escritorio".into())
+        }),
+        ("godot_biblioteca_recentes.png", |m| {
+            m.group = Some("recentes".into());
+            m.recent = vec![
+                "Operator".into(),
+                "lean_office/posto".into(),
+                "Queue".into(),
+            ];
+        }),
+        ("godot_biblioteca_busca.png", |m| {
+            m.library_search = "posto".into()
+        }),
+        ("godot_biblioteca_recolhida.png", |m| m.folded = true),
+    ];
+
+    #[test]
+    fn the_rail_shows_one_group_and_folds() {
+        let mut p = Panel::new();
+        let e = full_view();
+        let s = SimView::default();
+        p.frame(true, &e, &s, vec![]);
+        // The first group is Fluxo: its entries are there, the others are not.
+        assert!(p.reg.knows("Biblioteca_Source"));
+        assert!(!p.reg.knows("Biblioteca_Operator"));
+        for g in &GROUPS {
+            assert!(p.reg.knows(&format!("Biblioteca_Grupo_{}", g.id)));
+        }
+        let click = |p: &mut Panel, name: &str| {
+            let at = p.center(name);
+            for ev in [moved(at), press(at, true), press(at, false)] {
+                p.frame(true, &e, &s, vec![ev]);
+            }
+            p.frame(true, &e, &s, vec![]);
+        };
+        click(&mut p, "Biblioteca_Grupo_movimento");
+        assert!(p.reg.knows("Biblioteca_Operator"));
+        assert!(!p.reg.knows("Biblioteca_Source"));
+        // Arming an entry puts it in Recentes.
+        click(&mut p, "Biblioteca_Operator");
+        assert_eq!(p.mem.recent, vec!["Operator".to_string()]);
+        // A click on the open group folds the library; a group icon opens it again.
+        click(&mut p, "Biblioteca_Grupo_movimento");
+        assert!(p.mem.folded);
+        assert!(!p.reg.knows("Biblioteca_Operator"));
+        click(&mut p, "Biblioteca_Grupo_recentes");
+        assert!(!p.mem.folded);
+        assert!(p.reg.knows("Biblioteca_Operator"));
+        // The search looks into every group.
+        p.mem.library_search = "posto".into();
+        p.frame(true, &e, &s, vec![]);
+        assert!(p.reg.knows("Biblioteca_lean_office/posto"));
+    }
+
+    #[test]
+    fn every_entry_has_a_group() {
+        let e = full_view();
+        for x in &e.library {
+            let g = group_of(x);
+            assert!(GROUPS.iter().any(|k| k.id == g), "{}: {g}", x.id);
+        }
     }
 }
