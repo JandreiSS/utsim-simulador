@@ -621,7 +621,11 @@ fn as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1() {
                 "{chave}: osso {nome} fora da pose do UAL1"
             );
         }
-        assert_eq!(g.doc.animations().count(), 0, "{chave}: sem animações próprias");
+        assert_eq!(
+            g.doc.animations().count(),
+            0,
+            "{chave}: sem animações próprias"
+        );
         // Todo vértice pesado (soma 1) e o corpo com os materiais que o 3D recolore.
         for malha in g.doc.meshes() {
             for prim in malha.primitives() {
@@ -629,7 +633,11 @@ fn as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1() {
                 let pesos = r.read_weights(0).expect("pesos").into_f32();
                 for w in pesos {
                     let s: f32 = w.iter().sum();
-                    assert!((s - 1.0).abs() < 0.01, "{chave}/{:?}: peso {s}", malha.name());
+                    assert!(
+                        (s - 1.0).abs() < 0.01,
+                        "{chave}/{:?}: peso {s}",
+                        malha.name()
+                    );
                 }
             }
         }
@@ -639,12 +647,18 @@ fn as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1() {
             .filter_map(|p| p.material().name())
             .collect();
         for m in item["dados"]["recolorir"].as_array().unwrap() {
-            assert!(mats.contains(m.as_str().unwrap()), "{chave}: falta o material {m}");
+            assert!(
+                mats.contains(m.as_str().unwrap()),
+                "{chave}: falta o material {m}"
+            );
         }
         // Em pé no piso, com a altura do esqueleto.
         let alt = item["tamanho"][2].as_f64().unwrap();
         let base = item["dados"]["altura_base"].as_f64().unwrap();
         assert!((alt - base).abs() < 0.03, "{chave}: altura {alt}");
-        assert!(item["minimo"][2].as_f64().unwrap().abs() < 0.01, "{chave}: fora do piso");
+        assert!(
+            item["minimo"][2].as_f64().unwrap().abs() < 0.01,
+            "{chave}: fora do piso"
+        );
     }
 }
