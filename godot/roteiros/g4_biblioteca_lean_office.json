@@ -4,6 +4,7 @@
 		{"nota": "Lean Office, passo 12: as predefinições da linha na Biblioteca (categoria própria); colocar uma grava a linha no modelo, e a lista de objetos usa o vocabulário da linha."},
 		{"novo": true},
 		{"camera": {"alvo": [0, 0], "distancia": 22.0, "giro": 0.0, "inclinacao": 0.85}},
+		{"clicar": {"controle": "Biblioteca_Grupo_escritorio"}},
 		{"clicar": {"controle": "Biblioteca_lean_office/posto"}},
 		{"conferir": {"ferramenta": "colocar"}},
 		{"clicar": {"chao": [2.0, 0.0]}},

@@ -1,8 +1,12 @@
 """Máquinas: torno CNC, prensa e injetora.
 
 Lado de trabalho em `-y` (porta e painel), como a `maquina` do `utsim-assets`.
+`ponto_porta` é por onde o operador chega, 0,6 m além de `ponto_operador`: ao entrar, ele
+anda da porta até o posto enquanto a porta da máquina abre.
 Clipes: `ciclo` (laço, processando), `porta_abrir` (0 fechada, 1 aberta), `setup`
-(laço, preparando) e `quebra` (0 normal, 1 tampa de manutenção aberta).
+(laço, preparando), `quebra` (0 normal, 1 tampa de manutenção aberta) e `ciclo_auto`
+(máquina sem operador, carregada por robô ou esteira: a porta está aberta e a peça entra,
+a porta fecha, o `ciclo` roda, a porta abre e a peça sai).
 """
 
 import math
@@ -10,6 +14,36 @@ import math
 from comum import Elemento
 
 TAU = 2 * math.pi
+
+# `ciclo_auto`, em quadros de 24 (fases exatas): porta aberta até 2, fechada de 4 a 20 (o
+# `ciclo` roda nesse trecho) e aberta de 22 ao fim. A peça fica na entrada até 2, no lugar da
+# peça até 22 e na saída até o fim: entra e sai com a porta toda aberta.
+AUTO_FECHA = (2 / 24, 4 / 24)
+AUTO_ABRE = (20 / 24, 22 / 24)
+AUTO_PECA = (AUTO_FECHA[0], AUTO_ABRE[1])
+
+
+def _ciclo_auto(e, ciclo, porta):
+    """Grava `ciclo` e `porta_abrir` e, com eles, `ciclo_auto`. `porta` = (caminho, eixo,
+    valor aberto) da porta; `ciclo` = as chaves do clipe `ciclo`."""
+    caminho, eixo, aberta = porta
+    e.clipe("ciclo", True, ciclo)
+    a, b = AUTO_FECHA[1], AUTO_ABRE[0]
+    auto = {no: [(a + (b - a) * f, c, i, v) for f, c, i, v in ks] for no, ks in ciclo.items()}
+    for no, ks in auto.items():
+        # Antes e depois do trecho, o nó fica parado no começo e no fim do `ciclo`.
+        auto[no] = [(0, ks[0][1], ks[0][2], ks[0][3])] + ks + [(1, ks[-1][1], ks[-1][2], ks[-1][3])]
+    auto["porta"] = [(0, caminho, eixo, aberta), (AUTO_FECHA[0], caminho, eixo, aberta),
+                     (AUTO_FECHA[1], caminho, eixo, 0.0), (AUTO_ABRE[0], caminho, eixo, 0.0),
+                     (AUTO_ABRE[1], caminho, eixo, aberta), (1, caminho, eixo, aberta)]
+    e.clipe("ciclo_auto", False, auto)
+    # `porta_abrir` por último: a trilha de cima vale na fase 0, que é a pose de repouso
+    # gravada no `.glb`; com `ciclo_auto` por cima, a porta ficaria aberta em repouso.
+    e.clipe("porta_abrir", False, {"porta": [(0, caminho, eixo, 0.0), (1, caminho, eixo, aberta)]})
+    r = lambda x: round(x, 6)  # noqa: E731
+    e.peca = {"processing_auto": [[0.0, r(AUTO_PECA[0]), "ponto_entrada"],
+                                  [r(AUTO_PECA[0]), r(AUTO_PECA[1]), "ponto_peca"],
+                                  [r(AUTO_PECA[1]), 1.0, "ponto_saida"]]}
 
 
 def _torre_luz(e, x, y, z):
@@ -74,17 +108,16 @@ def cnc(detalhe=0):
     _torre_luz(e, 0.75, 0.45, 1.95)
     # Pontos.
     e.ponto("ponto_operador", (-0.15, -1.20, 0.0), 90)
-    e.ponto("ponto_porta", (-0.15, -0.85, 0.0), 90)
+    e.ponto("ponto_porta", (-0.15, -1.80, 0.0), 90)
     e.ponto("ponto_peca", (-0.30, -0.45, 1.10), 0)
     e.ponto("ponto_entrada", (-1.30, -0.95, 0.90), 0)
     e.ponto("ponto_saida", (1.30, -0.95, 0.90), 0)
     # Clipes.
-    e.clipe("ciclo", True, {
+    _ciclo_auto(e, {
         "fuso": [(0, "rotation_euler", 0, 0.0), (1, "rotation_euler", 0, 3 * TAU)],
         "torre": [(0, "location", 0, 0.0), (0.2, "location", 0, 0.0), (0.45, "location", 0, -0.12),
                   (0.8, "location", 0, -0.12), (1, "location", 0, 0.0)],
-    })
-    e.clipe("porta_abrir", False, {"porta": [(0, "location", 0, 0.0), (1, "location", 0, -0.80)]})
+    }, ("location", 0, -0.80))
     e.clipe("setup", True, {
         "torre": [(0, "rotation_euler", 0, 0.0), (0.3, "rotation_euler", 0, 0.0),
                   (0.7, "rotation_euler", 0, math.pi / 2), (1, "rotation_euler", 0, math.pi / 2)],
@@ -135,16 +168,15 @@ def prensa(detalhe=0):
         e.caixa("porta", "aco_escuro", (x - 0.008, -0.53, 1.00), (x + 0.008, -0.51, 1.40))
     _torre_luz(e, 0.45, 0.45, 2.55)
     e.ponto("ponto_operador", (0.0, -1.00, 0.0), 90)
-    e.ponto("ponto_porta", (0.0, -0.75, 0.0), 90)
+    e.ponto("ponto_porta", (0.0, -1.60, 0.0), 90)
     e.ponto("ponto_peca", (0.0, -0.10, 1.06), 0)
     e.ponto("ponto_entrada", (-1.0, -0.40, 0.95), 0)
     e.ponto("ponto_saida", (1.0, -0.40, 0.95), 0)
-    e.clipe("ciclo", True, {
+    _ciclo_auto(e, {
         "martelo": [(0, "location", 2, 0.0), (0.3, "location", 2, 0.0), (0.45, "location", 2, -0.26),
                     (0.55, "location", 2, -0.26), (0.85, "location", 2, 0.0), (1, "location", 2, 0.0)],
         "volante": [(0, "rotation_euler", 0, 0.0), (1, "rotation_euler", 0, 2 * TAU)],
-    })
-    e.clipe("porta_abrir", False, {"porta": [(0, "location", 2, 0.0), (1, "location", 2, 0.55)]})
+    }, ("location", 2, 0.55))
     e.clipe("setup", True, {
         "matriz": [(0, "location", 1, 0.0), (0.2, "location", 1, 0.0), (0.5, "location", 1, -0.30),
                    (0.6, "location", 1, -0.30), (0.9, "location", 1, 0.0), (1, "location", 1, 0.0)],
@@ -192,15 +224,14 @@ def injetora(detalhe=0):
     e.caixa("porta", "vidro", (-1.48, -0.585, 1.02), (-0.12, -0.575, 1.78))
     _torre_luz(e, -1.80, 0.40, 0.95)
     e.ponto("ponto_operador", (-0.80, -1.05, 0.0), 90)
-    e.ponto("ponto_porta", (-0.80, -0.75, 0.0), 90)
+    e.ponto("ponto_porta", (-0.80, -1.65, 0.0), 90)
     e.ponto("ponto_peca", (-0.15, 0.0, 1.35), 0)
     e.ponto("ponto_entrada", (2.30, 0.0, 1.0), 180)
     e.ponto("ponto_saida", (-0.20, -0.85, 0.90), -90)
-    e.clipe("ciclo", True, {
+    _ciclo_auto(e, {
         "molde": [(0, "location", 0, 0.0), (0.2, "location", 0, 0.24), (0.7, "location", 0, 0.24),
                   (0.9, "location", 0, 0.0), (1, "location", 0, 0.0)],
-    })
-    e.clipe("porta_abrir", False, {"porta": [(0, "location", 0, 0.0), (1, "location", 0, 1.30)]})
+    }, ("location", 0, 1.30))
     e.clipe("setup", True, {
         "unidade": [(0, "location", 0, 0.0), (0.25, "location", 0, 0.30), (0.75, "location", 0, 0.30),
                     (1, "location", 0, 0.0)],

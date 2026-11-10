@@ -113,7 +113,7 @@ Todo relatório mostra a origem dos dados (manual, importado com o hash, simulad
 
 ## Capacidade, cartas de controle, MSA e Pareto
 
-Essas ferramentas ficam no UTSim Qualidade, a tela única da família para elas. O menu Qualidade do Estatística grava as colunas escolhidas num CSV em `estatistica/para_qualidade/` e abre o UTSim Qualidade, se ele estiver instalado pelo launcher. Para o Pareto, escolha a coluna das categorias (defeito, posto) e, se quiser, uma coluna de números para somar no lugar de contar: o CSV sai já contado, `categoria;contagem`, da maior para a menor. Por enquanto o resultado não volta sozinho ao Estatística. Isso chega com o pedido entre apps, numa próxima versão.
+Essas ferramentas ficam no UTSim Qualidade, a tela única da família para elas. O menu Qualidade do Estatística grava as colunas escolhidas num CSV em `estatistica/para_qualidade/` e abre o UTSim Qualidade, se ele estiver instalado pelo launcher, já com um estudo da ferramenta sobre esse CSV. Na capacidade e na carta, escolha a coluna das medições na ordem da coleta (na carta, uma segunda coluna pode ser o subgrupo). No MSA, as colunas são achadas pelo nome: peça, operador e medida. Para o Pareto, escolha a coluna das categorias (defeito, posto) e, se quiser, uma coluna de números para somar no lugar de contar: o CSV sai já contado, `categoria;contagem`, da maior para a menor. Por enquanto o resultado não volta sozinho ao Estatística.
 
 ## O que vem depois
 

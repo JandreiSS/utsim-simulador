@@ -96,6 +96,32 @@ impl Glb {
 
     /// Posição (UTSim) de cada nó com o clipe `clipe` no fim (`fim`) ou no começo.
     fn pose(&self, clipe: Option<&str>, fim: bool) -> HashMap<String, [f32; 3]> {
+        self.pose_por(clipe, &|t: &[f32]| if fim { t.len() - 1 } else { 0 })
+    }
+
+    /// Posição de um nó no instante `t` (s) do clipe; `t` tem de ser um quadro-chave dos
+    /// canais desse nó e dos pais dele (os outros canais ficam no começo).
+    fn no_em(&self, clipe: &str, t: f32, no: &str) -> [f32; 3] {
+        self.pose_por(Some(clipe), &|ts: &[f32]| {
+            ts.iter().position(|x| (x - t).abs() < 1e-3).unwrap_or(0)
+        })[no]
+    }
+
+    /// Posição de cada nó no instante `t` (s) do clipe; `t` tem de ser um quadro-chave de
+    /// todos os canais (os clipes do robô têm chave nas trocas de fase).
+    fn pose_em(&self, clipe: &str, t: f32) -> HashMap<String, [f32; 3]> {
+        self.pose_por(Some(clipe), &|ts: &[f32]| {
+            ts.iter()
+                .position(|x| (x - t).abs() < 1e-3)
+                .unwrap_or_else(|| panic!("{clipe}: sem chave em {t} ({ts:?})"))
+        })
+    }
+
+    fn pose_por(
+        &self,
+        clipe: Option<&str>,
+        escolha: &dyn Fn(&[f32]) -> usize,
+    ) -> HashMap<String, [f32; 3]> {
         let mut locais: Vec<([f32; 3], [f32; 4], [f32; 3])> = self
             .doc
             .nodes()
@@ -110,20 +136,13 @@ impl Glb {
             for ch in anim.channels() {
                 let r = ch.reader(|_| Some(&self.blob));
                 let k = ch.target().node().index();
+                let tempos: Vec<f32> = r.read_inputs().expect("tempos").collect();
+                let i = escolha(&tempos);
                 use gltf::animation::util::ReadOutputs as O;
                 match r.read_outputs().expect("saídas") {
-                    O::Translations(it) => {
-                        let v: Vec<_> = it.collect();
-                        locais[k].0 = if fim { *v.last().unwrap() } else { v[0] };
-                    }
-                    O::Rotations(it) => {
-                        let v: Vec<_> = it.into_f32().collect();
-                        locais[k].1 = if fim { *v.last().unwrap() } else { v[0] };
-                    }
-                    O::Scales(it) => {
-                        let v: Vec<_> = it.collect();
-                        locais[k].2 = if fim { *v.last().unwrap() } else { v[0] };
-                    }
+                    O::Translations(it) => locais[k].0 = it.collect::<Vec<_>>()[i],
+                    O::Rotations(it) => locais[k].1 = it.into_f32().collect::<Vec<_>>()[i],
+                    O::Scales(it) => locais[k].2 = it.collect::<Vec<_>>()[i],
                     O::MorphTargetWeights(_) => {}
                 }
             }
@@ -293,7 +312,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "prensa",
@@ -307,7 +326,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "injetora",
@@ -319,7 +338,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "posto",
@@ -449,11 +468,13 @@ fn o_operador_fica_fora_da_maquina_e_olha_para_ela() {
             90.0,
             "{nome}: operador olha para +y"
         );
-        // A porta fica entre o operador e a máquina.
+        // Nas máquinas, a porta (por onde o operador chega) fica 0,6 m além do operador, para
+        // ele andar da porta até o posto ao entrar. No posto, os dois pontos são o mesmo.
         let porta = v3(&item["pontos"]["ponto_porta"]["pos"]);
+        let recuo = if nome == "posto" { 0.0 } else { 0.6 };
         assert!(
-            porta[1] >= pos[1] && (porta[0] - pos[0]).abs() < 0.3,
-            "{nome}: porta"
+            (pos[1] - porta[1] - recuo).abs() < 1e-3 && (porta[0] - pos[0]).abs() < 1e-3,
+            "{nome}: porta em {porta:?}, operador em {pos:?}"
         );
     }
     // Na célula, o operador entra: a porta fica fora da cerca e o posto dentro.
@@ -546,103 +567,120 @@ fn os_clipes_movem_o_que_devem() {
     }
 }
 
-/// A tabela `estados` do catálogo: de estado do posto na simulação para o clipe que a ponte
-/// toca (com a fase de começo e de fim) e o caminho do operador ao entrar e ao sair.
-/// (estado, clipe, de, até, laço, caminho do operador).
+/// A tabela `estados` do catálogo: de estado na simulação para o clipe que a ponte toca (com a
+/// fase de começo e de fim) e o caminho do operador ao entrar e ao sair.
+/// (estado, clipe, de, até, laço, caminho do operador); `None` em de/até é o `levante` do
+/// elemento (`dados.levante`, 1 sem ele).
 type Estado = (
     &'static str,
     &'static str,
-    f64,
-    f64,
+    Option<f64>,
+    Option<f64>,
     bool,
     Option<[&'static str; 2]>,
 );
 
 #[test]
-fn os_estados_do_posto_apontam_para_clipes_e_pontos_do_elemento() {
+fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
+    let entra = Some(["ponto_porta", "ponto_operador"]);
+    let sai = Some(["ponto_operador", "ponto_porta"]);
+    // Na ordem de preferência: vale a primeira linha do estado cujo clipe o elemento tem.
     let tabela: &[Estado] = &[
         (
             "entering",
             "porta_abrir",
-            0.0,
-            1.0,
+            Some(0.0),
+            Some(1.0),
             false,
-            Some(["ponto_porta", "ponto_operador"]),
+            entra,
         ),
+        ("leaving", "porta_abrir", Some(1.0), Some(0.0), false, sai),
+        ("processing", "ciclo", Some(0.0), Some(1.0), true, None),
         (
-            "leaving",
-            "porta_abrir",
-            1.0,
-            0.0,
+            "processing_auto",
+            "ciclo_auto",
+            Some(0.0),
+            Some(1.0),
             false,
-            Some(["ponto_operador", "ponto_porta"]),
+            None,
         ),
-        ("processing", "ciclo", 0.0, 1.0, true, None),
-        ("setup", "setup", 0.0, 1.0, true, None),
-        ("down", "quebra", 0.0, 1.0, false, None),
-        ("waiting_repair", "quebra", 1.0, 1.0, false, None),
-        ("maintenance", "quebra", 1.0, 1.0, false, None),
+        ("setup", "setup", Some(0.0), Some(1.0), true, None),
+        ("down", "quebra", Some(0.0), Some(1.0), false, None),
+        (
+            "waiting_repair",
+            "quebra",
+            Some(1.0),
+            Some(1.0),
+            false,
+            None,
+        ),
+        ("maintenance", "quebra", Some(1.0), Some(1.0), false, None),
+        ("loading", "garfo_subir", Some(0.0), None, false, None),
+        ("loading", "mesa_subir", Some(0.0), None, false, None),
+        ("travel_loaded", "garfo_subir", None, None, false, None),
+        ("travel_loaded", "mesa_subir", None, None, false, None),
+        ("unloading", "garfo_subir", None, Some(0.0), false, None),
+        ("unloading", "mesa_subir", None, Some(0.0), false, None),
     ];
-    let estados_validos: BTreeSet<&str> = tabela.iter().map(|t| t.0).collect();
     for (chave, item) in catalogo() {
         let clipes = item["clipes"].as_object().unwrap();
         let pontos = item["pontos"].as_object().unwrap();
+        let levante = item["dados"]
+            .get("levante")
+            .and_then(Value::as_f64)
+            .unwrap_or(1.0);
         let estados = item["estados"]
             .as_object()
             .unwrap_or_else(|| panic!("{chave}: sem a tabela estados"));
-        for (estado, e) in estados {
-            assert!(
-                estados_validos.contains(estado.as_str()),
-                "{chave}: estado {estado} desconhecido"
+        let mut esperados = BTreeSet::new();
+        for &(estado, clipe, de, ate, laco, caminho) in tabela {
+            if !clipes.contains_key(clipe) || !esperados.insert(estado) {
+                continue;
+            }
+            let e = estados
+                .get(estado)
+                .unwrap_or_else(|| panic!("{chave}: falta {estado}"));
+            assert_eq!(e["clipe"], clipe, "{chave}/{estado}");
+            assert_eq!(
+                e["de"].as_f64(),
+                Some(de.unwrap_or(levante)),
+                "{chave}/{estado}: de"
             );
-            let clipe = e["clipe"].as_str().unwrap();
-            assert!(clipes.contains_key(clipe), "{chave}/{estado}: sem {clipe}");
+            assert_eq!(
+                e["ate"].as_f64(),
+                Some(ate.unwrap_or(levante)),
+                "{chave}/{estado}: até"
+            );
+            assert_eq!(e["laco"].as_bool(), Some(laco), "{chave}/{estado}: laço");
             assert_eq!(
                 e["laco"].as_bool(),
                 clipes[clipe]["laco"].as_bool(),
-                "{chave}/{estado}: laço"
+                "{chave}/{estado}: laço do clipe"
             );
-            if let Some(op) = e.get("operador") {
-                for p in op.as_array().unwrap() {
-                    assert!(
-                        pontos.contains_key(p.as_str().unwrap()),
-                        "{chave}/{estado}: sem {p}"
-                    );
+            match caminho.filter(|c| c.iter().all(|p| pontos.contains_key(*p))) {
+                Some(c) => {
+                    let tem: Vec<&str> = e["operador"]
+                        .as_array()
+                        .unwrap_or_else(|| panic!("{chave}/{estado}: sem caminho"))
+                        .iter()
+                        .map(|v| v.as_str().unwrap())
+                        .collect();
+                    assert_eq!(tem, c.to_vec(), "{chave}/{estado}: caminho");
                 }
-            }
-        }
-        // Todo estado da tabela cujo clipe o elemento tem está lá, com os números certos.
-        for &(estado, clipe, de, ate, laco, caminho) in tabela {
-            if !clipes.contains_key(clipe) {
-                assert!(estados.get(estado).is_none(), "{chave}: {estado} sem clipe");
-                continue;
-            }
-            let e = &estados[estado];
-            assert_eq!(e["clipe"], clipe, "{chave}/{estado}");
-            assert_eq!(e["de"].as_f64(), Some(de), "{chave}/{estado}: de");
-            assert_eq!(e["ate"].as_f64(), Some(ate), "{chave}/{estado}: até");
-            assert_eq!(e["laco"].as_bool(), Some(laco), "{chave}/{estado}: laço");
-            let tem_pontos = caminho.is_some_and(|c| c.iter().all(|p| pontos.contains_key(*p)));
-            if tem_pontos {
-                let c: Vec<&str> = e["operador"]
-                    .as_array()
-                    .unwrap_or_else(|| panic!("{chave}/{estado}: sem caminho"))
-                    .iter()
-                    .map(|v| v.as_str().unwrap())
-                    .collect();
-                assert_eq!(c, caminho.unwrap().to_vec(), "{chave}/{estado}: caminho");
-            } else {
-                assert!(
+                None => assert!(
                     e.get("operador").is_none(),
                     "{chave}/{estado}: caminho a mais"
-                );
+                ),
             }
         }
+        let tem: BTreeSet<&str> = estados.keys().map(|k| k.as_str()).collect();
+        assert_eq!(tem, esperados, "{chave}: estados");
     }
-    // As máquinas fazem tudo; a célula só abre o portão.
+    // As máquinas fazem tudo; a célula só abre o portão; a empilhadeira só tira o palete do
+    // chão (0,10 m do curso do garfo).
     let cat = catalogo();
     for m in ["cnc", "prensa", "injetora"] {
-        assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 7, "{m}");
+        assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 8, "{m}");
     }
     let celula: BTreeSet<&str> = cat["celula"]["estados"]
         .as_object()
@@ -651,6 +689,126 @@ fn os_estados_do_posto_apontam_para_clipes_e_pontos_do_elemento() {
         .map(|k| k.as_str())
         .collect();
     assert_eq!(celula, BTreeSet::from(["entering", "leaving"]));
+    let d = &cat["empilhadeira"]["dados"];
+    let ergue = d["levante"].as_f64().unwrap() * d["garfo_curso"].as_f64().unwrap();
+    assert!((ergue - 0.10).abs() < 1e-6, "empilhadeira ergue {ergue}");
+}
+
+/// A tabela `peca`: por estado, trechos de fase que cobrem 0 a 1 sem buraco, cada um com um
+/// ponto do elemento. O robô leva a peça da entrada à saída presa na garra.
+#[test]
+fn a_peca_segue_pontos_do_elemento_em_cada_estado() {
+    let conhecidos = [
+        "entering",
+        "leaving",
+        "setup",
+        "processing",
+        "down",
+        "waiting_repair",
+        "maintenance",
+        "processing_auto",
+        "blocked",
+        "loading",
+        "travel_loaded",
+        "unloading",
+    ];
+    let cat = catalogo();
+    for (chave, item) in &cat {
+        let pontos = item["pontos"].as_object().unwrap();
+        let peca = item["peca"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{chave}: sem a tabela peca"));
+        for (estado, trechos) in peca {
+            assert!(conhecidos.contains(&estado.as_str()), "{chave}: {estado}");
+            let mut fim = 0.0;
+            for t in trechos.as_array().unwrap() {
+                let t = t.as_array().unwrap();
+                let (a, b) = (t[0].as_f64().unwrap(), t[1].as_f64().unwrap());
+                assert_eq!(a, fim, "{chave}/{estado}: buraco em {fim}");
+                assert!(b > a, "{chave}/{estado}: trecho vazio");
+                fim = b;
+                let p = t[2].as_str().unwrap();
+                assert!(pontos.contains_key(p), "{chave}/{estado}: sem {p}");
+            }
+            assert_eq!(fim, 1.0, "{chave}/{estado}: não chega a 1");
+        }
+    }
+    // Máquina: entra pela entrada, fica no lugar da peça, sai pela saída.
+    for m in ["cnc", "prensa", "injetora", "posto"] {
+        let p = &cat[m]["peca"];
+        assert_eq!(p["entering"][0][2], "ponto_entrada", "{m}");
+        assert_eq!(p["processing"][0][2], "ponto_peca", "{m}");
+        assert_eq!(p["leaving"][0][2], "ponto_saida", "{m}");
+    }
+    // Veículos: a carga vai no ponto de carga (que sobe com o garfo ou a mesa).
+    for v in ["empilhadeira", "agv"] {
+        for e in ["loading", "travel_loaded", "unloading"] {
+            assert_eq!(cat[v]["peca"][e][0][2], "ponto_carga", "{v}/{e}");
+        }
+    }
+    // Robô: nas trocas de trecho, a garra está mesmo sobre a peça.
+    let trechos = cat["robo"]["peca"]["processing"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let pega = trechos[1][0].as_f64().unwrap() as f32;
+    let solta = trechos[1][1].as_f64().unwrap() as f32;
+    assert_eq!(trechos[1][2], "ponto_garra");
+    for sufixo in ["", "_medio"] {
+        let g = Glb::ler(&format!("robo{sufixo}.glb"));
+        let rep = g.pose(None, false);
+        let a = g.pose_em("ciclo", pega)["ponto_garra"];
+        let b = g.pose_em("ciclo", solta)["ponto_garra"];
+        assert!(perto(a, rep["ponto_entrada"], 0.01), "pega em {a:?}");
+        assert!(perto(b, rep["ponto_saida"], 0.01), "solta em {b:?}");
+    }
+}
+
+/// A máquina sem operador (`processing_auto`, clipe `ciclo_auto`): a porta está toda aberta
+/// quando a peça entra e quando sai, e fechada enquanto o `ciclo` roda dentro dela.
+#[test]
+fn a_maquina_automatica_abre_a_porta_para_a_peca() {
+    let cat = catalogo();
+    for m in ["cnc", "prensa", "injetora"] {
+        let e = &cat[m]["estados"]["processing_auto"];
+        assert_eq!(e["clipe"], "ciclo_auto", "{m}");
+        let t = cat[m]["peca"]["processing_auto"]
+            .as_array()
+            .unwrap()
+            .clone();
+        let pontos: Vec<&str> = t.iter().map(|x| x[2].as_str().unwrap()).collect();
+        assert_eq!(
+            pontos,
+            ["ponto_entrada", "ponto_peca", "ponto_saida"],
+            "{m}"
+        );
+        let entra = t[1][0].as_f64().unwrap() as f32;
+        let sai = t[2][0].as_f64().unwrap() as f32;
+        for sufixo in ["", "_medio"] {
+            let g = Glb::ler(&format!("{m}{sufixo}.glb"));
+            let fechada = g.pose(Some("porta_abrir"), false)["porta"];
+            let aberta = g.pose(Some("porta_abrir"), true)["porta"];
+            for f in [0.0, entra, sai, 1.0] {
+                let p = g.no_em("ciclo_auto", f, "porta");
+                assert!(perto(p, aberta, 1e-3), "{m}{sufixo}: porta em {f}: {p:?}");
+            }
+            for f in [4.0 / 24.0, 20.0 / 24.0] {
+                let p = g.no_em("ciclo_auto", f, "porta");
+                assert!(perto(p, fechada, 1e-3), "{m}{sufixo}: porta em {f}: {p:?}");
+            }
+            // O ciclo roda inteiro com a porta fechada: os nós dele saem do começo e voltam
+            // ao fim do `ciclo` dentro desse trecho.
+            let ini = g.pose(Some("ciclo"), false);
+            let fim = g.pose(Some("ciclo"), true);
+            let a = g.pose_em("ciclo_auto", 4.0 / 24.0);
+            let b = g.pose_em("ciclo_auto", 20.0 / 24.0);
+            for no in cat[m]["clipes"]["ciclo"]["nos"].as_array().unwrap() {
+                let no = no.as_str().unwrap();
+                assert!(perto(a[no], ini[no], 1e-3), "{m}{sufixo}: {no} no começo");
+                assert!(perto(b[no], fim[no], 1e-3), "{m}{sufixo}: {no} no fim");
+            }
+        }
+    }
 }
 
 /// O robô quebrado fica com o braço caído, a garra bem abaixo do repouso.

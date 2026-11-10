@@ -58,6 +58,11 @@
 			}
 		},
 		{
+			"clicar": {
+				"controle": "Biblioteca_Grupo_movimento"
+			}
+		},
+		{
 			"arrastar": {
 				"de": {
 					"controle": "Biblioteca_Operator"
@@ -285,6 +290,11 @@
 			}
 		},
 		{
+			"clicar": {
+				"controle": "Biblioteca_Grupo_fluxo"
+			}
+		},
+		{
 			"arrastar": {
 				"de": {
 					"controle": "Biblioteca_Queue"
@@ -295,6 +305,11 @@
 						0.0
 					]
 				}
+			}
+		},
+		{
+			"clicar": {
+				"controle": "Biblioteca_Grupo_movimento"
 			}
 		},
 		{
