@@ -138,6 +138,8 @@ var _team_mesh: ImmediateMesh
 var _links: Array = []
 var _links_of: Object
 var _alt := false
+## The hand shows over the rotate handle of the selected object.
+var _hand := false
 ## The editor in Rust (`UtsimEditor`) and what it was last fed.
 var ed: Object
 var _zone_mesh: ArrayMesh
@@ -246,6 +248,10 @@ func sync(objects: Array, connections: Array) -> void:
 
 
 func set_tool(name: String, id := "") -> void:
+	# A turn of the rotate handle cut short (Esc, a tool key) still ends its undo step.
+	if ed != null and ed.is_turning():
+		doc().end_drag()
+	_rotate_cursor(false)
 	tool = name
 	place_id = id if name == "colocar" else ""
 	team_from = ""
@@ -328,6 +334,7 @@ func snap_point(p: Vector3) -> Vector3:
 	return Vector3(roundf(p.x / step) * step, 0, roundf(p.z / step) * step)
 
 
+## The box around block `i` on the floor (axis-aligned, around its turned footprint).
 func _box_of(i: int) -> AABB:
 	var b: Dictionary = cena().blocks[i]
 	var root: Node3D = cena().rigs[i]["root"]
@@ -338,7 +345,13 @@ func _box_of(i: int) -> AABB:
 	if b.get("skeletal", false):
 		h = 1.8
 	var p := root.global_position
-	return AABB(Vector3(p.x - hx, 0.0, p.z - hz), Vector3(2.0 * hx, h, 2.0 * hz))
+	# The footprint is in the object's own frame: the box around it once turned.
+	var yaw := 0.0 if bool(b.get("mobile", false)) else root.rotation.y
+	var c := absf(cos(yaw))
+	var sn := absf(sin(yaw))
+	var ex := c * hx + sn * hz
+	var ez := sn * hx + c * hz
+	return AABB(Vector3(p.x - ex, 0.0, p.z - ez), Vector3(2.0 * ex, h, 2.0 * ez))
 
 
 ## Names of the blocks under screen point `p`, nearest first.
@@ -432,6 +445,7 @@ func _feed() -> void:
 		var b: Dictionary = c.blocks[i]
 		blocks.append({"name": String(b["name"]), "kind": String(b.get("kind", "")),
 			"pos": (c.rigs[i]["root"] as Node3D).global_position, "size": b["size"],
+			"yaw": 0.0 if bool(b.get("mobile", false)) else (c.rigs[i]["root"] as Node3D).rotation.y,
 			"skeletal": bool(b.get("skeletal", false)), "problems": problems.has(b["name"])})
 	ed.set_scene(blocks, _connections, team_lines(), PackedStringArray(hidden))
 	_feed_zones()
@@ -539,6 +553,24 @@ func _apply(effects: Array) -> void:
 			"mover_fim":
 				doc().end_drag()
 				main.after_edit()
+			"girar_inicio":
+				doc().begin_rotate()
+			"girar":
+				# The rotate handle: the document takes the new `visual.yaw` (one undo step
+				# per turn) and the block's root turns at once (the scene is rebuilt at the end).
+				var name := String(e["name"])
+				var deg := float(e["degrees"])
+				if doc().rotate_drag(name, deg):
+					var i := cena().block_index(name)
+					if i >= 0:
+						(cena().rigs[i]["root"] as Node3D).rotation.y = deg_to_rad(deg)
+					ed.set_yaw(name, deg_to_rad(deg))
+					main.on_dragging()
+				else:
+					main.set_status("Não girou: %s" % doc().last_error())
+			"girar_fim":
+				doc().end_drag()
+				main.after_edit()
 			"colocar":
 				_place_at(String(e["id"]), e["at"], bool(e["keep"]))
 			"zona_nova":
@@ -627,6 +659,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		mouse = mm.position
 		_feed()
 		ed.hover(mm.position)
+		ed.set_shift(mm.shift_pressed)
+		_rotate_cursor(bool(ed.over_rotate_handle()))
 		_pull()
 		if tool == "rede":
 			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
@@ -752,6 +786,32 @@ func nudge(dx: int, dy: int) -> void:
 		main.after_edit()
 
 
+## R / Shift+R / Ctrl+R: turns every fixed object selected by `degrees` (counter-clockwise
+## seen from above), each about its centre, in one undo step.
+func rotate_selection(degrees: int) -> void:
+	if selected.is_empty():
+		main.set_status("Nada selecionado para girar.")
+		return
+	var n: int = doc().rotate_by(selection(), float(degrees))
+	if n == 0:
+		main.set_status("Não girou: %s" % doc().last_error())
+		return
+	main.after_edit()
+	var said := "%d°" % degrees
+	if n == 1:
+		main.set_status("Girado %s (Ctrl+Z desfaz)." % said)
+	else:
+		main.set_status("%d objetos girados %s, cada um em volta do próprio centro (Ctrl+Z desfaz)." % [n, said])
+
+
+## The pointing hand over the rotate handle (and while turning it), the arrow elsewhere.
+func _rotate_cursor(on: bool) -> void:
+	if on == _hand:
+		return
+	_hand = on
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if on else Input.CURSOR_ARROW)
+
+
 func delete_selected() -> void:
 	if tool == "rede" and rede.delete_selected():
 		return
@@ -809,10 +869,14 @@ func _process(_dt: float) -> void:
 			l.visible = false
 		if _ghost != null:
 			_ghost.visible = false
+		_rotate_cursor(false)
 		return
 	_lines.visible = true
 	_rust_lines.visible = true
 	_zone_fill.visible = true
+	# The hand only over the 3D view (the panels have their own cursors).
+	if _hand and main.over_ui(mouse) and not bool(ed.is_turning()):
+		_rotate_cursor(false)
 	if _ghost != null:
 		var at = floor_at(mouse)
 		_ghost.visible = at != null and not main.over_ui(mouse)

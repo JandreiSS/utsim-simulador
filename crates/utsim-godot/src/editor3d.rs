@@ -255,20 +255,33 @@ pub struct Block {
     pub kind: String,
     /// Where it is drawn (its root, on the floor).
     pub pos: V3,
-    /// Its size (x, height, z).
+    /// Its size (x, height, z) in its own frame.
     pub size: V3,
+    /// How its root is turned about `+Y` (radians, counter-clockwise seen from above): the
+    /// box, the nodes and the edges of the lines turn with it.
+    pub yaw: f64,
     /// Drawn as a person (the pick box is a person's height).
     pub skeletal: bool,
     /// Has problems (red corners).
     pub problems: bool,
 }
 
+/// `v` (a floor vector) turned by `yaw` about `+Y`: `x' = x cos + z sin`,
+/// `z' = -x sin + z cos` (Godot's `Basis(UP, yaw)`).
+pub fn turn(v: V3, yaw: f64) -> V3 {
+    if yaw == 0.0 {
+        return v;
+    }
+    let (s, c) = yaw.sin_cos();
+    [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
+}
+
 impl Block {
-    /// The box it is picked by: its footprint (at least 0.8 m) and its height (at least
-    /// 0.5 m; a person's 1.8 m).
+    /// The box it is picked by, in its own frame (centred on [`Block::pos`], before its
+    /// turn): its footprint (at least 0.8 m) and its height (at least 0.5 m; a person's
+    /// 1.8 m).
     pub fn pick_box(&self) -> (V3, V3) {
-        let hx = (self.size[0] * 0.5).max(0.4) + 0.05;
-        let hz = (self.size[2] * 0.5).max(0.4) + 0.05;
+        let (hx, hz) = self.pick_half();
         let h = if self.skeletal {
             1.8
         } else {
@@ -278,42 +291,116 @@ impl Block {
         ([p[0] - hx, 0.0, p[2] - hz], [p[0] + hx, h, p[2] + hz])
     }
 
+    fn pick_half(&self) -> (f64, f64) {
+        (
+            (self.size[0] * 0.5).max(0.4) + 0.05,
+            (self.size[2] * 0.5).max(0.4) + 0.05,
+        )
+    }
+
     fn centre(&self) -> V3 {
         let (lo, hi) = self.pick_box();
         lerp(lo, hi, 0.5)
+    }
+
+    /// The world point of `local`, a point of the block's own frame (from its root).
+    pub fn world(&self, local: V3) -> V3 {
+        add(self.pos, turn(local, self.yaw))
+    }
+
+    /// A world vector in the block's own frame.
+    pub fn local(&self, v: V3) -> V3 {
+        turn(v, -self.yaw)
+    }
+
+    /// The ray `o + t d` hits the turned pick box: where (`t`), `None` when it misses.
+    pub fn hit(&self, o: V3, d: V3) -> Option<f64> {
+        let (lo, hi) = self.pick_box();
+        let ol = add(self.pos, self.local(sub(o, self.pos)));
+        ray_box(ol, self.local(d), lo, hi)
+    }
+
+    /// A node on the side `sign` (+1 the output side, -1 the input side) of its own `x`,
+    /// `gap` metres out.
+    fn side_point(&self, sign: f64, gap: f64) -> V3 {
+        let (hx, _) = self.pick_half();
+        self.world([sign * (hx + gap), 0.06, 0.0])
     }
 
     pub fn port_out(&self) -> Option<V3> {
         if NO_OUTPUT.contains(&self.kind.as_str()) {
             return None;
         }
-        let (lo, hi) = self.pick_box();
-        Some([hi[0] + 0.25, 0.06, (lo[2] + hi[2]) / 2.0])
+        Some(self.side_point(1.0, 0.25))
     }
 
     pub fn port_in(&self) -> Option<V3> {
         if NO_INPUT.contains(&self.kind.as_str()) {
             return None;
         }
-        let (lo, hi) = self.pick_box();
-        Some([lo[0] - 0.25, 0.06, (lo[2] + hi[2]) / 2.0])
+        Some(self.side_point(-1.0, 0.25))
     }
 
     pub fn port_service(&self) -> Option<V3> {
         if !SERVICE.contains(&self.kind.as_str()) {
             return None;
         }
-        let (lo, hi) = self.pick_box();
-        Some([hi[0] + 0.3, 0.06, (lo[2] + hi[2]) / 2.0])
+        Some(self.side_point(1.0, 0.3))
+    }
+
+    /// Where the stub of a node meets the block (the middle of that side of the box).
+    pub fn node_edge(&self, side: Side) -> V3 {
+        self.side_point(if side == Side::In { -1.0 } else { 1.0 }, 0.0)
+    }
+
+    /// A fixed object, which turns (the mobiles and dispatchers do not: their
+    /// `visual.yaw` only turns the drawing).
+    pub fn turns(&self) -> bool {
+        !SERVICE.contains(&self.kind.as_str())
+    }
+
+    /// Where the rotate handle is: behind the block (its own `-z` side), on the floor.
+    pub fn rotate_handle(&self) -> V3 {
+        let (_, hz) = self.pick_half();
+        self.world([0.0, 0.06, -(hz + ROTATE_GAP)])
     }
 
     /// Distance from the centre to the edge of the footprint along `dir` (floor).
     fn radius(&self, dir: V3) -> f64 {
+        let dir = self.local(dir);
         let hx = (self.size[0] * 0.5).max(0.3);
         let hz = (self.size[2] * 0.5).max(0.3);
         let kx = hx / dir[0].abs().max(1e-6);
         let kz = hz / dir[2].abs().max(1e-6);
         kx.min(kz) + 0.15
+    }
+}
+
+/// Metres between the back of a block and its rotate handle.
+pub const ROTATE_GAP: f64 = 0.7;
+
+/// The yaw (radians about `+Y`) of the floor direction from `a` to `b`.
+pub fn heading_of(a: V3, b: V3) -> f64 {
+    (-(b[2] - a[2])).atan2(b[0] - a[0])
+}
+
+/// `deg` snapped to steps of `step` degrees and brought to [0, 360).
+pub fn snap_degrees(deg: f64, step: f64) -> f64 {
+    let d = if step > 0.0 {
+        (deg / step).round() * step
+    } else {
+        deg
+    };
+    let d = ((d.rem_euclid(360.0)) * 1e6).round() / 1e6;
+    if d >= 360.0 { 0.0 } else { d + 0.0 }
+}
+
+/// Degrees as the status line says them: whole when they are, else with one decimal.
+pub fn show_degrees(deg: f64) -> String {
+    if (deg - deg.round()).abs() < 1e-6 {
+        format!("{}", deg.round() as i64)
+    } else {
+        format!("{deg:.1}").replace('.', ",")
     }
 }
 
@@ -436,6 +523,14 @@ pub enum Effect {
     MoveBegin(Vec<String>),
     Move(V3),
     MoveEnd,
+    /// The rotate handle: a turn of object `name` begins, goes on (its new `visual.yaw`,
+    /// degrees in [0, 360), already snapped), ends.
+    RotateBegin(String),
+    Rotate {
+        name: String,
+        degrees: f64,
+    },
+    RotateEnd,
     /// Remove the selected objects.
     Remove(Vec<String>),
     /// A new risk zone along these floor points (the Zona tool).
@@ -538,6 +633,17 @@ struct ZoneDrag {
     press: V2,
 }
 
+/// A turn of the rotate handle: the block, its centre, its yaw when grabbed, the heading
+/// from the centre to the grab point, and the degrees last sent.
+#[derive(Clone, Debug, PartialEq)]
+struct Turning {
+    name: String,
+    centre: V3,
+    start: f64,
+    grab: f64,
+    degrees: f64,
+}
+
 /// What a press began.
 #[derive(Clone, Debug, PartialEq)]
 enum PressKind {
@@ -550,6 +656,8 @@ enum PressKind {
     },
     LinkIn(String),
     Serve(String),
+    /// The rotate handle of the selected object.
+    Rotate(String),
     /// A line was picked: the release does nothing.
     Pick,
 }
@@ -623,6 +731,11 @@ pub struct Editor3d {
     /// The grid step points snap to (0: none) and whether the press is a double click.
     pub snap: f64,
     pub double: bool,
+    /// Shift is held (the rotate handle snaps to 90° instead of 15°).
+    pub shift: bool,
+    /// The rotate handle is under the mouse, and the turn under way.
+    pub hover_rotate: bool,
+    rotating: Option<Turning>,
 }
 
 impl Editor3d {
@@ -670,6 +783,13 @@ impl Editor3d {
     }
 
     /// Moves block `name` where it is drawn now (during a move).
+    /// Turns block `name` as it is drawn now (during a turn of the rotate handle).
+    pub fn set_yaw(&mut self, name: &str, yaw: f64) {
+        if let Some(&i) = self.index.get(name) {
+            self.blocks[i].yaw = yaw;
+        }
+    }
+
     pub fn set_position(&mut self, name: &str, pos: V3) {
         if let Some(&i) = self.index.get(name) {
             self.blocks[i].pos = pos;
@@ -684,6 +804,26 @@ impl Editor3d {
         self.block(name).map_or("", |b| b.kind.as_str())
     }
 
+    /// The object whose rotate handle shows: the only one selected, when it turns (a
+    /// fixed object) and the Selecionar tool is on.
+    pub fn rotate_target(&self) -> Option<&Block> {
+        if self.tool != "selecionar" || self.selected.len() != 1 {
+            return None;
+        }
+        self.block(&self.selected[0]).filter(|b| b.turns())
+    }
+
+    /// The rotate handle is near screen point `p`.
+    pub fn rotate_handle_at(&self, p: V2) -> bool {
+        self.rotate_target()
+            .is_some_and(|b| self.camera.near(b.rotate_handle(), p, PORT_PIXELS))
+    }
+
+    /// The turn under way: `(name, degrees)`.
+    pub fn turning(&self) -> Option<(&str, f64)> {
+        self.rotating.as_ref().map(|t| (t.name.as_str(), t.degrees))
+    }
+
     // ----- picking ----------------------------------------------------------------------
 
     /// Blocks under screen point `p`, nearest first; a block small on screen is picked within
@@ -693,10 +833,7 @@ impl Editor3d {
         let mut found: Vec<(f64, &str)> = self
             .blocks
             .iter()
-            .filter_map(|b| {
-                let (lo, hi) = b.pick_box();
-                ray_box(o, d, lo, hi).map(|t| (t, b.name.as_str()))
-            })
+            .filter_map(|b| b.hit(o, d).map(|t| (t, b.name.as_str())))
             .collect();
         found.sort_by(|a, b| a.0.total_cmp(&b.0));
         if found.is_empty() {
@@ -756,7 +893,8 @@ impl Editor3d {
     }
 
     /// The connection lines as drawn: from node to node when the destination is ahead of the
-    /// origin, else edge to edge.
+    /// origin (along the output side of the origin's own frame, and into the input side of
+    /// the destination's), else edge to edge.
     pub fn segments(&self) -> Vec<Segment> {
         let mut out = Vec::new();
         for c in &self.conns {
@@ -777,7 +915,8 @@ impl Editor3d {
             }
             let (mut sa, mut sb) = (add(a, scale(dir, ra)), sub(b, scale(dir, rb)));
             if let (Some(po), Some(pi)) = (fa.port_out(), fb.port_in())
-                && pi[0] - po[0] > 0.4
+                && fa.local(sub(pi, po))[0] > 0.4
+                && fb.local(sub(pi, po))[0] > 0.4
             {
                 let d2 = norm(sub(pi, po));
                 sa = add(po, scale(d2, 0.13));
@@ -1059,6 +1198,7 @@ impl Editor3d {
         self.serve_from.clear();
         self.press = None;
         self.dragging = false;
+        self.rotating = None;
         self.boxing = None;
     }
 
@@ -1074,6 +1214,7 @@ impl Editor3d {
             .cloned()
             .or_else(|| self.hover_node.as_ref().map(|n| n.0.clone()))
             .unwrap_or_default();
+        self.hover_rotate = self.rotate_handle_at(p);
     }
 
     pub fn press(&mut self, p: V2, shift: bool) -> Vec<Effect> {
@@ -1104,6 +1245,30 @@ impl Editor3d {
             kind,
             moved: false,
         };
+        if self.rotate_handle_at(p)
+            && let Some(b) = self.rotate_target()
+        {
+            let (name, centre, start) = (b.name.clone(), b.pos, b.yaw);
+            let grab = self
+                .camera
+                .floor_at(p)
+                .map_or(start + std::f64::consts::FRAC_PI_2, |f| {
+                    heading_of(centre, f)
+                });
+            self.rotating = Some(Turning {
+                name: name.clone(),
+                centre,
+                start,
+                grab,
+                degrees: snap_degrees(start.to_degrees(), 0.0),
+            });
+            self.press = Some(begin(PressKind::Rotate(name.clone())));
+            out.push(Effect::RotateBegin(name));
+            out.push(Effect::Status(
+                "Girar: arraste em volta do objeto (passos de 15°; com Shift, 90°).".into(),
+            ));
+            return out;
+        }
         if self.connect_from.is_empty() {
             if let Some(res) = self.node_of(p, Side::Service, "") {
                 out.push(Effect::Status(format!(
@@ -1256,6 +1421,21 @@ impl Editor3d {
                 let start = press.pos;
                 self.boxing = Some((start, p));
             }
+            PressKind::Rotate(_) => {
+                press.moved = true;
+                let step = if self.shift { 90.0 } else { 15.0 };
+                if let (Some(t), Some(f)) = (self.rotating.as_mut(), self.camera.floor_at(p)) {
+                    let yaw = t.start + heading_of(t.centre, f) - t.grab;
+                    let deg = snap_degrees(yaw.to_degrees(), step);
+                    if deg != t.degrees {
+                        t.degrees = deg;
+                        out.push(Effect::Rotate {
+                            name: t.name.clone(),
+                            degrees: deg,
+                        });
+                    }
+                }
+            }
             PressKind::Pick => {}
         }
         out
@@ -1342,6 +1522,19 @@ impl Editor3d {
                     return out;
                 }
                 self.finish_serve(p, &res, press.shift, &mut out);
+            }
+            PressKind::Rotate(name) => {
+                let Some(t) = self.rotating.take() else {
+                    return out;
+                };
+                out.push(Effect::RotateEnd);
+                out.push(Effect::Status(if press.moved {
+                    format!("{name} girado para {}°.", show_degrees(t.degrees))
+                } else {
+                    format!(
+                        "{name}: arraste a alça em volta do objeto para girá-lo (R gira 90°, Ctrl+R 15°)."
+                    )
+                }));
             }
             PressKind::Pick => {}
             PressKind::Block(name) => {
@@ -1439,11 +1632,15 @@ impl Editor3d {
         for b in &self.blocks {
             let (lo, hi) = b.pick_box();
             if let Some(k) = self.selected.iter().position(|n| *n == b.name) {
-                o.corners
-                    .push((lo, hi, if k == 0 { Mark::Primary } else { Mark::Other }));
+                o.corners.push((
+                    lo,
+                    hi,
+                    if k == 0 { Mark::Primary } else { Mark::Other },
+                    b.yaw,
+                ));
             }
             if b.problems {
-                o.corners.push((lo, hi, Mark::Problem));
+                o.corners.push((lo, hi, Mark::Problem, b.yaw));
             }
             for side in [Side::Out, Side::In, Side::Service] {
                 if let Some(w) = self.node_pos(&b.name, side) {
@@ -1453,15 +1650,24 @@ impl Editor3d {
                             Side::In => self.connect_to == b.name,
                             Side::Service => self.serve_from == b.name,
                         };
-                    let edge = if side == Side::In { lo[0] } else { hi[0] };
                     o.nodes.push(NodeMark {
                         at: w,
                         side,
                         lit,
-                        edge,
+                        edge: b.node_edge(side),
                     });
                 }
             }
+        }
+        if let Some(b) = self.rotate_target() {
+            let (lo, _) = b.pick_box();
+            let active = self.rotating.is_some();
+            o.rotate = Some(RotateMark {
+                at: b.rotate_handle(),
+                anchor: b.world([0.0, 0.06, lo[2] - b.pos[2]]),
+                lit: active || self.hover_rotate,
+                active,
+            });
         }
         o.remove = self.remove_point();
         if let Some(press) = &self.press
@@ -2232,15 +2438,27 @@ pub struct NodeMark {
     pub at: V3,
     pub side: Side,
     pub lit: bool,
-    /// The x of the block's side the node sticks out of.
-    pub edge: f64,
+    /// Where the node's stub meets the block's side.
+    pub edge: V3,
+}
+
+/// The rotate handle of the object selected: where it is, the point of the block's back
+/// edge its stub starts at, lit (under the mouse or turning) and turning.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RotateMark {
+    pub at: V3,
+    pub anchor: V3,
+    pub lit: bool,
+    pub active: bool,
 }
 
 /// What the overlay draws.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Overlay {
     pub nodes: Vec<NodeMark>,
-    pub corners: Vec<(V3, V3, Mark)>,
+    /// The footprint marks: the box in the block's own frame (see [`Block::pick_box`]), the
+    /// mark and the block's turn.
+    pub corners: Vec<(V3, V3, Mark, f64)>,
     pub remove: Option<V3>,
     pub preview: Option<(V3, V3, PreviewKind)>,
     pub boxing: Option<(V2, V2)>,
@@ -2248,6 +2466,7 @@ pub struct Overlay {
     /// point under the mouse last).
     pub zones: Vec<(ZoneView, bool)>,
     pub zone_drawing: Vec<V3>,
+    pub rotate: Option<RotateMark>,
 }
 
 #[cfg(test)]
@@ -2260,6 +2479,7 @@ mod tests {
             kind: kind.into(),
             pos: [x, 0.0, z],
             size: [1.0, 1.0, 1.0],
+            yaw: 0.0,
             skeletal: false,
             problems: false,
         }
@@ -2770,6 +2990,155 @@ mod tests {
         let n = pts.len() as f64;
         let c = pts.iter().fold([0.0; 3], |a, v| add(a, *v));
         screen(e, scale(c, 1.0 / n))
+    }
+
+    #[test]
+    fn a_turned_block_is_picked_in_its_box_and_its_nodes_turn_with_it() {
+        use std::f64::consts::FRAC_PI_2;
+        let mut e = editor();
+        // A long processor (4 x 1) turned a quarter: its length lies along Z.
+        let mut b = block("processo", "Processor", 8.0, 0.0);
+        b.size = [4.0, 1.0, 1.0];
+        b.yaw = FRAC_PI_2;
+        let mut blocks = e.blocks.clone();
+        let k = blocks.iter().position(|x| x.name == "processo").unwrap();
+        blocks[k] = b;
+        e.set_scene(blocks, e.conns.clone(), Vec::new());
+        // Its output is on its own +x, turned: layout -Z of the centre.
+        let b = e.block("processo").unwrap();
+        let out = b.port_out().unwrap();
+        assert!(
+            (out[0] - 8.0).abs() < 1e-9 && (out[2] + 2.3).abs() < 1e-9,
+            "{out:?}"
+        );
+        let inp = b.port_in().unwrap();
+        assert!((inp[2] - 2.3).abs() < 1e-9, "{inp:?}");
+        assert!((b.node_edge(Side::Out)[2] + 2.05).abs() < 1e-9);
+        // Picked 1.5 m along Z (inside the turned box), not 1.5 m along X (outside it).
+        assert_eq!(
+            e.hits_at(screen(&e, [8.0, 0.5, 1.5])),
+            vec!["processo".to_owned()]
+        );
+        assert!(
+            !e.hits_at(screen(&e, [9.5, 0.5, 0.0]))
+                .contains(&"processo".to_owned())
+        );
+        assert_eq!(
+            e.node_at(screen(&e, out)),
+            Some(("processo".into(), Side::Out))
+        );
+        // The radius along Z is the half length now.
+        assert!((b.radius([0.0, 0.0, 1.0]) - 2.15).abs() < 1e-9);
+        // The corners of the selection turn with it.
+        let p = e.block_screen("processo").unwrap();
+        click(&mut e, p, false);
+        let o = e.overlay();
+        assert!(
+            o.corners
+                .iter()
+                .any(|c| c.2 == Mark::Primary && c.3 == FRAC_PI_2)
+        );
+    }
+
+    #[test]
+    fn a_line_goes_node_to_node_only_when_ahead_in_the_turned_frames() {
+        use std::f64::consts::PI;
+        let mut e = editor();
+        let conns = vec![Conn {
+            from: "espera".into(),
+            to: "processo".into(),
+            port: 1,
+            logical: false,
+        }];
+        let blocks = e.blocks.clone();
+        e.set_scene(blocks.clone(), conns.clone(), Vec::new());
+        let nn = e.segments()[0].a;
+        let po = e.block("espera").unwrap().port_out().unwrap();
+        assert!(len(sub(nn, po)) < 0.2, "node to node: {nn:?}");
+        // The destination turned half round: its input faces away, edge to edge.
+        let mut turned = blocks.clone();
+        turned
+            .iter_mut()
+            .find(|b| b.name == "processo")
+            .unwrap()
+            .yaw = PI;
+        e.set_scene(turned, conns.clone(), Vec::new());
+        let a = e.segments()[0].a;
+        assert!(len(sub(a, nn)) > 0.2, "edge to edge: {a:?}");
+        // The origin turned half round: its output faces away, edge to edge too.
+        let mut turned = blocks;
+        turned.iter_mut().find(|b| b.name == "espera").unwrap().yaw = PI;
+        e.set_scene(turned, conns, Vec::new());
+        let po = e.block("espera").unwrap().port_out().unwrap();
+        assert!(po[0] < 4.0);
+        assert!(len(sub(e.segments()[0].a, po)) > 0.2);
+    }
+
+    #[test]
+    fn the_rotate_handle_turns_the_selected_fixed_object_in_snapped_steps() {
+        let mut e = editor();
+        // Nothing selected, a mobile selected, two selected: no handle.
+        assert!(e.overlay().rotate.is_none());
+        e.selected = vec!["operador".into()];
+        assert!(e.overlay().rotate.is_none());
+        e.selected = vec!["processo".into(), "espera".into()];
+        assert!(e.overlay().rotate.is_none());
+        e.selected = vec!["processo".into()];
+        let b = e.block("processo").unwrap().clone();
+        let h = b.rotate_handle();
+        // Behind the block (its -z side), on the floor.
+        assert!((h[0] - 8.0).abs() < 1e-9 && h[2] < -0.5);
+        assert!(e.overlay().rotate.is_some());
+        let at = screen(&e, h);
+        e.hover(at);
+        assert!(e.hover_rotate && e.overlay().rotate.unwrap().lit);
+        // Dragged a quarter turn counter-clockwise (from behind to the right, seen from
+        // above: -Z to +X is clockwise; to -X is counter-clockwise).
+        let target = screen(&e, [8.0 - 3.0, 0.0, 0.1]);
+        let out = drag(&mut e, at, target);
+        assert!(out.contains(&Effect::RotateBegin("processo".into())));
+        assert!(out.contains(&Effect::RotateEnd));
+        let last = out
+            .iter()
+            .rev()
+            .find_map(|x| match x {
+                Effect::Rotate { degrees, .. } => Some(*degrees),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(last, 90.0, "{out:?}");
+        assert!(
+            out.iter()
+                .filter_map(|x| match x {
+                    Effect::Rotate { degrees, .. } => Some(*degrees),
+                    _ => None,
+                })
+                .all(|d| d % 15.0 == 0.0),
+            "snapped to 15°"
+        );
+        assert!(out.contains(&Effect::Status("processo girado para 90°.".into())));
+        assert!(e.turning().is_none());
+        // Shift: steps of 90°; a small turn stays at the start.
+        e.shift = true;
+        let b = screen(&e, [8.0 - 0.6, 0.0, -1.2]);
+        let out = drag(&mut e, at, b);
+        assert!(!out.iter().any(|x| matches!(x, Effect::Rotate { .. })));
+        // Pressing the block itself still moves it.
+        e.shift = false;
+        let (a, b) = (
+            e.block_screen("processo").unwrap(),
+            screen(&e, [9.0, 0.0, 1.0]),
+        );
+        let out = drag(&mut e, a, b);
+        assert!(out.contains(&Effect::MoveEnd));
+        assert_eq!(snap_degrees(-7.0, 15.0), 0.0);
+        assert_eq!(snap_degrees(-8.0, 15.0), 345.0);
+        assert_eq!(snap_degrees(420.0, 90.0), 90.0);
+        assert_eq!(snap_degrees(400.0, 90.0), 0.0);
+        assert_eq!(show_degrees(37.5), "37,5");
+        assert!(
+            (heading_of([0.0; 3], [0.0, 0.0, -1.0]) - std::f64::consts::FRAC_PI_2).abs() < 1e-12
+        );
     }
 
     #[test]

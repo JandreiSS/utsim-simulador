@@ -18,7 +18,8 @@ pub struct KeyContext {
 /// Actions: `desfazer`, `refazer`, `salvar`, `salvar_como`, `abrir`, `novo`,
 /// `organizar:<copiar|recortar|colar|duplicar>`, `selecionar_tudo`, `atalhos`,
 /// `desempenho`, `modo:alternar`, `enquadrar`, `reproduzir`, `excluir`, `cancelar`,
-/// `mover:<dx>:<dy>`, `ferramenta:<nome>` (the tool, or `selecionar` when it is already
+/// `mover:<dx>:<dy>`, `girar:<graus>` (the selection, counter-clockwise seen from above),
+/// `ferramenta:<nome>` (the tool, or `selecionar` when it is already
 /// on), `zona_fechar`, `corredor_fechar` and `grade`.
 pub fn key_action(keycode: i64, ctrl: bool, shift: bool, ctx: &KeyContext) -> Option<String> {
     let key = crate::egui_input::key_of(keycode)?;
@@ -28,6 +29,8 @@ pub fn key_action(keycode: i64, ctrl: bool, shift: bool, ctx: &KeyContext) -> Op
             Key::Z if ctx.editing && shift => s("refazer"),
             Key::Z if ctx.editing => s("desfazer"),
             Key::Y if ctx.editing => s("refazer"),
+            Key::R if ctx.editing && shift => s("girar:-15"),
+            Key::R if ctx.editing => s("girar:15"),
             Key::S if shift => s("salvar_como"),
             Key::S => s("salvar"),
             Key::O => s("abrir"),
@@ -72,6 +75,8 @@ pub fn key_action(keycode: i64, ctrl: bool, shift: bool, ctx: &KeyContext) -> Op
         Key::Enter if ctx.tool == "zona" => s("zona_fechar"),
         Key::Enter if ctx.tool == "corredor" => s("corredor_fechar"),
         Key::G => s("grade"),
+        Key::R if shift => s("girar:-90"),
+        Key::R => s("girar:90"),
         _ => None,
     }
 }
@@ -112,6 +117,20 @@ mod tests {
             Some("organizar:duplicar")
         );
         assert_eq!(act('Q' as i64, true, false, &e), None);
+    }
+
+    #[test]
+    fn r_turns_the_selection_a_quarter_and_ctrl_r_a_step_of_15_degrees() {
+        let sel = ctx(true, "selecionar");
+        let r = 'R' as i64;
+        assert_eq!(act(r, false, false, &sel).as_deref(), Some("girar:90"));
+        assert_eq!(act(r, false, true, &sel).as_deref(), Some("girar:-90"));
+        assert_eq!(act(r, true, false, &sel).as_deref(), Some("girar:15"));
+        assert_eq!(act(r, true, true, &sel).as_deref(), Some("girar:-15"));
+        // Simulating, R and Ctrl+R are nothing.
+        let sim = ctx(false, "selecionar");
+        assert_eq!(act(r, false, false, &sim), None);
+        assert_eq!(act(r, true, false, &sim), None);
     }
 
     #[test]

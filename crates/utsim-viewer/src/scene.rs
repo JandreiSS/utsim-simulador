@@ -42,6 +42,8 @@ pub struct BlockMaterials {
     offsets: Vec<f32>,
     /// Realistic look of each block, when drawn with one.
     looks: Vec<Option<Look>>,
+    /// How each simple shape is turned (`visual.yaw` of a fixed object; a change rebuilds).
+    turns: Vec<f32>,
 }
 
 #[derive(Resource)]
@@ -92,7 +94,8 @@ fn block_mesh(shape: Shape, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
     }
 }
 
-/// Spawns the visual of one block at `translation` (its base plus half its height).
+/// Spawns the visual of one block at `translation` (its base plus half its height), turned
+/// by `turn` about the vertical (a fixed object's `visual.yaw`; a belt follows its `geom.yaw`).
 fn spawn_block(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -100,6 +103,7 @@ fn spawn_block(
     geom: &Geom,
     material: Handle<StandardMaterial>,
     translation: Vec3,
+    turn: f32,
 ) -> Entity {
     let steel = materials.add(StandardMaterial {
         base_color: Color::srgb(0.27, 0.29, 0.34),
@@ -161,7 +165,8 @@ fn spawn_block(
             let lane = p.item_size() * 0.4;
             let id = commands
                 .spawn((
-                    Transform::from_translation(translation),
+                    Transform::from_translation(translation)
+                        .with_rotation(Quat::from_rotation_y(turn)),
                     Visibility::default(),
                     BlockVisual,
                 ))
@@ -196,7 +201,7 @@ fn spawn_block(
                     MeshMaterial3d(material),
                     Transform {
                         translation,
-                        rotation: block_rotation(shape),
+                        rotation: Quat::from_rotation_y(turn) * block_rotation(shape),
                         scale: Vec3::ONE,
                     },
                     BlockVisual,
@@ -266,6 +271,38 @@ pub fn sync_blocks(
         Vec::new()
     };
     let wanted = |i: usize| looks.get(i).cloned().flatten();
+    // How each simple shape is turned: a fixed object's `visual.yaw` (a belt already
+    // follows its `geom.yaw`, the mobiles their heading).
+    let turns: Vec<f32> = match editor.mode {
+        Mode::Edit => {
+            let model = editor.doc.model();
+            (0..geoms.len())
+                .map(|i| {
+                    let kind = editor.view.kinds.get(i).copied().unwrap_or("");
+                    if kind == "Transporter" || geoms[i].shape == Shape::Belt {
+                        return 0.0;
+                    }
+                    model
+                        .objects
+                        .iter()
+                        .find(|o| Some(&o.name) == editor.view.names.get(i))
+                        .and_then(|o| o.visual.as_ref())
+                        .and_then(|v| v.yaw)
+                        .filter(|y| y.is_finite())
+                        .map_or(0.0, |y| (y as f32).to_radians())
+                })
+                .collect()
+        }
+        Mode::Sim => (0..geoms.len())
+            .map(|i| {
+                if geoms[i].shape == Shape::Belt {
+                    0.0
+                } else {
+                    data.turn(i)
+                }
+            })
+            .collect(),
+    };
     let rebuild = *last_mode != Some(editor.mode)
         || (editor.mode == Mode::Sim && data.is_changed())
         || visual.is_changed()
@@ -275,6 +312,7 @@ pub fn sync_blocks(
             .map(String::as_str)
             .ne(kinds.iter().copied())
         || mats.geoms.as_slice() != geoms
+        || mats.turns != turns
         || (0..geoms.len()).any(|i| mats.looks.get(i).cloned().flatten() != wanted(i));
     if rebuild {
         *last_mode = Some(editor.mode);
@@ -290,6 +328,7 @@ pub fn sync_blocks(
         mats.looks.clear();
         mats.kinds = kinds.iter().map(|k| k.to_string()).collect();
         mats.geoms = geoms.to_vec();
+        mats.turns = turns.clone();
         for (i, geom) in geoms.iter().enumerate() {
             let material = materials.add(StandardMaterial {
                 base_color: color(style::state_color(None)),
@@ -327,6 +366,7 @@ pub fn sync_blocks(
                         geom,
                         material,
                         base + Vec3::Y * geom.half[1],
+                        turns[i],
                     )
                 }
             };

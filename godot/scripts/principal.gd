@@ -579,6 +579,8 @@ func _run_step(p: Dictionary) -> bool:
 			editor.cancel()
 		"mover":
 			editor.nudge(int(p["n"]), int(p["n2"]))
+		"girar":
+			editor.rotate_selection(int(p["n"]))
 		"fechar_zona":
 			editor.zone_finish()
 		"fechar_corredor":
