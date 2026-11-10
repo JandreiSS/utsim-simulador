@@ -1,7 +1,8 @@
 //! Os elementos 3D gerados no Blender (`assets/modelos3d`, scripts em `tools/blender`):
 //! cada `.glb` bate com o `catalogo.json`, tem os pontos e os clipes que a interface usa,
 //! os clipes duram 1 s e movem o que devem (a garra do robô chega à peça, a porta abre,
-//! o garfo sobe), e os arquivos são leves.
+//! o garfo sobe), e os arquivos são leves. As pessoas (`pessoa_homem`, `pessoa_mulher`) têm
+//! o esqueleto do boneco UAL1, o corpo com os materiais que o 3D recolore e um nó por EPI.
 //!
 //! O teste não roda o Blender: ele confere os arquivos versionados. Para gerar de novo,
 //! `bash scripts/blender.sh`.
@@ -177,7 +178,7 @@ fn o_catalogo_e_os_arquivos_batem() {
         arquivos, listados,
         "arquivos .glb fora do catálogo (ou faltando)"
     );
-    for (chave, item) in &cat {
+    for (chave, item) in cat.iter().filter(|(k, _)| !k.starts_with("pessoa_")) {
         let g = Glb::ler(item["arquivo"].as_str().unwrap());
         let elemento = chave.trim_end_matches("_medio");
         assert_eq!(g.raiz(), elemento);
@@ -255,7 +256,9 @@ fn os_arquivos_sao_leves() {
             .len();
         total += tam;
         let tri = item["triangulos"].as_u64().unwrap();
-        let (lim_kb, lim_tri) = if chave.ends_with("_medio") {
+        let (lim_kb, lim_tri) = if chave.starts_with("pessoa_") {
+            (400, 7000)
+        } else if chave.ends_with("_medio") {
             (160, 4000)
         } else {
             (64, 1500)
@@ -264,7 +267,7 @@ fn os_arquivos_sao_leves() {
         assert!(tri <= lim_tri, "{chave}: {tri} triângulos");
     }
     assert!(
-        total <= 2 * 1024 * 1024,
+        total <= 5 * 512 * 1024,
         "assets/modelos3d tem {total} bytes"
     );
 }
@@ -396,7 +399,11 @@ const CONTRATO: &[Contrato] = &[
 #[test]
 fn cada_elemento_tem_os_nos_pontos_e_clipes_do_contrato() {
     let cat = catalogo();
-    let elementos: BTreeSet<&str> = cat.keys().map(|k| k.trim_end_matches("_medio")).collect();
+    let elementos: BTreeSet<&str> = cat
+        .keys()
+        .filter(|k| !k.starts_with("pessoa_"))
+        .map(|k| k.trim_end_matches("_medio"))
+        .collect();
     let contrato: BTreeSet<&str> = CONTRATO.iter().map(|c| c.0).collect();
     assert_eq!(elementos, contrato);
     for &(nome, nos, pontos, clipes) in CONTRATO {
@@ -534,5 +541,124 @@ fn os_clipes_movem_o_que_devem() {
                 assert!(perto(*p, b[n], 2e-3), "{m}/{c}: {n} salta na volta");
             }
         }
+    }
+}
+
+/// Os EPIs que o modelo conhece (`utsim_model::quality::PPE_NAMES`): um nó `epi_<nome>` cada.
+const EPIS: &[&str] = &[
+    "capacete",
+    "oculos",
+    "protetor_auricular",
+    "luvas",
+    "botina",
+    "colete",
+    "mascara",
+    "avental",
+];
+
+#[test]
+fn as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1() {
+    let cat = catalogo();
+    let ual = {
+        let p = dir().join("../terceiros/quaternius_ual/UAL1_Standard.glb");
+        let g = gltf::Gltf::open(p).expect("UAL1");
+        let skin = g.document.skins().next().expect("esqueleto do UAL1");
+        skin.joints()
+            .map(|j| (j.name().unwrap().to_string(), j.transform().decomposed()))
+            .collect::<BTreeMap<_, _>>()
+    };
+    for sexo in ["homem", "mulher"] {
+        let chave = format!("pessoa_{sexo}");
+        let item = &cat[&chave];
+        let g = Glb::ler(item["arquivo"].as_str().unwrap());
+        assert_eq!(g.raiz(), chave);
+        // Malhas: o corpo e um nó por EPI, todas presas ao mesmo esqueleto.
+        let malhas: BTreeSet<String> = g
+            .doc
+            .nodes()
+            .filter(|n| n.mesh().is_some())
+            .map(|n| {
+                assert!(n.skin().is_some(), "{chave}: {:?} sem esqueleto", n.name());
+                n.name().unwrap().to_string()
+            })
+            .collect();
+        let mut esperadas: BTreeSet<String> = EPIS.iter().map(|e| format!("epi_{e}")).collect();
+        esperadas.insert("corpo".into());
+        assert_eq!(malhas, esperadas, "{chave}: malhas");
+        let nos: BTreeSet<String> = item["nos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(nos, esperadas, "{chave}: nós do catálogo");
+        let lista: Vec<&str> = item["dados"]["epis"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(
+            lista.iter().copied().collect::<BTreeSet<_>>(),
+            EPIS.iter().copied().collect()
+        );
+        // Mesmos ossos e mesma pose de repouso do UAL1: as animações dele servem.
+        let skin = g.doc.skins().next().expect("esqueleto");
+        let ossos: BTreeMap<String, _> = skin
+            .joints()
+            .map(|j| (j.name().unwrap().to_string(), j.transform().decomposed()))
+            .collect();
+        assert_eq!(
+            ossos.keys().collect::<Vec<_>>(),
+            ual.keys().collect::<Vec<_>>(),
+            "{chave}: ossos"
+        );
+        for (nome, (t, q, _)) in &ossos {
+            let (t0, q0, _) = ual[nome];
+            assert!(
+                (0..3).all(|k| (t[k] - t0[k]).abs() < 1e-4)
+                    && (0..4).all(|k| (q[k] - q0[k]).abs() < 1e-4),
+                "{chave}: osso {nome} fora da pose do UAL1"
+            );
+        }
+        assert_eq!(
+            g.doc.animations().count(),
+            0,
+            "{chave}: sem animações próprias"
+        );
+        // Todo vértice pesado (soma 1) e o corpo com os materiais que o 3D recolore.
+        for malha in g.doc.meshes() {
+            for prim in malha.primitives() {
+                let r = prim.reader(|_| Some(&g.blob));
+                let pesos = r.read_weights(0).expect("pesos").into_f32();
+                for w in pesos {
+                    let s: f32 = w.iter().sum();
+                    assert!(
+                        (s - 1.0).abs() < 0.01,
+                        "{chave}/{:?}: peso {s}",
+                        malha.name()
+                    );
+                }
+            }
+        }
+        let corpo = g.doc.meshes().find(|m| m.name() == Some("corpo")).unwrap();
+        let mats: BTreeSet<&str> = corpo
+            .primitives()
+            .filter_map(|p| p.material().name())
+            .collect();
+        for m in item["dados"]["recolorir"].as_array().unwrap() {
+            assert!(
+                mats.contains(m.as_str().unwrap()),
+                "{chave}: falta o material {m}"
+            );
+        }
+        // Em pé no piso, com a altura do esqueleto.
+        let alt = item["tamanho"][2].as_f64().unwrap();
+        let base = item["dados"]["altura_base"].as_f64().unwrap();
+        assert!((alt - base).abs() < 0.03, "{chave}: altura {alt}");
+        assert!(
+            item["minimo"][2].as_f64().unwrap().abs() < 0.01,
+            "{chave}: fora do piso"
+        );
     }
 }
