@@ -1,6 +1,8 @@
 """Máquinas: torno CNC, prensa e injetora.
 
 Lado de trabalho em `-y` (porta e painel), como a `maquina` do `utsim-assets`.
+`ponto_porta` é por onde o operador chega, 0,6 m além de `ponto_operador`: ao entrar, ele
+anda da porta até o posto enquanto a porta da máquina abre.
 Clipes: `ciclo` (laço, processando), `porta_abrir` (0 fechada, 1 aberta), `setup`
 (laço, preparando) e `quebra` (0 normal, 1 tampa de manutenção aberta).
 """
@@ -74,7 +76,7 @@ def cnc(detalhe=0):
     _torre_luz(e, 0.75, 0.45, 1.95)
     # Pontos.
     e.ponto("ponto_operador", (-0.15, -1.20, 0.0), 90)
-    e.ponto("ponto_porta", (-0.15, -0.85, 0.0), 90)
+    e.ponto("ponto_porta", (-0.15, -1.80, 0.0), 90)
     e.ponto("ponto_peca", (-0.30, -0.45, 1.10), 0)
     e.ponto("ponto_entrada", (-1.30, -0.95, 0.90), 0)
     e.ponto("ponto_saida", (1.30, -0.95, 0.90), 0)
@@ -135,7 +137,7 @@ def prensa(detalhe=0):
         e.caixa("porta", "aco_escuro", (x - 0.008, -0.53, 1.00), (x + 0.008, -0.51, 1.40))
     _torre_luz(e, 0.45, 0.45, 2.55)
     e.ponto("ponto_operador", (0.0, -1.00, 0.0), 90)
-    e.ponto("ponto_porta", (0.0, -0.75, 0.0), 90)
+    e.ponto("ponto_porta", (0.0, -1.60, 0.0), 90)
     e.ponto("ponto_peca", (0.0, -0.10, 1.06), 0)
     e.ponto("ponto_entrada", (-1.0, -0.40, 0.95), 0)
     e.ponto("ponto_saida", (1.0, -0.40, 0.95), 0)
@@ -192,7 +194,7 @@ def injetora(detalhe=0):
     e.caixa("porta", "vidro", (-1.48, -0.585, 1.02), (-0.12, -0.575, 1.78))
     _torre_luz(e, -1.80, 0.40, 0.95)
     e.ponto("ponto_operador", (-0.80, -1.05, 0.0), 90)
-    e.ponto("ponto_porta", (-0.80, -0.75, 0.0), 90)
+    e.ponto("ponto_porta", (-0.80, -1.65, 0.0), 90)
     e.ponto("ponto_peca", (-0.15, 0.0, 1.35), 0)
     e.ponto("ponto_entrada", (2.30, 0.0, 1.0), 180)
     e.ponto("ponto_saida", (-0.20, -0.85, 0.90), -90)
