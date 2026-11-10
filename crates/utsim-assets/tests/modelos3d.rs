@@ -99,6 +99,14 @@ impl Glb {
         self.pose_por(clipe, &|t: &[f32]| if fim { t.len() - 1 } else { 0 })
     }
 
+    /// Posição de um nó no instante `t` (s) do clipe; `t` tem de ser um quadro-chave dos
+    /// canais desse nó e dos pais dele (os outros canais ficam no começo).
+    fn no_em(&self, clipe: &str, t: f32, no: &str) -> [f32; 3] {
+        self.pose_por(Some(clipe), &|ts: &[f32]| {
+            ts.iter().position(|x| (x - t).abs() < 1e-3).unwrap_or(0)
+        })[no]
+    }
+
     /// Posição de cada nó no instante `t` (s) do clipe; `t` tem de ser um quadro-chave de
     /// todos os canais (os clipes do robô têm chave nas trocas de fase).
     fn pose_em(&self, clipe: &str, t: f32) -> HashMap<String, [f32; 3]> {
@@ -304,7 +312,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "prensa",
@@ -318,7 +326,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "injetora",
@@ -330,7 +338,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo", "porta_abrir", "setup", "quebra"],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
     (
         "posto",
@@ -588,6 +596,7 @@ fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
         ),
         ("leaving", "porta_abrir", Some(1.0), Some(0.0), false, sai),
         ("processing", "ciclo", Some(0.0), Some(1.0), true, None),
+        ("processing_auto", "ciclo_auto", Some(0.0), Some(1.0), false, None),
         ("setup", "setup", Some(0.0), Some(1.0), true, None),
         ("down", "quebra", Some(0.0), Some(1.0), false, None),
         (
@@ -664,7 +673,7 @@ fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
     // chão (0,10 m do curso do garfo).
     let cat = catalogo();
     for m in ["cnc", "prensa", "injetora"] {
-        assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 7, "{m}");
+        assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 8, "{m}");
     }
     let celula: BTreeSet<&str> = cat["celula"]["estados"]
         .as_object()
@@ -690,6 +699,7 @@ fn a_peca_segue_pontos_do_elemento_em_cada_estado() {
         "down",
         "waiting_repair",
         "maintenance",
+        "processing_auto",
         "blocked",
         "loading",
         "travel_loaded",
@@ -744,6 +754,46 @@ fn a_peca_segue_pontos_do_elemento_em_cada_estado() {
         let b = g.pose_em("ciclo", solta)["ponto_garra"];
         assert!(perto(a, rep["ponto_entrada"], 0.01), "pega em {a:?}");
         assert!(perto(b, rep["ponto_saida"], 0.01), "solta em {b:?}");
+    }
+}
+
+/// A máquina sem operador (`processing_auto`, clipe `ciclo_auto`): a porta está toda aberta
+/// quando a peça entra e quando sai, e fechada enquanto o `ciclo` roda dentro dela.
+#[test]
+fn a_maquina_automatica_abre_a_porta_para_a_peca() {
+    let cat = catalogo();
+    for m in ["cnc", "prensa", "injetora"] {
+        let e = &cat[m]["estados"]["processing_auto"];
+        assert_eq!(e["clipe"], "ciclo_auto", "{m}");
+        let t = cat[m]["peca"]["processing_auto"].as_array().unwrap().clone();
+        let pontos: Vec<&str> = t.iter().map(|x| x[2].as_str().unwrap()).collect();
+        assert_eq!(pontos, ["ponto_entrada", "ponto_peca", "ponto_saida"], "{m}");
+        let entra = t[1][0].as_f64().unwrap() as f32;
+        let sai = t[2][0].as_f64().unwrap() as f32;
+        for sufixo in ["", "_medio"] {
+            let g = Glb::ler(&format!("{m}{sufixo}.glb"));
+            let fechada = g.pose(Some("porta_abrir"), false)["porta"];
+            let aberta = g.pose(Some("porta_abrir"), true)["porta"];
+            for f in [0.0, entra, sai, 1.0] {
+                let p = g.no_em("ciclo_auto", f, "porta");
+                assert!(perto(p, aberta, 1e-3), "{m}{sufixo}: porta em {f}: {p:?}");
+            }
+            for f in [4.0 / 24.0, 20.0 / 24.0] {
+                let p = g.no_em("ciclo_auto", f, "porta");
+                assert!(perto(p, fechada, 1e-3), "{m}{sufixo}: porta em {f}: {p:?}");
+            }
+            // O ciclo roda inteiro com a porta fechada: os nós dele saem do começo e voltam
+            // ao fim do `ciclo` dentro desse trecho.
+            let ini = g.pose(Some("ciclo"), false);
+            let fim = g.pose(Some("ciclo"), true);
+            let a = g.pose_em("ciclo_auto", 4.0 / 24.0);
+            let b = g.pose_em("ciclo_auto", 20.0 / 24.0);
+            for no in cat[m]["clipes"]["ciclo"]["nos"].as_array().unwrap() {
+                let no = no.as_str().unwrap();
+                assert!(perto(a[no], ini[no], 1e-3), "{m}{sufixo}: {no} no começo");
+                assert!(perto(b[no], fim[no], 1e-3), "{m}{sufixo}: {no} no fim");
+            }
+        }
     }
 }
 
