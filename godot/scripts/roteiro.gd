@@ -67,6 +67,7 @@
 ##    `{"porta_saida": "nome"}` / `{"porta_entrada": "nome"}` (a block's nodes),
 ##    `{"zona": "zona_1"}` (the middle of a risk zone), `{"vertice_zona": ["zona_1", 0]}`,
 ##    `{"remover_ligacao": true}` (the × of the selected connection or team line),
+##    `{"alca_giro": true}` (the rotate handle of the only object selected),
 ##    `{"no_atende": "operador_1"}` (the orange service node of a transporter or dispatcher),
 ##    `{"linha_equipe": ["operadores", "processo", "operador_1"]}` (the middle of a team line),
 ##    `{"no": "nome"}` (a node of the path network), `{"trecho": ["de", "para"]}` (the
@@ -581,6 +582,9 @@ func _target(t: Variant) -> Variant:
 	if d.has("vertice_zona"):
 		_main.editor._feed()
 		return _main.editor.ed.zone_vertex_screen(String(d["vertice_zona"][0]), int(d["vertice_zona"][1]))
+	if d.has("alca_giro"):
+		_main.editor._feed()
+		return _main.editor.ed.rotate_handle_screen()
 	if d.has("remover_ligacao"):
 		return _main.editor.remove_screen()
 	if d.has("ligacao"):
@@ -765,7 +769,8 @@ func _accept_dialog(path: String, k: int) -> void:
 ## `[bloco, "out"|"in"|"service"]`, or []), `linha_equipe` / `sem_linha_equipe`
 ## (`[tipo, de, para]`: a team line exists or not), `linha_equipe_selecionada`,
 ## `ativo` ({objeto, valor}: `visual.asset`, "" for the default look), `miniatura` (the
-## asset the miniature shows) and `foco` (name of the control with the keyboard focus).
+## asset the miniature shows), `foco` (name of the control with the keyboard focus) and
+## `giro` ({objeto, graus, tolerancia}: how the block is turned as drawn, its root).
 ##
 ## G4: `corredores` ({total, pedestre, empilhadeira, misto, cruzamentos}), `faixas` ({continuas_maior_que, zebras_maior_que, setas_maior_que}: polygons of the floor marking in the scene), `corredor` ({nome, tipo, largura, mao_dupla, pontos, perfil}: an aisle of the document), `corredor_selecionado` (name), `desenhando` (points of the aisle being drawn), `obstaculos_visiveis`, `acesso` ({objeto, proprio, x, y, tolerancia}: the access point of an object, model plan), `destaque` (names outlined), `campo_painel` ({objeto, caminho, valor}: a field of the properties schema; `objeto` "run" for the model) and `movel_em` ({objeto, t, x, y, tolerancia}: where a mobile is drawn at time `t`, a range `[min, max]` for `x` and `y`).
 ##
@@ -997,6 +1002,13 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("y"):
 						report.call("y do acesso de %s" % a["object"], absf(-pt.z - float(want["y"])) <= tol, str(-pt.z))
 				report.call("acesso de %s" % want["objeto"], found, "")
+			"giro":
+				var i: int = _main.cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var drawn := fposmod(rad_to_deg((_main.cena.rigs[i]["root"] as Node3D).rotation.y), 360.0)
+					var diff := absf(fposmod(drawn - float(want["graus"]) + 180.0, 360.0) - 180.0)
+					report.call("giro de %s" % want["objeto"], diff <= float(want.get("tolerancia", 0.01)), "%.3f°" % drawn)
 			"campo_painel":
 				var value: Variant = "(sem o campo)"
 				for f in doc.properties(String(want["objeto"])).get("fields", []):

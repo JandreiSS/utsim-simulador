@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 
 use utsim_assets::{AreaSpec, ConveyorSpec, RackSpec, Spec, dims};
 use utsim_model::VisualDef;
+use utsim_scene::compose::turned;
 use utsim_scene::geometry::Geom;
 use utsim_scene::handling::{BEAM, BELT_THICKNESS, BELT_WIDTH, RACK_DEPTH};
 use utsim_scene::style::{self, Shape};
@@ -78,7 +79,8 @@ pub struct Look {
     pub source: Source,
     /// Uniform scale (`visual.scale`).
     pub scale: f32,
-    /// Extra rotation about the vertical, radians (`visual.yaw`, plus the belt heading).
+    /// Extra rotation about the vertical, radians (`visual.yaw`; a belt without it: its
+    /// heading).
     pub yaw: f32,
     /// Colour of the `pintura` material (`visual.color`), sRGB.
     pub color: Option<[f32; 3]>,
@@ -273,16 +275,19 @@ pub fn look_of(
         Source::Library(s) => Some(*s),
         _ => None,
     };
-    let belt_yaw = if geom.shape == Shape::Belt {
-        geom.yaw
-    } else {
-        0.0
+    // A belt points along its connection, or where `visual.yaw` turns it (then its
+    // heading is that, as the navigation and the scene see it, not the sum).
+    let has_yaw = visual.and_then(|v| v.yaw).is_some_and(f64::is_finite);
+    let belt = geom.shape == Shape::Belt;
+    let yaw = match (belt, has_yaw) {
+        (true, false) => geom.yaw,
+        _ => user_yaw,
     };
     Some(Look {
         carry: carry_of(spec.as_ref(), role),
         source,
         scale: user_scale,
-        yaw: belt_yaw + user_yaw,
+        yaw,
         color,
         offset: [0.0; 3],
         skeletal: false,
@@ -583,30 +588,41 @@ pub fn carried_center(
     Some([xz[0], y, xz[1]])
 }
 
-/// Where an operator works at a station whose footprint has half extents `half`: at
-/// the front (layout `+Z`, where the machine's door and panel are), facing it.
-pub fn station_front(base: [f32; 3], half: [f32; 3]) -> ([f32; 3], f32) {
-    ([base[0], base[1], base[2] + half[2] + 0.3], PI / 2.0)
+/// Where an operator works at a station whose footprint has half extents `half` (in its
+/// own frame) and that is turned by `turn` about the vertical: at the front (the local
+/// `+Z` side, where the machine's door and panel are), facing it.
+pub fn station_front(base: [f32; 3], half: [f32; 3], turn: f32) -> ([f32; 3], f32) {
+    let f = turned([0.0, 0.0, half[2] + 0.3], turn);
+    ([base[0] + f[0], base[1], base[2] + f[2]], PI / 2.0 + turn)
 }
 
 /// Keeps a mobile of radius `radius` out of a station (a machine drawn as a solid
 /// body): when its layout `position` falls inside the station's footprint (`center`,
-/// half extents `half`, grown by `radius`), it is moved back against its heading `yaw`
-/// to the edge. The trace parks vehicles at the station's network node, its centre.
+/// half extents `half` in its own frame, turned by `turn`, grown by `radius`), it is
+/// moved back against its heading `yaw` to the edge. The trace parks vehicles at the
+/// station's network node, its centre.
 pub fn keep_outside(
     position: [f32; 3],
     yaw: f32,
     center: [f32; 3],
     half: [f32; 3],
+    turn: f32,
     radius: f32,
 ) -> [f32; 3] {
     let (hx, hz) = (half[0] + radius, half[2] + radius);
-    let (dx, dz) = (position[0] - center[0], position[2] - center[2]);
+    // In the station's own frame.
+    let d = turned(
+        [position[0] - center[0], 0.0, position[2] - center[2]],
+        -turn,
+    );
+    let (dx, dz) = (d[0], d[2]);
     if dx.abs() >= hx || dz.abs() >= hz {
         return position;
     }
     // Backwards along the heading: -(cos, -sin) in layout space.
-    let (bx, bz) = (-yaw.cos(), yaw.sin());
+    let back = [-yaw.cos(), 0.0, yaw.sin()];
+    let b = turned(back, -turn);
+    let (bx, bz) = (b[0], b[2]);
     let exit = |d: f32, b: f32, h: f32| {
         if b.abs() < 1e-6 {
             f32::INFINITY
@@ -615,7 +631,11 @@ pub fn keep_outside(
         }
     };
     let t = exit(dx, bx, hx).min(exit(dz, bz, hz));
-    [position[0] + bx * t, position[1], position[2] + bz * t]
+    [
+        position[0] + back[0] * t,
+        position[1],
+        position[2] + back[2] * t,
+    ]
 }
 
 /// A queue drawn with the conveyor (`visual.asset: "esteira"`): its resting items ride
@@ -995,10 +1015,10 @@ mod tests {
         assert_eq!(FORK_REACH, dims::FORK_CENTER);
         let (rack, pos) = ([60.0, 0.0, 0.0], [60.0, 0.0, 0.0]);
         // At the window ends it is where the trace says.
-        let (p, y) = rack_approach(pos, 0.0, 0.0, rack, 1.8);
+        let (p, y) = rack_approach(pos, 0.0, 0.0, rack, 1.8, 0.0);
         assert_eq!((p, y), (pos, 0.0));
         // In the middle: in front of the cell, facing the rack (-Z), forks under the cell.
-        let (p, y) = rack_approach(pos, 0.0, 0.5, rack, 1.8);
+        let (p, y) = rack_approach(pos, 0.0, 0.5, rack, 1.8, 0.0);
         assert!((y - PI / 2.0).abs() < 1e-5);
         let fork = carried_center(
             Carry::Forks {
@@ -1017,7 +1037,7 @@ mod tests {
             "{fork:?}"
         );
         // Turns the short way round.
-        let (_, y) = rack_approach(pos, PI, 0.5, rack, 0.0);
+        let (_, y) = rack_approach(pos, PI, 0.5, rack, 0.0, 0.0);
         assert!((y - PI / 2.0).abs() < 1e-5, "{y}");
     }
 
@@ -1116,18 +1136,39 @@ mod tests {
     fn vehicles_stop_at_the_edge_of_a_station() {
         let (c, h) = ([60.0, 0.0, 0.0], [0.9, 0.5, 0.9]);
         // Arriving along +x at the centre: held 0.9 + 0.6 before it.
-        let p = keep_outside([60.0, 0.0, 0.0], 0.0, c, h, 0.6);
+        let p = keep_outside([60.0, 0.0, 0.0], 0.0, c, h, 0.0, 0.6);
         assert!((p[0] - 58.5).abs() < 1e-5 && p[2].abs() < 1e-6, "{p:?}");
         // Heading model +y (layout -Z): held on the +Z side.
-        let p = keep_outside([60.0, 0.0, 0.2], PI / 2.0, c, h, 0.6);
+        let p = keep_outside([60.0, 0.0, 0.2], PI / 2.0, c, h, 0.0, 0.6);
         assert!(
             (p[2] - 1.5).abs() < 1e-5 && (p[0] - 60.0).abs() < 1e-5,
             "{p:?}"
         );
         // Outside: unchanged.
         assert_eq!(
-            keep_outside([50.0, 0.0, 0.0], 0.0, c, h, 0.6),
+            keep_outside([50.0, 0.0, 0.0], 0.0, c, h, 0.0, 0.6),
             [50.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn a_turned_station_has_its_front_and_its_footprint_turned_too() {
+        // A long station (2 x 0.5 half extents) turned a quarter: its front (+Z of its own
+        // frame) is now layout +X, and the operator faces -X (heading pi).
+        let (c, h) = ([10.0, 0.0, 0.0], [2.0, 0.5, 0.5]);
+        let (p, y) = station_front(c, h, PI / 2.0);
+        assert!((p[0] - 10.8).abs() < 1e-5 && p[2].abs() < 1e-5, "{p:?}");
+        assert!((y - PI).abs() < 1e-5);
+        assert_eq!(station_front(c, h, 0.0).0, [10.0, 0.0, 0.8]);
+        // Unturned, a point 1.5 m along -Z is outside (0.5 + 0.6 < 1.5); turned a
+        // quarter, the long side lies along Z and holds it.
+        let at = [10.0, 0.0, -1.5];
+        assert_eq!(keep_outside(at, PI / 2.0, c, h, 0.0, 0.6), at);
+        let p = keep_outside(at, -PI / 2.0, c, h, PI / 2.0, 0.6);
+        // Heading -pi/2 is layout +Z: moved back along -Z to the turned edge, 2 + 0.6.
+        assert!(
+            (p[2] + 2.6).abs() < 1e-4 && (p[0] - 10.0).abs() < 1e-4,
+            "{p:?}"
         );
     }
 

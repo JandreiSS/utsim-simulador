@@ -24,6 +24,75 @@ use crate::schema::{self, Field, Value};
 /// Undo key of a drag (consecutive moves merge into one step).
 const DRAG_KEY: &str = "arrastar";
 
+/// Undo key of a turn of the rotate handle.
+const TURN_KEY: &str = "girar";
+
+/// `deg` brought to [0, 360), rounded to a millionth of a degree (so 90 + 270 is 0, not
+/// a hair under 360).
+pub fn normal_degrees(deg: f64) -> f64 {
+    let d = (deg.rem_euclid(360.0) * 1e6).round() / 1e6;
+    if d >= 360.0 { 0.0 } else { d + 0.0 }
+}
+
+/// The heading a belt is drawn with when it has no `visual.yaw`: towards the object its
+/// first outgoing connection reaches (degrees in [0, 360), counter-clockwise seen from
+/// above; 0 without a connection), as the scene and the navigation draw it. `None` for
+/// the other kinds.
+pub fn belt_heading(model: &Model, obj: &utsim_model::ObjectDef) -> Option<f64> {
+    if !matches!(obj.kind, ObjectKind::Conveyor { .. }) {
+        return None;
+    }
+    let to = model
+        .connections
+        .iter()
+        .find(|(f, _)| *f == obj.name)
+        .and_then(|(_, t)| model.objects.iter().find(|o| &o.name == t));
+    Some(to.map_or(0.0, |q| {
+        let (dx, dy) = (
+            q.position[0] - obj.position[0],
+            q.position[1] - obj.position[1],
+        );
+        if dx.abs() + dy.abs() > 1e-9 {
+            normal_degrees(dy.atan2(dx).to_degrees())
+        } else {
+            0.0
+        }
+    }))
+}
+
+/// The turn of `obj` as drawn (degrees in [0, 360)): its `visual.yaw`; unset, a belt's
+/// [`belt_heading`] and 0 for the others.
+pub fn yaw_of(model: &Model, obj: &utsim_model::ObjectDef) -> f64 {
+    match obj
+        .visual
+        .as_ref()
+        .and_then(|v| v.yaw)
+        .filter(|y| y.is_finite())
+    {
+        Some(y) => normal_degrees(y),
+        None => belt_heading(model, obj).unwrap_or(0.0),
+    }
+}
+
+/// The `visual` of `obj` turned to `degrees` (brought to [0, 360)). 0 clears `visual.yaw`
+/// (a belt keeps `Some(0.0)`: unset, it would follow its connection again), and no
+/// `visual` is left when nothing else of it is set (the file stays tidy).
+pub fn turned_visual(obj: &utsim_model::ObjectDef, degrees: f64) -> Option<VisualDef> {
+    let d = normal_degrees(degrees);
+    let belt = matches!(obj.kind, ObjectKind::Conveyor { .. });
+    let mut v: VisualDef = obj.visual.clone().unwrap_or_default();
+    v.yaw = (belt || d != 0.0).then_some(d);
+    (v != VisualDef::default()).then_some(v)
+}
+
+/// The command that turns `obj` to `degrees` ([`turned_visual`]).
+pub fn yaw_command(obj: &utsim_model::ObjectDef, degrees: f64) -> Command {
+    Command::SetVisual {
+        name: obj.name.clone(),
+        visual: turned_visual(obj, degrees),
+    }
+}
+
 /// Offset of the `n`-th paste (n >= 1) of the same clipboard: two metres right and two
 /// down per paste, so the copies do not land on top of each other (the Bevy editor's).
 pub fn paste_offset(n: u32) -> [f64; 3] {
@@ -452,6 +521,64 @@ impl Editor {
         )
     }
 
+    /// Starts turning `name` with the rotate handle (every [`Self::rotate_drag`] of the
+    /// turn is one undo step, until [`Self::end_drag`]).
+    pub fn begin_rotate(&mut self) {
+        self.doc.end_gesture();
+    }
+
+    /// The rotate handle turned `name` to `degrees` (its `visual.yaw`, brought to
+    /// [0, 360)); the calls of one turn merge into one undo step.
+    pub fn rotate_drag(&mut self, name: &str, degrees: f64) -> Result<(), String> {
+        let obj = self
+            .model()
+            .objects
+            .iter()
+            .find(|o| o.name == name)
+            .ok_or_else(|| format!("objeto '{name}' não existe"))?;
+        if is_mobile(&obj.kind) {
+            return Err(format!(
+                "{name} é um recurso móvel: ele vira para onde anda"
+            ));
+        }
+        if turned_visual(obj, degrees) == obj.visual {
+            return Ok(());
+        }
+        let command = yaw_command(obj, degrees);
+        self.doc.apply_coalescing(command, Some(TURN_KEY))
+    }
+
+    /// Turns every fixed object of `names` by `delta` degrees (counter-clockwise seen from
+    /// above), each about its own centre, in one undo step (R, Shift+R, Ctrl+R). The mobile
+    /// resources are left as they are; an error when none of `names` turns.
+    pub fn rotate_by(&mut self, names: &[String], delta: f64) -> Result<usize, String> {
+        self.doc.end_gesture();
+        let batch: Vec<Command> = names
+            .iter()
+            .filter_map(|n| self.model().objects.iter().find(|o| &o.name == n))
+            .filter(|o| !is_mobile(&o.kind))
+            .map(|o| yaw_command(o, yaw_of(self.model(), o) + delta))
+            .collect();
+        if batch.is_empty() {
+            return Err(if names.is_empty() {
+                "nada selecionado".into()
+            } else {
+                "recursos móveis não giram: eles viram para onde andam".into()
+            });
+        }
+        let n = batch.len();
+        self.apply(if n == 1 {
+            batch
+                .into_iter()
+                .next()
+                .unwrap_or(Command::Batch(Vec::new()))
+        } else {
+            Command::Batch(batch)
+        })?;
+        self.doc.end_gesture();
+        Ok(n)
+    }
+
     pub fn copy(&mut self, names: &[String]) -> usize {
         self.clipboard = Clipboard::copy(self.model(), names);
         self.pastes = 0;
@@ -874,7 +1001,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 34] = [
+pub const SHORTCUTS: [(&str, &str); 38] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -903,6 +1030,13 @@ pub const SHORTCUTS: [(&str, &str); 34] = [
         "coloca um objeto onde soltar",
     ),
     ("Setas", "move a seleção um passo da grade"),
+    ("R", "girar 90° (anti-horário visto de cima)"),
+    ("Shift + R", "girar −90° (horário)"),
+    ("Ctrl + R / Ctrl + Shift + R", "girar 15° / −15°"),
+    (
+        "Arrastar a alça de giro (roxa)",
+        "gira o objeto selecionado em passos de 15° (com Shift, 90°)",
+    ),
     ("Del", "exclui a seleção (ou a ligação selecionada)"),
     (
         "L",
@@ -1151,6 +1285,107 @@ mod tests {
         assert_eq!(e.outputs("chegada"), names(&["espera"]));
         e.disconnect("processo", "saida").unwrap();
         assert_eq!(e.outputs("processo"), names(&["saida_3", "saida_2"]));
+    }
+
+    fn yaw(e: &Editor, name: &str) -> Option<f64> {
+        let o = e.model().objects.iter().find(|o| o.name == name).unwrap();
+        o.visual.as_ref().and_then(|v| v.yaw)
+    }
+
+    #[test]
+    fn r_turns_every_fixed_object_selected_in_one_undo_step() {
+        let mut e = line();
+        e.add("Transporter", [0.0, 5.0, 0.0]).unwrap();
+        let mobile = e.model().objects.last().unwrap().name.clone();
+        let sel = names(&["espera", "processo", &mobile]);
+        assert_eq!(e.rotate_by(&sel, 90.0), Ok(2), "the mobile does not turn");
+        assert_eq!(
+            (yaw(&e, "espera"), yaw(&e, "processo")),
+            (Some(90.0), Some(90.0))
+        );
+        assert_eq!(yaw(&e, &mobile), None);
+        // Shift+R twice from 90: 0 clears the yaw (no visual left), then 270.
+        e.rotate_by(&sel, -90.0).unwrap();
+        assert_eq!(yaw(&e, "espera"), None);
+        let espera = e.model().objects.iter().find(|o| o.name == "espera");
+        assert!(espera.unwrap().visual.is_none(), "a tidy file");
+        e.rotate_by(&sel, -90.0).unwrap();
+        assert_eq!(yaw(&e, "processo"), Some(270.0));
+        // Each press is one step.
+        e.doc.undo();
+        assert_eq!((yaw(&e, "espera"), yaw(&e, "processo")), (None, None));
+        e.doc.undo();
+        assert_eq!(yaw(&e, "processo"), Some(90.0));
+        assert!(e.rotate_by(&names(&[&mobile]), 15.0).is_err());
+        assert!(e.rotate_by(&[], 15.0).is_err());
+        // Other looks are kept.
+        e.set_property("saida", "visual.scale", &Value::Float(2.0), &[])
+            .unwrap();
+        e.rotate_by(&names(&["saida"]), 15.0).unwrap();
+        let v = e.model().objects.iter().find(|o| o.name == "saida");
+        let v = v.unwrap().visual.clone().unwrap();
+        assert_eq!((v.scale, v.yaw), (Some(2.0), Some(15.0)));
+    }
+
+    #[test]
+    fn a_belt_turns_from_its_drawn_heading_and_keeps_0_degrees() {
+        let mut e = line();
+        // A belt below the wait, feeding it: drawn heading up the plan, 90°.
+        let belt = e.add("Conveyor", [3.0, -4.0, 0.0]).unwrap();
+        e.connect(&belt, "espera").unwrap();
+        let obj = |e: &Editor| {
+            e.model()
+                .objects
+                .iter()
+                .find(|o| o.name == belt)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(yaw_of(e.model(), &obj(&e)), 90.0);
+        let shown = e
+            .properties(&belt)
+            .fields
+            .into_iter()
+            .find(|f| f.path == "visual.yaw")
+            .unwrap();
+        assert_eq!(
+            shown.value,
+            Value::Float(90.0),
+            "the panel shows the drawn heading"
+        );
+        // R turns it from where it is drawn; a turn to 0 is kept as 0, not "follow".
+        e.rotate_by(&names(&[&belt]), 90.0).unwrap();
+        assert_eq!(yaw(&e, &belt), Some(180.0));
+        e.rotate_by(&names(&[&belt]), 180.0).unwrap();
+        assert_eq!(yaw(&e, &belt), Some(0.0));
+        e.set_property(&belt, "visual.yaw", &Value::Float(0.0), &[])
+            .unwrap();
+        assert_eq!(yaw(&e, &belt), Some(0.0));
+        e.doc.undo();
+        e.doc.undo();
+        assert_eq!(yaw(&e, &belt), Some(180.0));
+        e.doc.undo();
+        assert_eq!(yaw(&e, &belt), None);
+        // A belt without a connection is drawn along +x.
+        let lone = e.add("Conveyor", [20.0, 0.0, 0.0]).unwrap();
+        let o = e.model().objects.iter().find(|o| o.name == lone).unwrap();
+        assert_eq!(belt_heading(e.model(), o), Some(0.0));
+    }
+
+    #[test]
+    fn a_turn_of_the_handle_is_one_undo_step_in_0_to_360() {
+        let mut e = line();
+        e.begin_rotate();
+        for d in [15.0, 30.0, 45.0, -90.0, 450.0] {
+            e.rotate_drag("processo", d).unwrap();
+        }
+        e.end_drag();
+        assert_eq!(yaw(&e, "processo"), Some(90.0));
+        e.doc.undo();
+        assert_eq!(yaw(&e, "processo"), None);
+        assert_eq!(normal_degrees(-15.0), 345.0);
+        assert_eq!(normal_degrees(360.0 - 1e-9), 0.0);
+        assert!(e.rotate_drag("nada", 15.0).is_err());
     }
 
     #[test]

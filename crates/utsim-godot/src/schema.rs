@@ -978,6 +978,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             operators,
             also,
             changeover,
+            recipe,
         } => {
             out.push(
                 int(s, "capacity", "Capacidade", *capacity as u64)
@@ -1001,6 +1002,16 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .help("Preparação só quando o produto muda: o rótulo do produto e, se quiser, o tempo de cada troca (de, para); sem linha na matriz vale a preparação acima. Exemplo: (label: \"produto\", matrix: [(from: 1, to: 2, time: Const(30.0))]). None: preparação em toda peça."),
             );
             out.push(dist_field(s, "process", "Tempo de processamento", process));
+            out.push(
+                Field::new(
+                    s,
+                    "recipe",
+                    "Tempo por receita",
+                    FieldType::Ron,
+                    Value::Text(ron::option(recipe, ron::recipe)),
+                )
+                .help("Tempo de processamento que depende do item: o rótulo da receita e o tempo de cada valor; os itens sem receita na tabela usam o tempo acima. Exemplo: (label: \"produto\", times: [(value: 1, time: Const(90.0)), (value: 2, time: Const(120.0))]). None: o mesmo tempo para todos."),
+            );
             out.push(
                 group(s, "operators", "Operadores", operators.is_some())
                     .help("Quem opera esta máquina: marque e escolha abaixo, ou arraste do nó laranja do operador (ou da equipe) até a máquina. O processo espera um deles livre."),
@@ -1603,7 +1614,7 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
     if let Some(e) = v.asset.as_deref().and_then(catalogue::by_name) {
         asset.help = format!("{}, {}. {}", e.autor, e.licenca, e.uso);
     }
-    vec![
+    let mut out = vec![
         asset,
         Field::new(
             s,
@@ -1614,16 +1625,33 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
         )
         .optional(v.color.is_some()),
         float(s, "visual.scale", "Escala", v.scale.unwrap_or(1.0)).min(0.01),
-        float(s, "visual.yaw", "Giro", v.yaw.unwrap_or(0.0)).unit("graus"),
+    ];
+    // A fixed object turns in "Posição" (Rotação); a mobile resource faces where it goes,
+    // and this only turns its drawing.
+    if is_mobile(&obj.kind) {
+        out.push(
+            float(s, "visual.yaw", "Giro do desenho", v.yaw.unwrap_or(0.0))
+                .unit("graus")
+                .help("Corrige para onde o modelo 3D olha; o recurso vira para onde anda."),
+        );
+    }
+    out.push(
         Field::new(
             s,
             "visual.reset",
             "Restaurar padrão",
             FieldType::Action,
-            Value::Bool(obj.visual.is_some()),
+            Value::Bool(obj.visual.as_ref().is_some_and(|v| {
+                is_mobile(&obj.kind)
+                    || VisualDef {
+                        yaw: None,
+                        ..v.clone()
+                    } != VisualDef::default()
+            })),
         )
         .help("Volta à aparência padrão do tipo de objeto."),
-    ]
+    );
+    out
 }
 
 /// Every field of object `obj`, in panel order.
@@ -1656,6 +1684,20 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 obj.position[i],
             )
             .unit("m"),
+        );
+    }
+    // A fixed object turns about its centre (`visual.yaw`): its drawing, its ports and its
+    // area on the floor turn together (the editor's R and rotate handle set it too).
+    if !is_mobile(&obj.kind) {
+        out.push(
+            float(
+                S_POSITION,
+                "visual.yaw",
+                "Rotação",
+                crate::document::yaw_of(model, obj),
+            )
+            .unit("°")
+            .help("Giro em graus, anti-horário visto de cima (R gira 90°, Ctrl+R 15°)."),
         );
     }
     out.extend(serves_fields(model, obj));
@@ -1832,6 +1874,7 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
         (ObjectKind::Processor { changeover, .. }, "changeover") => {
             ron::option(changeover, ron::changeover)
         }
+        (ObjectKind::Processor { recipe, .. }, "recipe") => ron::option(recipe, ron::recipe),
         (ObjectKind::Transporter { speed, .. }, "speed") => ron::float(*speed),
         (ObjectKind::Transporter { acceleration, .. }, "acceleration") => {
             ron::option(acceleration, |v| ron::float(*v))
@@ -2168,7 +2211,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                 position,
             });
         }
-        "visual" => return edit_visual(obj, rest, value),
+        "visual" => return edit_visual(model, obj, rest, value),
         _ => {}
     }
     if let Some(command) = edit_movement(model, obj, head, rest, value) {
@@ -2463,7 +2506,12 @@ fn edit_output(
     Ok(set(&obj.name, "output", ron::output(&rule)))
 }
 
-fn edit_visual(obj: &ObjectDef, rest: &str, value: &Value) -> Result<Command, String> {
+fn edit_visual(
+    model: &Model,
+    obj: &ObjectDef,
+    rest: &str,
+    value: &Value,
+) -> Result<Command, String> {
     let mut v: VisualDef = obj.visual.clone().unwrap_or_default();
     match rest {
         "asset" => {
@@ -2497,14 +2545,38 @@ fn edit_visual(obj: &ObjectDef, rest: &str, value: &Value) -> Result<Command, St
         }
         "yaw" => {
             let y = f64_of(value, "giro")?;
+            if !y.is_finite() {
+                return Err("giro: um número de graus".into());
+            }
+            if !is_mobile(&obj.kind) {
+                // The rotation of a fixed object: in [0, 360), a belt keeps 0. Its drawn
+                // value typed back (a belt following its connection) changes nothing.
+                let unset = obj.visual.as_ref().and_then(|v| v.yaw).is_none();
+                if unset
+                    && crate::document::normal_degrees(y) == crate::document::yaw_of(model, obj)
+                {
+                    return Ok(Command::SetVisual {
+                        name: obj.name.clone(),
+                        visual: obj.visual.clone(),
+                    });
+                }
+                return Ok(crate::document::yaw_command(obj, y));
+            }
             v.yaw = (y != 0.0).then_some(y);
         }
-        "reset" => v = VisualDef::default(),
+        // The rotation of a fixed object is its place on the floor, not its look: kept.
+        "reset" => {
+            let keep = v.yaw.filter(|_| !is_mobile(&obj.kind));
+            v = VisualDef {
+                yaw: keep,
+                ..VisualDef::default()
+            };
+        }
         _ => return Err(format!("campo desconhecido: visual.{rest}")),
     }
     Ok(Command::SetVisual {
         name: obj.name.clone(),
-        visual: Some(v),
+        visual: (v != VisualDef::default()).then_some(v),
     })
 }
 
@@ -2952,6 +3024,24 @@ mod tests {
     }
 
     #[test]
+    fn processor_with_a_recipe() {
+        let mut d = doc();
+        assert_eq!(field(&d, "p", "recipe").value, Value::Text("None".into()));
+        let text = "(label: \"produto\", times: [(value: 1.0, time: Const(90.0))])";
+        apply(&mut d, "p", "recipe", Value::Text(text.into()));
+        let ObjectKind::Processor { recipe, .. } = &object(&d, "p").kind else {
+            unreachable!()
+        };
+        assert_eq!(recipe.as_ref().unwrap().times.len(), 1);
+        assert_eq!(field(&d, "p", "recipe").value, Value::Text(text.into()));
+        apply(&mut d, "p", "recipe", Value::Text("None".into()));
+        let ObjectKind::Processor { recipe, .. } = &object(&d, "p").kind else {
+            unreachable!()
+        };
+        assert!(recipe.is_none());
+    }
+
+    #[test]
     fn processor_with_another_team_at_the_same_time() {
         let mut d = doc();
         d.apply(Command::Add(Box::new(
@@ -3029,6 +3119,20 @@ mod tests {
         assert_eq!((v.scale, v.yaw), (Some(1.5), Some(90.0)));
         assert_eq!(field(&d, "p", "visual.reset").value, Value::Bool(true));
         apply(&mut d, "p", "visual.reset", Value::Null);
+        // The look goes back to the default; the rotation (its place on the floor) stays.
+        let kept = object(&d, "p").visual.clone().unwrap();
+        assert_eq!(
+            kept,
+            VisualDef {
+                yaw: Some(90.0),
+                ..VisualDef::default()
+            }
+        );
+        assert_eq!(field(&d, "p", "visual.reset").value, Value::Bool(false));
+        // Typed: brought to [0, 360); 0 clears it (and the whole `visual`).
+        apply(&mut d, "p", "visual.yaw", Value::Float(-90.0));
+        assert_eq!(object(&d, "p").visual.as_ref().unwrap().yaw, Some(270.0));
+        apply(&mut d, "p", "visual.yaw", Value::Float(720.0));
         assert!(object(&d, "p").visual.is_none());
         assert!(edit(d.model(), "p", "visual.color", &Value::Text("verde".into())).is_err());
         apply(&mut d, "p", "name", Value::Text("maquina".into()));
