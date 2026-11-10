@@ -33,8 +33,13 @@ na sua pasta de usuário, e nunca dentro dos projetos:
 - Windows: `%APPDATA%\UTSim\seis-sigma\config.json`;
 - Linux: `~/.config/utsim/seis-sigma/config.json`.
 
-Ali também ficam a lista de projetos recentes e o tema (sistema, claro ou escuro). "Trocar",
-na tela inicial, corrige o nome ou o e-mail.
+Ali também ficam a lista de projetos recentes, o tema (sistema, claro ou escuro) e o
+**idioma** da interface: português do Brasil, inglês ou espanhol. A troca vale na hora, e cada
+pessoa da equipe pode usar o seu idioma no mesmo projeto, porque o que se grava no diário são
+os dados, não os textos das telas. Os textos que a própria equipe escreve (títulos, descrições,
+atas) ficam como foram escritos. Por enquanto, números, datas e o símbolo da moeda seguem o
+formato brasileiro em todos os idiomas, e alguns textos gerados pelas análises e relatórios
+ainda saem em português. "Trocar", na tela inicial, corrige o nome ou o e-mail.
 
 Não há senha: sem servidor, não há como conferir quem é quem. Qualquer pessoa com acesso à
 pasta pode gravar no projeto em nome de outra. Para aprovações com valor de registro, o plano
@@ -1131,8 +1136,16 @@ compartilhamento das pastas, que o app não confere (não usa a API do Drive):
   e do MBB; banco de questões, gabaritos e notas nas pastas restritas da formação (veja
   Formação e certificação).
 
-Até a lista de papéis assinada (etapa P7), quem edita os arquivos à mão consegue gravar uma
-alteração, mas o app a ignora se o autor não tiver o perfil.
+Quem edita os arquivos à mão consegue gravar uma alteração, mas o app a ignora se o autor não
+tiver o perfil.
+
+**Assinatura da lista de papéis.** Abaixo da lista, o MBB vê **Assinar a lista**. A assinatura
+cobre todos os papéis do momento, com a pessoa, o perfil e a unidade. Depois dela, a tela
+mostra "Lista assinada por ... sem mudanças desde então" ou, se alguém incluiu ou retirou um
+papel, quais papéis estão fora da lista assinada, até um MBB assinar de novo. Assim um papel
+gravado à mão nos arquivos aparece. A primeira assinatura vale quando é do criador do
+programa, e as seguintes quando são de um MBB da lista assinada antes. Uma assinatura de
+outra pessoa aparece como inválida.
 
 ### Dados pessoais
 
@@ -1322,6 +1335,14 @@ nível":
 
 O botão "PDF" de cada certificação do registro grava o certificado em `certificacoes/`.
 
+**Certificados assinados.** Ao lado de cada certificação emitida aparece se ela está assinada
+pelo emissor. O emissor, no computador com a sua chave, vê **Assinar**. A assinatura cobre o
+número, a pessoa, o nível, as datas, os requisitos com as evidências e a observação: se algo
+mudar depois, a tela mostra que a assinatura é de outra versão. O PDF de um certificado
+assinado traz a linha da assinatura eletrônica, com o emissor, a data, o início da chave e o
+selo, e diz onde conferi-la. Como as demais assinaturas do app, ela revela alterações, mas não
+tem a validade jurídica de uma assinatura digital certificada.
+
 ### Pastas restritas da formação
 
 ```
@@ -1381,6 +1402,6 @@ Plackett-Burman, superfície de resposta e desejabilidade no DOE (no UTSim Estat
 as assinaturas da equipe: a chave de cada pessoa, a cadeia assinada do diário conferida na
 tela Equipe e ao abrir o projeto, as aprovações assinadas de tollgates e ganhos, e a visão
 "minhas ações" de toda a carteira. Ficam para depois o conflito por parágrafo nos textos
-longos, o acesso pela rede local com token, a lista de papéis do programa assinada pelo master
-black belt e os certificados assinados. Da gestão do projeto ficam para depois raias no quadro,
+longos e o acesso pela rede local com token. A P9 completou o programa com a lista de papéis
+assinada pelo master black belt e os certificados assinados pelo emissor. Da gestão do projeto ficam para depois raias no quadro,
 reuniões recorrentes e a capacidade dos belts em horas.
