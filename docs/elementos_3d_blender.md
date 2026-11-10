@@ -72,12 +72,12 @@ pular no tempo.
 |---|---|---|---|
 | cnc, prensa, injetora | `ciclo` | sim | processando |
 | | `setup` | sim | em setup |
-| | `porta_abrir` | não | operador entrando (0 → 1) e saindo (1 → 0) |
+| | `porta_abrir` | não | posto em `entering` (fase 0 → 1) e em `leaving` (1 → 0), da regra de operação do nó |
 | | `quebra` | não | quebrado (abre a tampa de manutenção) |
 | posto | `ciclo` | sim | processando |
 | robo | `pegar`, `levar`, `soltar` | não | carregar, transportar e descarregar a peça |
 | | `ciclo` | sim | os três seguidos, para um robô sempre ocupado |
-| celula | `porta_abrir` | não | pessoa entrando ou saindo da célula |
+| celula | `porta_abrir` | não | posto da célula em `entering` (0 → 1) e em `leaving` (1 → 0) |
 | esteira | `rolar` | sim | fase = distância / (2π · `raio_rolo`) |
 | empilhadeira | `garfo_subir` | não | altura do garfo / `garfo_curso` |
 | agv | `mesa_subir` | não | carregando ou descarregando |
