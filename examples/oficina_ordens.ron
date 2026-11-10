@@ -1,0 +1,106 @@
+// Oficina por ordens: modelo pronto da linha Manufatura discreta, montado com as predefinições
+// de linhas/manufatura/biblioteca.ron e as de inspeção, retrabalho e refugo do pacote Qualidade.
+//
+// Ordens de três produtos chegam em média a cada 12 minutos, com prazo entre 45 e 150 minutos.
+// Cada produto tem o seu roteiro: o produto 1 passa por serra e torno, o 2 por serra e fresa
+// e o 3 por torno e fresa; todos terminam na inspeção. A fila de entrada e o torno escolhem a
+// saída por script (produto 3 vai direto ao torno e, do torno, à fresa) e a serra pelo rótulo
+// produto. Três operadores, cada um com duas habilidades (serra e torno, serra e fresa, torno
+// e fresa): o torno exige quem sabe tornear e a fresa quem sabe fresar. O torno e a fresa geram
+// defeitos (campo quality do nó); a inspeção pega 90 % deles, a peça rejeitada vai para o
+// retrabalho e volta, e depois de duas passagens vai para o refugo.
+//
+// Experimentos: tirar a habilidade de fresa de um operador, mudar a mistura dos produtos ou a
+// probabilidade de defeito e ver o OEE, o refugo e as ordens no prazo.
+//
+// Resultado (5 replicações, média): cerca de 120 ordens por dia, atravessamento de 38 min
+// (28 no produto 1, 50 no produto 3), 97 % no prazo e 1,8 % de refugo; OEE da fresa perto de
+// 62 % e do torno perto de 59 %; o terceiro operador fica pouco ocupado (25 %), porque os
+// dois primeiros são chamados antes.
+//
+// Tempo em minutos. Rode com:
+//   utsim linha manufatura relatorio examples/oficina_ordens.ron --html relatorio.html
+//
+//   liberacao -> fila_entrada -> fila_serra -> serra -> fila_torno | fila_fresa
+//                             -> fila_torno -> torno -> fila_inspecao | fila_fresa
+//   fila_fresa -> fresa -> fila_inspecao -> inspecao -> expedicao | retrabalho | refugo
+//   retrabalho -> fila_inspecao
+Model(
+    name: "Oficina por ordens",
+    description: "Manufatura discreta: roteiro por produto, operadores com habilidades, inspeção com retrabalho e refugo",
+    line: "manufatura",
+    packs: ["qualidade", "seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 107, replications: 5),
+    objects: [
+        (name: "liberacao", kind: Source(interarrival: Exp(mean: 12.0),
+            labels: {"produto": Discrete([(1.0, 0.4), (2.0, 0.35), (3.0, 0.25)]), "prazo": Uniform(min: 45.0, max: 150.0)}),
+            position: (0.0, 0.0, 0.0), symbol: "inicio", preset: "manufatura/liberacao", department: "Oficina"),
+        (name: "fila_entrada", kind: Queue(), position: (3.0, 0.0, 0.0), symbol: "espera",
+            on_entry: Some("if label(item, \"vence\", -1.0) < 0.0 { item.vence = now + label(item, \"prazo\", 1.0e9); }"),
+            output: Script("if label(item, \"produto\", 0.0) == 3.0 { 2 } else { 1 }"),
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Oficina"),
+        (name: "fila_serra", kind: Queue(order: Some(Asc("vence"))), position: (6.0, 3.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Oficina"),
+        (name: "serra", kind: Processor(process: Triangular(min: 4.0, mode: 5.0, max: 7.0),
+            operators: Some(OperatorUse(team: "operadores"))), output: ByLabel("produto"),
+            ppe: ["oculos", "protetor_auricular"], position: (9.0, 3.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Oficina"),
+        (name: "fila_torno", kind: Queue(order: Some(Asc("vence"))), position: (9.0, -1.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Oficina"),
+        (name: "torno", kind: Processor(process: Triangular(min: 8.0, mode: 10.0, max: 14.0),
+            operators: Some(OperatorUse(team: "operadores", requires: Some("torno")))),
+            output: Script("if label(item, \"produto\", 0.0) == 3.0 { 2 } else { 1 }"),
+            quality: Some((defects: [(name: "rebarba", probability: 0.06)])),
+            ppe: ["oculos", "protetor_auricular"], position: (12.0, -1.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Oficina"),
+        (name: "fila_fresa", kind: Queue(order: Some(Asc("vence"))), position: (12.0, 3.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Oficina"),
+        (name: "fresa", kind: Processor(process: Triangular(min: 9.0, mode: 12.0, max: 16.0),
+            operators: Some(OperatorUse(team: "operadores", requires: Some("fresa")))),
+            quality: Some((defects: [(name: "risco", probability: 0.08)])),
+            downtime: Some((mtbf: Exp(mean: 1440.0), mttr: Exp(mean: 60.0))),
+            ppe: ["oculos", "protetor_auricular"], position: (15.0, 3.0, 0.0), symbol: "operacao",
+            visual: Some((asset: Some("maquina"))), preset: "manufatura/maquina", department: "Oficina"),
+        (name: "fila_inspecao", kind: Queue(), position: (15.0, -1.0, 0.0), symbol: "espera",
+            visual: Some((asset: Some("area"))), preset: "manufatura/fila_ordens", department: "Qualidade"),
+        (name: "inspecao", kind: Processor(process: Triangular(min: 2.0, mode: 3.0, max: 4.0)), output: ByLabel("inspecao"),
+            inspection: Some((every: 1, detect: 0.9, false_reject: 0.005, on_reject: Rework, max_rework: Some(2))),
+            position: (18.0, -1.0, 0.0), symbol: "inspecao", preset: "qualidade/estacao_inspecao", department: "Qualidade"),
+        (name: "retrabalho", kind: Processor(process: Exp(mean: 8.0)), rework: Some((fix: 0.5)),
+            ppe: ["luvas"], position: (18.0, -4.0, 0.0), symbol: "operacao", preset: "qualidade/retrabalho",
+            department: "Qualidade"),
+        (name: "expedicao", kind: Sink, position: (21.0, -1.0, 0.0), symbol: "fim", preset: "manufatura/expedicao",
+            department: "Expedição"),
+        (name: "refugo", kind: Sink, sink_role: Some(Scrap), position: (21.0, -4.0, 0.0), symbol: "fim",
+            preset: "qualidade/refugo", department: "Qualidade"),
+        (name: "operadores", kind: Dispatcher(team: ["operadores_1", "operadores_2", "operadores_3"], rule: FirstAvailable),
+            position: (12.0, 6.0, 0.0), preset: "manufatura/operadores", department: "Oficina"),
+        (name: "operadores_1", kind: Transporter(speed: 60.0), position: (9.0, 6.0, 0.0),
+            ppe: ["oculos", "protetor_auricular", "botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["serra", "torno"])), preset: "manufatura/operador", department: "Oficina"),
+        (name: "operadores_2", kind: Transporter(speed: 60.0), position: (12.0, 6.0, 0.0),
+            ppe: ["oculos", "protetor_auricular", "botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["serra", "fresa"])), preset: "manufatura/operador", department: "Oficina"),
+        (name: "operadores_3", kind: Transporter(speed: 60.0), position: (15.0, 6.0, 0.0),
+            ppe: ["oculos", "protetor_auricular", "botina"], visual: Some((asset: Some("pessoa"))),
+            person: Some((skills: ["torno", "fresa"])), preset: "manufatura/operador", department: "Oficina"),
+    ],
+    connections: [
+        ("liberacao", "fila_entrada"),
+        ("fila_entrada", "fila_serra"),
+        ("fila_entrada", "fila_torno"),
+        ("fila_serra", "serra"),
+        ("serra", "fila_torno"),
+        ("serra", "fila_fresa"),
+        ("fila_torno", "torno"),
+        ("torno", "fila_inspecao"),
+        ("torno", "fila_fresa"),
+        ("fila_fresa", "fresa"),
+        ("fresa", "fila_inspecao"),
+        ("fila_inspecao", "inspecao"),
+        ("inspecao", "expedicao"),
+        ("inspecao", "retrabalho"),
+        ("inspecao", "refugo"),
+        ("retrabalho", "fila_inspecao"),
+    ],
+)

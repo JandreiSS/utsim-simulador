@@ -56,6 +56,7 @@
 - [Serviços e atendimento](linhas/servicos/index.md)
 - [Logística e armazém](linhas/logistica/index.md)
 - [Saúde e hospital](linhas/saude/index.md)
+- [Manufatura discreta](linhas/manufatura/index.md)
 - [Pacotes transversais](linhas/pacotes-transversais.md)
 
 # Recursos avançados

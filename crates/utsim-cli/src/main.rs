@@ -465,7 +465,7 @@ enum Cmd {
         args: Vec<String>,
     },
     /// Linhas especializadas (Lean Office, Serviços e atendimento,
-    /// Logística e armazém, Saúde e hospital): predefinições,
+    /// Logística e armazém, Saúde e hospital, Manufatura discreta): predefinições,
     /// vocabulário, modelos prontos, indicadores e relatório da linha
     #[command(disable_help_flag = true)]
     Linha {
