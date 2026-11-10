@@ -75,14 +75,37 @@ pular no tempo.
 | | `porta_abrir` | não | posto em `entering` (fase 0 → 1) e em `leaving` (1 → 0), da regra de operação do nó |
 | | `quebra` | não | quebrado (abre a tampa de manutenção) |
 | posto | `ciclo` | sim | processando |
+| | `setup` | sim | em setup (o grampo abre todo e volta) |
 | robo | `pegar`, `levar`, `soltar` | não | carregar, transportar e descarregar a peça |
 | | `ciclo` | sim | os três seguidos, para um robô sempre ocupado |
+| | `setup` | sim | em setup (a base gira e os dedos abrem e fecham) |
+| | `quebra` | não | quebrado (o braço cai e fica parado) |
 | celula | `porta_abrir` | não | posto da célula em `entering` (0 → 1) e em `leaving` (1 → 0) |
 | esteira | `rolar` | sim | fase = distância / (2π · `raio_rolo`) |
 | empilhadeira | `garfo_subir` | não | altura do garfo / `garfo_curso` |
 | agv | `mesa_subir` | não | carregando ou descarregando |
 
 Parado, livre e bloqueado aparecem pela cor da `luz`, como hoje.
+
+### Tabela `estados`
+
+Cada item do `catalogo.json` tem a tabela `estados`, que liga o estado do posto na
+simulação ao clipe. A ponte lê a tabela e não precisa saber de cada elemento:
+
+| Estado | Clipe | `de` → `ate` | Laço | `operador` |
+|---|---|---|---|---|
+| `entering` | `porta_abrir` | 0 → 1 | não | `ponto_porta` → `ponto_operador` |
+| `leaving` | `porta_abrir` | 1 → 0 | não | `ponto_operador` → `ponto_porta` |
+| `processing` | `ciclo` | 0 → 1 | sim | |
+| `setup` | `setup` | 0 → 1 | sim | |
+| `down` | `quebra` | 0 → 1 | não | |
+| `waiting_repair`, `maintenance` | `quebra` | 1 → 1 | não | |
+
+A fase do clipe é `de + (ate - de) * fase`, com a fase do estado de 0 a 1. Num clipe em
+laço, uma volta cabe no estado: uma peça, um ciclo. Só entram os estados cujo clipe o
+elemento tem; a célula, por exemplo, só tem `entering` e `leaving`. O caminho
+`operador` só aparece quando o elemento tem os dois pontos. Sem ele, a ponte põe a pessoa
+de frente para a estação (`station_front`). Os pontos giram com a estação.
 
 ### Interações
 

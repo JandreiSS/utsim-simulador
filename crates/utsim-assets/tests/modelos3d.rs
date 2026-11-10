@@ -331,7 +331,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_entrada",
             "ponto_saida",
         ],
-        &["ciclo"],
+        &["ciclo", "setup"],
     ),
     (
         "robo",
@@ -350,7 +350,7 @@ const CONTRATO: &[Contrato] = &[
             "ponto_saida",
             "ponto_operador",
         ],
-        &["pegar", "levar", "soltar", "ciclo"],
+        &["pegar", "levar", "soltar", "ciclo", "setup", "quebra"],
     ),
     (
         "celula",
@@ -533,6 +533,8 @@ fn os_clipes_movem_o_que_devem() {
             ("cnc", "setup"),
             ("prensa", "setup"),
             ("injetora", "setup"),
+            ("posto", "setup"),
+            ("robo", "setup"),
         ] {
             let g = Glb::ler(&format!("{m}{sufixo}.glb"));
             let a = g.pose(Some(c), false);
@@ -541,6 +543,128 @@ fn os_clipes_movem_o_que_devem() {
                 assert!(perto(*p, b[n], 2e-3), "{m}/{c}: {n} salta na volta");
             }
         }
+    }
+}
+
+/// A tabela `estados` do catálogo: de estado do posto na simulação para o clipe que a ponte
+/// toca (com a fase de começo e de fim) e o caminho do operador ao entrar e ao sair.
+/// (estado, clipe, de, até, laço, caminho do operador).
+type Estado = (
+    &'static str,
+    &'static str,
+    f64,
+    f64,
+    bool,
+    Option<[&'static str; 2]>,
+);
+
+#[test]
+fn os_estados_do_posto_apontam_para_clipes_e_pontos_do_elemento() {
+    let tabela: &[Estado] = &[
+        (
+            "entering",
+            "porta_abrir",
+            0.0,
+            1.0,
+            false,
+            Some(["ponto_porta", "ponto_operador"]),
+        ),
+        (
+            "leaving",
+            "porta_abrir",
+            1.0,
+            0.0,
+            false,
+            Some(["ponto_operador", "ponto_porta"]),
+        ),
+        ("processing", "ciclo", 0.0, 1.0, true, None),
+        ("setup", "setup", 0.0, 1.0, true, None),
+        ("down", "quebra", 0.0, 1.0, false, None),
+        ("waiting_repair", "quebra", 1.0, 1.0, false, None),
+        ("maintenance", "quebra", 1.0, 1.0, false, None),
+    ];
+    let estados_validos: BTreeSet<&str> = tabela.iter().map(|t| t.0).collect();
+    for (chave, item) in catalogo() {
+        let clipes = item["clipes"].as_object().unwrap();
+        let pontos = item["pontos"].as_object().unwrap();
+        let estados = item["estados"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{chave}: sem a tabela estados"));
+        for (estado, e) in estados {
+            assert!(
+                estados_validos.contains(estado.as_str()),
+                "{chave}: estado {estado} desconhecido"
+            );
+            let clipe = e["clipe"].as_str().unwrap();
+            assert!(clipes.contains_key(clipe), "{chave}/{estado}: sem {clipe}");
+            assert_eq!(
+                e["laco"].as_bool(),
+                clipes[clipe]["laco"].as_bool(),
+                "{chave}/{estado}: laço"
+            );
+            if let Some(op) = e.get("operador") {
+                for p in op.as_array().unwrap() {
+                    assert!(
+                        pontos.contains_key(p.as_str().unwrap()),
+                        "{chave}/{estado}: sem {p}"
+                    );
+                }
+            }
+        }
+        // Todo estado da tabela cujo clipe o elemento tem está lá, com os números certos.
+        for &(estado, clipe, de, ate, laco, caminho) in tabela {
+            if !clipes.contains_key(clipe) {
+                assert!(estados.get(estado).is_none(), "{chave}: {estado} sem clipe");
+                continue;
+            }
+            let e = &estados[estado];
+            assert_eq!(e["clipe"], clipe, "{chave}/{estado}");
+            assert_eq!(e["de"].as_f64(), Some(de), "{chave}/{estado}: de");
+            assert_eq!(e["ate"].as_f64(), Some(ate), "{chave}/{estado}: até");
+            assert_eq!(e["laco"].as_bool(), Some(laco), "{chave}/{estado}: laço");
+            let tem_pontos = caminho.is_some_and(|c| c.iter().all(|p| pontos.contains_key(*p)));
+            if tem_pontos {
+                let c: Vec<&str> = e["operador"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("{chave}/{estado}: sem caminho"))
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect();
+                assert_eq!(c, caminho.unwrap().to_vec(), "{chave}/{estado}: caminho");
+            } else {
+                assert!(
+                    e.get("operador").is_none(),
+                    "{chave}/{estado}: caminho a mais"
+                );
+            }
+        }
+    }
+    // As máquinas fazem tudo; a célula só abre o portão.
+    let cat = catalogo();
+    for m in ["cnc", "prensa", "injetora"] {
+        assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 7, "{m}");
+    }
+    let celula: BTreeSet<&str> = cat["celula"]["estados"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+    assert_eq!(celula, BTreeSet::from(["entering", "leaving"]));
+}
+
+/// O robô quebrado fica com o braço caído, a garra bem abaixo do repouso.
+#[test]
+fn o_robo_quebrado_baixa_o_braco() {
+    for sufixo in ["", "_medio"] {
+        let g = Glb::ler(&format!("robo{sufixo}.glb"));
+        let rep = g.pose(None, false)["ponto_garra"];
+        let caiu = g.pose(Some("quebra"), true)["ponto_garra"];
+        assert!(
+            perto(g.pose(Some("quebra"), false)["ponto_garra"], rep, 1e-3),
+            "quebra começa no repouso"
+        );
+        assert!(caiu[2] < rep[2] - 0.3, "{sufixo}: {caiu:?} x {rep:?}");
     }
 }
 

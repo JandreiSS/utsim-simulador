@@ -48,6 +48,11 @@ def posto(detalhe=0):
         "grampo": [(0, "rotation_euler", 1, 0.0), (0.15, "rotation_euler", 1, math.radians(-70)),
                    (0.85, "rotation_euler", 1, math.radians(-70)), (1, "rotation_euler", 1, 0.0)],
     })
+    # Setup: o grampo abre todo para trocar o gabarito e volta.
+    e.clipe("setup", True, {
+        "grampo": [(0, "rotation_euler", 1, 0.0), (0.3, "rotation_euler", 1, math.radians(-120)),
+                   (0.7, "rotation_euler", 1, math.radians(-120)), (1, "rotation_euler", 1, 0.0)],
+    })
     return e
 
 
@@ -74,7 +79,9 @@ def robo(detalhe=0):
     (ombro, gira em y), `antebraco` (cotovelo), `garra` (punho), `dedo_e`, `dedo_d`.
     Pega em `ponto_entrada` (+y) e solta em `ponto_saida` (-y).
     Clipes: `pegar` (de repouso até a peça, fecha a garra), `levar` (sobe e gira até
-    a saída), `soltar` (desce, abre e volta ao repouso), `ciclo` (os três seguidos)."""
+    a saída), `soltar` (desce, abre e volta ao repouso), `ciclo` (os três seguidos),
+    `setup` (a base gira e os dedos abrem e fecham na troca de ferramenta) e `quebra`
+    (o braço cai e fica parado)."""
     e = Elemento("robo", detalhe)
     e.material("robo", 0xF08A00, 0.15, 0.45)
     e.no("pedestal")
@@ -138,6 +145,21 @@ def robo(detalhe=0):
     tudo = [(f / 3, p) for f, p in pegar] + [((1 + f) / 3, p) for f, p in levar[1:]] + [
         ((2 + f) / 3, p) for f, p in soltar[1:]]
     e.clipe("ciclo", True, chaves(tudo))
+    # Só os eixos que os outros clipes já usam (o exportador completa os outros eixos de
+    # um nó com o valor de outro clipe).
+    e.clipe("setup", True, {
+        "base": [(0, "rotation_euler", 2, 0.0), (0.4, "rotation_euler", 2, math.radians(-30)),
+                 (0.6, "rotation_euler", 2, math.radians(-30)), (1, "rotation_euler", 2, 0.0)],
+        "dedo_e": [(0, "location", 1, 0.0), (0.4, "location", 1, -aberto), (0.6, "location", 1, -aberto),
+                   (1, "location", 1, 0.0)],
+        "dedo_d": [(0, "location", 1, 0.0), (0.4, "location", 1, aberto), (0.6, "location", 1, aberto),
+                   (1, "location", 1, 0.0)],
+    })
+    e.clipe("quebra", False, {
+        "braco": [(0, "rotation_euler", 1, 0.0), (1, "rotation_euler", 1, math.radians(25))],
+        "antebraco": [(0, "rotation_euler", 1, 0.0), (1, "rotation_euler", 1, math.radians(40))],
+        "garra": [(0, "rotation_euler", 1, 0.0), (1, "rotation_euler", 1, math.radians(20))],
+    })
     return e
 
 
