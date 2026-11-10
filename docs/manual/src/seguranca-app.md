@@ -100,7 +100,7 @@ A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Q
 
 ## Abrir pelo UTSim
 
-No UTSim 3D, "Abrir no UTSim Segurança" nas abas do nó abre a tela Modelo com o nó escolhido, mesmo sem unidade aberta. O UTSim grava o que estiver pendente e entrega a edição. Se outra pessoa ou outro programa estiver editando, o modelo abre só para leitura, com o aviso de quem edita. Na linha de comando: `utsim-seguranca --utsim-abrir=<modelo.ron> --utsim-no=<nó>`. Arquivos de dados (CSV ou xlsx) também abrem, com `--utsim-ferramenta=<chave>`, como no UTSim Qualidade.
+No UTSim 3D, "Abrir no UTSim Segurança" nas abas do nó abre a tela Modelo com o nó escolhido, mesmo sem unidade aberta. O UTSim grava o que estiver pendente e entrega a edição. Se outra pessoa ou outro programa estiver editando, o modelo abre só para leitura, com o aviso de quem edita. Na linha de comando: `utsim-seguranca --utsim-abrir=<modelo.ron> --utsim-no=<nó>`. Arquivos de dados (CSV ou xlsx) também abrem, com `--utsim-ferramenta=<chave>`, como no UTSim Qualidade. Pedidos de outros apps (`--utsim-pedido=<arquivo>`) também são atendidos e respondidos ao fechar, como lá.
 
 ## Modelo (mão dupla com o UTSim)
 
