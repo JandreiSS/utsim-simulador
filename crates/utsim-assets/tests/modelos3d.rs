@@ -596,7 +596,14 @@ fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
         ),
         ("leaving", "porta_abrir", Some(1.0), Some(0.0), false, sai),
         ("processing", "ciclo", Some(0.0), Some(1.0), true, None),
-        ("processing_auto", "ciclo_auto", Some(0.0), Some(1.0), false, None),
+        (
+            "processing_auto",
+            "ciclo_auto",
+            Some(0.0),
+            Some(1.0),
+            false,
+            None,
+        ),
         ("setup", "setup", Some(0.0), Some(1.0), true, None),
         ("down", "quebra", Some(0.0), Some(1.0), false, None),
         (
@@ -765,9 +772,16 @@ fn a_maquina_automatica_abre_a_porta_para_a_peca() {
     for m in ["cnc", "prensa", "injetora"] {
         let e = &cat[m]["estados"]["processing_auto"];
         assert_eq!(e["clipe"], "ciclo_auto", "{m}");
-        let t = cat[m]["peca"]["processing_auto"].as_array().unwrap().clone();
+        let t = cat[m]["peca"]["processing_auto"]
+            .as_array()
+            .unwrap()
+            .clone();
         let pontos: Vec<&str> = t.iter().map(|x| x[2].as_str().unwrap()).collect();
-        assert_eq!(pontos, ["ponto_entrada", "ponto_peca", "ponto_saida"], "{m}");
+        assert_eq!(
+            pontos,
+            ["ponto_entrada", "ponto_peca", "ponto_saida"],
+            "{m}"
+        );
         let entra = t[1][0].as_f64().unwrap() as f32;
         let sai = t[2][0].as_f64().unwrap() as f32;
         for sufixo in ["", "_medio"] {

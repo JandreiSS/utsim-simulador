@@ -113,8 +113,10 @@ elemento tem; a célula, por exemplo, só tem `entering` e `leaving`. O caminho
 de frente para a estação (`station_front`). Os pontos giram com a estação.
 
 `processing_auto` não é um estado da simulação. É o `processing` de uma estação que
-ninguém opera, ou seja, sem `entering` antes, como uma máquina carregada por robô ou
-por esteira. Quando o elemento tem essa linha, a ponte a usa no lugar de `processing`.
+ninguém opera, como uma máquina carregada por robô ou por esteira. A ponte usa essa
+linha no lugar de `processing` quando o nó não pede operador (o `Processor` não tem
+`operators` nem `also`) e o elemento tem a linha. O critério é do modelo, não do trace,
+então vale igual em qualquer instante e para qualquer peça.
 A porta fica toda aberta até 2/24 da fase, fecha até 4/24, fica fechada enquanto o
 `ciclo` roda até 20/24 e abre de novo até 22/24.
 
