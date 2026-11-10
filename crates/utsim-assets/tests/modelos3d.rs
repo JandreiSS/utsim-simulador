@@ -548,10 +548,19 @@ fn os_clipes_movem_o_que_devem() {
 
 /// A tabela `estados` do catálogo: de estado do posto na simulação para o clipe que a ponte
 /// toca (com a fase de começo e de fim) e o caminho do operador ao entrar e ao sair.
+/// (estado, clipe, de, até, laço, caminho do operador).
+type Estado = (
+    &'static str,
+    &'static str,
+    f64,
+    f64,
+    bool,
+    Option<[&'static str; 2]>,
+);
+
 #[test]
 fn os_estados_do_posto_apontam_para_clipes_e_pontos_do_elemento() {
-    // (estado, clipe, de, até, laço, caminho do operador)
-    let tabela: &[(&str, &str, f64, f64, bool, Option<[&str; 2]>)] = &[
+    let tabela: &[Estado] = &[
         (
             "entering",
             "porta_abrir",
