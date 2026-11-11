@@ -14,6 +14,7 @@
 		{"conferir": {"elemento": {"objeto": "cnc_1", "t": 11.7, "clipe": "ciclo", "fase_entre": [0.5, 0.55], "aberto": "porta"}}},
 		{"conferir": {"movel_em": {"objeto": "ana", "t": 11.7, "x": [1.8, 1.9], "y": [-1.25, -1.15]}}},
 		{"conferir": {"pessoa3d": {"objeto": "ana", "corpo_blender": true, "epis": ["capacete", "luvas", "oculos", "protetor_auricular"], "animada": true}}},
+		{"conferir": {"pessoa3d": {"objeto": "bruno", "corpo_blender": true, "arquivo": "pessoa_homem", "altura_entre": [1.94, 1.96], "largura_entre": [1.15, 1.17]}}},
 		{"tempo": 11.7},
 		{"focar": {"objeto": "cnc_1", "distancia": 5.0, "giro": 0.6, "inclinacao": 0.35}},
 		{"capturar": "g4_blender3d_02_ciclo"},

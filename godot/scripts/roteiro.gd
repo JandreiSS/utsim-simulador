@@ -55,6 +55,13 @@
 ##      (at most that many seconds; a failure if it does not). `modo` and the captures of
 ##      models wait by themselves.
 ##    - `{"tempo": 120.0}`: jumps the playback to that instant.
+##    - `{"andar": {"frente": 1, "lado": 0, "subir": 0, "correr": false, "segundos": 2,
+##      "olhar": [dx, dy], "mirar": "objeto"}}`: the free first-person camera (F) moves as if
+##      those keys were held that long (the mouse moved `olhar` pixels first, or the eye
+##      turned to the middle of `mirar`); `{"clicar_mira": true}`:
+##      a left click while walking (the crosshair, in the middle of the view).
+##    - `{"propriedade": {"objeto": "run", "caminho": "marking.floor_color", "valor": "#d0c8a0"}}`:
+##      sets a field of the properties panel, as the panel does (`null` turns it off).
 ##    - `{"outro_app": {"arquivo": "{saida}/m.ron", "trocar": ["de", "para"]}}`: another app
 ##      (UTSim Qualidade, Segurança) saves the model: the text is replaced in the file, and
 ##      the main scene looks at the disk as when the window gets the focus back.
@@ -90,6 +97,8 @@ var _main: Node
 ## How much the last `camera` step backed off (1 at 1600x900, more in a smaller window):
 ## the `camera_distancia` checks are scaled by it.
 var _cam_scale := 1.0
+## Where the eye was when the last `andar` step began (the `andando.andou_entre` check).
+var _walk_from := Vector3.ZERO
 var _buttons := 0
 
 
@@ -372,6 +381,39 @@ func _step(s: Dictionary, k: int) -> void:
 		await _frames(4)
 	elif s.has("tecla"):
 		await _combo(String(s["tecla"]))
+	elif s.has("andar"):
+		var w: Dictionary = s["andar"]
+		if not _main.walking():
+			_fail("passo %d: não está andando (tecla F no Simular)" % k)
+			return
+		_walk_from = _main.camera.global_position
+		if w.has("olhar"):
+			_main.andar.look(float(w["olhar"][0]), float(w["olhar"][1]))
+		if w.has("mirar"):
+			var mi: int = _main.cena.block_index(String(w["mirar"]))
+			if mi < 0:
+				_fail("passo %d: objeto não encontrado: %s" % [k, w["mirar"]])
+				return
+			_main.andar.aim_at(_main.cena.block_focus(mi))
+		# Fixed steps of 1/60 s, so the distance does not depend on the frame rate.
+		var n := int(round(float(w.get("segundos", 1.0)) * 60.0))
+		for i in maxi(n, 1):
+			_main.walk_step(float(w.get("frente", 0.0)), float(w.get("lado", 0.0)),
+				float(w.get("subir", 0.0)), bool(w.get("correr", false)), 1.0 / 60.0 if n > 0 else 0.0)
+		await _frames(2)
+	elif s.has("propriedade"):
+		var pr: Dictionary = s["propriedade"]
+		if not _main.doc.set_property(String(pr["objeto"]), String(pr["caminho"]), pr["valor"], PackedStringArray()):
+			_fail("passo %d: %s.%s não aceitou %s (%s)" % [k, pr["objeto"], pr["caminho"], pr["valor"], _main.doc.last_error()])
+		_main.after_edit()
+		await _frames(3)
+	elif s.has("clicar_mira"):
+		var c := get_viewport().get_visible_rect().size * 0.5
+		print("[roteiro] mira em %s, olho %s, olhando %s" % [c, _main.camera.global_position, _main.camera_aim])
+		_button(c, MOUSE_BUTTON_LEFT, true, false)
+		await _frames(2)
+		_button(c, MOUSE_BUTTON_LEFT, false, false)
+		await _frames(4)
 	elif s.has("esperar"):
 		await _frames(int(s["esperar"]))
 	elif s.has("esperar_s"):
@@ -1212,8 +1254,9 @@ func _check(c: Dictionary, k: int) -> void:
 					var h: float = cena.point_height(i, String(want["ponto"]))
 					report.call("altura de %s de %s" % [want["ponto"], want["objeto"]], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.2f m" % h)
 			"pessoa3d":
-				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true}: a person
-				# drawn with a Blender body, the protective equipment shown, and a clip playing.
+				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true, "arquivo",
+				# "altura_entre", "largura_entre"}: a person drawn with a Blender body, the
+				# protective equipment shown, a clip playing, the body file and its size.
 				var cena: CenaUtsim = _main.cena
 				var i: int = cena.block_index(String(want["objeto"]))
 				report.call("bloco %s" % want["objeto"], i >= 0, "")
@@ -1224,9 +1267,54 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("epis") and rig.has("asset"):
 						var shown := Pessoa.epis_visiveis(rig["asset"])
 						report.call("EPI de %s" % want["objeto"], Array(shown) == Array(want["epis"]), str(shown))
+					if want.has("arquivo"):
+						var file := String((rig.get("pessoa", {}) as Dictionary).get("arquivo", ""))
+						report.call("corpo de %s" % want["objeto"], file == String(want["arquivo"]), file)
+					if (want.has("altura_entre") or want.has("largura_entre")) and rig.has("asset"):
+						# {"altura_entre": [a, b]} in metres (the body's height over its
+						# skeleton's), {"largura_entre": [a, b]} the width over the height scale.
+						var sc: Vector3 = (rig["asset"] as Node3D).scale
+						var body: Dictionary = rig.get("pessoa", {})
+						if want.has("altura_entre"):
+							var h := float(body.get("altura", 0.0)) * sc.y / maxf(float(body.get("escala", 1.0)), 1e-6)
+							report.call("altura de %s" % want["objeto"], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.3f m" % h)
+						if want.has("largura_entre"):
+							var w := sc.x / maxf(sc.y, 1e-6)
+							report.call("largura de %s" % want["objeto"], w >= float(want["largura_entre"][0]) and w <= float(want["largura_entre"][1]) and absf(sc.z / maxf(sc.y, 1e-6) - w) < 1e-4, "%.3f (z %.3f)" % [w, sc.z / maxf(sc.y, 1e-6)])
 					if want.get("animada", false):
 						var clip: String = (rig["person"] as Pessoa).clip_name() if rig.has("person") else ""
 						report.call("%s animada" % want["objeto"], clip != "", clip)
+			"chao":
+				# {"cor": "#rrggbb", "grade_visivel": true}: the floor's colour as drawn, and
+				# the grid's tone apart from it (at least 0,07 of brightness).
+				var floor_c: Color = (_main._ground.material_override as StandardMaterial3D).albedo_color
+				if want.has("cor"):
+					var hex := "#" + floor_c.to_html(false)
+					report.call("cor do chão", hex == String(want["cor"]).to_lower(), hex)
+				if want.has("grade_visivel"):
+					var lum := func(c: Color) -> float:
+						return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+					var gap: float = absf(float(lum.call(_main._grid_color)) - float(lum.call(floor_c)))
+					report.call("grade visível no chão", (gap >= 0.069) == bool(want["grade_visivel"]), "%.3f" % gap)
+			"andando":
+				# {"ativo", "voo", "altura_entre": [a, b], "andou_entre": [a, b], "perspectiva"}:
+				# the free first-person camera, the eye's height, how far the last `andar`
+				# step took it, and whether the camera has perspective (not the plan's).
+				var on: bool = _main.walking()
+				if want.has("ativo"):
+					report.call("andando", on == bool(want["ativo"]), str(on))
+				if want.has("voo"):
+					var fly: bool = on and _main.andar.flying()
+					report.call("voando", fly == bool(want["voo"]), str(fly))
+				var eye: Vector3 = _main.camera.global_position
+				if want.has("altura_entre"):
+					report.call("altura do olho", eye.y >= float(want["altura_entre"][0]) and eye.y <= float(want["altura_entre"][1]), "%.3f" % eye.y)
+				if want.has("andou_entre"):
+					var d := eye.distance_to(_walk_from)
+					report.call("distância andada", d >= float(want["andou_entre"][0]) and d <= float(want["andou_entre"][1]), "%.3f" % d)
+				if want.has("perspectiva"):
+					var persp: bool = _main.camera.projection == Camera3D.PROJECTION_PERSPECTIVE
+					report.call("perspectiva", persp == bool(want["perspectiva"]), str(persp))
 			"camera_nos_olhos":
 				var cena: CenaUtsim = _main.cena
 				var eye = cena.driver_eye(cena.block_index(String(want)))

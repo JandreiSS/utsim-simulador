@@ -1251,7 +1251,10 @@ fn blender_look(
             .and_then(|m| Some(m.worn_ppe(m.objects.iter().find(|o| o.name == name)?)))
             .map_or_else(Vec::new, |set| set.into_iter().collect());
         let color = visual.and_then(|v| v.color.as_deref());
-        let Some(mut p) = modelos3d::pessoa(cat, name, word.as_deref(), &ppe, color) else {
+        let corpo = model
+            .and_then(|m| m.objects.iter().find(|o| o.name == name))
+            .and_then(|o| o.person.as_deref());
+        let Some(mut p) = modelos3d::pessoa(cat, name, word.as_deref(), &ppe, color, corpo) else {
             return (None, None);
         };
         p.escala_boneco = l.scale;
@@ -1898,6 +1901,17 @@ mod tests {
         // No clips of its own and no state runs: the UAL clips drive it.
         assert!(v.clips.is_empty());
         assert_eq!(pb.frame(10.0).anim_clip[ana], -1);
+        // Bruno's record: a man's body, 1,95 m tall, as wide as 120 kg asks.
+        let bruno = &pb.blocks[index(&pb, "bruno")];
+        let body = bruno.pessoa.as_ref().expect("a Blender body");
+        assert_eq!(body.arquivo, "pessoa_homem");
+        assert!((body.altura - 1.95).abs() < 1e-6);
+        assert!(
+            body.largura > 1.15 && body.largura < 1.17,
+            "{}",
+            body.largura
+        );
+        assert!((bruno.look.as_ref().unwrap().scale - body.escala).abs() < 1e-5);
         // Without the mannequin files the person keeps the procedural operator.
         let bare = blender_model(false);
         assert!(bare.blocks[ana].pessoa.is_none());

@@ -31,6 +31,7 @@ pub mod acoes;
 pub mod aisle_edit;
 pub mod aisle_godot;
 pub mod andamento;
+pub mod andar;
 pub mod ao_vivo;
 pub mod camera_follow;
 pub mod coords;
@@ -638,6 +639,7 @@ impl UtsimPlayback {
                     put(&mut body, "cores", cores);
                     put(&mut body, "altura", p.altura);
                     put(&mut body, "escala", p.escala);
+                    put(&mut body, "largura", p.largura);
                     put(&mut e, "pessoa", body);
                 }
             }
