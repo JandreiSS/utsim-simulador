@@ -863,6 +863,11 @@ def familia(nome):
 PELES = ["#f1c7a5", "#e0ac84", "#c68e6b", "#a86f4c", "#8a5638", "#5f3a25"]
 CABELOS = ["#1f1a17", "#3b2a20", "#6b4a2b", "#a07040", "#c9a36a", "#8c8c8c"]
 ALTURAS = {"homem": [1.65, 1.90], "mulher": [1.55, 1.78]}
+# IMC (kg/m²) estimado do corpo gerado (peso médio do MakeHuman, um pouco acima no homem) e a
+# faixa do fator de largura: com o peso da pessoa, o 3D alarga ou afina o corpo por
+# sqrt(IMC / imc_base), dentro da faixa.
+IMC_BASE = {"homem": 23.5, "mulher": 22.0}
+LARGURA = [0.85, 1.25]
 EPIS = ["avental", "botina", "capacete", "colete", "luvas", "mascara", "oculos", "protetor_auricular"]
 
 
@@ -953,6 +958,8 @@ def gerar(sexo, saida):
         "dados": {
             "altura_base": round(hi[2] - lo[2], 2),
             "alturas": ALTURAS[sexo],
+            "imc_base": IMC_BASE[sexo],
+            "largura": LARGURA,
             "cabelos": CABELOS,
             "epis": EPIS,
             "esqueleto": "UAL1",

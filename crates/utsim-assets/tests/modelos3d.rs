@@ -520,6 +520,18 @@ fn os_clipes_movem_o_que_devem() {
         // Dedos fechados ao pegar.
         let abertura = |p: &HashMap<String, [f32; 3]>| p["dedo_e"][1] - p["dedo_d"][1];
         assert!(abertura(&pegou) < abertura(&rep) - 0.05);
+        // Fechados, os dedos (2 cm de espessura) encostam na peça de 0,12 m sem atravessá-la;
+        // abertos, passam por ela com folga.
+        let vao = |p: &HashMap<String, [f32; 3]>| {
+            let (a, b) = (p["dedo_e"], p["dedo_d"]);
+            ((0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f32>()).sqrt() - 0.02
+        };
+        assert!(
+            (0.12..0.14).contains(&vao(&pegou)),
+            "{sufixo}: vão fechado {}",
+            vao(&pegou)
+        );
+        assert!(vao(&rep) > 0.18, "{sufixo}: vão aberto {}", vao(&rep));
 
         // Porta das máquinas: fechada em 0, deslocada em 1.
         for (m, dist) in [("cnc", 0.8), ("prensa", 0.55), ("injetora", 1.3)] {
