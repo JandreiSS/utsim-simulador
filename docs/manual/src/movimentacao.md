@@ -94,6 +94,34 @@ junto. Para escolher outro lado, use `access` com o ponto em coordenadas do obje
  access: (1.5, 0.0)),  // ao lado direito da máquina
 ```
 
+### Pontas da esteira
+
+Numa esteira o recurso não para no meio dela. Ele **deixa** a peça na ponta de **entrada** e a
+**pega** na ponta de **saída**, ao lado da esteira (no lado `-y`, como o ponto de acesso), meio
+metro para dentro de cada ponta. Assim, uma esteira longa muda as distâncias e os tempos dos
+operadores e veículos que a atendem. Isso vale nos modos `Free`, `Network` e `Aisles`; o modo
+`Legacy` continua indo de centro a centro. Com `access` na esteira, as duas pontas são o ponto
+dado.
+
+### Dimensões do objeto
+
+`size: (comprimento, largura, altura)`, em metros e no sentido do objeto, troca a área padrão
+do tipo (processador 1,8 × 1,8 m, espera 4 × 1,4 m...). A área no piso leva o ponto de acesso
+junto, então a distância até o objeto muda com o tamanho dele; a altura só muda o desenho. A
+esteira e o porta-paletes não têm `size`: as medidas deles vêm de `length` e dos vãos e níveis.
+
+```ron
+(name: "prensa", kind: Processor(process: Const(40.0)), position: (10.0, 0.0, 0.0),
+ size: (4.0, 2.5, 3.0)),
+```
+
+Numa espera, `area_per_item` (m²) dá a capacidade pela área: a área da espera dividida pela
+área de cada item, só itens inteiros (e no máximo `capacity`, se houver):
+
+```ron
+(name: "pulmao", kind: Queue(), size: (6.0, 2.0, 1.0), area_per_item: 1.5),  // 8 itens
+```
+
 ## Distância e tempo
 
 O caminho é calculado numa grade de 25 cm com os obstáculos inflados pela folga (A\* com
