@@ -134,7 +134,8 @@ var playing_replay := false
 ## A scripted run (`roteiro.gd`) drives the window: no system dialogs, no browser.
 var scripted := false
 ## The kinds of team and request lines hidden (the "Ligações" toggles of the bar).
-var links_hidden: Array = []
+## `simulacao`: none of them in Simular (the default; they stay in Editar).
+var links_hidden: Array = ["simulacao"]
 
 
 func _ready() -> void:
@@ -628,6 +629,10 @@ func _run_step(p: Dictionary) -> bool:
 			ui.flows_time(t)
 		"cancelar_trabalho":
 			cancel_job()
+		"fechar_painel_vivo":
+			# Esc in Simular: the live panel not pinned, or else the most recent one; the
+			# key goes on when none is open.
+			return mode == "simular" and ui.live_close_top()
 		# The properties panel.
 		"prop_ok":
 			if p["s2"] == "name" and not editor.selected.is_empty():
@@ -740,6 +745,7 @@ func new_document(force := false) -> void:
 		model_path = ""
 		if ui != null:
 			ui.clear_indicators()
+			ui.live_close_all()
 		editor.set_tool("selecionar")
 		editor.clear_selection()
 		set_mode("editar")
@@ -767,8 +773,9 @@ func open_model(path: String) -> bool:
 	model_path = path
 	_disk_warned = false
 	if ui != null:
-		# The numbers of the node tabs were of the model closed.
+		# The numbers of the node tabs and the live panels were of the model closed.
 		ui.clear_indicators()
+		ui.live_close_all()
 	editor.set_tool("selecionar")
 	editor.clear_selection()
 	if mode != "editar":
@@ -1237,6 +1244,9 @@ func set_mode(which: String) -> bool:
 	set_playing(false)
 	mode = "editar"
 	playing_replay = false
+	if ui != null:
+		# The live panels are of the playback: Editar closes them.
+		ui.live_close_all()
 	_set_right(true)
 	_sync_play()
 	_sync_panels()
@@ -1458,6 +1468,50 @@ func _process(dt: float) -> void:
 	if _perf_on and ui != null and _frames % 15 == 0:
 		ui.set_performance("%d qps | ponte %.2f ms | cena %.2f ms" % [
 			Engine.get_frames_per_second(), cena.last_bridge_us / 1000.0, cena.last_apply_us / 1000.0])
+
+
+## Simular: a left click on an object of the 3D view opens its live results panel (the
+## egui panels took the clicks over them already; the camera turns with the other buttons).
+func _unhandled_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if mode != "simular" or playback == null or ui == null or over_ui(mb.position):
+		return
+	if pick_live_panel(mb.position):
+		get_viewport().set_input_as_handled()
+
+
+## Opens the live results panel of the object under the screen point `p` (Simular). The
+## ray test is the bridge's (`ao_vivo::escolher`); false when it hits nothing.
+func pick_live_panel(p: Vector2) -> bool:
+	var cam := get_viewport().get_camera_3d()
+	# Built only when the scene has a rig per block (as the editor's `_feed`).
+	if cam == null or cena.blocks.is_empty() or cena.rigs.size() != cena.blocks.size():
+		return false
+	var centers := PackedVector3Array()
+	var sizes := PackedVector3Array()
+	var yaws := PackedFloat32Array()
+	var hidden := PackedByteArray()
+	for i in cena.blocks.size():
+		# The box of the scene's geometry around the root (the asset is fitted into it by
+		# its offset and scale), turned with the root; hidden when the camera's view hid it.
+		var root: Node3D = cena.rigs[i]["root"]
+		centers.append(cena.block_focus(i))
+		sizes.append(cena.blocks[i]["size"])
+		yaws.append(root.global_rotation.y)
+		hidden.append(1 if cena.hidden_for_view(i) else 0)
+	var hit: int = ui.live_pick(cam.project_ray_origin(p), cam.project_ray_normal(p), centers, sizes, yaws, hidden)
+	if hit < 0:
+		return false
+	return open_live_panel(String(cena.blocks[hit]["name"]))
+
+
+## Opens the live results panel of `name` at the playback time (Simular only).
+func open_live_panel(name: String) -> bool:
+	if mode != "simular" or playback == null or ui == null:
+		return false
+	return ui.live_open(name)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1750,6 +1804,8 @@ func open_replay(path: String) -> bool:
 	if not r["ok"]:
 		set_status("Não abriu %s: %s" % [path.get_file(), ", ".join(r["errors"])])
 		return false
+	if ui != null:
+		ui.live_close_all()
 	model = m
 	playback = model.playback(0, CenaUtsim.skeletal_available())
 	if playback == null:

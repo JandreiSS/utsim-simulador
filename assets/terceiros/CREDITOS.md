@@ -27,5 +27,9 @@ apontam para `Textures/colormap.png` ao lado de cada arquivo. Essas PNGs são do
 pacote Kenney (CC0 1.0), uma cópia por pasta, extraídas de `Models/GLB format/Textures/colormap.png`
 dos zips oficiais baixados em 2026-10-26.
 
+As pessoas de `assets/modelos3d` (`pessoa_homem.glb`, `pessoa_mulher.glb`) são humanos do
+MakeHuman (malha base, alvos e pacote de assets de sistema, CC0 1.0), gerados pelo complemento
+MPFB 2.0.18. A fonte, a versão e a licença de cada parte estão em `assets/modelos3d/LEIA-ME.md`.
+
 Para regerar ou trocar um arquivo, veja a seção "Ativos de terceiros" em
 `docs/plano_3d_realista.md`.

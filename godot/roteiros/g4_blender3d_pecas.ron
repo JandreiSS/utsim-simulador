@@ -1,0 +1,41 @@
+// Ponto de partida do roteiro g4_blender3d_pecas.json: as peças nos pontos dos elementos
+// do Blender (tabela `peca` do catálogo). Um robô (visual.asset "robo") pega a peça no
+// ponto_entrada, leva na garra e solta no ponto_saida, num ciclo por peça; um AGV levanta
+// a mesa para carregar, anda com a carga no ponto_carga e baixa a mesa para descarregar;
+// uma empilhadeira guarda paletes num porta-paletes de quatro níveis de 1,5 m (o garfo sobe
+// até o vão, além do curso do clipe no vão de cima).
+Model(
+    format: 2,
+    name: "peças nos pontos",
+    run: (stop_time: 400.0, seed: 5, replications: 1),
+    objects: [
+        (name: "fonte", kind: Source(interarrival: Const(20.0), first_at_zero: true, max_arrivals: Some(4)),
+         position: (-6.0, 0.0, 0.0)),
+        (name: "robo_1", kind: Processor(process: Const(6.0)), position: (0.0, 0.0, 0.0),
+         visual: (asset: "robo")),
+        (name: "saida", kind: Sink, position: (6.0, 0.0, 0.0)),
+        (name: "fonte_agv", kind: Source(interarrival: Const(40.0), first_at_zero: true, max_arrivals: Some(3)),
+         position: (-6.0, 8.0, 0.0)),
+        (name: "doca_agv", kind: Queue(), transport: "agv_1", position: (-3.0, 8.0, 0.0)),
+        (name: "saida_agv", kind: Sink, position: (9.0, 8.0, 0.0)),
+        (name: "agv_1", kind: Transporter(speed: 1.0, load_time: Const(3.0), unload_time: Const(3.0), agv: true),
+         position: (-3.0, 5.0, 0.0)),
+        (name: "fonte_palete", kind: Source(interarrival: Const(60.0), first_at_zero: true, max_arrivals: Some(4)),
+         position: (-6.0, 18.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "empilhadeira_1", position: (-3.0, 18.0, 0.0)),
+        (name: "estoque", kind: Rack(bays: 1, levels: 4, level_height: 1.5, dwell: Some(Const(1000.0))), transport: "empilhadeira_1",
+         position: (6.0, 18.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (12.0, 18.0, 0.0)),
+        (name: "empilhadeira_1", kind: Transporter(speed: 1.5, load_time: Const(4.0), unload_time: Const(4.0)),
+         position: (-3.0, 14.0, 0.0)),
+    ],
+    connections: [
+        ("fonte", "robo_1"),
+        ("robo_1", "saida"),
+        ("fonte_agv", "doca_agv"),
+        ("doca_agv", "saida_agv"),
+        ("fonte_palete", "doca"),
+        ("doca", "estoque"),
+        ("estoque", "expedicao"),
+    ],
+)

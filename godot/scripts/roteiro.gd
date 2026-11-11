@@ -428,6 +428,11 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("tempo"):
 		_main.seek(float(s["tempo"]), true)
 		await _frames(3)
+	elif s.has("painel_ao_vivo"):
+		# Simular: the live results panel of an object, as a click on it opens it.
+		if not _main.open_live_panel(String(s["painel_ao_vivo"])):
+			_fail("passo %d: o painel ao vivo de %s não abriu" % [k, s["painel_ao_vivo"]])
+		await _frames(4)
 	elif s.has("outro_app"):
 		var o: Dictionary = s["outro_app"]
 		var path := _resolve(_base, String(o["arquivo"]))
@@ -540,6 +545,16 @@ func _target(t: Variant) -> Variant:
 		return cam.unproject_position(p)
 	if d.has("objeto"):
 		return _main.editor.block_screen(d["objeto"]) if _main.is_editing() else null
+	if d.has("objeto_simular"):
+		# Simular: the middle of the object in the playback (its click opens the live panel).
+		var i: int = _main.cena.block_index(String(d["objeto_simular"]))
+		if i < 0:
+			return null
+		var at: Vector3 = _main.cena.block_focus(i)
+		var c3 := _main.get_viewport().get_camera_3d()
+		if c3 == null or c3.is_position_behind(at):
+			return null
+		return c3.unproject_position(at)
 	if d.has("porta_saida") or d.has("porta_entrada"):
 		var out := d.has("porta_saida")
 		var name: String = d["porta_saida"] if out else d["porta_entrada"]
@@ -1049,6 +1064,14 @@ func _check(c: Dictionary, k: int) -> void:
 				for n in want:
 					var ctl := _control(String(n))
 					report.call("%s oculto" % n, (ctl == null or not ctl.is_visible_in_tree()) and not _widget_visible(String(n)), "")
+			"painel_vivo":
+				# The objects of the live panels on screen, the most recent first.
+				var vivos: Array = Array(_egui().live_names()) if _egui() != null else []
+				report.call("painéis ao vivo %s" % [want], vivos == Array(want), str(vivos))
+			"painel_vivo_relatorio":
+				# At the end of the replication the live numbers are its final report's.
+				var diff: String = String(_egui().live_check(String(want))) if _egui() != null else "sem interface"
+				report.call("painel ao vivo de %s = relatório" % want, diff == "", diff.substr(0, 300))
 			"replicacoes":
 				var n: int = _main.results.replications() if _main.results != null else 0
 				report.call("replicações dos resultados", n == int(want), str(n))
@@ -1152,6 +1175,58 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("clipe"):
 						var clip: String = (cena.rigs[i]["driver"] as Pessoa).clip_name()
 						report.call("clipe do motorista de %s" % want["objeto"], clip == String(want["clipe"]), clip)
+			"elemento":
+				# {"objeto", "t", "clipe", "fase_entre": [a, b], "aberto"/"fechado": "no"}: the
+				# clip a Blender element plays at `t` ("" for none), its phase, and whether a
+				# node is out of its rest pose.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var playing: Array = cena.element_clip(i)
+					if want.has("clipe"):
+						report.call("clipe de %s" % want["objeto"], String(playing[0]) == String(want["clipe"]), str(playing))
+					if want.has("fase_entre"):
+						var fase := float(playing[1])
+						report.call("fase de %s entre %s e %s" % [want["objeto"], want["fase_entre"][0], want["fase_entre"][1]], fase >= float(want["fase_entre"][0]) and fase <= float(want["fase_entre"][1]), "%.3f" % fase)
+					if want.has("aberto") or want.has("fechado"):
+						# {"aberto": "porta"} / {"fechado": "porta"}: that node out of / at rest.
+						var want_open: bool = want.has("aberto")
+						var node_name := String(want["aberto"] if want_open else want["fechado"])
+						var moved = cena.element_node_moved(i, node_name)
+						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"item_em_ponto":
+				# {"objeto", "t", "ponto", "altura_entre": [a, b]}: an item sits on that point
+				# of the block's Blender element (the part it works on, the load on its forks
+				# or deck), and the point's height.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				var n: int = cena.items_at_point(i, String(want["ponto"]))
+				report.call("item em %s de %s" % [want["ponto"], want["objeto"]], n > 0, "%d item(ns)" % n)
+				if want.has("altura_entre"):
+					# The point itself (the forks past the clip's travel reach the cell).
+					var h: float = cena.point_height(i, String(want["ponto"]))
+					report.call("altura de %s de %s" % [want["ponto"], want["objeto"]], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.2f m" % h)
+			"pessoa3d":
+				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true}: a person
+				# drawn with a Blender body, the protective equipment shown, and a clip playing.
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var rig: Dictionary = cena.rigs[i]
+					if want.has("corpo_blender"):
+						report.call("corpo do Blender em %s" % want["objeto"], rig.has("pessoa") == bool(want["corpo_blender"]), str(rig.get("pessoa", {})))
+					if want.has("epis") and rig.has("asset"):
+						var shown := Pessoa.epis_visiveis(rig["asset"])
+						report.call("EPI de %s" % want["objeto"], Array(shown) == Array(want["epis"]), str(shown))
+					if want.get("animada", false):
+						var clip: String = (rig["person"] as Pessoa).clip_name() if rig.has("person") else ""
+						report.call("%s animada" % want["objeto"], clip != "", clip)
 			"camera_nos_olhos":
 				var cena: CenaUtsim = _main.cena
 				var eye = cena.driver_eye(cena.block_index(String(want)))

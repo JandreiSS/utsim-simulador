@@ -592,6 +592,19 @@ fn links_menu(ui: &mut Ui, s: &BarState, reg: &mut Registry, act: &mut dyn FnMut
             ));
         }
     }
+    ui.separator();
+    let mut on = !s.links_hidden.iter().any(|h| h == "simulacao");
+    let label = "Também durante a simulação";
+    let c = ui.checkbox(&mut on, label).on_hover_text(
+        "As linhas tracejadas entre operadores, veículos e máquinas no modo Simular",
+    );
+    reg.put_toggle("Ligacoes_simulacao", &c, label, on);
+    if c.changed() {
+        act(format!(
+            "ligacoes:simulacao:{}",
+            if on { "ligar" } else { "desligar" }
+        ));
+    }
 }
 
 /// A step without trailing zeros (`0.25`, `1`).

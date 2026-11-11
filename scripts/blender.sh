@@ -16,5 +16,11 @@ if [ -z "$b" ]; then
   fi
 fi
 [ -n "$b" ] || { echo "Blender não encontrado (defina BLENDER)" >&2; exit 1; }
+# As pessoas usam o MPFB, fora do repositório (veja assets/modelos3d/LEIA-ME.md). As pastas de
+# trabalho dele (cache, logs) ficam junto, e não na pasta do Blender do usuário.
+mpfb="${UTSIM_MPFB:-$HOME/Documents/Codes/UTSim-origem-3d/mpfb}"
+command -v cygpath >/dev/null 2>&1 && mpfb="$(cygpath -w "$mpfb")"
+export UTSIM_MPFB="$mpfb"
+export BLENDER_USER_EXTENSIONS="$mpfb/blender"
 saida=$("$b" -b --factory-startup --python-exit-code 1 -P "$raiz/tools/blender/gerar.py" -- "$@" 2>&1) || { echo "$saida" >&2; exit 1; }
 echo "$saida" | grep -E "^utsim-blender:|Error|Traceback" || true

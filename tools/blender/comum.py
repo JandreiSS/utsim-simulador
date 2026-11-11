@@ -350,6 +350,39 @@ class Elemento:
         hi = [max(a[i], b[i]) + (h if a[i] == b[i] else 0.0) for i in range(3)]
         return self.caixa(no, mat, lo, hi)
 
+    def prisma(self, no, mat, perfil, a, b, eixo=1, liso=False):
+        """Prisma: o `perfil` (lista de pares) extrudado de `a` a `b` ao longo de `eixo`.
+        Com `eixo` 1 (y), os pares são (x, z); com 0 (x), (y, z); com 2 (z), (x, y).
+        O perfil pode ser côncavo (um para-lama em arco, por exemplo)."""
+        bm = self._bm[no]
+        k = self._mat(no, mat)
+        i1, i2 = [(1, 2), (0, 2), (0, 1)][eixo]
+        aneis = []
+        for v in (a, b):
+            anel = []
+            for u, w in perfil:
+                p = [0.0, 0.0, 0.0]
+                p[eixo], p[i1], p[i2] = v, u, w
+                anel.append(bm.verts.new(self._local(no, p)))
+            aneis.append(anel)
+        n = len(perfil)
+        # Área com sinal do perfil: decide o lado de fora sem depender do Blender.
+        area = sum(perfil[j][0] * perfil[(j + 1) % n][1] - perfil[(j + 1) % n][0] * perfil[j][1] for j in range(n))
+        # (i1, i2, eixo) é destro quando o eixo é x ou z; com y, é canhoto.
+        fora = ((area > 0) == (eixo != 1)) == (b > a)
+        faces = []
+        for j in range(n):
+            j2 = (j + 1) % n
+            q = [aneis[0][j], aneis[0][j2], aneis[1][j2], aneis[1][j]]
+            f = bm.faces.new(q if fora else list(reversed(q)))
+            f.smooth = liso
+            faces.append(f)
+        faces.append(bm.faces.new(list(reversed(aneis[0])) if fora else aneis[0]))
+        faces.append(bm.faces.new(aneis[1] if fora else list(reversed(aneis[1]))))
+        for f in faces:
+            f.material_index = k
+        return faces
+
     # ---------------------------------------------------------------- animação
     def clipe(self, nome, laco, chaves):
         """Clipe de 1 s. `chaves` = {nó: [(fase, 'location'|'rotation_euler', eixo, valor)]}.
