@@ -182,6 +182,8 @@ func build(pb: Object, keep_templates := false) -> void:
 				asset.position = fb.get("offset", asset.position)
 			root.add_child(asset)
 			rig["asset"] = asset
+			if b.get("sized", false) and not fell_back:
+				_fit_to_size(root, asset, b["size"])
 			if b.has("color") and not b.get("skeletal", false):
 				_tint_named(asset, "pintura", b["color"])
 			_bind(rig, asset)
@@ -577,6 +579,50 @@ func _plain(color: Color, rough := 0.6) -> StandardMaterial3D:
 		m.roughness = rough
 		_materials[key] = m
 	return _materials[key]
+
+
+## The transform of `node` in the frame of its ancestor `frame` (no tree needed).
+func _rel(frame: Node, node: Node) -> Transform3D:
+	var t := Transform3D.IDENTITY
+	var n := node
+	while n != null and n != frame:
+		if n is Node3D:
+			t = (n as Node3D).transform * t
+		n = n.get_parent()
+	return t
+
+
+## The box of the meshes under `node` (itself included), in the frame of `frame`.
+func _box_in(frame: Node3D, node: Node) -> AABB:
+	var box := AABB()
+	var first := true
+	var meshes: Array = node.find_children("*", "MeshInstance3D", true, false)
+	if node is MeshInstance3D:
+		meshes.append(node)
+	for mi in meshes:
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		var b: AABB = _rel(frame, m) * m.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
+## Dimensions given in the model (`size`): the asset is stretched along each axis of the
+## block (x length, y height, z width) to that box, standing on the floor at its centre.
+## The asset turns under the root by quarter turns only, so the axes swap when it is
+## turned sideways.
+func _fit_to_size(root: Node3D, asset: Node3D, size: Vector3) -> void:
+	var box := _box_in(root, asset)
+	if box.size.x <= 1e-4 or box.size.y <= 1e-4 or box.size.z <= 1e-4:
+		return
+	var f := Vector3(size.x / box.size.x, size.y / box.size.y, size.z / box.size.z)
+	var sideways := absf(sin(asset.rotation.y)) > 0.7
+	var local := Vector3(f.z, f.y, f.x) if sideways else f
+	asset.scale = asset.scale * local
+	box = _box_in(root, asset)
+	asset.position -= Vector3(box.get_center().x, box.position.y, box.get_center().z)
 
 
 ## The simple shape of a block without a realistic look (sources, sinks...), with the
