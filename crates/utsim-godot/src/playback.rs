@@ -67,6 +67,9 @@ pub struct BlockView {
     pub size: [f32; 3],
     /// A queue with `discipline: Lifo` (a stack): labelled and drawn as one.
     pub stack: bool,
+    /// Dimensions given in the model (`size`): the asset is fitted to the box `size`
+    /// instead of keeping its own proportions.
+    pub sized: bool,
     /// A source's arrival mode, for the badge of its label (`horário`, `tabela`,
     /// `sequência`, `taxa`, with `lote` for batches); empty for the plain interval.
     pub badge: String,
@@ -429,6 +432,11 @@ impl Playback {
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
             let stack = kind == "Queue" && is_stack(model, &name);
+            let sized = role.is_none()
+                && !matches!(kind.as_str(), "Conveyor" | "Rack")
+                && model
+                    .and_then(|m| m.objects.iter().find(|o| o.name == name))
+                    .is_some_and(|o| o.size.is_some());
             let badge = if kind == "Source" {
                 source_badge(model, &name)
             } else {
@@ -445,6 +453,7 @@ impl Playback {
                 clips,
                 pessoa,
                 stack,
+                sized,
                 badge,
                 type_mix,
                 name,

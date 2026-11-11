@@ -152,6 +152,24 @@ editá-los, e o programa só mostra que isso aconteceu. A primeira chave que uma
 num projeto é a que vale. Estas assinaturas não têm a validade jurídica de uma assinatura
 digital certificada.
 
+### Página das ações no gemba
+
+No fim da tela **Equipe e RACI**, a seção **Acesso pela rede local** liga uma página só de
+leitura com as ações abertas do projeto, separadas por responsável e em ordem de prazo, com a
+coluna do quadro, o prazo (as atrasadas em vermelho) e o lugar. Ela serve para acompanhar o
+quadro num tablet ou celular no chão de fábrica. A página se recarrega a cada 30 segundos e
+ninguém edita nada por ela.
+
+- **Só este computador**, que é o padrão: o endereço é `http://localhost:8790/` (outra porta,
+  se essa estiver ocupada), e só um navegador deste computador abre a página.
+- **Abrir para a rede local**: marque a opção antes de ligar. O endereço passa a ter o número
+  deste computador na rede e um token (`/?t=…`), sorteado a cada vez que a página é ligada.
+  Quem não tiver o endereço completo recebe uma página de acesso negado. O Windows pode pedir
+  permissão no firewall na primeira vez.
+
+Qualquer pessoa da rede com o endereço lê as ações, então desligue a página quando não
+precisar mais. Ela também desliga ao fechar o projeto ou o programa.
+
 ## Telas do projeto
 
 A navegação à esquerda tem a **Carteira** e as telas do projeto.

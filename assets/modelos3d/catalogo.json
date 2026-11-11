@@ -36,7 +36,7 @@
   "minimo": [
    -0.57,
    -0.4,
-   0.0
+   -0.0
   ],
   "nos": [
    "agv",
@@ -85,7 +85,7 @@
    0.8,
    0.353
   ],
-  "triangulos": 364
+  "triangulos": 996
  },
  "agv_medio": {
   "arquivo": "agv_medio.glb",
@@ -124,7 +124,7 @@
   "minimo": [
    -0.57,
    -0.4,
-   0.0
+   -0.0
   ],
   "nos": [
    "agv",
@@ -173,7 +173,7 @@
    0.8,
    0.353
   ],
-  "triangulos": 684
+  "triangulos": 1412
  },
  "caixa": {
   "arquivo": "caixa.glb",
@@ -1266,9 +1266,9 @@
   "tamanho": [
    3.0,
    0.8,
-   0.76
+   0.83
   ],
-  "triangulos": 604
+  "triangulos": 764
  },
  "esteira_medio": {
   "arquivo": "esteira_medio.glb",
@@ -1357,9 +1357,9 @@
   "tamanho": [
    3.0,
    0.8,
-   0.76
+   0.83
   ],
-  "triangulos": 1308
+  "triangulos": 1516
  },
  "injetora": {
   "arquivo": "injetora.glb",
@@ -1955,6 +1955,11 @@
     "protetor_auricular"
    ],
    "esqueleto": "UAL1",
+   "imc_base": 23.5,
+   "largura": [
+    0.85,
+    1.25
+   ],
    "peles": [
     "#f1c7a5",
     "#e0ac84",
@@ -2024,6 +2029,11 @@
     "protetor_auricular"
    ],
    "esqueleto": "UAL1",
+   "imc_base": 22.0,
+   "largura": [
+    0.85,
+    1.25
+   ],
    "peles": [
     "#f1c7a5",
     "#e0ac84",
@@ -3325,7 +3335,7 @@
     "pos": [
      0.65,
      0.0,
-     1.26
+     1.21
     ]
    },
    "ponto_operador": {
@@ -3357,11 +3367,11 @@
    }
   },
   "tamanho": [
-   1.06,
+   1.07,
    0.7,
-   1.56
+   1.6
   ],
-  "triangulos": 304
+  "triangulos": 720
  },
  "robo_medio": {
   "arquivo": "robo_medio.glb",
@@ -3517,7 +3527,7 @@
     "pos": [
      0.65,
      0.0,
-     1.26
+     1.21
     ]
    },
    "ponto_operador": {
@@ -3549,10 +3559,10 @@
    }
   },
   "tamanho": [
-   1.06,
+   1.07,
    0.7,
-   1.56
+   1.6
   ],
-  "triangulos": 608
+  "triangulos": 1388
  }
 }
