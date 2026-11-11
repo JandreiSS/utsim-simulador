@@ -45,7 +45,7 @@ fn opt_summary(s: &Option<Summary>) -> Value {
     s.as_ref().map_or(Value::Null, summary)
 }
 
-const STATES: [State; 23] = [
+pub(crate) const STATES: [State; 23] = [
     State::Idle,
     State::Empty,
     State::Generating,

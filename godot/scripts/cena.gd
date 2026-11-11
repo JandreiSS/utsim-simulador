@@ -82,6 +82,8 @@ const VIEW_MARGIN := 0.5
 var _hidden_for_view: Array[MeshInstance3D] = []
 ## Blocks whose driver `clear_view` hid (the camera is at its eyes).
 var _view_hidden := {}
+## Blocks with meshes `clear_view` hid (a click in Simular does not pick them).
+var _blocks_hidden_for_view := {}
 ## Editar draws its own connections (arrows, port numbers) and floor.
 var show_connections := true
 var show_floor := true
@@ -121,6 +123,7 @@ func clear(keep_templates := false) -> void:
 	_fluid_materials.clear()
 	_hidden_for_view.clear()
 	_view_hidden.clear()
+	_blocks_hidden_for_view.clear()
 	camada = null
 	playback = null
 
@@ -1346,6 +1349,12 @@ func clear_view(eye: Vector3, aim: Vector3, own: int) -> void:
 			if box.grow(VIEW_MARGIN).has_point(eye) or box.intersects_segment(eye, near):
 				mi.visible = false
 				_hidden_for_view.append(mi)
+				_blocks_hidden_for_view[i] = true
+
+
+## Whether `clear_view` hid block `i` (its driver or meshes of it) for the camera's view.
+func hidden_for_view(i: int) -> bool:
+	return _view_hidden.has(i) or _blocks_hidden_for_view.has(i)
 
 
 ## Shows again what `clear_view` hid.
@@ -1354,6 +1363,7 @@ func restore_view() -> void:
 		if i < rigs.size() and rigs[i].has("driver_node"):
 			(rigs[i]["driver_node"] as Node3D).visible = not drivers_off.has(String(blocks[i]["name"]))
 	_view_hidden.clear()
+	_blocks_hidden_for_view.clear()
 	for mi in _hidden_for_view:
 		if is_instance_valid(mi):
 			mi.visible = true

@@ -79,6 +79,9 @@ pub struct UtsimUi {
     /// The playback clock of Simular and the replication it plays (for its events).
     relogio: Relogio,
     clock_pb: Option<Gd<crate::UtsimPlayback>>,
+    /// The playback time and the real time (s) the live panels were computed at.
+    vivo_t: f64,
+    vivo_em: f64,
     /// What the last run says about each node (the node tabs), the quality and safety
     /// numbers still coming from a thread, and its stop flag.
     indicadores: Option<crate::indicadores::Indicadores>,
@@ -116,6 +119,8 @@ impl INode2D for UtsimUi {
             flows_pb: None,
             relogio: Relogio::default(),
             clock_pb: None,
+            vivo_t: f64::NAN,
+            vivo_em: 0.0,
             indicadores: None,
             ind_rx: None,
             ind_stop: Default::default(),
@@ -133,6 +138,7 @@ impl INode2D for UtsimUi {
 
     fn process(&mut self, _delta: f64) {
         self.poll_indicators();
+        self.refresh_live(false);
         self.frame_if_needed();
     }
 
@@ -506,6 +512,122 @@ impl UtsimUi {
         self.relogio.carregar(end);
         self.clock_pb = playback.filter(|_| end.is_some());
         self.sync_clock();
+        // Another run of the same model: the live panels of objects it still has stay open
+        // (Editar and a new model close them all, `live_close_all`); while the new run goes
+        // (no replication yet) they keep their numbers.
+        if self.host.vivo.is_empty() || self.clock_pb.is_none() {
+            return;
+        }
+        let keep: Vec<bool> = {
+            let pb = self.clock_pb.as_ref().map(|p| p.bind());
+            let vivo = pb
+                .as_ref()
+                .and_then(|b| b.core.as_ref())
+                .and_then(|c| c.vivo());
+            self.host
+                .vivo
+                .iter()
+                .map(|p| vivo.is_some_and(|v| v.conhece(&p.nome)))
+                .collect()
+        };
+        let mut k = keep.into_iter();
+        self.host.vivo.retain(|_| k.next().unwrap_or(false));
+        self.refresh_live(true);
+    }
+
+    /// Simular: the drawn block a click hits, by a ray from `origin` along `dir` against
+    /// one turned box per block, in the order of the scene's blocks: its middle (`centers`),
+    /// its geometry (`sizes`, in its own axes), its turn (`yaws`, the root's `rotation.y`)
+    /// and whether the camera's view hides it (`hidden`). -1: none (`ao_vivo::escolher`).
+    #[func]
+    fn live_pick(
+        &self,
+        origin: Vector3,
+        dir: Vector3,
+        centers: PackedVector3Array,
+        sizes: PackedVector3Array,
+        yaws: PackedFloat32Array,
+        hidden: PackedByteArray,
+    ) -> i64 {
+        let v = |p: Vector3| [p.x, p.y, p.z];
+        let caixas: Vec<crate::ao_vivo::Caixa> = centers
+            .as_slice()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| crate::ao_vivo::Caixa {
+                centro: v(*c),
+                tamanho: sizes.as_slice().get(i).map_or([1.0; 3], |s| v(*s)),
+                yaw: yaws.as_slice().get(i).copied().unwrap_or(0.0),
+                oculto: hidden.as_slice().get(i).is_some_and(|h| *h != 0),
+            })
+            .collect();
+        crate::ao_vivo::escolher(v(origin), v(dir), &caixas).map_or(-1, |i| i as i64)
+    }
+
+    /// Opens the live results panel of `name` at the clock's time (`ui_ao_vivo`): it
+    /// replaces the panel not pinned. False when the replication does not know it.
+    #[func]
+    fn live_open(&mut self, name: GString) -> bool {
+        let name = name.to_string();
+        let known = self.clock_pb.as_ref().is_some_and(|p| {
+            p.bind()
+                .core
+                .as_ref()
+                .and_then(|c| c.vivo())
+                .is_some_and(|v| v.conhece(&name))
+        });
+        if !known {
+            return false;
+        }
+        crate::ui_ao_vivo::abrir(&mut self.host.vivo, &name);
+        self.refresh_live(true);
+        true
+    }
+
+    /// Esc in Simular: closes the panel not pinned, or else the most recent one. False when
+    /// none is on screen (none open, or the Resultados or PERT/CPM window covers them).
+    #[func]
+    fn live_close_top(&mut self) -> bool {
+        if !self.host.vivo_visivel() {
+            return false;
+        }
+        let closed = crate::ui_ao_vivo::fechar_topo(&mut self.host.vivo);
+        if closed {
+            self.host.invalidate();
+        }
+        closed
+    }
+
+    #[func]
+    fn live_close_all(&mut self) {
+        if !self.host.vivo.is_empty() {
+            self.host.vivo.clear();
+            self.host.invalidate();
+        }
+    }
+
+    /// The objects of the live panels on screen, the most recent first.
+    #[func]
+    fn live_names(&self) -> PackedStringArray {
+        let names: Vec<&str> = self.host.vivo.iter().map(|p| p.nome.as_str()).collect();
+        strings(&names)
+    }
+
+    /// The differences between the live numbers of `name` at the end of the replication
+    /// and its final report (`""`: they agree), for the scripted checks.
+    #[func]
+    fn live_check(&self, name: GString) -> GString {
+        let Some(pb) = self.clock_pb.as_ref() else {
+            return "sem replicação".into();
+        };
+        let b = pb.bind();
+        let Some(c) = b.core.as_ref() else {
+            return "sem replicação".into();
+        };
+        match c.vivo() {
+            Some(v) => v.confere(&name.to_string()).join("; ").as_str().into(),
+            None => "sem rastro da replicação".into(),
+        }
     }
 
     /// Plays or pauses (it only plays with a replication, in Simular).
@@ -1324,6 +1446,34 @@ impl UtsimUi {
         }
         self.sync_clock();
         true
+    }
+
+    /// Computes the live panels again at the clock's time when it moved (at most every
+    /// `ao_vivo::INTERVALO` s while playing; at once when paused, dragged or `force`).
+    fn refresh_live(&mut self, force: bool) {
+        if self.host.vivo.is_empty() || self.clock_pb.is_none() {
+            return;
+        }
+        let t = self.relogio.t;
+        let now = self.start.elapsed().as_secs_f64();
+        if !force
+            && !crate::ao_vivo::recalcular(t, self.vivo_t, self.relogio.playing, now, self.vivo_em)
+        {
+            return;
+        }
+        {
+            let pb = self.clock_pb.as_ref().map(|p| p.bind());
+            let vivo = pb
+                .as_ref()
+                .and_then(|b| b.core.as_ref())
+                .and_then(|c| c.vivo());
+            for p in &mut self.host.vivo {
+                p.leitura = vivo.and_then(|v| v.leitura(&p.nome, t));
+            }
+        }
+        self.vivo_t = t;
+        self.vivo_em = now;
+        self.host.invalidate();
     }
 
     /// What the playback bar shows of the clock.
