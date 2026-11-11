@@ -146,6 +146,7 @@ presa na garra, no garfo ou na mesa vai junto com o clipe.
 A passagem entre elementos fica com a ponte. A peça sai do `ponto_saida` de um posto e vai
 para o `ponto_carga` do veículo que a carrega, ou para o `ponto_entrada` do próximo posto.
 O teste confere que a garra do robô está mesmo sobre a peça em 1/3 e em 3/4 do `ciclo`.
+Outro teste confere que os dedos fechados encostam na peça (0,12 m) sem atravessá-la.
 Também confere que, no `ciclo_auto`, a porta está toda aberta quando a peça entra e
 quando sai.
 
@@ -154,6 +155,7 @@ quando sai.
 A peça passa de um elemento a outro pelos pontos:
 
 - da esteira, sai em `ponto_saida`;
+- no AGV, vai na mesa (`ponto_carga`). A mesa sobe 6 cm e mostra os pistões embaixo;
 - na garra, vai presa em `ponto_garra` entre `pegar` e `soltar`;
 - na máquina, entra em `ponto_entrada` e fica em `ponto_peca`;
 - na máquina sem operador, a porta abre sozinha para a peça entrar e sair
@@ -215,6 +217,17 @@ Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 | `peles`, `cabelos` | tons sugeridos (sRGB) |
 | `alturas` | faixa de altura do sexo, em metros |
 | `altura_base` | altura do arquivo, do chão ao topo da cabeça; a escala é altura / `altura_base` |
+| `imc_base` | IMC (kg/m²) estimado do corpo do arquivo |
+| `largura` | faixa do fator de largura, `[mín, máx]` |
+
+Escala por pessoa. Quando o modelo traz a altura e o peso da pessoa, a ponte usa os dois.
+Sem eles, a altura é sorteada pelo nome dentro de `alturas` e a largura fica 1.
+
+- Vertical (eixo da altura): altura / `altura_base`.
+- Largura e profundidade: a escala vertical vezes sqrt(IMC / `imc_base`), com o IMC = peso /
+  altura² e a raiz limitada à faixa `largura`.
+
+A escala vai no nó raiz da pessoa, então o esqueleto, os clipes do UAL1 e os EPIs acompanham.
 
 O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 
