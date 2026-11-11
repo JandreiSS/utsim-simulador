@@ -1,8 +1,9 @@
 //! Os elementos 3D gerados no Blender (`assets/modelos3d`, scripts em `tools/blender`):
 //! cada `.glb` bate com o `catalogo.json`, tem os pontos e os clipes que a interface usa,
 //! os clipes duram 1 s e movem o que devem (a garra do robô chega à peça, a porta abre,
-//! o garfo sobe), e os arquivos são leves. As pessoas (`pessoa_homem`, `pessoa_mulher`) têm
-//! o esqueleto do boneco UAL1, o corpo com os materiais que o 3D recolore e um nó por EPI.
+//! o garfo sobe), e os arquivos são leves. As pessoas (`pessoa_homem`, `pessoa_mulher`, humanos
+//! do MakeHuman) têm o esqueleto do boneco UAL1, o corpo com os materiais que o 3D recolore e
+//! um nó por EPI.
 //!
 //! O teste não roda o Blender: ele confere os arquivos versionados. Para gerar de novo,
 //! `bash scripts/blender.sh`.
@@ -268,21 +269,24 @@ fn o_catalogo_e_os_arquivos_batem() {
 #[test]
 fn os_arquivos_sao_leves() {
     let cat = catalogo();
+    // Os elementos somam no máximo 2,5 MB; as pessoas (MakeHuman, com rosto, mãos e roupa de
+    // verdade, mais os oito EPIs) têm orçamento próprio, por arquivo.
     let mut total = 0u64;
     for (chave, item) in &cat {
         let tam = std::fs::metadata(dir().join(item["arquivo"].as_str().unwrap()))
             .unwrap()
             .len();
-        total += tam;
         let tri = item["triangulos"].as_u64().unwrap();
         let (lim_kb, lim_tri) = if chave.starts_with("pessoa_") {
-            // Corpo com rosto, dedos e cabelo, mais os oito EPIs.
-            (400, 10000)
+            (1280, 21000)
         } else if chave.ends_with("_medio") {
             (160, 4000)
         } else {
             (96, 1500)
         };
+        if !chave.starts_with("pessoa_") {
+            total += tam;
+        }
         assert!(tam <= lim_kb * 1024, "{chave}: {tam} bytes");
         assert!(tri <= lim_tri, "{chave}: {tri} triângulos");
     }
@@ -516,6 +520,18 @@ fn os_clipes_movem_o_que_devem() {
         // Dedos fechados ao pegar.
         let abertura = |p: &HashMap<String, [f32; 3]>| p["dedo_e"][1] - p["dedo_d"][1];
         assert!(abertura(&pegou) < abertura(&rep) - 0.05);
+        // Fechados, os dedos (2 cm de espessura) encostam na peça de 0,12 m sem atravessá-la;
+        // abertos, passam por ela com folga.
+        let vao = |p: &HashMap<String, [f32; 3]>| {
+            let (a, b) = (p["dedo_e"], p["dedo_d"]);
+            ((0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f32>()).sqrt() - 0.02
+        };
+        assert!(
+            (0.12..0.14).contains(&vao(&pegou)),
+            "{sufixo}: vão fechado {}",
+            vao(&pegou)
+        );
+        assert!(vao(&rep) > 0.18, "{sufixo}: vão aberto {}", vao(&rep));
 
         // Porta das máquinas: fechada em 0, deslocada em 1.
         for (m, dist) in [("cnc", 0.8), ("prensa", 0.55), ("injetora", 1.3)] {
@@ -841,7 +857,8 @@ fn o_robo_quebrado_baixa_o_braco() {
     }
 }
 
-/// O homem e a mulher têm corpos diferentes: ela tem ombros e cintura mais estreitos.
+/// O homem e a mulher têm corpos diferentes: ela tem o quadril mais largo e a cintura e o peito
+/// mais estreitos (largura da roupa do tronco, a camiseta e o macacão).
 #[test]
 fn o_homem_e_a_mulher_tem_corpos_diferentes() {
     let largura = |sexo: &str, z0: f32, z1: f32| {
@@ -849,22 +866,24 @@ fn o_homem_e_a_mulher_tem_corpos_diferentes() {
         let corpo = g.doc.meshes().find(|m| m.name() == Some("corpo")).unwrap();
         let mut max = 0.0f32;
         for prim in corpo.primitives() {
-            if prim.material().name() != Some("camisa") {
+            if !matches!(prim.material().name(), Some("camisa" | "calca")) {
                 continue;
             }
             let r = prim.reader(|_| Some(&g.blob));
             // glTF: y para cima, x para o lado. Só o tronco (longe dos braços abertos).
             for p in r.read_positions().expect("posições") {
-                if p[1] > z0 && p[1] < z1 && p[0].abs() < 0.19 {
+                if p[1] > z0 && p[1] < z1 && p[0].abs() < 0.25 {
                     max = max.max(p[0].abs());
                 }
             }
         }
         max
     };
+    let (h, m) = (largura("homem", 0.88, 0.98), largura("mulher", 0.88, 0.98));
+    assert!(m > h + 0.015, "quadril: homem {h}, mulher {m}");
     let (h, m) = (largura("homem", 1.12, 1.18), largura("mulher", 1.12, 1.18));
     assert!(h > m + 0.015, "cintura: homem {h}, mulher {m}");
-    let (h, m) = (largura("homem", 1.33, 1.38), largura("mulher", 1.33, 1.38));
+    let (h, m) = (largura("homem", 1.27, 1.32), largura("mulher", 1.27, 1.32));
     assert!(h > m + 0.015, "peito: homem {h}, mulher {m}");
 }
 

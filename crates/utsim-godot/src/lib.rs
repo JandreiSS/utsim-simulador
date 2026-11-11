@@ -586,6 +586,7 @@ impl UtsimPlayback {
             put(&mut e, "yaw", c.turn(i));
             put(&mut e, "shape", simple_shape(&v.kind));
             put(&mut e, "stack", v.stack);
+            put(&mut e, "sized", v.sized);
             if v.kind == "Source" {
                 // C7: the item a source creates, in the colour its items get.
                 let c = utsim_scene::style::origin_color(v.b);

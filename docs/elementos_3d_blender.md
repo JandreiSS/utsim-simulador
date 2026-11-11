@@ -14,6 +14,8 @@ bash scripts/blender.sh --so cnc   # só alguns
 
 O script acha o Blender (`BLENDER`, `PATH` ou a pasta padrão do Windows) e roda
 `blender -b --factory-startup -P tools/blender/gerar.py -- --saida assets/modelos3d`.
+As pessoas precisam também do MPFB e do pacote de assets do MakeHuman, fora do repositório
+(veja `assets/modelos3d/LEIA-ME.md`).
 Para conferir o visual, `tools/blender/vitrine.py` monta uma pequena linha com pessoas
 e renderiza uma imagem.
 
@@ -144,6 +146,7 @@ presa na garra, no garfo ou na mesa vai junto com o clipe.
 A passagem entre elementos fica com a ponte. A peça sai do `ponto_saida` de um posto e vai
 para o `ponto_carga` do veículo que a carrega, ou para o `ponto_entrada` do próximo posto.
 O teste confere que a garra do robô está mesmo sobre a peça em 1/3 e em 3/4 do `ciclo`.
+Outro teste confere que os dedos fechados encostam na peça (0,12 m) sem atravessá-la.
 Também confere que, no `ciclo_auto`, a porta está toda aberta quando a peça entra e
 quando sai.
 
@@ -152,6 +155,7 @@ quando sai.
 A peça passa de um elemento a outro pelos pontos:
 
 - da esteira, sai em `ponto_saida`;
+- no AGV, vai na mesa (`ponto_carga`). A mesa sobe 6 cm e mostra os pistões embaixo;
 - na garra, vai presa em `ponto_garra` entre `pegar` e `soltar`;
 - na máquina, entra em `ponto_entrada` e fica em `ponto_peca`;
 - na máquina sem operador, a porta abre sozinha para a peça entrar e sair
@@ -166,31 +170,44 @@ e da interface.
 ## Pessoas
 
 `tools/blender/pessoas.py` (chamado pelo `gerar.py`) gera `pessoa_homem.glb` e
-`pessoa_mulher.glb`. Elas são feitas sem nada baixado: o corpo é uma malha de anéis
-montada sobre os ossos, por famílias (tronco, cada braço, cada perna, cabeça). Os arquivos têm:
+`pessoa_mulher.glb` a partir de humanos do MakeHuman, feitos pelo complemento MPFB no
+Blender. O MPFB e o pacote de assets (CC0) ficam fora do repositório; a fonte, a versão, a
+licença e o jeito de preparar a pasta estão em `assets/modelos3d/LEIA-ME.md`. Os arquivos têm:
 
 - o esqueleto do boneco livre UAL1 (`assets/terceiros/quaternius_ual`), com os mesmos ossos
   e a mesma pose de repouso, e sem animações próprias. O 3D toca nelas as animações do UAL1
   e do UAL2 (andar, operar, carregar, pegar, interagir), como faz hoje no boneco;
-- `corpo`: corpo com proporções de gente, rosto (olhos, sobrancelhas, nariz, boca e
-  orelhas), mãos com os cinco dedos, cabelo, camisa de manga curta com gola, cinto, calça e
-  sapato. O homem e a mulher são diferentes no corpo (ombros, cintura, quadril, busto), no
-  rosto (queixo, olhos, sobrancelhas, lábios) e no cabelo (curto nele, até os ombros nela).
-  A cor vem só dos materiais, sem textura: `pele`, `cabelo`, `camisa`, `calca`, `calcado`,
-  `sola`, `cinto`, `fivela`, `olho`, `olho_branco` e `labio`;
+- `corpo`: o humano do MakeHuman, com rosto, mãos, cabelo e sobrancelhas, vestindo camiseta,
+  macacão de trabalho e sapato fechado. O homem e a mulher vêm de macros diferentes do
+  MakeHuman (sexo, idade, músculo, peso, proporções), então mudam no corpo (ombros, cintura,
+  quadril, busto) e no rosto. O cabelo é curto nele e uma trança presa nela. A cor vem só dos
+  materiais, sem textura: `pele`, `labio`, `olho`, `olho_branco`, `cabelo` (cabelo e
+  sobrancelhas), `camisa`, `calca` (o macacão), `fivela`, `calcado` e `sola`;
 - `epi_<nome>`: uma malha por EPI do modelo (`capacete`, `oculos`, `protetor_auricular`,
   `luvas`, `botina`, `colete`, `mascara`, `avental`). O 3D mostra só as do EPI que a pessoa
-  veste (o `ppe` do nó dela). Cada EPI veste o corpo: usa os mesmos cortes dele, com folga.
-  O capacete fica acima da testa, as lentes dos óculos são transparentes e a máscara cobre
-  só o nariz e a boca, então os olhos e as sobrancelhas aparecem mesmo com tudo vestido.
+  veste (o `ppe` do nó dela). Cada EPI é feito sobre o corpo vestido: raios de fora para
+  dentro acham a pele ou a roupa, e a peça fica com folga sobre ela. O capacete fica acima da
+  testa, as lentes dos óculos são transparentes e a máscara cobre só o nariz e a boca, então
+  os olhos aparecem mesmo com tudo vestido. As luvas são a mão do corpo com folga; a botina é
+  a bota `shoes03` do pacote, um pouco por fora do sapato.
 
-Os pesos de pele vêm do boneco UAL1, pelo ponto mais próximo. Há dois cuidados:
+### Do MPFB ao esqueleto do UAL1
 
-- cada família só pode seguir os próprios ossos (o tronco não segue o braço);
-- perto do ombro, o peso passa aos poucos da clavícula para o braço.
+O rig `game_engine` do MPFB tem os mesmos nomes de ossos do UAL1 (só `head` vira `Head`), mas
+as juntas ficam em outros lugares: o UAL1 tem o tronco um pouco inclinado para trás, o ombro
+mais alto e a coluna dividida de outro jeito. Como as animações do UAL trazem a posição de
+todos os ossos, o corpo é que se encaixa nas juntas do UAL1:
 
-A cabeça, o capacete, os óculos, o protetor e a máscara ficam presos ao osso `Head`. As
-luvas seguem os ossos da mão, dedo por dedo, como a mão do corpo.
+- o tronco (bacia, coluna e clavículas) vai inteiro, girado e escalado, para que o meio do
+  quadril e o meio dos ombros caiam nos do UAL1;
+- a cabeça vai reta para a junta da cabeça do UAL1, e o pescoço fica no meio-termo;
+- braços e pernas giram até a direção dos ossos do UAL1 (de braços abertos) e os ossos longos
+  esticam até o comprimento deles; mãos e pés só giram, e o pé desce até a sola tocar o chão.
+
+Cada vértice vai com a média das matrizes dos seus ossos, com os pesos do próprio MPFB, que
+continuam no arquivo. Depois, cada parte é reduzida (Decimate simétrico) para caber no
+orçamento do 3D em tempo real: cerca de 19 mil triângulos e 1,2 MB por pessoa, com os oito
+EPIs.
 
 Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 
@@ -199,7 +216,18 @@ Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 | `recolorir` | materiais que o 3D recolore |
 | `peles`, `cabelos` | tons sugeridos (sRGB) |
 | `alturas` | faixa de altura do sexo, em metros |
-| `altura_base` | altura do esqueleto (1,82 m); a escala é altura / `altura_base` |
+| `altura_base` | altura do arquivo, do chão ao topo da cabeça; a escala é altura / `altura_base` |
+| `imc_base` | IMC (kg/m²) estimado do corpo do arquivo |
+| `largura` | faixa do fator de largura, `[mín, máx]` |
+
+Escala por pessoa. Quando o modelo traz a altura e o peso da pessoa, a ponte usa os dois.
+Sem eles, a altura é sorteada pelo nome dentro de `alturas` e a largura fica 1.
+
+- Vertical (eixo da altura): altura / `altura_base`.
+- Largura e profundidade: a escala vertical vezes sqrt(IMC / `imc_base`), com o IMC = peso /
+  altura² e a raiz limitada à faixa `largura`.
+
+A escala vai no nó raiz da pessoa, então o esqueleto, os clipes do UAL1 e os EPIs acompanham.
 
 O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 
@@ -209,6 +237,6 @@ O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 - o corpo tem os materiais recoloríveis, olhos e boca;
 - cada dedo tem malha presa ao próprio osso.
 
-O teste `o_homem_e_a_mulher_tem_corpos_diferentes` confere que a cintura e o peito dela
-são mais estreitos que os dele.
+O teste `o_homem_e_a_mulher_tem_corpos_diferentes` confere que o quadril dela é mais largo e
+que a cintura e o peito dela são mais estreitos que os dele.
 
