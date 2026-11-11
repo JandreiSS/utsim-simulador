@@ -763,6 +763,163 @@ fn access_fields(obj: &ObjectDef) -> Vec<Field> {
     out
 }
 
+/// A length in metres with a decimal comma (`1,80`).
+fn metres(v: f64) -> String {
+    format!("{v:.2}").replace('.', ",")
+}
+
+/// Height an object gets when its dimensions are turned on: the real one of its catalogue
+/// asset, else a usual one for its kind.
+fn default_height(obj: &ObjectDef) -> f64 {
+    let visual = obj.visual.as_ref();
+    let asset = visual.and_then(|v| v.asset.as_deref());
+    let scale = visual.and_then(|v| v.scale).unwrap_or(1.0);
+    if let Some(e) = asset.and_then(|a| catalogue::entries().iter().find(|e| e.nome == a)) {
+        return f64::from(e.tamanho_real_m.1) * scale;
+    }
+    match obj.kind {
+        ObjectKind::Queue { .. } => 0.3,
+        ObjectKind::Processor { .. } => 1.8,
+        ObjectKind::Combiner { .. } | ObjectKind::Separator { .. } => 1.5,
+        _ => 1.0,
+    }
+}
+
+/// Dimensions of a fixed object (`size`) and, in a queue, its capacity by area
+/// (`area_per_item`). A belt and a rack show theirs, which come from their fields.
+fn size_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
+    let s = S_POSITION;
+    let info = |text: String| {
+        Field::new(
+            s,
+            "size.info",
+            "Dimensões",
+            FieldType::Info,
+            Value::Text(text),
+        )
+    };
+    let [l, w] = model.footprint(obj).unwrap_or([0.0, 0.0]);
+    match &obj.kind {
+        ObjectKind::Conveyor { .. } => {
+            return vec![info(format!(
+                "{} × {} m: o comprimento é o da esteira (Parâmetros)",
+                metres(l),
+                metres(w)
+            ))];
+        }
+        ObjectKind::Rack {
+            levels,
+            level_height,
+            ..
+        } => {
+            return vec![info(format!(
+                "{} × {} × {} m: pelos vãos e níveis (Parâmetros)",
+                metres(l),
+                metres(w),
+                metres(*levels as f64 * level_height)
+            ))];
+        }
+        _ => {}
+    }
+    let mut out = vec![group(s, "size", "Dimensões próprias", obj.size.is_some()).help(
+        "Comprimento, largura e altura do objeto em metros, no sentido dele. A área no piso muda o ponto de acesso e, com ele, as distâncias e os tempos dos operadores e veículos; numa espera com área por item, também a capacidade. O 3D estica o modelo para essas medidas. Desligado, vale a área padrão do tipo.",
+    )];
+    match obj.size {
+        Some(d) => {
+            for (i, (axis, label)) in [("x", "Comprimento"), ("y", "Largura"), ("z", "Altura")]
+                .iter()
+                .enumerate()
+            {
+                out.push(
+                    float(s, &format!("size.{axis}"), label, d[i])
+                        .depth(1)
+                        .min(0.01)
+                        .unit("m"),
+                );
+            }
+        }
+        None => out.push(info(format!("{} × {} m (padrão)", metres(l), metres(w)))),
+    }
+    if matches!(obj.kind, ObjectKind::Queue { .. }) {
+        out.push(
+            group(s, "area_per_item", "Capacidade pela área", obj.area_per_item.is_some())
+                .help(
+                    "A capacidade da espera sai da sua área no piso dividida pela área que cada item ocupa (só itens inteiros). Com uma capacidade dada também, vale a menor.",
+                ),
+        );
+        if let Some(a) = obj.area_per_item {
+            out.push(
+                float(s, "area_per_item", "Área por item", a)
+                    .depth(1)
+                    .min(0.01)
+                    .unit("m²"),
+            );
+            let fits = model
+                .queue_capacity(obj)
+                .map_or("sem limite".to_string(), |n| format!("{n} itens"));
+            out.push(
+                Field::new(
+                    s,
+                    "area_per_item.info",
+                    "Cabem",
+                    FieldType::Info,
+                    Value::Text(fits),
+                )
+                .depth(1),
+            );
+        }
+    }
+    out
+}
+
+/// The edit of the dimension fields (`size`, `area_per_item`), or `None` for others.
+fn edit_size(
+    model: &Model,
+    obj: &ObjectDef,
+    head: &str,
+    rest: &str,
+    value: &Value,
+) -> Option<Result<Command, String>> {
+    let name = obj.name.clone();
+    let start = || {
+        let [l, w] = model.footprint(obj).unwrap_or([1.0, 1.0]);
+        [l, w, default_height(obj)]
+    };
+    Some(match (head, rest) {
+        ("size", "on") => bool_of(value, "size").map(|on| Command::SetSize {
+            size: on.then(start),
+            name,
+        }),
+        ("size", "x" | "y" | "z") => {
+            let mut d = obj.size.unwrap_or_else(start);
+            let k = match rest {
+                "x" => 0,
+                "y" => 1,
+                _ => 2,
+            };
+            f64_of(value, "dimensão").map(|v| {
+                d[k] = v;
+                Command::SetSize {
+                    name,
+                    size: Some(d),
+                }
+            })
+        }
+        ("area_per_item", "on") => bool_of(value, "area_per_item").map(|on| {
+            // One item per square metre, to start from.
+            Command::SetAreaPerItem {
+                area: on.then_some(1.0),
+                name,
+            }
+        }),
+        ("area_per_item", "") => f64_of(value, "área por item").map(|a| Command::SetAreaPerItem {
+            name,
+            area: Some(a),
+        }),
+        _ => return None,
+    })
+}
+
 /// The edit of the movement fields (`movement`, `clearance`, `access`), or `None` for
 /// other fields.
 fn edit_movement(
@@ -1700,6 +1857,9 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             .help("Giro em graus, anti-horário visto de cima (R gira 90°, Ctrl+R 15°)."),
         );
     }
+    if !is_mobile(&obj.kind) {
+        out.extend(size_fields(model, obj));
+    }
     out.extend(serves_fields(model, obj));
     out.extend(kind_fields(model, obj));
     if !is_mobile(&obj.kind) {
@@ -2217,6 +2377,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     if let Some(command) = edit_movement(model, obj, head, rest, value) {
         return command;
     }
+    if let Some(command) = edit_size(model, obj, head, rest, value) {
+        return command;
+    }
     if rest == "on" {
         let on = bool_of(value, path)?;
         let text = if on {
@@ -2686,6 +2849,55 @@ mod tests {
         for path in ["movement", "marking.profile", "marking.line_width"] {
             assert!(fields.iter().any(|f| f.path == path), "{path}");
         }
+    }
+
+    #[test]
+    fn dimensions_and_the_area_of_a_queue_are_edited_through_the_panel() {
+        let mut d = doc();
+        // Off: the default footprint as information.
+        assert_eq!(
+            field(&d, "p", "size.info").value,
+            Value::Text("1,80 × 1,80 m (padrão)".into())
+        );
+        // On: it starts from the footprint and a usual height, and each axis is edited.
+        apply(&mut d, "p", "size.on", Value::Bool(true));
+        assert_eq!(object(&d, "p").size, Some([1.8, 1.8, 1.8]));
+        apply(&mut d, "p", "size.x", Value::Float(4.0));
+        apply(&mut d, "p", "size.z", Value::Float(2.5));
+        assert_eq!(object(&d, "p").size, Some([4.0, 1.8, 2.5]));
+        assert_eq!(field(&d, "p", "size.y").value, Value::Float(1.8));
+        assert_eq!(d.model().footprint(object(&d, "p")), Some([4.0, 1.8]));
+        assert!(edit(d.model(), "p", "size.y", &Value::Float(0.0)).is_ok());
+        assert!(
+            d.apply(edit(d.model(), "p", "size.y", &Value::Float(0.0)).unwrap())
+                .is_err()
+        );
+        apply(&mut d, "p", "size.on", Value::Bool(false));
+        assert_eq!(object(&d, "p").size, None);
+        // Mobile resources have no dimensions.
+        assert!(
+            object_fields(d.model(), object(&d, "emp"))
+                .iter()
+                .all(|f| !f.path.starts_with("size"))
+        );
+        // A queue: capacity by area.
+        apply(&mut d, "q", "size.on", Value::Bool(true));
+        apply(&mut d, "q", "size.x", Value::Float(3.0));
+        apply(&mut d, "q", "size.y", Value::Float(2.0));
+        apply(&mut d, "q", "area_per_item.on", Value::Bool(true));
+        assert_eq!(object(&d, "q").area_per_item, Some(1.0));
+        apply(&mut d, "q", "area_per_item", Value::Float(1.5));
+        assert_eq!(
+            field(&d, "q", "area_per_item.info").value,
+            Value::Text("4 itens".into())
+        );
+        assert!(
+            object_fields(d.model(), object(&d, "p"))
+                .iter()
+                .all(|f| !f.path.starts_with("area_per_item"))
+        );
+        apply(&mut d, "q", "area_per_item.on", Value::Bool(false));
+        assert_eq!(object(&d, "q").area_per_item, None);
     }
 
     #[test]
