@@ -1149,7 +1149,7 @@ mod tests {
         assert!(tones("cabelos").contains(&color("cabelo").unwrap()));
         assert_eq!(color("camisa").as_deref(), Some("#3366cc"));
         assert_eq!(color("calca"), None);
-        // Height in the range of the body, scale = height / 1.82.
+        // Height in the range of the body, scale = height / altura_base.
         let range: Vec<f64> = e.dados["alturas"]
             .as_array()
             .unwrap()
@@ -1157,7 +1157,9 @@ mod tests {
             .map(|v| v.as_f64().unwrap())
             .collect();
         assert!(f64::from(a.altura) >= range[0] - 1e-6 && f64::from(a.altura) <= range[1] + 1e-6);
-        assert!((a.escala - a.altura / 1.82).abs() < 1e-6);
+        assert!(
+            (a.escala - a.altura / e.dados["altura_base"].as_f64().unwrap() as f32).abs() < 1e-6
+        );
         assert!(a.path.is_file());
         // Without a colour the shirt keeps its own; the body can be forced.
         let b = pessoa(&c, "ana", Some("pessoa_mulher"), &[], None).unwrap();
