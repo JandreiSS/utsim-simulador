@@ -16,6 +16,7 @@ use egui::{Context, Event, FullOutput, Order, Pos2, RawInput, Rect, Vec2, Viewpo
 
 use crate::egui_input::{self, Input};
 use crate::egui_widgets::Registry;
+use crate::ui_ao_vivo;
 use crate::ui_bar::{self, BarMemory, BarState};
 use crate::ui_bottom::{self, PlayView, StatusView};
 use crate::ui_flows::{self, FlowsMemory, FlowsView};
@@ -71,6 +72,8 @@ pub struct Host {
     pub flows: Option<FlowsView>,
     pub flows_open: bool,
     pub flows_mem: FlowsMemory,
+    /// The live results panels of Simular (`ui_ao_vivo`), the most recent first.
+    pub vivo: Vec<crate::ui_ao_vivo::Painel>,
     /// The performance line over the 3D view (F3).
     pub perf: String,
     /// The egui panels of the last frame, in points.
@@ -129,6 +132,7 @@ impl Host {
             flows: None,
             flows_open: false,
             flows_mem: FlowsMemory::default(),
+            vivo: Vec::new(),
             panels: Vec::new(),
             was_over: false,
             central: Rect::NOTHING,
@@ -329,6 +333,15 @@ impl Host {
         self.central.shrink(ui_results::MARGIN)
     }
 
+    /// Whether the live panels are on screen: some open, in Simular, with no window over
+    /// the view.
+    pub fn vivo_visivel(&self) -> bool {
+        !self.vivo.is_empty()
+            && !self.bar.editing
+            && !self.pert_open
+            && !(self.results_open && self.results.is_some())
+    }
+
     /// Asks for a frame (something outside egui changed what it shows).
     pub fn invalidate(&mut self) {
         self.dirty = true;
@@ -386,6 +399,7 @@ impl Host {
             &mut self.flows_mem,
         );
         let props_on = props.is_some();
+        let vivo = &self.vivo;
         let output = self.ctx.run_ui(raw, |ui| {
             // A pass may run twice (egui discards the first when the layout changed):
             // only the last one counts.
@@ -460,6 +474,7 @@ impl Host {
                     panels.push(rect);
                 }
             }
+            let mut live_area = central.shrink(ui_results::MARGIN);
             if let Some(v) = flows {
                 // On the right of the free area, over the view (and over a window).
                 let area = central.shrink(ui_results::MARGIN);
@@ -469,6 +484,16 @@ impl Host {
                 );
                 if rect.width() > 200.0 && rect.height() > 150.0 {
                     ui_flows::show(ui, rect, v, flmem, reg, &mut actions);
+                    panels.push(rect);
+                    live_area.max.x = rect.min.x - ui_ao_vivo::GAP;
+                }
+            }
+            // The live results panels: Simular only, in the bottom-right corner of the
+            // view, not over the Resultados or PERT/CPM window that covers it.
+            if !bar.editing && !pert_open && results.is_none() {
+                let rects = ui_ao_vivo::rects(live_area, vivo.len());
+                for (k, (rect, p)) in rects.into_iter().zip(vivo).enumerate() {
+                    ui_ao_vivo::show(ui, rect, k, p, reg, &mut actions);
                     panels.push(rect);
                 }
             }
@@ -505,6 +530,13 @@ impl Host {
         }
         if actions.iter().any(|a| a == "fluxos:fechar") {
             self.flows_open = false;
+            self.dirty = true;
+        }
+        // The clicks of the live panels are the host's (close, pin).
+        let before = actions.len();
+        let vivo = &mut self.vivo;
+        actions.retain(|a| !crate::ui_ao_vivo::acao(vivo, a));
+        if actions.len() != before {
             self.dirty = true;
         }
         if actions.iter().any(|a| a == "pert:fechar") {
@@ -1052,6 +1084,96 @@ mod tests {
             );
             assert_eq!(h.reg.get("Reproducao_Play").unwrap().text, "Pausar");
             assert!(h.is_over([bar.center().x, bar.center().y]));
+        }
+    }
+
+    /// The live panel of Simular: in the bottom-right corner above the playback bar, its
+    /// lines named, and its X and "Fixar" handled by the host (not sent to the bridge).
+    #[test]
+    fn the_live_panel_sits_in_the_corner_and_closes_with_its_x() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/inspecao_e_retrabalho.ron");
+        let model = utsim_model::Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let vivo = crate::ao_vivo::AoVivo::new(&replay, Some(&model), |_| None);
+        let mut h = Host::new();
+        h.set_bar(BarState {
+            editing: false,
+            ..BarState::default()
+        });
+        h.left = true;
+        h.set_sim(sim_view());
+        h.set_play(crate::ui_bottom::PlayView {
+            visible: true,
+            playing: false,
+            t: 2400.0,
+            end: 4800.0,
+            speed: 1.0,
+        });
+        crate::ui_ao_vivo::abrir(&mut h.vivo, "inspecao");
+        h.vivo[0].leitura = vivo.leitura("inspecao", 2400.0);
+        for k in 0..3 {
+            drop_frame(h.frame(k as f64 * 0.1, SIZE, 1.0));
+        }
+        for name in [
+            "PainelVivo",
+            "PainelVivo_Titulo",
+            "PainelVivo_Fechar",
+            "PainelVivo_Fixar",
+            "PainelVivo_Processados",
+            "PainelVivo_Fila",
+            "PainelVivo_Refugo",
+            "PainelVivo_Ocupado",
+        ] {
+            let w = h.reg.get(name).unwrap_or_else(|| panic!("{name}"));
+            assert!(w.rect.is_positive(), "{name} {:?}", w.rect);
+        }
+        let n = vivo.numeros("inspecao", 2400.0).unwrap();
+        assert_eq!(
+            h.reg.get("PainelVivo_Processados").unwrap().text,
+            n.saidas.to_string()
+        );
+        assert_eq!(
+            h.reg.get("PainelVivo_Titulo").unwrap().text,
+            "inspecao (processo)"
+        );
+        let panel = h.reg.get("PainelVivo").unwrap().rect;
+        let bar = h.reg.get("BarraReproducao").unwrap().rect;
+        let left = h.reg.get("Simular_Blocos").map(|w| w.rect);
+        assert!(panel.max.y <= bar.min.y, "{panel:?} {bar:?}");
+        assert!(
+            (panel.max.x - (SIZE[0] - ui_results::MARGIN)).abs() < 1.0,
+            "{panel:?}"
+        );
+        if let Some(l) = left {
+            assert!(!panel.intersects(l), "{panel:?} {l:?}");
+        }
+        assert!(h.is_over([panel.center().x, panel.center().y]));
+        // Pin, then close: the host does it, nothing goes to the bridge.
+        let mut now = 1.0;
+        for (name, fixed) in [("PainelVivo_Fixar", true), ("PainelVivo_Fechar", false)] {
+            let at = center(&h, name);
+            let mut actions = Vec::new();
+            for input in &[
+                Input::Motion {
+                    pos: at,
+                    mods: Mods::default(),
+                },
+                button(at, 1, true),
+                button(at, 1, false),
+            ] {
+                h.push(input, no_clip);
+                now += 0.1;
+                let f = h.frame(now, SIZE, 1.0);
+                actions.extend(f.actions);
+                f.output.drop_without_applying_deltas();
+            }
+            assert!(actions.is_empty(), "{actions:?}");
+            if fixed {
+                assert!(h.vivo[0].fixo);
+            } else {
+                assert!(h.vivo.is_empty());
+            }
         }
     }
 

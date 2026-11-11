@@ -366,6 +366,10 @@ pub struct Playback {
     /// post and walks in the layout) and the runs of its states as the table sees them
     /// ([`Animado::runs`]); `None` for the others.
     pub animados: Vec<Option<(Animado, modelos3d::Runs)>>,
+    /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
+    /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
+    vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
+    rastro: std::sync::Mutex<Option<Replay>>,
 }
 
 impl Playback {
@@ -532,6 +536,8 @@ impl Playback {
             dropped,
             modelos3d: catalogo,
             animados: Vec::new(),
+            vivo: std::sync::OnceLock::new(),
+            rastro: std::sync::Mutex::new(None),
         }
         .with_blender(replay)
     }
@@ -570,6 +576,27 @@ impl Playback {
         }
         self.animados = animados;
         self
+    }
+
+    /// Keeps the trace of `replay` (the one the scene was built from) for the live panel:
+    /// it is read only if a panel opens ([`Playback::vivo`]).
+    pub fn com_rastro(self, replay: Replay) -> Playback {
+        if let Ok(mut r) = self.rastro.lock() {
+            *r = Some(replay);
+        }
+        self
+    }
+
+    /// The live numbers of every block, read from the kept trace on the first call;
+    /// `None` without a trace ([`Playback::com_rastro`]).
+    pub fn vivo(&self) -> Option<&crate::ao_vivo::AoVivo> {
+        if let Some(v) = self.vivo.get() {
+            return Some(v);
+        }
+        let replay = self.rastro.lock().ok()?.take()?;
+        Some(self.vivo.get_or_init(|| {
+            crate::ao_vivo::AoVivo::new(&replay, self.model.as_ref(), |b| self.scene.role(b))
+        }))
     }
 
     /// The asset of block `i` as the engine loads it, and the library asset to fall back
@@ -1889,7 +1916,7 @@ mod tests {
                     // One source for the forks: the clip, at the carriage's rise over
                     // the travel (the engine then leaves the `carro` node alone).
                     assert_eq!(a.clips[f.anim_clip[i] as usize], "garfo_subir");
-                    assert!((f.anim_fase[i] - ((lift - 0.1) / 2.0).min(1.0)).abs() < 1e-4);
+                    assert!((f.anim_fase[i] - ((lift - 0.1) / 6.0).min(1.0)).abs() < 1e-4);
                     high = high.max(f.anim_fase[i]);
                 } else {
                     assert_eq!(f.anim_clip[i], -1, "t={k}");
@@ -1952,23 +1979,23 @@ mod tests {
             (1.0, ["ponto_carga".to_string()].as_slice())
         );
         assert!((at("agv_1", 17.95).1 - 0.5).abs() < 1e-3);
-        // The fourth pallet goes to the top cell (4.5 m, past the 2 m of the fork clip):
-        // the clip at its end, the rest of the rise added to the carriage, and the pallet
-        // on the forks at the cell's height.
+        // The fourth pallet goes to the top cell (4.5 m, inside the 6 m of the mast): the
+        // clip carries the whole rise, nothing is added to the carriage, and the pallet
+        // rides on the forks at the cell's height.
         let i = index(&pb, "empilhadeira_1");
         let f = pb.frame(198.0);
         assert!(f.lift[i] >= 4.5, "{}", f.lift[i]);
-        assert_eq!(f.anim_fase[i], 1.0);
-        assert!((0.1 + 2.0 + f.anim_extra[i] - f.lift[i]).abs() < 1e-4);
+        assert!((f.anim_fase[i] - (f.lift[i] - 0.1) / 6.0).abs() < 1e-4);
+        assert_eq!(f.anim_extra[i], 0.0);
         let k = (0..f.item_id.len())
             .find(|&k| f.item_ancora_bloco[k] == i as i32)
             .expect("the pallet on the forks");
         let half = f.item_scale[k] * ITEM_SIZE / 2.0;
         assert!((f.item_position[k][1] - half - f.lift[i]).abs() < 1e-3);
-        // The third one goes in the bay at 3 m.
+        // The third one goes in the bay at 3 m: half of the mast's 6 m.
         let (clip, p, on) = at("empilhadeira_1", 138.0);
         assert_eq!(clip.as_deref(), Some("garfo_subir"));
-        assert!(p > 0.9, "{p}");
+        assert!((p - 0.5).abs() < 0.02, "{p}");
         assert_eq!(on, ["ponto_carga"]);
     }
 

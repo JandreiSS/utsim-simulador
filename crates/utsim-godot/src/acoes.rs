@@ -87,6 +87,8 @@ pub enum Passo {
     Relogio,
     FluxosTempo,
     CancelarTrabalho,
+    /// Esc in Simular: closes the most recent live results panel (`ui_ao_vivo`).
+    FecharPainelVivo,
     // The properties panel.
     PropOk {
         objeto: String,
@@ -276,6 +278,7 @@ impl Passo {
             Relogio => "relogio",
             FluxosTempo => "fluxos_tempo",
             CancelarTrabalho => "cancelar_trabalho",
+            FecharPainelVivo => "fechar_painel_vivo",
             PropOk {
                 objeto,
                 caminho,
@@ -599,6 +602,7 @@ pub fn rotear_tecla(what: &str, st: &Estado) -> Vec<Passo> {
         "reproduzir" => Reproduzir,
         "excluir" => Excluir,
         "cancelar" => CancelarEditor,
+        "painel_vivo_fechar" => FecharPainelVivo,
         "mover" => match (int(arg), int(partes.next().unwrap_or(""))) {
             (Some(x), Some(z)) => Mover(x, z),
             _ => return Vec::new(),
@@ -789,6 +793,11 @@ mod tests {
             vec![Organizar("colar".into())]
         );
         assert_eq!(rotear_tecla("cancelar", &s), vec![CancelarEditor]);
+        assert_eq!(
+            rotear_tecla("painel_vivo_fechar", &s),
+            vec![FecharPainelVivo]
+        );
+        assert_eq!(FecharPainelVivo.campos().0, "fechar_painel_vivo");
         assert_eq!(
             rotear_tecla("grade", &s),
             vec![Encaixe {

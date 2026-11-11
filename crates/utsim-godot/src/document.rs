@@ -1001,7 +1001,7 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 38] = [
+pub const SHORTCUTS: [(&str, &str); 40] = [
     ("Clique", "seleciona o bloco ou a ligação"),
     (
         "Clique de novo no mesmo ponto",
@@ -1057,6 +1057,14 @@ pub const SHORTCUTS: [(&str, &str); 38] = [
     (
         "Esc",
         "cancela a ferramenta, a ligação ou o corredor começado, ou a seleção",
+    ),
+    (
+        "Simular: clique num objeto",
+        "abre o painel de resultados ao vivo do objeto no canto da vista",
+    ),
+    (
+        "Simular: Esc",
+        "fecha o painel ao vivo mais recente (o não fixado primeiro)",
     ),
     ("F", "enquadra o modelo"),
     ("G", "liga ou desliga o encaixe na grade"),

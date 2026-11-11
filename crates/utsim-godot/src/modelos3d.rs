@@ -1066,20 +1066,22 @@ mod tests {
         assert_eq!(agv.anchor(run_at(&runs, 13.0), 13.0), None);
         assert_eq!(agv.fork(1.0, 1.0), None);
         assert_eq!(agv.mesa.map(|m| m.1), Some(0.06));
-        // The forks follow the lift: rest 0.10 m, 2 m of travel; a high bay goes up.
+        // The forks follow the lift: rest 0.10 m, 6 m of telescopic mast; a high bay goes up.
         let fork = Animado::resolve(c.get("empilhadeira").unwrap(), "empilhadeira", &AT, false);
         let garfo = fork.clips.iter().position(|c| c == "garfo_subir").unwrap() as i32;
         assert_eq!(fork.fork(0.10, 1.0), Some((garfo, 0.0, 0.0)));
-        let (_, p, _) = fork.fork(0.20, 1.0).unwrap();
-        assert!((p - 0.05).abs() < 1e-6, "{p}");
-        assert_eq!(fork.fork(1.60, 1.0), Some((garfo, 0.75, 0.0)));
-        // A cell above the travel: the clip at its end, the rest added to the carriage.
+        let (_, p, _) = fork.fork(0.70, 1.0).unwrap();
+        assert!((p - 0.1).abs() < 1e-6, "{p}");
         let (_, p, extra) = fork.fork(4.6, 1.0).unwrap();
+        assert!((p - 0.75).abs() < 1e-6, "{p}");
+        assert_eq!(extra, 0.0);
+        // Only above the 6 m of travel does the rest go to the carriage.
+        let (_, p, extra) = fork.fork(7.1, 1.0).unwrap();
         assert_eq!(p, 1.0);
-        assert!((extra - 2.5).abs() < 1e-5, "{extra}");
+        assert!((extra - 1.0).abs() < 1e-5, "{extra}");
         // At half size: the rest (0.10 in the file) is 0.05 m in the world.
         assert_eq!(fork.fork(0.05, 0.5), Some((garfo, 0.0, 0.0)));
-        let (_, p, _) = fork.fork(0.55, 0.5).unwrap();
+        let (_, p, _) = fork.fork(1.55, 0.5).unwrap();
         assert!((p - 0.5).abs() < 1e-5, "{p}");
     }
 
@@ -1147,7 +1149,7 @@ mod tests {
         assert!(tones("cabelos").contains(&color("cabelo").unwrap()));
         assert_eq!(color("camisa").as_deref(), Some("#3366cc"));
         assert_eq!(color("calca"), None);
-        // Height in the range of the body, scale = height / 1.82.
+        // Height in the range of the body, scale = height / altura_base.
         let range: Vec<f64> = e.dados["alturas"]
             .as_array()
             .unwrap()
@@ -1155,7 +1157,9 @@ mod tests {
             .map(|v| v.as_f64().unwrap())
             .collect();
         assert!(f64::from(a.altura) >= range[0] - 1e-6 && f64::from(a.altura) <= range[1] + 1e-6);
-        assert!((a.escala - a.altura / 1.82).abs() < 1e-6);
+        assert!(
+            (a.escala - a.altura / e.dados["altura_base"].as_f64().unwrap() as f32).abs() < 1e-6
+        );
         assert!(a.path.is_file());
         // Without a colour the shirt keeps its own; the body can be forced.
         let b = pessoa(&c, "ana", Some("pessoa_mulher"), &[], None).unwrap();

@@ -428,6 +428,11 @@ func _step(s: Dictionary, k: int) -> void:
 	elif s.has("tempo"):
 		_main.seek(float(s["tempo"]), true)
 		await _frames(3)
+	elif s.has("painel_ao_vivo"):
+		# Simular: the live results panel of an object, as a click on it opens it.
+		if not _main.open_live_panel(String(s["painel_ao_vivo"])):
+			_fail("passo %d: o painel ao vivo de %s não abriu" % [k, s["painel_ao_vivo"]])
+		await _frames(4)
 	elif s.has("outro_app"):
 		var o: Dictionary = s["outro_app"]
 		var path := _resolve(_base, String(o["arquivo"]))
@@ -540,6 +545,16 @@ func _target(t: Variant) -> Variant:
 		return cam.unproject_position(p)
 	if d.has("objeto"):
 		return _main.editor.block_screen(d["objeto"]) if _main.is_editing() else null
+	if d.has("objeto_simular"):
+		# Simular: the middle of the object in the playback (its click opens the live panel).
+		var i: int = _main.cena.block_index(String(d["objeto_simular"]))
+		if i < 0:
+			return null
+		var at: Vector3 = _main.cena.block_focus(i)
+		var c3 := _main.get_viewport().get_camera_3d()
+		if c3 == null or c3.is_position_behind(at):
+			return null
+		return c3.unproject_position(at)
 	if d.has("porta_saida") or d.has("porta_entrada"):
 		var out := d.has("porta_saida")
 		var name: String = d["porta_saida"] if out else d["porta_entrada"]
@@ -1049,6 +1064,14 @@ func _check(c: Dictionary, k: int) -> void:
 				for n in want:
 					var ctl := _control(String(n))
 					report.call("%s oculto" % n, (ctl == null or not ctl.is_visible_in_tree()) and not _widget_visible(String(n)), "")
+			"painel_vivo":
+				# The objects of the live panels on screen, the most recent first.
+				var vivos: Array = Array(_egui().live_names()) if _egui() != null else []
+				report.call("painéis ao vivo %s" % [want], vivos == Array(want), str(vivos))
+			"painel_vivo_relatorio":
+				# At the end of the replication the live numbers are its final report's.
+				var diff: String = String(_egui().live_check(String(want))) if _egui() != null else "sem interface"
+				report.call("painel ao vivo de %s = relatório" % want, diff == "", diff.substr(0, 300))
 			"replicacoes":
 				var n: int = _main.results.replications() if _main.results != null else 0
 				report.call("replicações dos resultados", n == int(want), str(n))
