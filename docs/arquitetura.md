@@ -231,7 +231,8 @@ bloco segue o caminho das quebras simples, intocado: os golden não mudam.
 ### Pessoas (`utsim_core::person`, `engine/person.rs`)
 O campo opcional `person` de um objeto (só `Transporter`) é o `utsim_core::Person` em si
 (serde direto, como os tipos da manutenção): `fatigue`, `learning`, `skills`,
-`walk_speed_loaded`, `variation`, `weight_label` e `lift`. O modelo chama
+`walk_speed_loaded`, `variation`, `weight_label`, `lift` e os registros `sex`, `height_m`,
+`mass_kg`, `age`, `experience_years` e `capacity` (o núcleo não os lê). O modelo chama
 `Simulation::set_person`; sem `person`, nenhum caminho novo é tomado e os golden não mudam.
 
 - **Fadiga só nos eventos.** Por pessoa, `PersonState` guarda o nível `F` num instante

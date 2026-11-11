@@ -57,6 +57,12 @@ mesmos resultados. O exemplo completo está em `examples/pessoas_fadiga.ron`.
 | `variation` | nenhuma | ritmo individual `(dist, min, max)` |
 | `weight_label` | `"weight"` | rótulo com o peso do item, em kg |
 | `lift` | nenhum | geometria do levantamento, para o aviso do NIOSH |
+| `sex` | nenhum | `Some(Female)` ou `Some(Male)` (também `Feminino`, `Masculino`); sem valor, não informado |
+| `height_m` | nenhuma | altura em metros |
+| `mass_kg` | nenhuma | massa corporal em kg |
+| `age` | nenhuma | idade em anos (registro) |
+| `experience_years` | nenhuma | anos de experiência na função (registro) |
+| `capacity` | nenhuma | capacidade medida `(load_kg, force_n)`: maior carga que a pessoa levanta na função (kg) e maior força que ela faz ao empurrar ou puxar (N) |
 
 O perfil só vale para um `Transporter`. Ele vale para tudo o que a pessoa faz: andar,
 carregar e descarregar itens, operar um posto (`OperatorUse`) e atender a manutenção
@@ -201,6 +207,40 @@ divididos por `v` e a velocidade multiplicada por `v`. O sorteio é truncado em
 `[min, max]` e vem de um *stream* próprio da pessoa, então ligar a variação não muda as
 chegadas nem os tempos sorteados pelos outros objetos.
 
+## Quem é a pessoa
+
+```ron
+person: Some((
+    sex: Some(Female), height_m: Some(1.62), mass_kg: Some(58.0),
+    age: Some(34), experience_years: Some(6.0),
+    capacity: Some((load_kg: Some(18.0))),
+)),
+```
+
+Os campos também aceitam os nomes em português (`sexo`, `altura_m`, `massa_kg`, `idade`,
+`experiencia_anos`, `capacidade` com `carga_kg` e `forca_n`). O que eles fazem hoje:
+
+- **Nada muda na rodada.** O núcleo não lê nenhum desses campos: com ou sem eles, os
+  resultados são os mesmos.
+- **3D.** O sexo escolhe o corpo (sem valor, o corpo continua escolhido pelo nome). A
+  altura dá a altura do boneco, e a massa, junto com a altura, dá a largura pelo índice de
+  massa corporal.
+- **Avisos.** Uma carga acima da capacidade medida (`capacity.load_kg`) dá aviso. Com
+  `sex: Some(Female)`, uma carga acima de 20 kg dá o aviso da CLT, art. 390 (abaixo). A
+  altura fora de 1,40 a 2,10 m e a massa fora de 35 a 200 kg também dão aviso, porque quase
+  sempre são outra unidade (centímetros, libras). É só aviso: há pessoas reais fora
+  dessas faixas.
+- **Fadiga.** Não há padrão de fadiga por sexo, e nenhum campo daqui muda a fadiga. A
+  variação entre pessoas é maior que a diferença média entre os sexos; quando houver
+  medições, a fadiga vem delas.
+- **Massa corporal.** As normas usadas aqui (NIOSH e CLT) não usam a massa da pessoa. Por
+  isso ela é só registro e serve para o 3D.
+- **Idade e experiência** são só registro.
+
+**Dados pessoais (LGPD).** Sexo, idade, medidas e tempos de pessoas reais são dados
+pessoais. Use um apelido ou um código como nome do objeto, e cuide do arquivo do modelo
+como de qualquer cadastro de pessoal antes de mandá-lo a alguém.
+
 ## Levantamento manual (aviso)
 
 O UTSim não impede um levantamento pesado; ele avisa no `utsim check` e no `utsim run`.
@@ -217,7 +257,9 @@ Para cada pessoa com perfil que carrega itens, o maior peso que as fontes dão a
   constante de carga de 23 kg (condições ideais);
 - o limite de referência da **CLT, art. 198** (60 kg por empregado na remoção individual)
   [conferir no texto vigente]. A CLT, art. 390, traz limites menores para o trabalho da
-  mulher (20 kg contínuo, 25 kg ocasional) [conferir no texto vigente].
+  mulher (20 kg contínuo, 25 kg ocasional) [conferir no texto vigente]: com
+  `sex: Some(Female)`, uma carga acima de 20 kg dá aviso;
+- a **capacidade medida** da pessoa (`capacity.load_kg`), quando ela existe.
 
 A **NR-17 (Ergonomia)** pede que o transporte manual de cargas não comprometa a saúde
 ou a segurança do trabalhador e que ele seja treinado; ela não fixa um peso único e
