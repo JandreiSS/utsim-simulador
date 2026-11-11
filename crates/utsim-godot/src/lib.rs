@@ -31,6 +31,7 @@ pub mod acoes;
 pub mod aisle_edit;
 pub mod aisle_godot;
 pub mod andamento;
+pub mod ao_vivo;
 pub mod camera_follow;
 pub mod coords;
 pub mod dados;
@@ -66,6 +67,7 @@ pub mod shortcuts;
 pub mod tool_panels;
 pub mod trava_modelo;
 pub mod ui_abas;
+pub mod ui_ao_vivo;
 pub mod ui_arrivals;
 pub mod ui_bar;
 pub mod ui_bottom;
@@ -400,7 +402,7 @@ impl UtsimModel {
     fn playback(&mut self, replication: i64, skeletal_people: bool) -> Option<Gd<UtsimPlayback>> {
         if let Some(replay) = &self.replay {
             let dir = self.path.as_ref().and_then(|p| p.parent());
-            let core = Playback::new(replay, None, dir, skeletal_people);
+            let core = Playback::new(replay, None, dir, skeletal_people).com_rastro(replay.clone());
             return Some(Gd::from_init_fn(|base| UtsimPlayback {
                 core: Some(core),
                 base,
@@ -410,7 +412,8 @@ impl UtsimModel {
         match model.replay(replication.max(0) as u32) {
             Ok(replay) => {
                 let dir = self.path.as_ref().and_then(|p| p.parent());
-                let core = Playback::new(&replay, Some(model), dir, skeletal_people);
+                let core =
+                    Playback::new(&replay, Some(model), dir, skeletal_people).com_rastro(replay);
                 Some(Gd::from_init_fn(|base| UtsimPlayback {
                     core: Some(core),
                     base,

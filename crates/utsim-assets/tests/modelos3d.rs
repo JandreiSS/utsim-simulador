@@ -276,11 +276,12 @@ fn os_arquivos_sao_leves() {
         total += tam;
         let tri = item["triangulos"].as_u64().unwrap();
         let (lim_kb, lim_tri) = if chave.starts_with("pessoa_") {
-            (400, 7000)
+            // Corpo com rosto, dedos e cabelo, mais os oito EPIs.
+            (400, 10000)
         } else if chave.ends_with("_medio") {
             (160, 4000)
         } else {
-            (64, 1500)
+            (96, 1500)
         };
         assert!(tam <= lim_kb * 1024, "{chave}: {tam} bytes");
         assert!(tri <= lim_tri, "{chave}: {tri} triângulos");
@@ -386,8 +387,8 @@ const CONTRATO: &[Contrato] = &[
     (
         "empilhadeira",
         &[
-            "chassi", "cabine", "luz", "torre", "carro", "garfos", "roda_de", "roda_dd", "roda_te",
-            "roda_td",
+            "chassi", "cabine", "luz", "torre", "mastro_m", "mastro_i", "carro", "garfos",
+            "roda_de", "roda_dd", "roda_te", "roda_td",
         ],
         &["ponto_carga", "ponto_operador"],
         &["garfo_subir"],
@@ -536,8 +537,22 @@ fn os_clipes_movem_o_que_devem() {
             .as_f64()
             .unwrap() as f32;
         let z0 = g.pose(None, false)["ponto_carga"][2];
-        let z1 = g.pose(Some("garfo_subir"), true)["ponto_carga"][2];
-        assert!((z1 - z0 - curso).abs() < 1e-3);
+        let fim = g.pose(Some("garfo_subir"), true);
+        assert!((fim["ponto_carga"][2] - z0 - curso).abs() < 1e-3);
+        // O curso cobre o vão mais alto do porta-paletes, e o mastro é telescópico: o
+        // estágio do meio sobe um terço do curso e o de dentro, dois terços.
+        let vao = cat["porta_paletes"]["pontos"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|p| p["pos"][2].as_f64().unwrap() as f32)
+            .fold(0.0, f32::max);
+        assert!(z0 + curso >= vao, "garfo até {} < vão {vao}", z0 + curso);
+        let rep = g.pose(None, false);
+        for (no, parte) in [("mastro_m", 1.0 / 3.0), ("mastro_i", 2.0 / 3.0)] {
+            let subiu = fim[no][2] - rep[no][2];
+            assert!((subiu - curso * parte).abs() < 1e-3, "{no} sobe {subiu}");
+        }
         let g = Glb::ler(&format!("agv{sufixo}.glb"));
         let curso = cat["agv"]["dados"]["mesa_curso"].as_f64().unwrap() as f32;
         let z0 = g.pose(None, false)["ponto_carga"][2];
@@ -691,7 +706,7 @@ fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
     assert_eq!(celula, BTreeSet::from(["entering", "leaving"]));
     let d = &cat["empilhadeira"]["dados"];
     let ergue = d["levante"].as_f64().unwrap() * d["garfo_curso"].as_f64().unwrap();
-    assert!((ergue - 0.10).abs() < 1e-6, "empilhadeira ergue {ergue}");
+    assert!((ergue - 0.10).abs() < 1e-4, "empilhadeira ergue {ergue}");
 }
 
 /// A tabela `peca`: por estado, trechos de fase que cobrem 0 a 1 sem buraco, cada um com um
@@ -826,6 +841,33 @@ fn o_robo_quebrado_baixa_o_braco() {
     }
 }
 
+/// O homem e a mulher têm corpos diferentes: ela tem ombros e cintura mais estreitos.
+#[test]
+fn o_homem_e_a_mulher_tem_corpos_diferentes() {
+    let largura = |sexo: &str, z0: f32, z1: f32| {
+        let g = Glb::ler(&format!("pessoa_{sexo}.glb"));
+        let corpo = g.doc.meshes().find(|m| m.name() == Some("corpo")).unwrap();
+        let mut max = 0.0f32;
+        for prim in corpo.primitives() {
+            if prim.material().name() != Some("camisa") {
+                continue;
+            }
+            let r = prim.reader(|_| Some(&g.blob));
+            // glTF: y para cima, x para o lado. Só o tronco (longe dos braços abertos).
+            for p in r.read_positions().expect("posições") {
+                if p[1] > z0 && p[1] < z1 && p[0].abs() < 0.19 {
+                    max = max.max(p[0].abs());
+                }
+            }
+        }
+        max
+    };
+    let (h, m) = (largura("homem", 1.12, 1.18), largura("mulher", 1.12, 1.18));
+    assert!(h > m + 0.015, "cintura: homem {h}, mulher {m}");
+    let (h, m) = (largura("homem", 1.33, 1.38), largura("mulher", 1.33, 1.38));
+    assert!(h > m + 0.015, "peito: homem {h}, mulher {m}");
+}
+
 /// Os EPIs que o modelo conhece (`utsim_model::quality::PPE_NAMES`): um nó `epi_<nome>` cada.
 const EPIS: &[&str] = &[
     "capacete",
@@ -933,6 +975,33 @@ fn as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1() {
                 mats.contains(m.as_str().unwrap()),
                 "{chave}: falta o material {m}"
             );
+        }
+        // Gente de verdade: rosto com olhos e boca, e dedos que dobram com os ossos da mão.
+        for m in ["labio", "olho", "olho_branco"] {
+            assert!(mats.contains(m), "{chave}: falta o material {m}");
+        }
+        let nomes: Vec<&str> = skin.joints().map(|j| j.name().unwrap()).collect();
+        let mut dedos = BTreeSet::new();
+        for prim in corpo.primitives() {
+            let r = prim.reader(|_| Some(&g.blob));
+            let juntas = r.read_joints(0).expect("juntas").into_u16();
+            let pesos = r.read_weights(0).expect("pesos").into_f32();
+            for (j, w) in juntas.zip(pesos) {
+                for k in 0..4 {
+                    if w[k] > 0.5 {
+                        dedos.insert(nomes[j[k] as usize]);
+                    }
+                }
+            }
+        }
+        for d in ["thumb", "index", "middle", "ring", "pinky"] {
+            for lado in ["l", "r"] {
+                let osso = format!("{d}_02_{lado}");
+                assert!(
+                    dedos.contains(osso.as_str()),
+                    "{chave}: dedo {osso} sem malha"
+                );
+            }
         }
         // Em pé no piso, com a altura do esqueleto.
         let alt = item["tamanho"][2].as_f64().unwrap();

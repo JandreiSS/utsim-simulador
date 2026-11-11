@@ -83,7 +83,7 @@ pular no tempo.
 | | `quebra` | não | quebrado (o braço cai e fica parado) |
 | celula | `porta_abrir` | não | posto da célula em `entering` (0 → 1) e em `leaving` (1 → 0) |
 | esteira | `rolar` | sim | fase = distância / (2π · `raio_rolo`) |
-| empilhadeira | `garfo_subir` | não | altura do garfo / `garfo_curso` |
+| empilhadeira | `garfo_subir` | não | altura do garfo / `garfo_curso` (6 m); os estágios `mastro_m` e `mastro_i` do mastro sobem junto |
 | agv | `mesa_subir` | não | carregando ou descarregando |
 
 Parado, livre e bloqueado aparecem pela cor da `luz`, como hoje.
@@ -120,7 +120,7 @@ então vale igual em qualquer instante e para qualquer peça.
 A porta fica toda aberta até 2/24 da fase, fecha até 4/24, fica fechada enquanto o
 `ciclo` roda até 20/24 e abre de novo até 22/24.
 
-`levante` é a fase que só tira a carga do chão: na empilhadeira, 0,05 do curso do garfo
+`levante` é a fase que só tira a carga do chão: na empilhadeira, 1/60 do curso do garfo
 (0,10 m, em `dados.levante`); no AGV, a mesa sobe tudo (1). Para pôr o palete num vão
 alto do porta-paletes, a ponte usa a altura do vão (fase = altura / `garfo_curso`).
 
@@ -166,26 +166,31 @@ e da interface.
 ## Pessoas
 
 `tools/blender/pessoas.py` (chamado pelo `gerar.py`) gera `pessoa_homem.glb` e
-`pessoa_mulher.glb`. Elas são feitas sem nada baixado: o corpo é de metaball, por famílias
-(tronco, cada braço, cada perna), convertido em malha leve. Os arquivos têm:
+`pessoa_mulher.glb`. Elas são feitas sem nada baixado: o corpo é uma malha de anéis
+montada sobre os ossos, por famílias (tronco, cada braço, cada perna, cabeça). Os arquivos têm:
 
 - o esqueleto do boneco livre UAL1 (`assets/terceiros/quaternius_ual`), com os mesmos ossos
   e a mesma pose de repouso, e sem animações próprias. O 3D toca nelas as animações do UAL1
   e do UAL2 (andar, operar, carregar, pegar, interagir), como faz hoje no boneco;
-- `corpo`: corpo liso com rosto simples (olhos, sobrancelhas, nariz, orelhas e boca),
-  cabelo, camisa de manga curta, calça e calçado. A cor vem dos materiais `pele`, `cabelo`,
-  `camisa`, `calca`, `calcado`, `olho` e `labio`, sem textura;
+- `corpo`: corpo com proporções de gente, rosto (olhos, sobrancelhas, nariz, boca e
+  orelhas), mãos com os cinco dedos, cabelo, camisa de manga curta com gola, cinto, calça e
+  sapato. O homem e a mulher são diferentes no corpo (ombros, cintura, quadril, busto), no
+  rosto (queixo, olhos, sobrancelhas, lábios) e no cabelo (curto nele, até os ombros nela).
+  A cor vem só dos materiais, sem textura: `pele`, `cabelo`, `camisa`, `calca`, `calcado`,
+  `sola`, `cinto`, `fivela`, `olho`, `olho_branco` e `labio`;
 - `epi_<nome>`: uma malha por EPI do modelo (`capacete`, `oculos`, `protetor_auricular`,
   `luvas`, `botina`, `colete`, `mascara`, `avental`). O 3D mostra só as do EPI que a pessoa
-  veste (o `ppe` do nó dela).
+  veste (o `ppe` do nó dela). Cada EPI veste o corpo: usa os mesmos cortes dele, com folga.
+  O capacete fica acima da testa, as lentes dos óculos são transparentes e a máscara cobre
+  só o nariz e a boca, então os olhos e as sobrancelhas aparecem mesmo com tudo vestido.
 
 Os pesos de pele vêm do boneco UAL1, pelo ponto mais próximo. Há dois cuidados:
 
 - cada família só pode seguir os próprios ossos (o tronco não segue o braço);
 - perto do ombro, o peso passa aos poucos da clavícula para o braço.
 
-As peças da cabeça, o capacete, os óculos, o protetor e a máscara ficam presos ao osso
-`Head`, e as luvas à mão.
+A cabeça, o capacete, os óculos, o protetor e a máscara ficam presos ao osso `Head`. As
+luvas seguem os ossos da mão, dedo por dedo, como a mão do corpo.
 
 Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 
@@ -201,5 +206,9 @@ O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 - os ossos e a pose de repouso batem com os do UAL1;
 - há um nó por EPI;
 - todo vértice tem peso;
-- o corpo tem os materiais recoloríveis.
+- o corpo tem os materiais recoloríveis, olhos e boca;
+- cada dedo tem malha presa ao próprio osso.
+
+O teste `o_homem_e_a_mulher_tem_corpos_diferentes` confere que a cintura e o peito dela
+são mais estreitos que os dele.
 

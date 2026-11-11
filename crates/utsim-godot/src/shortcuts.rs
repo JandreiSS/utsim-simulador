@@ -18,6 +18,7 @@ pub struct KeyContext {
 /// Actions: `desfazer`, `refazer`, `salvar`, `salvar_como`, `abrir`, `novo`,
 /// `organizar:<copiar|recortar|colar|duplicar>`, `selecionar_tudo`, `atalhos`,
 /// `desempenho`, `modo:alternar`, `enquadrar`, `reproduzir`, `excluir`, `cancelar`,
+/// `painel_vivo_fechar` (Esc in Simular),
 /// `mover:<dx>:<dy>`, `girar:<graus>` (the selection, counter-clockwise seen from above),
 /// `ferramenta:<nome>` (the tool, or `selecionar` when it is already
 /// on), `zona_fechar`, `corredor_fechar` and `grade`.
@@ -49,6 +50,8 @@ pub fn key_action(keycode: i64, ctrl: bool, shift: bool, ctx: &KeyContext) -> Op
         Key::Tab => return s("modo:alternar"),
         Key::F => return s("enquadrar"),
         Key::Space if !ctx.editing => return s("reproduzir"),
+        // Simular: Esc closes the most recent live results panel (`ui_ao_vivo`).
+        Key::Escape if !ctx.editing => return s("painel_vivo_fechar"),
         _ => {}
     }
     if !ctx.editing {
@@ -179,6 +182,11 @@ mod tests {
         assert_eq!(act('L' as i64, false, false, &sim), None);
         assert_eq!(act(32, false, false, &sim).as_deref(), Some("reproduzir"));
         assert_eq!(act(32, false, false, &sel), None);
+        // Esc: in Simular it closes the live panel; in Editar it cancels the tool.
+        assert_eq!(
+            act(SPECIAL + 1, false, false, &sim).as_deref(),
+            Some("painel_vivo_fechar")
+        );
         assert_eq!(
             act('F' as i64, false, false, &sel).as_deref(),
             Some("enquadrar")

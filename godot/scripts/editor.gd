@@ -1038,6 +1038,8 @@ func _draw_team() -> void:
 	elif main.follow_name != "":
 		focus[c.block_index(main.follow_name)] = true
 	var hidden: Array = main.links_hidden
+	# In Simular the dashed lines are off unless "Também durante a simulação" is on.
+	var quiet: bool = not editing and hidden.has("simulacao")
 	var members := {}
 	for l in _links:
 		var kind := String(l["kind"])
@@ -1045,7 +1047,7 @@ func _draw_team() -> void:
 		var to := int(l["to"])
 		if kind == "equipe" and to >= 0:
 			members[to] = true
-		if hidden.has(kind) or from >= c.rigs.size() or to >= c.rigs.size():
+		if quiet or hidden.has(kind) or from >= c.rigs.size() or to >= c.rigs.size():
 			continue
 		var a: Vector3 = (c.rigs[from]["root"] as Node3D).global_position
 		var b: Vector3 = (c.rigs[to]["root"] as Node3D).global_position if to >= 0 else l["point"]
@@ -1070,7 +1072,7 @@ func _draw_team() -> void:
 		for i in focus:
 			if i >= 0 and i < c.task_target.size():
 				var t := c.task_target[i]
-				if not is_nan(t.x):
+				if not quiet and not is_nan(t.x):
 					var a: Vector3 = (c.rigs[i]["root"] as Node3D).global_position
 					_dashed(a + Vector3(0, 0.12, 0), t + Vector3(0, 0.12, 0), TASK_LINE, 0.07, 0.35, 0.2)
 	elif serve_from != "":
