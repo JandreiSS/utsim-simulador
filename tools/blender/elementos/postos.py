@@ -9,7 +9,8 @@ PEDESTAL = 0.50
 OMBRO = 0.78  # altura da junta do ombro
 BRACO = 0.70
 ANTEBRACO = 0.65
-GARRA = 0.22  # do punho à ponta dos dedos
+GARRA = 0.27  # do punho à ponta dos dedos
+DEDO = 0.11  # dedo aberto, do centro da garra
 ALCANCE = 1.0  # distância horizontal do eixo à peça, em ponto_entrada e ponto_saida
 PEGA = 0.76  # altura da base da peça (topo da esteira padrão)
 
@@ -83,27 +84,57 @@ def robo(detalhe=0):
     `setup` (a base gira e os dedos abrem e fecham na troca de ferramenta) e `quebra`
     (o braço cai e fica parado)."""
     e = Elemento("robo", detalhe)
+    d = detalhe
     e.material("robo", 0xF08A00, 0.15, 0.45)
+    e.material("motor", 0x3A3F45, 0.4, 0.5)
+    lados = 20 if d else 12
+    # Pedestal: chapa de base com parafusos, coluna e flange.
     e.no("pedestal")
-    e.caixa("pedestal", "base", (-0.35, -0.35, 0.0), (0.35, 0.35, 0.05))
-    e.cilindro("pedestal", "aco_escuro", (0.0, 0.0, 0.05), (0.0, 0.0, PEDESTAL), 0.20)
+    e.caixa("pedestal", "base", (-0.35, -0.35, 0.0), (0.35, 0.35, 0.05), chanfro=0.015)
+    if d:
+        for x in (-0.28, 0.28):
+            for y in (-0.28, 0.28):
+                e.cilindro("pedestal", "aco", (x, y, 0.05), (x, y, 0.07), 0.018, 6)
+    e.cilindro("pedestal", "aco_escuro", (0.0, 0.0, 0.05), (0.0, 0.0, PEDESTAL - 0.04), 0.19, lados)
+    e.cilindro("pedestal", "aco_escuro", (0.0, 0.0, PEDESTAL - 0.04), (0.0, 0.0, PEDESTAL), 0.25, lados)
+    # Eixo 1: torre que gira, com o motor vertical atrás e o apoio do ombro.
     e.no("base", pivo=(0.0, 0.0, PEDESTAL))
-    e.cilindro("base", "robo", (0.0, 0.0, PEDESTAL), (0.0, 0.0, PEDESTAL + 0.18), 0.24)
-    e.caixa("base", "robo", (-0.14, -0.16, PEDESTAL + 0.18), (0.14, 0.16, OMBRO + 0.10))
+    e.cilindro("base", "robo", (0.0, 0.0, PEDESTAL), (0.0, 0.0, PEDESTAL + 0.14), 0.27, lados, raio2=0.25)
+    e.prisma("base", "robo", [(-0.22, PEDESTAL + 0.14), (0.20, PEDESTAL + 0.14), (0.15, OMBRO - 0.02),
+                              (0.06, OMBRO + 0.12), (-0.08, OMBRO + 0.12), (-0.17, OMBRO - 0.02)], -0.15, 0.15)
+    e.cilindro("base", "motor", (-0.24, 0.0, PEDESTAL + 0.06), (-0.24, 0.0, PEDESTAL + 0.34), 0.075, 12 if d else 8)
+    e.cilindro("base", "aco_escuro", (-0.24, 0.0, PEDESTAL + 0.34), (-0.24, 0.0, PEDESTAL + 0.37), 0.055, 12 if d else 8)
+    # Eixo 2 (ombro): cubo largo, motor do lado e o braço afinando até o cotovelo.
     e.no("braco", "base", (0.0, 0.0, OMBRO))
-    e.cilindro("braco", "aco_escuro", (0.0, -0.17, OMBRO), (0.0, 0.17, OMBRO), 0.11)
-    e.caixa("braco", "robo", (-0.08, -0.10, OMBRO), (0.08, 0.10, OMBRO + BRACO))
+    e.cilindro("braco", "robo", (0.0, -0.17, OMBRO), (0.0, 0.17, OMBRO), 0.15, lados)
+    e.cilindro("braco", "motor", (0.0, 0.17, OMBRO), (0.0, 0.29, OMBRO), 0.10, 14 if d else 8)
+    e.cilindro("braco", "aco_escuro", (0.0, 0.29, OMBRO), (0.0, 0.31, OMBRO), 0.07, 14 if d else 8)
     cot = OMBRO + BRACO
+    e.prisma("braco", "robo", [(-0.13, OMBRO), (0.13, OMBRO), (0.10, cot), (-0.10, cot)], -0.11, 0.11)
+    if d:
+        e.caixa("braco", "aco_escuro", (-0.09, -0.115, OMBRO + 0.20), (0.09, 0.115, OMBRO + 0.24), chanfro=0)
+    # Eixo 3 (cotovelo): carcaça com o motor atrás e o antebraço redondo para a frente.
     e.no("antebraco", "braco", (0.0, 0.0, cot))
-    e.cilindro("antebraco", "aco_escuro", (0.0, -0.13, cot), (0.0, 0.13, cot), 0.08)
-    e.caixa("antebraco", "robo", (0.0, -0.07, cot - 0.07), (ANTEBRACO, 0.07, cot + 0.07))
+    e.cilindro("antebraco", "robo", (0.0, -0.13, cot), (0.0, 0.13, cot), 0.12, lados)
+    e.caixa("antebraco", "robo", (-0.20, -0.10, cot - 0.09), (0.06, 0.10, cot + 0.11), chanfro=0.03)
+    e.cilindro("antebraco", "motor", (-0.20, 0.0, cot + 0.01), (-0.33, 0.0, cot + 0.01), 0.075, 12 if d else 8)
+    e.cilindro("antebraco", "robo", (0.06, 0.0, cot), (ANTEBRACO - 0.08, 0.0, cot), 0.08, lados, raio2=0.065)
+    # Eixo 4: anel do giro do antebraço.
+    e.cilindro("antebraco", "aco_escuro", (0.28, 0.0, cot), (0.30, 0.0, cot), 0.084, lados)
+    # Eixos 5 e 6: punho, flange e a garra de dois dedos.
     e.no("garra", "antebraco", (ANTEBRACO, 0.0, cot))
-    e.cilindro("garra", "aco_escuro", (ANTEBRACO, -0.06, cot), (ANTEBRACO, 0.06, cot), 0.06)
-    e.caixa("garra", "aco", (ANTEBRACO - 0.05, -0.08, cot - 0.12), (ANTEBRACO + 0.05, 0.08, cot - 0.04))
+    e.cilindro("garra", "robo", (ANTEBRACO, -0.075, cot), (ANTEBRACO, 0.075, cot), 0.07, lados)
+    e.cilindro("garra", "robo", (ANTEBRACO - 0.08, 0.0, cot), (ANTEBRACO, 0.0, cot), 0.06, lados)
+    e.cilindro("garra", "aco", (ANTEBRACO, 0.0, cot - 0.06), (ANTEBRACO, 0.0, cot - 0.09), 0.055, lados)
+    e.caixa("garra", "aco_escuro", (ANTEBRACO - 0.05, -0.14, cot - 0.14), (ANTEBRACO + 0.05, 0.14, cot - 0.09), chanfro=0.01)
     for nome, s in (("dedo_e", 1), ("dedo_d", -1)):
-        e.no(nome, "garra", (ANTEBRACO, s * 0.06, cot - 0.12))
-        e.caixa(nome, "aco_escuro", (ANTEBRACO - 0.02, s * 0.06 - 0.01, cot - GARRA),
-                (ANTEBRACO + 0.02, s * 0.06 + 0.01, cot - 0.12))
+        y = s * DEDO
+        e.no(nome, "garra", (ANTEBRACO, y, cot - 0.14))
+        e.caixa(nome, "aco", (ANTEBRACO - 0.03, y - 0.012, cot - 0.16), (ANTEBRACO + 0.03, y + 0.012, cot - 0.12), chanfro=0)
+        e.caixa(nome, "aco_escuro", (ANTEBRACO - 0.025, y - 0.010, cot - GARRA), (ANTEBRACO + 0.025, y + 0.010, cot - 0.16), chanfro=0.004)
+        # Almofada de borracha do lado de dentro.
+        y0, y1 = sorted((y - s * 0.016, y - s * 0.010))
+        e.caixa(nome, "borracha", (ANTEBRACO - 0.022, y0, cot - GARRA + 0.01), (ANTEBRACO + 0.022, y1, cot - GARRA + 0.10), chanfro=0)
     # Na ponta dos dedos: a base da peça presa fica aqui.
     e.ponto("ponto_garra", (ANTEBRACO, 0.0, cot - GARRA), 0, pai="garra")
     e.ponto("ponto_entrada", (0.0, ALCANCE, PEGA), 90)
@@ -114,7 +145,8 @@ def robo(detalhe=0):
     # Poses (relativas ao repouso): giro da base, ombro, cotovelo, punho, dedos.
     a, b, c = _ik(ALCANCE, PEGA)
     a2, b2, c2 = _ik(ALCANCE, PEGA + 0.35)
-    aberto, fechado = 0.04, 0.0
+    # Dedos: abertos a `DEDO` do centro; fechados, encostam na peça (0,12 m de diâmetro).
+    aberto, fechado = round(DEDO - 0.076, 6), 0.0
     rep = (0.0, 0.0, 0.0, 0.0, aberto)
     sobre_e = (math.pi / 2, a2, b2, c2, aberto)
     pega_ab = (math.pi / 2, a, b, c, aberto)

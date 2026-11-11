@@ -47,6 +47,16 @@ def esteira(detalhe=0, comprimento=ESTEIRA_COMPRIMENTO, largura=ESTEIRA_LARGURA,
             e.caixa("estrutura", "aco_escuro", (x - 0.03, y - 0.03, 0.0), (x + 0.03, y + 0.03, topo - 0.10))
             e.caixa("estrutura", "base", (x - 0.06, y - 0.06, 0.0), (x + 0.06, y + 0.06, 0.02))
         e.caixa("estrutura", "aco_escuro", (x - 0.02, -w2 + 0.06, 0.20), (x + 0.02, w2 - 0.06, 0.24))
+    # Guias laterais sobre os rolos (em suportes) e o motor de acionamento embaixo, perto da saída.
+    for s in (-1, 1):
+        y = s * (w2 - 0.03)
+        e.caixa("estrutura", "aco", (-c2, y - 0.008, altura + 0.03), (c2, y + 0.008, altura + 0.07), chanfro=0)
+        for k in range(max(2, int(comprimento / 1.0) + 1)):
+            x = -c2 + 0.05 + k * (comprimento - 0.10) / max(1, int(comprimento / 1.0))
+            e.caixa("estrutura", "aco_escuro", (x - 0.01, y - 0.006, altura - 0.01), (x + 0.01, y + 0.006, altura + 0.05), chanfro=0)
+    xm = c2 - 0.25
+    e.caixa("estrutura", "faixa", (xm - 0.12, -w2 + 0.10, topo - 0.34), (xm + 0.12, -w2 + 0.28, topo - 0.14))
+    e.cilindro("estrutura", "aco_escuro", (xm, -w2 + 0.28, topo - 0.24), (xm, -w2 + 0.34, topo - 0.24), 0.06, 12 if detalhe else 8)
     n = int(comprimento / PASSO_ROLO)
     for k in range(n):
         x = -c2 + PASSO_ROLO / 2 + k * PASSO_ROLO
@@ -220,31 +230,68 @@ def empilhadeira(detalhe=0):
     return e
 
 
+def _retangulo(x, y, r, n):
+    """Contorno (vista de cima) de um retângulo de meia-largura `x` e meia-profundidade `y`,
+    com cantos de raio `r` em `n` trechos."""
+    pts = []
+    for cx, cy, a0 in ((x - r, y - r, 0), (-x + r, y - r, 90), (-x + r, -y + r, 180), (x - r, -y + r, 270)):
+        pts += _arco(cx, cy, r, a0, a0 + 90, n)
+    return pts
+
+
 def agv(detalhe=0):
-    """AGV com mesa elevatória. Nós: `chassi`, `mesa` (sobe `AGV_CURSO`), `luz`,
-    `roda_e`, `roda_d`. Clipe `mesa_subir`."""
+    """AGV com mesa elevatória. Nós: `chassi`, `mesa` (sobe `AGV_CURSO`, com os pistões que
+    aparecem embaixo dela), `luz` (faixa de estado), `roda_e`, `roda_d`. Frente em `+x`.
+    Clipe `mesa_subir`."""
     e = Elemento("agv", detalhe)
+    d = detalhe
     e.material("pintura", 0xDFE3E8, 0.1, 0.5)
+    n = 4 if d else 2
+    topo = AGV_MESA - 0.04  # tampo do chassi, sob a mesa
     e.no("chassi")
-    e.caixa("chassi", "borracha", (-0.50, -0.34, 0.02), (0.50, 0.34, 0.12))
-    e.caixa("chassi", "pintura", (-0.55, -0.40, 0.12), (0.55, 0.40, AGV_MESA - 0.03))
-    for s, mat in ((1, "amarelo"), (-1, "borracha")):
-        x = s * 0.555
-        e.caixa("chassi", mat, (x - 0.015, -0.38, 0.10), (x + 0.015, 0.38, 0.18))
-    e.caixa("chassi", "tela", (0.553, -0.15, 0.24), (0.565, 0.15, 0.29))
-    for x in (-0.42, 0.42):
-        for y in (-0.28, 0.28):
-            e.cilindro("chassi", "pneu", (x, y - 0.02, 0.025), (x, y + 0.02, 0.025), 0.025, 8)
-    e.no("mesa", pivo=(0.0, 0.0, AGV_MESA - 0.03))
-    e.caixa("mesa", "borracha", (-0.50, -0.36, AGV_MESA - 0.03), (0.50, 0.36, AGV_MESA))
+    # Para-choque de borracha embaixo e carenagem de cantos redondos em cima.
+    e.prisma("chassi", "borracha", _retangulo(0.57, 0.40, 0.10, n), 0.025, 0.11, eixo=2)
+    e.prisma("chassi", "pintura", _retangulo(0.55, 0.385, 0.09, n), 0.11, topo, eixo=2)
+    # Faixas de atenção na frente e atrás.
+    for s in (1, -1):
+        x = s * 0.552
+        e.caixa("chassi", "amarelo", (x - 0.006, -0.22, 0.14), (x + 0.006, 0.22, 0.16), chanfro=0)
+    # Scanners de segurança nos cantos da frente e de trás, e a janela do sensor.
+    for x, y in ((0.50, 0.33), (-0.50, -0.33)):
+        e.cilindro("chassi", "aco_escuro", (x, y, 0.11), (x, y, 0.19), 0.045, 12 if d else 8)
+        e.cilindro("chassi", "tela", (x, y, 0.13), (x, y, 0.17), 0.047, 12 if d else 8)
+    e.caixa("chassi", "tela", (0.548, -0.12, 0.22), (0.558, 0.12, 0.26), chanfro=0)
+    # Botões de emergência nos quatro cantos do tampo e a tela de status atrás.
+    for x in (-0.47, 0.47):
+        for y in (-0.31, 0.31):
+            e.cilindro("chassi", "amarelo", (x, y, topo), (x, y, topo + 0.012), 0.03, 10 if d else 6)
+            e.cilindro("chassi", "vermelho", (x, y, topo + 0.012), (x, y, topo + 0.03), 0.02, 10 if d else 6)
+    e.caixa("chassi", "aco_escuro", (-0.558, 0.10, 0.19), (-0.548, 0.28, 0.27), chanfro=0)
+    e.caixa("chassi", "tela", (-0.560, 0.115, 0.20), (-0.557, 0.265, 0.26), chanfro=0)
+    # Rodízios nos cantos (as rodas de tração ficam no meio).
+    for x in (-0.40, 0.40):
+        for y in (-0.27, 0.27):
+            e.cilindro("chassi", "aco_escuro", (x, y, 0.035), (x, y, 0.06), 0.02, 6)
+            e.cilindro("chassi", "pneu", (x, y - 0.015, 0.025), (x, y + 0.015, 0.025), 0.025, 8)
+    # Mesa elevatória com borracha antiderrapante e guias; os pistões descem dela.
+    e.no("mesa", pivo=(0.0, 0.0, topo))
+    e.prisma("mesa", "aco_escuro", _retangulo(0.44, 0.30, 0.04, n), topo + 0.008, AGV_MESA - 0.006, eixo=2)
+    e.prisma("mesa", "borracha", _retangulo(0.43, 0.29, 0.035, n), AGV_MESA - 0.006, AGV_MESA, eixo=2)
     for y in (-0.12, 0.12):
-        e.caixa("mesa", "amarelo", (0.10, y - 0.02, AGV_MESA), (0.30, y + 0.02, AGV_MESA + 0.003))
+        e.caixa("mesa", "amarelo", (-0.40, y - 0.015, AGV_MESA), (0.40, y + 0.015, AGV_MESA + 0.003), chanfro=0)
+    for x in (-0.25, 0.25):
+        for y in (-0.15, 0.15):
+            e.cilindro("mesa", "aco", (x, y, topo - 0.07), (x, y, topo + 0.008), 0.025, 10 if d else 6)
     e.ponto("ponto_carga", (0.0, 0.0, AGV_MESA), 0, pai="mesa")
+    # Faixa de luz de estado nas laterais e na frente.
     e.material("luz", 0xE8F4FF, 0.0, 0.4, emissao=True)
     e.no("luz", pivo=(0.0, 0.0, 0.22))
-    e.caixa("luz", "luz", (-0.556, -0.40, 0.20), (0.556, 0.40, 0.23))
-    _roda(e, "roda_e", 0.0, 0.33, 0.06, 0.05)
-    _roda(e, "roda_d", 0.0, -0.33, 0.06, 0.05)
+    for s in (1, -1):
+        e.caixa("luz", "luz", (-0.40, s * 0.385 - 0.006, 0.21), (0.40, s * 0.385 + 0.006, 0.235), chanfro=0)
+    e.caixa("luz", "luz", (0.548, 0.16, 0.21), (0.556, 0.30, 0.235), chanfro=0)
+    e.caixa("luz", "luz", (0.548, -0.30, 0.21), (0.556, -0.16, 0.235), chanfro=0)
+    _roda(e, "roda_e", 0.0, 0.33, 0.075, 0.05)
+    _roda(e, "roda_d", 0.0, -0.33, 0.075, 0.05)
     e.dados = {"mesa": AGV_MESA, "mesa_curso": AGV_CURSO}
     e.clipe("mesa_subir", False, {"mesa": [(0, "location", 2, 0.0), (1, "location", 2, AGV_CURSO)]})
     return e
