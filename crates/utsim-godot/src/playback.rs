@@ -366,6 +366,10 @@ pub struct Playback {
     /// post and walks in the layout) and the runs of its states as the table sees them
     /// ([`Animado::runs`]); `None` for the others.
     pub animados: Vec<Option<(Animado, modelos3d::Runs)>>,
+    /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
+    /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
+    vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
+    rastro: std::sync::Mutex<Option<Replay>>,
 }
 
 impl Playback {
@@ -532,6 +536,8 @@ impl Playback {
             dropped,
             modelos3d: catalogo,
             animados: Vec::new(),
+            vivo: std::sync::OnceLock::new(),
+            rastro: std::sync::Mutex::new(None),
         }
         .with_blender(replay)
     }
@@ -570,6 +576,27 @@ impl Playback {
         }
         self.animados = animados;
         self
+    }
+
+    /// Keeps the trace of `replay` (the one the scene was built from) for the live panel:
+    /// it is read only if a panel opens ([`Playback::vivo`]).
+    pub fn com_rastro(self, replay: Replay) -> Playback {
+        if let Ok(mut r) = self.rastro.lock() {
+            *r = Some(replay);
+        }
+        self
+    }
+
+    /// The live numbers of every block, read from the kept trace on the first call;
+    /// `None` without a trace ([`Playback::com_rastro`]).
+    pub fn vivo(&self) -> Option<&crate::ao_vivo::AoVivo> {
+        if let Some(v) = self.vivo.get() {
+            return Some(v);
+        }
+        let replay = self.rastro.lock().ok()?.take()?;
+        Some(self.vivo.get_or_init(|| {
+            crate::ao_vivo::AoVivo::new(&replay, self.model.as_ref(), |b| self.scene.role(b))
+        }))
     }
 
     /// The asset of block `i` as the engine loads it, and the library asset to fall back
