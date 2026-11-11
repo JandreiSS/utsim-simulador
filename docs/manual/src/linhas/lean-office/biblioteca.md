@@ -11,7 +11,7 @@ dela.
 | `entrada` (Entrada de pedidos) | `Source` | intervalo, rótulos, horário | entrada |
 | `caixa_entrada` (Caixa de entrada) | `Queue` com `order` | ordem (chegada, `Desc("prioridade")`, `Asc("prazo")`), limite | caixa de entrada |
 | `posto` (Posto de trabalho) | `Processor` com `operators` | tempo, equipe, %C&A, mesas | trabalho |
-| `aprovacao` (Aprovação) | `Processor` com `Weighted([aprova, devolve])` | tempo, aprovador, pesos | aprovação |
+| `aprovacao` (Aprovação) | `Processor` com `Weighted([aprova, devolve])` | tempo, aprovador, pesos, mesas (casos em análise ao mesmo tempo: um por aprovador) | aprovação |
 | `verificacao` (Verificação) | `Processor` com `ByLabel("rota")` | tempo, equipe, fração percebida | verificação |
 | `tramitacao` (Tramitação) | `Processor` de capacidade ilimitada, sem pessoa | tempo de passagem | tramitação |
 | `espera_informacao` (Espera por informação) | `Processor` de capacidade ilimitada | tempo de resposta | espera por informação |

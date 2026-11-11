@@ -123,12 +123,13 @@ Um Processor pode exigir pessoas durante o setup, o processamento ou os dois.
 | Campo | Padrão | Significado |
 |---|---|---|
 | `team` | obrigatório | `Transporter` ou `Dispatcher` de onde vêm os operadores |
-| `count` | `1` | quantos operadores a fase exige |
+| `count` | `1` | operadores por peça: quantos a fase exige ao mesmo tempo (no inspetor, "Quantos por peça") |
 | `setup` | `true` | o setup exige operador |
 | `process` | `true` | o processamento exige operador |
 | `requires` | nenhum | habilidade que o operador precisa ter |
 | `priority` | `0` | prioridade dos pedidos de operador desta máquina na fila do despachante (maior vai primeiro) |
 | `priority_label` | nenhum | rótulo do item em processo cujo valor substitui `priority` |
+| `team_speedup` | nenhum (1) | ganho da equipe: o tempo sorteado da fase é dividido por ele (no inspetor, "Ganho da equipe") |
 
 Como funciona:
 
@@ -139,7 +140,14 @@ Como funciona:
 - A liberação acontece quando termina a última fase que exige operador. Uma saída bloqueada não prende o operador.
 - Numa quebra, os operadores ficam no posto e os tempos pausam.
 - Cada item tem os seus próprios pedidos, então `capacity` maior que 1 funciona.
+- Com `count: 2`, a peça só começa quando os dois chegam, e os dois ficam com ela até o fim; cada um conta o tempo inteiro como `utilize`. Por padrão a dupla leva o mesmo tempo que uma pessoa sozinha. Se a equipe faz mais rápido, diga quanto com `team_speedup`: uma tarefa de 10 min que dois fazem em 6 min fica `count: 2, team_speedup: Some(1.6667)`.
 - Com `requires: "torno"`, só pessoas com essa habilidade no perfil (`person.skills`) operam; veja [Pessoas](pessoas.md).
+
+### Operadores que nunca trabalham
+
+Uma máquina usa no máximo capacidade × `count` operadores ao mesmo tempo. Um despachante com 2 operadores ligado a um Processor de capacidade 1 e `count: 1` deixa sempre um parado, por maior que a fila fique. A análise do modelo (os avisos do editor, `utsim check` e `utsim run`) avisa quando a equipe tem mais operadores do que os processos que ela opera podem usar juntos, e diz as duas saídas: aumentar a capacidade da máquina ou usar mais operadores por peça (`count`, com `team_speedup` se a dupla faz mais rápido).
+
+O aviso não aparece quando a equipe tem outro trabalho (leva itens com `transport`, conserta máquinas com `repair_crew` ou faz preventiva) nem quando os membros se revezam de propósito: turnos diferentes ou um despachante com `rule` `RoundRobin`, `LeastBusy`, `LongestIdle` ou `Random` (a vez passa de um para o outro, um de cada vez).
 
 O [tutorial 03](tutoriais/03-operadores.md) usa isso.
 

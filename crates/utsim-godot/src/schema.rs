@@ -1193,9 +1193,20 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     .depth(1),
                 );
                 out.push(
-                    int(s, "operators.count", "Quantos", op.count as u64)
+                    int(s, "operators.count", "Quantos por peça", op.count as u64)
                         .min(1.0)
+                        .help("Operadores que a peça precisa ao mesmo tempo: ela só começa quando todos chegam, e eles ficam com ela até o fim. Com mais operadores na equipe do que capacidade × este número, os de sobra ficam parados.")
                         .depth(1),
+                );
+                out.push(
+                    float(
+                        s,
+                        "operators.team_speedup",
+                        "Ganho da equipe",
+                        op.team_speedup.unwrap_or(1.0),
+                    )
+                    .help("Quantas vezes mais rápido a equipe faz a etapa: o tempo sorteado é dividido por este número. 1: sem ganho (o tempo é o mesmo com um ou com vários).")
+                    .depth(1),
                 );
                 out.push(boolean(s, "operators.setup", "Durante a preparação", op.setup).depth(1));
                 out.push(
@@ -2291,6 +2302,13 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
             match rest {
                 "team" => op.team = v.as_text().ok_or("nome esperado")?.to_string(),
                 "count" => op.count = usize_of(v, w, 1)?,
+                "team_speedup" => {
+                    let gain = f64_of(v, w)?;
+                    if !(gain.is_finite() && gain > 0.0) {
+                        return Err("o ganho da equipe deve ser maior que zero".into());
+                    }
+                    op.team_speedup = (gain != 1.0).then_some(gain);
+                }
                 "setup" => op.setup = bool_of(v, w)?,
                 "process" => op.process = bool_of(v, w)?,
                 _ => return Err(format!("campo desconhecido: {w}")),

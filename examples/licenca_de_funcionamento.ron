@@ -60,7 +60,7 @@ Model(
         (name: "caixa_analise", kind: Queue(order: Asc("prazo")), position: (2.0, 2.0, 0.0),
             on_entry: "if label(item, \"prazo\", -1.0) < 0.0 && label(item, \"sla\", -1.0) >= 0.0 { item.prazo = now + item.sla; }",
             visual: Some((asset: Some("pilha_papeis"))), preset: "lean_office/caixa_entrada", department: "Análise", symbol: "espera"),
-        (name: "analise", kind: Processor(process: Triangular(min: 15.0, mode: 30.0, max: 60.0),
+        (name: "analise", kind: Processor(capacity: 2, process: Triangular(min: 15.0, mode: 30.0, max: 60.0),
             operators: Some(OperatorUse(team: "analistas"))), position: (3.0, 2.0, 0.0),
             output: ByLabel("rota"),
             on_entry: "item.rota = 1.0; if label(item, \"erro\", 0.0) >= 1.0 && random() < 0.9 { item.erro = 0.0; item.rota = 2.0; }",
