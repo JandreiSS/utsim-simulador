@@ -712,11 +712,33 @@ def epis(corpo, partes, ual):
             meio_k = 1.0 - abs(2.0 * k / (len(linhas) - 1) - 1.0)
             ln[j].y = min(ln[j].y, frente - 0.006 + 0.016 * (1.0 - meio_k) ** 2)
     m.grade(linhas, "epi_branco")
-    for z in (zs[1], zs[-2]):
-        angs = [62 + 236 * i / 16 for i in range(17)]
-        a1 = s.anel(Vector((0.0, eixo_y, z)), 0.004, angs, longe=0.3, perto=0.12)
-        a2 = s.anel(Vector((0.0, eixo_y, z + 0.006)), 0.004, angs, longe=0.3, perto=0.12)
-        m.grade([a1, a2], "epi_branco")
+    # Os elásticos saem da borda da concha e inclinam: o de cima sobe até acima das orelhas,
+    # o de baixo desce para a nuca. Assim não cruzam a orelha nem a raiz do rabo de cavalo, e
+    # passam por fora do cabelo (`perto` largo) em vez de sumir dentro dele.
+    for z0, dz, perto in ((zs[1], -0.030, 0.125), (zs[-2], 0.075, 0.17)):
+        dirs, alts, raios = [], [], []
+        for i in range(21):
+            a = 62 + 236 * i / 20
+            t = 1.0 - abs(a - 180.0) / 118.0
+            z = z0 + dz * t * t * (3.0 - 2.0 * t)
+            r = math.radians(a)
+            d = Vector((math.sin(r), -math.cos(r), 0.0))
+            c = Vector((0.0, eixo_y, z + 0.003))
+            p = s.ate(c, d, 0.004, longe=0.3, perto=perto)
+            dirs.append(d)
+            alts.append(z)
+            raios.append((p - c).dot(d) if p is not None else (raios[-1] if raios else 0.1))
+        # Um fio de cabelo solto (o rabo de cavalo) não puxa o elástico: o raio muda no máximo
+        # 8 mm de um ponto ao vizinho, medido a partir do ponto mais encostado.
+        for ordem in (range(1, 21), range(19, -1, -1)):
+            for i in ordem:
+                viz = i - 1 if ordem.step == 1 else i + 1
+                raios[i] = min(raios[i], raios[viz] + 0.008)
+        tiras = ([], [])
+        for d, z, r in zip(dirs, alts, raios):
+            tiras[0].append(Vector((d.x * r, eixo_y + d.y * r, z)))
+            tiras[1].append(Vector((d.x * r, eixo_y + d.y * r, z + 0.006)))
+        m.grade(list(tiras), "epi_branco")
     out["mascara"] = m.objeto()
 
     # Luvas: a mão com folga e o punho largo.

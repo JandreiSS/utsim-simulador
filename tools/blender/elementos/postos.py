@@ -30,6 +30,22 @@ def posto(detalhe=0):
     # Caixas de peças: entrada à esquerda (-x), saída à direita (+x).
     for x0, cor in ((-0.70, "laranja"), (0.40, "verde")):
         e.caixa("estrutura", cor, (x0, -0.05, 0.90), (x0 + 0.30, 0.25, 1.02))
+    # Gaveteiro sob o tampo, à direita, com três gavetas.
+    e.caixa("estrutura", "painel", (0.26, -0.33, 0.44), (0.66, 0.30, 0.84))
+    for k in range(3):
+        z = 0.47 + k * 0.125
+        e.caixa("estrutura", "aco", (0.28, -0.34, z), (0.64, -0.33, z + 0.105), chanfro=0)
+        e.caixa("estrutura", "base", (0.38, -0.355, z + 0.045), (0.54, -0.34, z + 0.06), chanfro=0)
+    # Ferramentas no painel.
+    e.caixa("estrutura", "vermelho", (-0.50, 0.315, 1.15), (-0.46, 0.33, 1.40), chanfro=0)
+    e.caixa("estrutura", "aco", (-0.38, 0.315, 1.12), (-0.35, 0.33, 1.42), chanfro=0)
+    e.caixa("estrutura", "amarelo", (-0.27, 0.315, 1.20), (-0.15, 0.33, 1.32), chanfro=0)
+    e.caixa("estrutura", "aco", (-0.02, 0.315, 1.18), (0.22, 0.33, 1.21), chanfro=0)
+    # Luminária sobre a bancada, em dois braços.
+    for x in (-0.60, 0.50):
+        e.caixa("estrutura", "faixa", (x - 0.02, 0.31, 1.60), (x + 0.02, 0.35, 1.84), chanfro=0)
+    e.caixa("estrutura", "aco_escuro", (-0.64, 0.02, 1.84), (0.54, 0.37, 1.88))
+    e.caixa("estrutura", "pintura", (-0.58, 0.06, 1.832), (0.48, 0.30, 1.84), chanfro=0)
     # Gabarito no centro.
     e.caixa("estrutura", "aco_escuro", (-0.18, -0.25, 0.90), (0.18, 0.05, 0.94))
     e.no("grampo", pivo=(0.14, -0.10, 0.96))
@@ -203,12 +219,59 @@ def robo(detalhe=0):
     return e
 
 
+def _malha(e, no, a, b, z0, z1, passo=0.25, fio=0.012):
+    """Fios da tela de um painel de cerca, de `a` a `b` (x, y) entre `z0` e `z1`."""
+    h = fio / 2
+    (x0, y0), (x1, y1) = (min(a[0], b[0]), min(a[1], b[1])), (max(a[0], b[0]), max(a[1], b[1]))
+    n = max(1, round(max(x1 - x0, y1 - y0) / passo))
+    for k in range(1, n):
+        f = k / n
+        x, y = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
+        e.caixa(no, "aco_escuro", (x - h, y - h, z0), (x + h, y + h, z1), chanfro=0)
+    m = max(1, round((z1 - z0) / passo))
+    for k in range(1, m):
+        z = z0 + (z1 - z0) * k / m
+        e.caixa(no, "aco_escuro", (x0 - h, y0 - h, z - h), (x1 + h, y1 + h, z + h), chanfro=0)
+
+
+def espera(detalhe=0):
+    """Mesa de espera (fila ou buffer), 1,20 × 0,80 m, tampo a 0,76 m (a altura da esteira).
+    A peça entra por `-x` e sai por `+x`; as guias baixas ficam nas bordas compridas.
+    Nós: `estrutura` e `faixa` (a faixa amarela no chão em volta, 1,40 × 1,00 m)."""
+    e = Elemento("espera", detalhe)
+    e.material("tampo_aco", 0xC9CED4, 0.6, 0.45)
+    e.no("estrutura")
+    for x in (-0.55, 0.55):
+        for y in (-0.35, 0.35):
+            e.caixa("estrutura", "aco_escuro", (x - 0.025, y - 0.025, 0.04), (x + 0.025, y + 0.025, 0.68))
+            e.cilindro("estrutura", "aco", (x, y, 0.015), (x, y, 0.04), 0.012, 8)
+            e.cilindro("estrutura", "aco", (x, y, 0.0), (x, y, 0.015), 0.04, 12)
+    e.caixa("estrutura", "aco_escuro", (-0.60, -0.40, 0.68), (0.60, 0.40, 0.72))
+    e.caixa("estrutura", "tampo_aco", (-0.60, -0.40, 0.72), (0.60, 0.40, 0.76))
+    for y in (-0.40, 0.38):
+        e.caixa("estrutura", "aco_escuro", (-0.60, y, 0.76), (0.60, y + 0.02, 0.82))
+    # Prateleira de baixo, sobre travessas.
+    for y in (-0.35, 0.35):
+        e.caixa("estrutura", "aco_escuro", (-0.55, y - 0.02, 0.20), (0.55, y + 0.02, 0.24), chanfro=0)
+    e.caixa("estrutura", "aco", (-0.57, -0.37, 0.24), (0.57, 0.37, 0.26))
+    # Faixa amarela no chão, 5 cm de largura.
+    e.no("faixa")
+    for y in (-0.50, 0.45):
+        e.caixa("faixa", "amarelo", (-0.70, y, 0.003), (0.70, y + 0.05, 0.006), chanfro=0)
+    for x in (-0.70, 0.65):
+        e.caixa("faixa", "amarelo", (x, -0.45, 0.003), (x + 0.05, 0.45, 0.006), chanfro=0)
+    e.ponto("ponto_entrada", (-0.45, 0.0, 0.76), 0)
+    e.ponto("ponto_saida", (0.45, 0.0, 0.76), 0)
+    e.dados = {"tampo": 0.76, "area": [1.10, 0.66]}
+    return e
+
+
 def celula(detalhe=0):
     """Cerca de célula robotizada, 3,0 × 3,0 × 2,0 m, com portão no lado `-y`.
     Nós: `cerca`, `portao` (dobradiça vertical em x = -0,5), `luz` (sinaleiro).
     `ponto_porta` fica fora do portão e `ponto_operador` dentro."""
     e = Elemento("celula", detalhe)
-    e.material("tela_cerca", 0x9AA3AD, 0.5, 0.5, alfa=0.35)
+    e.material("tela_cerca", 0x596068, 0.5, 0.5, alfa=0.30)
     lado, alt = 1.5, 2.0
     e.no("cerca")
     postes = [(-lado, -lado), (-lado, lado), (lado, lado), (lado, -lado), (-0.5, -lado), (0.5, -lado),
@@ -222,11 +285,15 @@ def celula(detalhe=0):
                 (max(x0, x1) + 0.005, max(y0, y1) + 0.005, alt - 0.05))
         e.caixa("cerca", "amarelo", (min(x0, x1) - 0.01, min(y0, y1) - 0.01, alt - 0.05),
                 (max(x0, x1) + 0.01, max(y0, y1) + 0.01, alt))
+        e.caixa("cerca", "amarelo", (min(x0, x1) - 0.01, min(y0, y1) - 0.01, 0.12),
+                (max(x0, x1) + 0.01, max(y0, y1) + 0.01, 0.15))
+        _malha(e, "cerca", (x0, y0), (x1, y1), 0.15, alt - 0.05)
     e.no("portao", pivo=(-0.47, -lado, 0.0))
     e.caixa("portao", "amarelo", (-0.47, -lado - 0.02, 0.10), (0.47, -lado + 0.02, 0.15))
     e.caixa("portao", "amarelo", (-0.47, -lado - 0.02, alt - 0.10), (0.47, -lado + 0.02, alt - 0.05))
     e.caixa("portao", "amarelo", (0.42, -lado - 0.02, 0.15), (0.47, -lado + 0.02, alt - 0.10))
     e.caixa("portao", "tela_cerca", (-0.47, -lado - 0.005, 0.15), (0.42, -lado + 0.005, alt - 0.10))
+    _malha(e, "portao", (-0.47, -lado), (0.42, -lado), 0.15, alt - 0.10)
     e.caixa("portao", "vermelho", (0.30, -lado - 0.06, 1.0), (0.40, -lado - 0.02, 1.10))  # trava
     e.cilindro("cerca", "painel", (-0.60, -lado - 0.05, alt), (-0.60, -lado - 0.05, alt + 0.15), 0.02, 8)
     e.material("luz", 0x46D160, 0.0, 0.4, emissao=True)

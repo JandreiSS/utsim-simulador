@@ -12,7 +12,8 @@ LARG_VAO, ALT_NIVEL, PROF, LONG = 1.4, 1.5, 1.0, 0.08
 
 
 def porta_paletes(detalhe=0, vaos=VAOS, niveis=NIVEIS):
-    """Porta-paletes: montantes azuis, longarinas laranja. Nó `estrutura`, sem clipe."""
+    """Porta-paletes: montantes azuis com travessas e diagonais, longarinas laranja e
+    protetor amarelo no pé das colunas do corredor. Nó `estrutura`, sem clipe."""
     e = Elemento("porta_paletes", detalhe)
     e.material("montante", 0x2B6CB0, 0.3, 0.5)
     e.no("estrutura")
@@ -24,9 +25,16 @@ def porta_paletes(detalhe=0, vaos=VAOS, niveis=NIVEIS):
         for y in (-p2, p2):
             e.caixa("estrutura", "montante", (x - 0.04, y - 0.04, 0.0), (x + 0.04, y + 0.04, topo))
             e.caixa("estrutura", "base", (x - 0.07, y - 0.07, 0.0), (x + 0.07, y + 0.07, 0.01))
-        for k in range(int(topo / 0.9)):
-            z = 0.3 + k * 0.9
-            e.caixa("estrutura", "montante", (x - 0.015, -p2, z), (x + 0.015, p2, z + 0.03))
+        # Protetor de coluna, só do lado do corredor.
+        e.caixa("estrutura", "amarelo", (x - 0.07, -p2 - 0.07, 0.01), (x + 0.07, -p2 + 0.07, 0.40))
+        # Travessas e diagonais do montante (sem chanfro: são finas).
+        zs = [0.3 + k * 0.9 for k in range(int((topo - 0.3) / 0.9) + 1)]
+        for z in zs:
+            e.caixa("estrutura", "montante", (x - 0.015, -p2, z), (x + 0.015, p2, z + 0.03), chanfro=0)
+        for k, (za, zb) in enumerate(zip(zs, zs[1:])):
+            ya, yb = (-p2 + 0.04, p2 - 0.04) if k % 2 == 0 else (p2 - 0.04, -p2 + 0.04)
+            e.prisma("estrutura", "montante", [(ya, za + 0.03), (ya, za + 0.07), (yb, zb), (yb, zb - 0.04)],
+                     x - 0.012, x + 0.012, eixo=0)
     for n in range(1, niveis + 1):
         z = n * ALT_NIVEL
         for y in (-p2, p2):
@@ -49,8 +57,12 @@ def estante(detalhe=0, niveis=4):
     for n in range(niveis + 1):
         z = 0.10 + n * (1.85 / niveis)
         e.caixa("estrutura", "aco", (-0.50, -0.25, z), (0.50, 0.25, z + 0.025))
+        e.caixa("estrutura", "aco_escuro", (-0.50, -0.25, z - 0.03), (0.50, -0.235, z), chanfro=0)  # aba
         if n < niveis:
             e.ponto(f"ponto_vao_0_{n}", (0.0, 0.0, z + 0.025), -90)
+    # Contraventamento em X no fundo.
+    for xa, xb in ((-0.46, 0.46), (0.46, -0.46)):
+        e.prisma("estrutura", "aco_escuro", [(xa, 0.15), (xa, 0.19), (xb, 1.95), (xb, 1.91)], 0.238, 0.248)
     return e
 
 

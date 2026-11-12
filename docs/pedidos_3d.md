@@ -274,6 +274,10 @@ shadows, no text or logos, single object, plain background.
 
 ## 9. Espera (mesa de espera, fila ou buffer)
 
+**Feito por script em 2026-11-12** (`espera` em `tools/blender/elementos/postos.py`): `espera.glb`
+e `espera_medio.glb`, com a faixa amarela no nó `faixa` e os pontos `ponto_entrada` e
+`ponto_saida`.
+
 - **Arquivo:** `espera.glb`.
 - **Medidas:** 1,20 m × 0,80 m, com o tampo a 0,76 m (a altura da esteira, para a peça passar
   de uma à outra).
