@@ -864,6 +864,13 @@ fatores mexem no Y e se eles agem juntos.
   dois fatores; em resolução IV os principais ficam limpos e as interações de dois fatores se
   confundem entre si; em resolução V ou mais os principais e as interações de dois fatores
   ficam limpos. As frações oferecidas vão de 3 a 8 fatores.
+- **Plackett-Burman (triagem)**: para separar, entre muitos fatores (até 15), os poucos que
+  mexem no Y. Roda 8, 12 ou 16 corridas, o menor número que cabe (11 fatores cabem em 12
+  corridas, contra 16 da menor fração de resolução III). Os efeitos principais ficam livres
+  entre si, mas cada interação de dois fatores se espalha, em parte, sobre vários efeitos
+  principais. Por isso a triagem serve para escolher os fatores, e o estudo deles fica para
+  um fatorial depois. Com mais de 8 fatores é o único plano oferecido. As colunas da matriz
+  que sobram sem fator dão graus de liberdade ao erro.
 - **Réplicas** repetem cada corrida (dão o erro puro); **pontos centrais** são corridas com
   todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
 - **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma
@@ -885,7 +892,8 @@ análise é a variabilidade da simulação, não a da fábrica.
 da planilha (ou escolha as colunas dos fatores; níveis reais são codificados pelo app), a
 resposta e a ordem máxima das interações (2 por padrão). O resultado traz o efeito de cada
 termo (média no alto menos média no baixo), os valores-p, o R², a curvatura pelos pontos
-centrais e os termos confundidos. O erro vem das réplicas, dos pontos centrais e dos termos
+centrais e os termos confundidos. Numa triagem de Plackett-Burman as interações não se separam
+dos efeitos principais: o app estima só os efeitos principais e avisa nas notas. O erro vem das réplicas, dos pontos centrais e dos termos
 deixados fora do modelo; sem nenhum grau de liberdade para o erro, os valores-p vêm do pseudo
 erro padrão de Lenth. Os gráficos são o Pareto dos efeitos, os efeitos principais e um gráfico
 de interação para cada interação de dois fatores do modelo (linhas que se cruzam ou se abrem
