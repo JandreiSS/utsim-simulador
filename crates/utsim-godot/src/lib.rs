@@ -31,6 +31,7 @@ pub mod acoes;
 pub mod aisle_edit;
 pub mod aisle_godot;
 pub mod andamento;
+pub mod andar;
 pub mod ao_vivo;
 pub mod camera_follow;
 pub mod coords;
@@ -638,6 +639,7 @@ impl UtsimPlayback {
                     put(&mut body, "cores", cores);
                     put(&mut body, "altura", p.altura);
                     put(&mut body, "escala", p.escala);
+                    put(&mut body, "largura", p.largura);
                     put(&mut e, "pessoa", body);
                 }
             }
@@ -648,6 +650,7 @@ impl UtsimPlayback {
                 put(&mut driver, "scale", m.scale);
                 put(&mut driver, "eye", v3(m.eye));
                 put(&mut driver, "hip", v3(m.hip));
+                put(&mut driver, "lean", v.driver_lean);
                 put(&mut e, "driver", driver);
             }
             blocks.push(&e.to_variant());
