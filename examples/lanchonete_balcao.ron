@@ -1,0 +1,84 @@
+// Lanchonete: balcão no almoço (linha Alimentação e food service): modelo pronto da linha,
+// montado só com as predefinições de linhas/alimentacao/biblioteca.ron.
+//
+// A loja recebe pedidos das 11h às 15h, todos os dias. O movimento sobe no almoço: 45
+// pedidos por hora das 11h às 12h, 90 das 12h às 13h30 e 40 depois. Dois caixas atendem
+// a fila (paciência de cerca de 10 minutos). A comanda divide o pedido nas suas partes: o
+// lanche vai para a chapa, o acompanhamento para a fritadeira e a bebida para o balcão de
+// bebidas; a montagem segura as partes até o pedido ficar completo. No pico, os dois
+// caixas mal dão conta: a fila cresce e alguns clientes desistem.
+//
+// Tempo em minutos; o dia começa às 0h. Rode com:
+//   utsim linha alimentacao relatorio examples/lanchonete_balcao.ron --prazo 12 --html relatorio.html
+//
+//   pedidos -> fila -> caixa -> comanda -> chapa | fritadeira | bebidas -> montagem -> saida
+Model(
+    name: "Lanchonete: balcão no almoço",
+    description: "Alimentação e food service: pico do almoço, dois caixas, comanda que divide o pedido entre chapa, fritadeira e bebidas, e montagem antes da entrega",
+    line: "alimentacao",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 71, replications: 5),
+    calendars: {
+        "loja": (period: 1440.0, off: [
+            (start: 0.0, duration: 660.0),
+            (start: 900.0, duration: 540.0),
+        ]),
+        "turno": (period: 1440.0, off: [
+            (start: 0.0, duration: 630.0),
+            (start: 930.0, duration: 510.0),
+        ]),
+    },
+    objects: [
+        (name: "pedidos", kind: Source(interarrival: Exp(mean: 1.0),
+            labels: {"canal": Const(1.0), "itens": Discrete([(1.0, 0.2), (2.0, 0.3), (3.0, 0.5)])},
+            schedule: Some((cycle: 1440.0, periods: [
+                (start: 660.0, end: 720.0, arrivals: Rate(0.75)),
+                (start: 720.0, end: 810.0, arrivals: Rate(1.5)),
+                (start: 810.0, end: 900.0, arrivals: Rate(0.67)),
+            ]))),
+            shifts: Calendar("loja"), position: (0.0, 0.0, 0.0),
+            preset: "alimentacao/pedidos", department: "Salão", symbol: "inicio"),
+        (name: "fila", kind: Queue(patience: Some(Exp(mean: 10.0))), position: (2.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "alimentacao/fila", department: "Salão", symbol: "espera"),
+        (name: "caixa", kind: Processor(capacity: 2, process: Triangular(min: 0.5, mode: 1.0, max: 2.5),
+            operators: Some(OperatorUse(team: "atendentes"))), position: (4.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "alimentacao/caixa", department: "Salão", symbol: "operacao"),
+        (name: "comanda", kind: Separator(mode: SplitBy(count: "itens", group: "comanda"), process: Const(0.0)),
+            output: ByLabel("linha"), position: (6.0, 0.0, 0.0),
+            preset: "alimentacao/comanda", department: "Cozinha", symbol: "operacao"),
+        (name: "chapa", kind: Processor(capacity: 8, process: Triangular(min: 3.0, mode: 4.0, max: 6.0)),
+            position: (8.0, 2.0, 0.0), ppe: ["touca", "avental"], visual: Some((asset: Some("bancada"))),
+            preset: "alimentacao/estacao", department: "Cozinha", symbol: "operacao"),
+        (name: "fritadeira", kind: Processor(capacity: 5, process: Const(3.0)),
+            downtime: Some((mtbf: Exp(mean: 2400.0), mttr: Exp(mean: 20.0))),
+            position: (8.0, 0.0, 0.0), ppe: ["touca", "avental"], visual: Some((asset: Some("bancada"))),
+            preset: "alimentacao/estacao", department: "Cozinha", symbol: "operacao"),
+        (name: "bebidas", kind: Processor(process: Triangular(min: 0.3, mode: 0.5, max: 1.0)),
+            position: (8.0, -2.0, 0.0), ppe: ["touca", "avental"], visual: Some((asset: Some("bancada"))),
+            preset: "alimentacao/estacao", department: "Cozinha", symbol: "operacao"),
+        (name: "montagem", kind: Queue(gather: Some((group: "comanda", count: "itens"))), position: (10.0, 0.0, 0.0),
+            visual: Some((asset: Some("bandeja"))), preset: "alimentacao/montagem", department: "Cozinha", symbol: "espera"),
+        (name: "saida", kind: Sink, position: (12.0, 0.0, 0.0),
+            preset: "alimentacao/saida", department: "Salão", symbol: "fim"),
+        (name: "atendentes", kind: Dispatcher(team: ["atendentes_1", "atendentes_2"], rule: FirstAvailable), position: (4.0, 2.0, 0.0),
+            preset: "alimentacao/equipe", department: "Salão"),
+        (name: "atendentes_1", kind: Transporter(speed: 60.0), position: (3.5, 3.0, 0.0),
+            shifts: Calendar("turno", Finish), ppe: ["touca", "avental"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "alimentacao/funcionario", department: "Salão"),
+        (name: "atendentes_2", kind: Transporter(speed: 60.0), position: (4.5, 3.0, 0.0),
+            shifts: Calendar("turno", Finish), ppe: ["touca", "avental"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "alimentacao/funcionario", department: "Salão"),
+    ],
+    connections: [
+        ("pedidos", "fila"),
+        ("fila", "caixa"),
+        ("caixa", "comanda"),
+        ("comanda", "chapa"),       // saída 1 -> o lanche
+        ("comanda", "fritadeira"),  // saída 2 -> o acompanhamento
+        ("comanda", "bebidas"),     // saída 3 -> a bebida
+        ("chapa", "montagem"),
+        ("fritadeira", "montagem"),
+        ("bebidas", "montagem"),
+        ("montagem", "saida"),
+    ],
+)

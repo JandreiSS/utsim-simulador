@@ -37,7 +37,7 @@ utsim linha lean_office colocar reembolso.ron entrada --nome pedidos --campo 'in
 utsim linha lean_office colocar reembolso.ron caixa_entrada --posicao 2 0 --departamento Financeiro
 utsim linha lean_office colocar reembolso.ron posto --nome lancamento --posicao 4 0 --campo 'tempo=Triangular(min: 5.0, mode: 10.0, max: 20.0)' --campo ca=0.9 --departamento Financeiro
 utsim linha lean_office colocar reembolso.ron lote --posicao 6 0 --campo tamanho=10 --departamento Financeiro
-utsim linha lean_office colocar reembolso.ron aprovacao --posicao 8 0 --campo 'aprovador="gestores"' --departamento Gerência
+utsim linha lean_office colocar reembolso.ron aprovacao --posicao 8 0 --campo 'aprovador="gestores"' --campo mesas=2 --departamento Gerência
 utsim linha lean_office colocar reembolso.ron tramitacao --nome malote --posicao 10 0 --campo 'tempo=Uniform(min: 60.0, max: 480.0)' --departamento Financeiro
 utsim linha lean_office colocar reembolso.ron posto --nome pagamento --posicao 12 0 --campo 'tempo=Triangular(min: 3.0, mode: 5.0, max: 10.0)' --departamento Tesouraria
 utsim linha lean_office colocar reembolso.ron conclusao --posicao 14 0 --departamento Tesouraria
@@ -89,7 +89,7 @@ utsim linha lean_office relatorio reembolso.ron --html atual.html
 ## 4. O que o estado atual mostra
 
 Com os números do mapa, cada caso recebe cerca de 32 minutos de trabalho (touch time) e leva
-cerca de 9,4 horas do pedido ao pagamento: a razão de atividade fica perto de 6 %. O Pareto das
+cerca de 9 horas do pedido ao pagamento: a razão de atividade fica perto de 6 %. O Pareto das
 esperas mostra onde está o resto: a espera para completar o lote e o malote. O FPY fica perto
 de 81 %, pelos erros do lançamento e pelas devoluções da aprovação.
 
@@ -114,7 +114,7 @@ Copie `reembolso.ron` para `futuro.ron` e faça as três mudanças no arquivo: n
 utsim linha lean_office relatorio reembolso.ron --comparar futuro.ron --html comparacao.html
 ```
 
-O lead time cai de cerca de 9,4 horas para menos de 1 hora, com o mesmo touch time, e o FPY
+O lead time cai de cerca de 9 horas para menos de 1 hora, com o mesmo touch time, e o FPY
 sobe para perto de 88 % (as devoluções da aprovação continuam). O relatório mostra os dois
 mapas do fluxo de valor, um embaixo do outro, e a tabela de indicadores lado a lado, cada um
 com o seu intervalo de confiança.

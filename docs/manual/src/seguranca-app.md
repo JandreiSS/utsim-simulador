@@ -26,6 +26,8 @@ No alto da tela ficam os alertas em vermelho: os perigos acima do nível mais ba
 
 As edições ficam num rascunho até você usar "Gravar", para que cada tecla digitada não vire uma alteração na pasta compartilhada.
 
+Quando o posto está ligado a um nó do modelo, os perigos gravados no próprio nó (aba Segurança do nó, no UTSim ou na tela Modelo) também aparecem no inventário, marcados "no nó do modelo". Eles entram nos alertas e no relatório, e as ações e as reavaliações deles ficam na unidade, como as dos outros perigos. Para mudar a descrição, o grupo, os controles, a probabilidade ou a severidade, edite no nó. O inventário relê o modelo quando o arquivo muda.
+
 ## Matriz
 
 A matriz padrão é uma grade própria de 5 por 5, com níveis baixo, médio, alto e crítico. Na tela Matriz, clique numa célula para trocar o nível dela e edite os nomes, as cores e as decisões dos níveis. É possível importar a matriz da sua empresa por CSV (de 3 por 3 até 5 por 5) e exportá-la. Uma matriz em que mais probabilidade ou mais severidade baixa o nível é recusada, e o programa mostra o motivo. "Gravar na unidade" faz a matriz valer para toda a unidade.

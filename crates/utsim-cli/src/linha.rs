@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use utsim_edit::{Command, Document};
+use utsim_linhas::alimentacao::{self, ALIMENTACAO, Alimentacao};
 use utsim_linhas::lean_office::{Indicadores, diagramas, relatorio};
 use utsim_linhas::logistica::{self, Armazem, LOGISTICA};
 use utsim_linhas::manufatura::{self, MANUFATURA, Manufatura};
@@ -24,7 +25,7 @@ use utsim_model::quality::{ZoneDef, ZoneKind};
     name = "utsim linha",
     about = "Linhas especializadas (Lean Office, Serviços e atendimento, Logística e \
              armazém, Saúde e hospital, Manufatura discreta, Processos contínuos e \
-             batelada): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha"
+             batelada, Alimentação e food service): predefinições, vocabulário, modelos prontos, indicadores e relatório da linha"
 )]
 struct Args {
     /// Linha (por exemplo lean_office), ou "lista" para ver as linhas instaladas
@@ -81,6 +82,9 @@ enum Acao {
         /// Processos contínuos e batelada: rendimento-alvo dos lotes, de 0 a 1 (padrão 0,95)
         #[arg(long)]
         rendimento_alvo: Option<f64>,
+        /// Alimentação e food service: prazo do pedido, em minutos (padrão 15)
+        #[arg(long)]
+        prazo: Option<f64>,
     },
     /// Coloca uma predefinição num modelo (cria o arquivo se não existir) e grava
     Colocar {
@@ -271,6 +275,16 @@ fn run(a: Args) -> Result<(), Box<dyn std::error::Error>> {
             json,
             meta_rendimento_de(rendimento_alvo)?,
         )?,
+        Some(Acao::Relatorio {
+            model,
+            reps,
+            html,
+            json,
+            prazo,
+            ..
+        }) if p.id() == ALIMENTACAO => {
+            alimentacao_cmd(&p, &model, reps, html, json, meta_prazo_de(prazo)?)?
+        }
         Some(Acao::Relatorio {
             model,
             reps,
@@ -672,6 +686,46 @@ fn processos_cmd(
     Ok(())
 }
 
+/// The order target of Alimentação e food service from the option.
+fn meta_prazo_de(prazo: Option<f64>) -> Result<alimentacao::Meta, String> {
+    let prazo = prazo.unwrap_or(alimentacao::Meta::default().prazo);
+    if !(prazo.is_finite() && prazo > 0.0) {
+        return Err(format!(
+            "--prazo deve ser um tempo positivo em minutos, recebi {prazo}"
+        ));
+    }
+    Ok(alimentacao::Meta { prazo })
+}
+
+/// `utsim linha alimentacao relatorio`: the indicators of Alimentação e food service.
+fn alimentacao_cmd(
+    p: &Pack,
+    path: &Path,
+    reps: Option<u32>,
+    html: Option<PathBuf>,
+    json: Option<PathBuf>,
+    meta: alimentacao::Meta,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let m = load(path, reps)?;
+    let k = Alimentacao::rodar(&m, Some(p), meta)?;
+    print!("{}", alimentacao::relatorio::texto(&k));
+    if let Some(out) = html {
+        std::fs::write(&out, alimentacao::relatorio::html(&k))?;
+        println!("relatório gravado em {}", out.display());
+    }
+    if let Some(out) = json {
+        let v = serde_json::json!({
+            "linha": p.id(),
+            "modelo": k.modelo,
+            "meta": {"prazo": meta.prazo},
+            "replicacoes": &k.reps,
+        });
+        std::fs::write(&out, serde_json::to_string_pretty(&v)?)?;
+        println!("indicadores gravados em {}", out.display());
+    }
+    Ok(())
+}
+
 /// `utsim run --linha <id>`: after the usual results, the line's indicators.
 pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let p = pack(id)?;
@@ -703,6 +757,12 @@ pub fn after_run(model: &Model, id: &str) -> Result<(), Box<dyn std::error::Erro
         let k = Processos::rodar(model, Some(&p), processos::Meta::default())?;
         println!();
         print!("{}", processos::relatorio::texto(&k));
+        return Ok(());
+    }
+    if p.id() == ALIMENTACAO {
+        let k = Alimentacao::rodar(model, Some(&p), alimentacao::Meta::default())?;
+        println!();
+        print!("{}", alimentacao::relatorio::texto(&k));
         return Ok(());
     }
     let k = Indicadores::rodar(model, Some(&p))?;

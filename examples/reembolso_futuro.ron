@@ -22,7 +22,7 @@ Model(
             operators: Some(OperatorUse(team: "equipe"))), position: (4.0, 0.0, 0.0),
             on_entry: "if random() > 0.98 { item.erro = 1.0; item.erros_lancamento = label(item, \"erros_lancamento\", 0.0) + 1.0; }",
             visual: Some((asset: Some("mesa"))), preset: "lean_office/posto", department: "Financeiro", symbol: "operacao"),
-        (name: "aprovacao", kind: Processor(process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
+        (name: "aprovacao", kind: Processor(capacity: 2, process: Triangular(min: 5.0, mode: 10.0, max: 20.0),
             operators: Some(OperatorUse(team: "gestores"))), output: Weighted([0.9, 0.1]),
             position: (8.0, 0.0, 0.0), visual: Some((asset: Some("mesa"))), preset: "lean_office/aprovacao", department: "Gerência", symbol: "inspecao"),
         (name: "malote", kind: Processor(capacity: 100000, process: Uniform(min: 5.0, max: 15.0)),

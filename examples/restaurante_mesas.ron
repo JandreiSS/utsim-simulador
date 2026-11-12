@@ -1,0 +1,69 @@
+// Restaurante: mesas no jantar (linha Alimentação e food service): modelo pronto da linha,
+// montado só com as predefinições de linhas/alimentacao/biblioteca.ron.
+//
+// O restaurante recebe grupos das 19h às 23h, todos os dias: 24 grupos por hora até as
+// 21h, 15 das 21h às 22h e 6 na última hora. O salão tem 25 mesas e cada grupo fica de 50
+// a 100 minutos (70, o mais comum), o que dá cerca de 21 grupos por hora: no começo da
+// noite forma-se fila na porta, e quem espera mais que a paciência (de 10 a 40 minutos)
+// vai embora. Na saída, dois garçons fecham a conta no caixa.
+//
+// Tempo em minutos; o dia começa às 0h. O salão fecha à meia-noite, mas termina de servir
+// quem já está sentado. Rode com:
+//   utsim linha alimentacao relatorio examples/restaurante_mesas.ron --prazo 120 --html relatorio.html
+//
+//   grupos -> espera -> salao -> caixa -> saida
+Model(
+    name: "Restaurante: mesas no jantar",
+    description: "Alimentação e food service: grupos que esperam mesa e desistem, salão com 25 mesas e o caixa com os garçons: giro de mesas e espera na porta",
+    line: "alimentacao",
+    packs: ["seguranca"],
+    run: (stop_time: 11520.0, warmup: 1440.0, seed: 72, replications: 5),
+    calendars: {
+        "porta": (period: 1440.0, off: [
+            (start: 0.0, duration: 1140.0),
+            (start: 1380.0, duration: 60.0),
+        ]),
+        "salao": (period: 1440.0, off: [
+            (start: 0.0, duration: 1140.0),
+        ]),
+        // Das 18h30 às 2h: fecham a conta de quem sai depois da meia-noite.
+        "garcons": (period: 1440.0, off: [
+            (start: 120.0, duration: 990.0),
+        ]),
+    },
+    objects: [
+        (name: "grupos", kind: Source(interarrival: Exp(mean: 2.5),
+            labels: {"canal": Const(1.0), "itens": Const(1.0)},
+            schedule: Some((cycle: 1440.0, periods: [
+                (start: 1140.0, end: 1260.0, arrivals: Rate(0.4)),
+                (start: 1260.0, end: 1320.0, arrivals: Rate(0.25)),
+                (start: 1320.0, end: 1380.0, arrivals: Rate(0.1)),
+            ]))),
+            shifts: Calendar("porta"), position: (0.0, 0.0, 0.0),
+            preset: "alimentacao/pedidos", department: "Recepção", symbol: "inicio"),
+        (name: "espera", kind: Queue(patience: Some(Triangular(min: 10.0, mode: 20.0, max: 40.0))), position: (2.0, 0.0, 0.0),
+            visual: Some((asset: Some("area"))), preset: "alimentacao/fila", department: "Recepção", symbol: "espera"),
+        (name: "salao", kind: Processor(capacity: 25, process: Triangular(min: 50.0, mode: 70.0, max: 100.0)),
+            shifts: Calendar("salao", Finish), position: (5.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "alimentacao/mesas", department: "Salão", symbol: "operacao"),
+        (name: "caixa", kind: Processor(capacity: 2, process: Triangular(min: 1.0, mode: 2.0, max: 4.0),
+            operators: Some(OperatorUse(team: "garcons"))), position: (8.0, 0.0, 0.0),
+            visual: Some((asset: Some("mesa"))), preset: "alimentacao/caixa", department: "Salão", symbol: "operacao"),
+        (name: "saida", kind: Sink, position: (10.0, 0.0, 0.0),
+            preset: "alimentacao/saida", department: "Recepção", symbol: "fim"),
+        (name: "garcons", kind: Dispatcher(team: ["garcons_1", "garcons_2"], rule: FirstAvailable), position: (8.0, 2.0, 0.0),
+            preset: "alimentacao/equipe", department: "Salão"),
+        (name: "garcons_1", kind: Transporter(speed: 60.0), position: (7.5, 3.0, 0.0),
+            shifts: Calendar("garcons", Finish), ppe: ["touca", "avental"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "alimentacao/funcionario", department: "Salão"),
+        (name: "garcons_2", kind: Transporter(speed: 60.0), position: (8.5, 3.0, 0.0),
+            shifts: Calendar("garcons", Finish), ppe: ["touca", "avental"], visual: Some((asset: Some("pessoa"))),
+            person: Some(()), preset: "alimentacao/funcionario", department: "Salão"),
+    ],
+    connections: [
+        ("grupos", "espera"),
+        ("espera", "salao"),
+        ("salao", "caixa"),
+        ("caixa", "saida"),
+    ],
+)

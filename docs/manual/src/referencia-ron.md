@@ -58,7 +58,7 @@ Model(
 | `obstacles` | `[]` | polígonos que os recursos não atravessam nos modos `Free` e `Network`: `(name, polygon: [(x, y), ...])`, ao menos 3 pontos, nomes únicos. Veja [Movimentação e obstáculos](movimentacao.md) |
 | `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
 | `aisles` | `[]` | corredores de circulação: `(name, kind: Pedestrian \| Forklift \| Mixed, points: [(x, y), ...], width, two_way: true, secondary: false, profile: None)`; geram a rede do modo `Aisles`. Veja [Corredores e faixas de segurança](corredores.md) |
-| `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0)` |
+| `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0, floor_color: Some("#d8d2bc"))`; `floor_color` é a cor do chão no 3D (ausente, o cinza de sempre) |
 | `line` | nenhuma | linha especializada do modelo (`"lean_office"`): vocabulário, biblioteca e indicadores da linha. A simulação não lê o campo. Veja [Lean Office](linhas/lean-office/index.md) |
 
 ## `run`
@@ -98,7 +98,7 @@ Model(
 | `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
 | `size` | área padrão do tipo | dimensões `(comprimento, largura, altura)` em metros, no sentido do objeto: mudam o ponto de acesso (e as distâncias), a capacidade de uma espera com `area_per_item` e o desenho 3D. Não vale para recursos móveis, esteiras e porta-paletes |
 | `area_per_item` | nenhuma | só numa `Queue`: área de cada item (m²); a capacidade passa a ser a área da espera dividida por ela, só itens inteiros, e no máximo `capacity` |
-| `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift)` ([Pessoas](pessoas.md)) |
+| `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift, sex, height_m, mass_kg, age, experience_years, capacity, study)` ([Pessoas](pessoas.md)) |
 | `preset` | nenhuma | predefinição da biblioteca de uma linha que criou o objeto, `"linha/predefinição"` (por exemplo `"lean_office/aprovacao"`): nome e papel do objeto nos relatórios da linha. A simulação não lê o campo |
 | `department` | nenhuma | departamento do objeto (`"Compras"`): raia do fluxograma multifuncional e relatórios por departamento. Não é uma das `areas` do modelo (áreas de piso). A simulação não lê o campo |
 | `symbol` | inferido | símbolo do fluxograma: `inicio`, `fim`, `operacao`, `transporte`, `inspecao`, `espera` ou `armazenagem`. Ausente, o fluxograma escolhe pelo tipo do objeto; `--simbolo` do `utsim fluxograma` ainda tem precedência |
@@ -180,7 +180,7 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 | `capacity` | `1` (mínimo 1) |
 | `setup` | nenhum |
 | `process` | obrigatório |
-| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None)`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
+| `operators` | nenhum: `OperatorUse(team: "x", count: 1, setup: true, process: true, requires: None, priority: None, priority_label: None, team_speedup: None)`; `count` é o número de operadores por peça; `team_speedup: Some(g)` divide o tempo da etapa por `g > 0`; `requires: "habilidade"` só aceita pessoas com ela; `priority` e `priority_label` ordenam os pedidos na fila do despachante |
 | `also` | `[]`: outras equipes pedidas junto com `operators`, cada uma um `OperatorUse` (por exemplo `[OperatorUse(team: "enfermagem")]` para o médico e o enfermeiro na mesma sala). A etapa só começa quando chegam as pessoas de todas as equipes que ela usa (`setup` e `process` de cada uma); se as equipes da preparação e do processo forem diferentes, quem preparou é liberado e as do processo são chamadas. Precisa de `operators`, e cada equipe aparece uma vez. Quem chega primeiro espera os outros na estação. Veja [Saúde e hospital](linhas/saude/index.md) |
 | `changeover` | nenhum: preparação em toda peça. `Some((label: "produto", matrix: [(from: 1.0, to: 2.0, time: Const(15.0))]))`: o `setup` só acontece quando o rótulo `label` da peça muda em relação à peça anterior, com o tempo de cada troca (de `from` para `to`) na `matrix`; troca sem linha na matriz usa o `setup`, que é obrigatório. A máquina começa pronta para o primeiro produto; com `capacity` maior que 1 vale o último produto que começou. Conta `changeovers` no relatório do bloco. Veja [Manufatura discreta](linhas/manufatura/index.md) |
 | `recipe` | nenhum: o mesmo `process` para todos. `Some((label: "produto", times: [(value: 1.0, time: Const(180.0))]))`: o item cujo rótulo `label` vale `value` processa pelo `time` daquela receita; os itens sem receita na tabela usam o `process`. Aceita o nome `receita`. Veja [Processos contínuos e batelada](linhas/processos/index.md) |

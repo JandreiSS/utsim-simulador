@@ -605,6 +605,9 @@ pub struct Pessoa {
     /// Height, metres, and the scale that gives it (height / `altura_base`).
     pub altura: f32,
     pub escala: f32,
+    /// Width and depth over the height scale: `sqrt(IMC / imc_base)` within the body's
+    /// `largura` range, 1 without a mass.
+    pub largura: f32,
     /// Scale and offset of the mannequin the body replaces (the fallback when the body
     /// does not load).
     pub escala_boneco: f32,
@@ -671,19 +674,25 @@ fn hex(text: &str) -> Option<String> {
 
 /// The body of person `name`. `forced`: the body named by `visual.asset`
 /// (`pessoa_homem`, `pessoa_mulher`); `ppe`: what the person wears (`Model::worn_ppe`);
-/// `color`: its `visual.color` (the shirt). `None` when the catalogue has neither body.
-/// The mannequin's scale and offset are filled by the caller.
+/// `color`: its `visual.color` (the shirt); `corpo`: the person's record (sex, height and
+/// mass), where given. `None` when the catalogue has neither body. The mannequin's scale
+/// and offset are filled by the caller.
 pub fn pessoa(
     cat: &Catalogo,
     name: &str,
     forced: Option<&str>,
     ppe: &[String],
     color: Option<&str>,
+    corpo: Option<&utsim_core::Person>,
 ) -> Option<Pessoa> {
     let forced = forced
         .map(|f| f.trim().to_lowercase())
         .filter(|f| PESSOAS.contains(&f.as_str()));
-    let pick = PESSOAS[(hash(name, "sexo") % 2) as usize];
+    let pick = match corpo.and_then(|p| p.sex) {
+        Some(utsim_core::Sex::Male) => PESSOAS[0],
+        Some(utsim_core::Sex::Female) => PESSOAS[1],
+        None => PESSOAS[(hash(name, "sexo") % 2) as usize],
+    };
     let arquivo = match forced {
         Some(f) => f,
         None if cat.get(pick).is_some() => pick.to_string(),
@@ -730,11 +739,16 @@ pub fn pessoa(
         .map_or(1.82, |v| v as f32)
         .max(0.1);
     let u = (hash(name, "altura") % 1001) as f32 / 1000.0;
-    let altura = match alturas.as_slice() {
+    let drawn = match alturas.as_slice() {
         [lo, hi, ..] => lo + (hi - lo) * u,
         [one] => *one,
         [] => base,
     };
+    let given = corpo
+        .and_then(|p| p.height_m)
+        .filter(|h| h.is_finite() && *h > 0.0);
+    let altura = given.map_or(drawn, |h| h as f32);
+    let largura = largura(d, given, corpo.and_then(|p| p.mass_kg));
     Some(Pessoa {
         path: cat.dir.join(&e.arquivo),
         arquivo,
@@ -742,9 +756,77 @@ pub fn pessoa(
         cores,
         altura,
         escala: altura / base,
+        largura,
         escala_boneco: 1.0,
         offset_boneco: [0.0; 3],
     })
+}
+
+/// Degrees the seated person leans forward (`dados.sentado_inclinar` of the person
+/// bodies): the clips sit it too far back. 0 when the catalogue does not say.
+pub fn sentado_inclinar(cat: &Catalogo) -> f32 {
+    PESSOAS
+        .iter()
+        .filter_map(|p| cat.get(p))
+        .find_map(|e| e.dados["sentado_inclinar"].as_f64())
+        .filter(|g| g.is_finite())
+        .map_or(0.0, |g| g as f32)
+}
+
+/// Leans the seated driver `graus` forward about its hip: the root and the eyes turn
+/// about the hip, on the driver's own side axis (its `x`, turned by its `yaw`). Returns
+/// the lean in radians, for the scene to turn the mannequin by.
+pub fn inclinar_motorista(m: &mut utsim_look::driver::DriverMount, graus: f32) -> f32 {
+    let a = graus.to_radians();
+    if a == 0.0 {
+        return 0.0;
+    }
+    // The side axis of the driver in the vehicle's frame (+x of the mannequin, turned by
+    // `yaw` as the engines turn: +z towards +x).
+    let (s, c) = m.yaw.sin_cos();
+    let axis = [c, 0.0, -s];
+    let turn = |v: [f32; 3]| {
+        let d = [v[0] - m.hip[0], v[1] - m.hip[1], v[2] - m.hip[2]];
+        // Rodrigues: d cos a + (k × d) sin a + k (k·d)(1 − cos a).
+        let (sa, ca) = a.sin_cos();
+        let k = axis;
+        let cross = [
+            k[1] * d[2] - k[2] * d[1],
+            k[2] * d[0] - k[0] * d[2],
+            k[0] * d[1] - k[1] * d[0],
+        ];
+        let dot = k[0] * d[0] + k[1] * d[1] + k[2] * d[2];
+        let r: [f32; 3] =
+            std::array::from_fn(|i| d[i] * ca + cross[i] * sa + k[i] * dot * (1.0 - ca));
+        [m.hip[0] + r[0], m.hip[1] + r[1], m.hip[2] + r[2]]
+    };
+    m.position = turn(m.position);
+    m.eye = turn(m.eye);
+    a
+}
+
+/// Width factor of a body (`dados` of its catalogue entry) for a person `height_m` tall
+/// and `mass_kg` heavy: `sqrt(IMC / imc_base)`, IMC = mass / height², kept within the
+/// body's `largura` range. 1 without a mass or a height (a drawn height has no mass to
+/// go with it), or without `imc_base` in the catalogue.
+fn largura(d: &serde_json::Value, height_m: Option<f64>, mass_kg: Option<f64>) -> f32 {
+    let (Some(h), Some(m), Some(base)) = (height_m, mass_kg, d["imc_base"].as_f64()) else {
+        return 1.0;
+    };
+    if !(h > 0.0 && m > 0.0 && base > 0.0 && m.is_finite()) {
+        return 1.0;
+    }
+    let range: Vec<f64> = d["largura"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_f64)
+        .collect();
+    let (lo, hi) = match range.as_slice() {
+        [lo, hi, ..] if lo <= hi => (*lo, *hi),
+        _ => (0.85, 1.25),
+    };
+    ((m / (h * h)) / base).sqrt().clamp(lo, hi) as f32
 }
 
 #[cfg(test)]
@@ -768,6 +850,106 @@ mod tests {
         root: [0.0; 3],
         turn: 0.0,
     };
+
+    #[test]
+    fn the_seated_driver_leans_forward_about_the_hip() {
+        let mount = |yaw: f32| utsim_look::driver::DriverMount {
+            position: [0.0, 0.2, -0.1],
+            yaw,
+            scale: 1.0,
+            eye: [0.0, 1.3, 0.0],
+            hip: [0.0, 0.7, 0.0],
+        };
+        // Facing +z: the eyes go forward (+z) and down, the hip stays, distances kept.
+        let mut m = mount(0.0);
+        let a = inclinar_motorista(&mut m, 15.0);
+        assert!((a - 15f32.to_radians()).abs() < 1e-6);
+        let s = 15f32.to_radians().sin();
+        let c = 15f32.to_radians().cos();
+        assert!(close(m.eye, [0.0, 0.7 + 0.6 * c, 0.6 * s]), "{:?}", m.eye);
+        assert_eq!(m.hip, [0.0, 0.7, 0.0]);
+        // Turned a quarter (facing +x): the lean goes towards +x.
+        let mut q = mount(FRAC_PI_2);
+        q.eye = [0.0, 1.3, 0.0];
+        inclinar_motorista(&mut q, 15.0);
+        assert!(q.eye[0] > 0.15 && q.eye[2].abs() < 1e-5, "{:?}", q.eye);
+        // No lean: nothing moves.
+        let mut z = mount(0.3);
+        assert_eq!(inclinar_motorista(&mut z, 0.0), 0.0);
+        assert_eq!(z, mount(0.3));
+        // The catalogue says how much (0 when it does not).
+        let g = sentado_inclinar(&cat());
+        assert!((0.0..=30.0).contains(&g), "{g}");
+    }
+
+    #[test]
+    fn the_record_of_a_person_sets_the_body_its_height_and_its_width() {
+        let c = cat();
+        let person = |sex, h, m| utsim_core::Person {
+            sex,
+            height_m: h,
+            mass_kg: m,
+            ..Default::default()
+        };
+        let base = |file: &str, key: &str| c.get(file).unwrap().dados[key].as_f64().unwrap();
+        // The sex picks the body, whatever the name draws.
+        for name in ["ana", "operador_1", "operador_2", "operador_3"] {
+            let men = person(Some(utsim_core::Sex::Male), None, None);
+            let women = person(Some(utsim_core::Sex::Female), None, None);
+            let a = pessoa(&c, name, None, &[], None, Some(&men)).unwrap();
+            let b = pessoa(&c, name, None, &[], None, Some(&women)).unwrap();
+            assert_eq!(
+                (a.arquivo.as_str(), b.arquivo.as_str()),
+                ("pessoa_homem", "pessoa_mulher")
+            );
+            // Without a sex, the name; the body named by the look still wins.
+            let none = pessoa(&c, name, None, &[], None, Some(&person(None, None, None))).unwrap();
+            assert_eq!(none, pessoa(&c, name, None, &[], None, None).unwrap());
+            let forced = pessoa(&c, name, Some("pessoa_mulher"), &[], None, Some(&men)).unwrap();
+            assert_eq!(forced.arquivo, "pessoa_mulher");
+        }
+        // The height given: scale = height / altura_base; no mass, width 1.
+        let tall = person(Some(utsim_core::Sex::Male), Some(1.95), None);
+        let a = pessoa(&c, "ana", None, &[], None, Some(&tall)).unwrap();
+        assert!((a.altura - 1.95).abs() < 1e-6);
+        let hb = base("pessoa_homem", "altura_base") as f32;
+        assert!((a.escala - 1.95 / hb).abs() < 1e-6);
+        assert_eq!(a.largura, 1.0);
+        // The mass: width = sqrt(IMC / imc_base), 120 kg at 1,95 m → IMC 31,56.
+        let heavy = person(Some(utsim_core::Sex::Male), Some(1.95), Some(120.0));
+        let a = pessoa(&c, "ana", None, &[], None, Some(&heavy)).unwrap();
+        let imc = 120.0 / (1.95f64 * 1.95);
+        let want = (imc / base("pessoa_homem", "imc_base")).sqrt() as f32;
+        assert!(
+            (a.largura - want).abs() < 1e-5 && a.largura > 1.15,
+            "{}",
+            a.largura
+        );
+        // The same IMC as the body's: width 1, for her body too (its own imc_base).
+        let ib = base("pessoa_mulher", "imc_base");
+        let even = person(
+            Some(utsim_core::Sex::Female),
+            Some(1.6),
+            Some(ib * 1.6 * 1.6),
+        );
+        let b = pessoa(&c, "ana", None, &[], None, Some(&even)).unwrap();
+        assert!((b.largura - 1.0).abs() < 1e-5, "{}", b.largura);
+        // Kept within the `largura` range of the body.
+        let thin = person(None, Some(1.9), Some(40.0));
+        let fat = person(None, Some(1.5), Some(200.0));
+        let range = |p: &Pessoa| {
+            let r = &c.get(&p.arquivo).unwrap().dados["largura"];
+            (r[0].as_f64().unwrap() as f32, r[1].as_f64().unwrap() as f32)
+        };
+        let t = pessoa(&c, "ana", None, &[], None, Some(&thin)).unwrap();
+        let f = pessoa(&c, "ana", None, &[], None, Some(&fat)).unwrap();
+        assert_eq!(t.largura, range(&t).0);
+        assert_eq!(f.largura, range(&f).1);
+        // A mass without a height: the drawn height has no mass to go with it.
+        let only_mass = person(None, None, Some(200.0));
+        let a = pessoa(&c, "ana", None, &[], None, Some(&only_mass)).unwrap();
+        assert_eq!(a.largura, 1.0);
+    }
 
     #[test]
     fn the_catalogue_maps_the_fixed_library_assets_and_keeps_the_parametric_ones() {
@@ -1128,8 +1310,11 @@ mod tests {
             "luva".to_string(),
             "cinto".to_string(),
         ];
-        let a = pessoa(&c, "ana", None, &ppe, Some("#3366CC")).unwrap();
-        assert_eq!(a, pessoa(&c, "ana", None, &ppe, Some("#3366CC")).unwrap());
+        let a = pessoa(&c, "ana", None, &ppe, Some("#3366CC"), None).unwrap();
+        assert_eq!(
+            a,
+            pessoa(&c, "ana", None, &ppe, Some("#3366CC"), None).unwrap()
+        );
         // Only the equipment of the catalogue, by its own names.
         assert_eq!(
             a.epis,
@@ -1162,22 +1347,22 @@ mod tests {
         );
         assert!(a.path.is_file());
         // Without a colour the shirt keeps its own; the body can be forced.
-        let b = pessoa(&c, "ana", Some("pessoa_mulher"), &[], None).unwrap();
+        let b = pessoa(&c, "ana", Some("pessoa_mulher"), &[], None, None).unwrap();
         assert_eq!(b.arquivo, "pessoa_mulher");
         assert!(b.epis.is_empty() && !b.cores.iter().any(|c| c.0 == "camisa"));
         // Different names give both bodies and different heights.
         let names: Vec<String> = (0..20).map(|k| format!("operador_{k}")).collect();
         let bodies: Vec<String> = names
             .iter()
-            .map(|n| pessoa(&c, n, None, &[], None).unwrap().arquivo)
+            .map(|n| pessoa(&c, n, None, &[], None, None).unwrap().arquivo)
             .collect();
         assert!(bodies.iter().any(|b| b == "pessoa_homem"));
         assert!(bodies.iter().any(|b| b == "pessoa_mulher"));
-        let h0 = pessoa(&c, &names[0], None, &[], None).unwrap().altura;
+        let h0 = pessoa(&c, &names[0], None, &[], None, None).unwrap().altura;
         assert!(
             names
                 .iter()
-                .any(|n| pessoa(&c, n, None, &[], None).unwrap().altura != h0)
+                .any(|n| pessoa(&c, n, None, &[], None, None).unwrap().altura != h0)
         );
     }
 

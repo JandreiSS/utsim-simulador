@@ -5,6 +5,39 @@
 
 pub type V3 = [f64; 3];
 
+/// The floor's grey when the model names no colour (`floor_marking.floor_color`).
+pub const FLOOR: [f32; 3] = [0.30, 0.31, 0.32];
+
+/// The floor colour of `hex` (`"#rrggbb"`), [`FLOOR`] when absent or unreadable.
+pub fn floor_color(hex: Option<&str>) -> [f32; 3] {
+    let Some(h) = hex.map(|h| h.trim().trim_start_matches('#')) else {
+        return FLOOR;
+    };
+    match u32::from_str_radix(h, 16) {
+        Ok(v) if h.len() == 6 && h.chars().all(|c| c.is_ascii_hexdigit()) => [
+            ((v >> 16) & 0xff) as f32 / 255.0,
+            ((v >> 8) & 0xff) as f32 / 255.0,
+            (v & 0xff) as f32 / 255.0,
+        ],
+        _ => FLOOR,
+    }
+}
+
+/// Relative brightness of a colour (sRGB weights, 0 black to 1 white).
+pub fn brightness(c: [f32; 3]) -> f32 {
+    0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+
+/// The grid lines' colour on a floor of colour `floor`, legible on any of them: darker on a
+/// light floor, lighter on a dark one (at least 0,07 of brightness apart).
+pub fn grid_color(floor: [f32; 3]) -> [f32; 3] {
+    if brightness(floor) > 0.25 {
+        floor.map(|v| v * 0.72)
+    } else {
+        floor.map(|v| v + (1.0 - v) * 0.22)
+    }
+}
+
 /// Editar: at least 40 m around the origin and 10 m around every object, the step of the
 /// snap doubled until there are at most 400 lines each way.
 pub fn edit_extent(positions: &[V3], snap: f64) -> (V3, V3, f64) {
@@ -65,6 +98,33 @@ pub fn lines(lo: V3, hi: V3, step: f64) -> Vec<V3> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_grid_stays_legible_on_any_floor() {
+        assert_eq!(floor_color(None), FLOOR);
+        assert_eq!(floor_color(Some("verde")), FLOOR);
+        assert_eq!(floor_color(Some("#ff8000")), [1.0, 128.0 / 255.0, 0.0]);
+        assert_eq!(floor_color(Some("FF8000")), [1.0, 128.0 / 255.0, 0.0]);
+        // The default grey keeps about the grid it had (a little darker than the floor).
+        let g = grid_color(FLOOR);
+        assert!(brightness(g) < brightness(FLOOR));
+        assert!((g[0] - 0.216).abs() < 0.01, "{g:?}");
+        // Every floor colour: the lines differ from it by at least 0,07 of brightness.
+        let mut worst = f32::MAX;
+        for r in (0..=255).step_by(17) {
+            for gr in (0..=255).step_by(17) {
+                for b in (0..=255).step_by(17) {
+                    let f = [r as f32 / 255.0, gr as f32 / 255.0, b as f32 / 255.0];
+                    let d = (brightness(grid_color(f)) - brightness(f)).abs();
+                    worst = worst.min(d);
+                }
+            }
+        }
+        assert!(worst >= 0.069, "{worst}");
+        // Black gets lighter lines, white darker ones.
+        assert!(brightness(grid_color([0.0; 3])) > 0.2);
+        assert!(brightness(grid_color([1.0; 3])) < 0.75);
+    }
 
     #[test]
     fn the_editar_grid_covers_the_objects_and_stays_under_400_lines() {
