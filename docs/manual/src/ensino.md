@@ -26,12 +26,12 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 4 | Balanceamento de linha | 4.1 Montagem do ventilador · 4.2 O balanceamento no papel e no chão · 4.3 A demanda subiu |
 | 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
 | 6 | Tempos e métodos | 6.1 Quantas máquinas por operador · 6.2 Trabalho externo · 6.3 Célula com operadores · 6.4 Cronometragem |
-| 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Do enunciado ao modelo |
+| 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Pronto atendimento por turnos · 7.3 Reembolso no escritório · 7.4 Do enunciado ao modelo |
 | 8 | O caso Lean Seis Sigma | 8.1 Definir · 8.2 Medir · 8.3 Analisar · 8.4 Melhorar · 8.5 Controlar |
 
 A aba **Glossário** reúne os conceitos da campanha, cada um com as missões que o usam e o capítulo do manual.
 
-Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele monta ou completa o modelo no UTSim e entrega o `.ron`. O ato 8 é o caso final, um projeto DMAIC completo na fábrica de eixos.
+Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças do problema: distribui tarefas entre estações e posiciona máquinas numa grade, e o app gera o modelo. No ato 6 ele aplica as fórmulas de tempos e métodos e confere na simulação. No ato 7 ele junta os temas em problemas maiores: decide a escala de uma clínica por turnos e as mudanças de um processo de escritório, e por fim monta ou completa o modelo no UTSim e entrega o `.ron`. O ato 8 é o caso final, um projeto DMAIC completo na fábrica de eixos.
 
 ## Uma missão
 
