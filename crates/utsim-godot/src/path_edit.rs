@@ -185,6 +185,33 @@ pub fn snap(
     if let Some((_, s)) = best {
         return s;
     }
+    // On the line of a floor path: a T-junction (the aisle network joins there).
+    for a in &model.aisles {
+        let line = a.centerline();
+        for w in line.windows(2) {
+            let (u, v) = (w[0], w[1]);
+            let (dx, dy) = (v[0] - u[0], v[1] - u[1]);
+            let len2 = dx * dx + dy * dy;
+            if len2 <= 0.0 {
+                continue;
+            }
+            let t = (((p[0] - u[0]) * dx + (p[1] - u[1]) * dy) / len2).clamp(0.0, 1.0);
+            let q = [u[0] + dx * t, u[1] + dy * t, u[2] + (v[2] - u[2]) * t];
+            offer(
+                d2(p, q),
+                Snap {
+                    at: q,
+                    what: "caminho",
+                    object: None,
+                    output: None,
+                },
+                &mut best,
+            );
+        }
+    }
+    if let Some((_, s)) = best {
+        return s;
+    }
     if let Some(q) = prev {
         let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
         let len = (dx * dx + dy * dy).sqrt();
@@ -958,6 +985,20 @@ mod tests {
         );
         assert_eq!(s.what, "angulo");
         assert!((s.at[1]).abs() < 1e-9 && (s.at[0] - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_path_can_start_on_the_line_of_another_one() {
+        let mut e = Editor::new("t");
+        e.add_floor_path(&[[0.0, 0.0, 0.0], [10.0, 0.0, 1.0]], &[], 0.0)
+            .unwrap();
+        let s = snap(e.model(), [4.0, 0.3, 0.0], 0.5, 0.5, None, None);
+        assert_eq!(s.what, "caminho");
+        assert!(
+            (s.at[1]).abs() < 1e-9 && (s.at[2] - 0.4).abs() < 1e-9,
+            "{:?}",
+            s.at
+        );
     }
 
     #[test]
