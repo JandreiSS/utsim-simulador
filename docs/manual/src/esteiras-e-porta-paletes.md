@@ -31,6 +31,60 @@ Os três primeiros precisam ser maiores que 0, e `item_length` não pode passar 
 
 **Use** a esteira quando o transporte entre dois postos é contínuo e o tempo de trânsito importa. É a forma de dar tempo de percurso a uma ligação direta. Para junções e desvios, use as filas e as regras de saída que já existem. O modelo `examples/linha_com_esteiras.ron` mostra uma esteira com acúmulo e outra sem.
 
+### Esteira desenhada por nós (`route`)
+
+A esteira pode seguir um trajeto desenhado por nós, como se desenham ruas: retas, curvas e subidas. Com `route`, o trajeto manda no resultado e o campo `length` deixa de valer.
+
+```ron
+(name: "esteira_sobe", kind: Conveyor(length: 5.0, speed: 0.5, item_length: 0.6,
+    route: Some((
+        nodes: [
+            (at: (0.0, 0.0, 0.8)),
+            (at: (6.0, 0.0, 0.8), radius: Some(1.5)),
+            (at: (6.0, 5.0, 2.2)),
+        ],
+        style: Channeled,
+        drive: Powered,
+    ))),
+    position: (10.0, 4.0, 0.0))
+```
+
+| Campo de `route` | Padrão | Significado |
+|---|---|---|
+| `nodes` | obrigatório | nós do trajeto, ao menos 2. `at` é a posição relativa à da esteira, e `z` é a altura da superfície da correia. `radius` arredonda a quina num nó do meio |
+| `style` | `Simple` | `Simple` (esteira simples) ou `Channeled` (esteira com canaletas laterais) |
+| `drive` | `Powered` | `Powered` (motorizada) ou `Gravity` (roletes livres por gravidade) |
+| `max_slope` | do tipo | inclinação máxima em graus |
+| `width` | `0.6` | largura da esteira em metros |
+
+O que a geometria muda no resultado:
+
+- **Comprimento:** é o do trajeto em 3D, com as curvas e as subidas. Subir 1 m em 4 m de planta dá √(4² + 1²) ≈ 4,12 m.
+- **Tempo de passagem:** comprimento ÷ velocidade.
+- **Capacidade:** comprimento ÷ `item_length`.
+- **Curva:** o arco é tangente aos dois trechos e fica no plano do piso. Se o raio não cabe, ele diminui até o ponto de tangência chegar à metade do trecho mais curto. O arco de raio `r` que vira θ encurta o caminho em `2r·tan(θ/2) − r·θ`.
+- **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
+- **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora.
+
+#### Inclinação máxima
+
+Acima do limite aparece um aviso, porque a peça escorrega ou tomba.
+
+| Tipo | Limite padrão |
+|---|---|
+| Esteira simples (correia lisa) | 15° |
+| Esteira com canaletas (guias laterais altas) | 25° |
+
+#### Esteira por gravidade
+
+Nos roletes livres, a peça desce pela inclinação, e os roletes de freio a seguram na velocidade-limite `speed`. Cada pedaço do trajeto tem a sua velocidade, em função da descida `g` (subida ÷ distância em planta, 0,03 = 3 %):
+
+`v = speed × limitar((g − 0,015) ÷ (0,05 − 0,015), 0,1, 1)`
+
+- Abaixo de 1,5 % de descida, a resistência ao rolamento vence e a peça só anda empurrada pelas de trás, a 10 % da velocidade-limite. Um trecho assim gera um aviso.
+- Com 5 % ou mais de descida, a peça chega à velocidade-limite.
+- A esteira inteira usa a velocidade que dá o mesmo tempo de passagem do trajeto: `L ÷ Σ (Lᵢ ÷ vᵢ)`.
+
 ## Rack (Porta-paletes)
 
 Armazenagem endereçada: `bays` colunas por `levels` níveis.
