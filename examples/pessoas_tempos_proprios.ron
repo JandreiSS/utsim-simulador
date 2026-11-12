@@ -13,7 +13,10 @@
 // que bruno. As métricas `ana.person.own_times` e `bruno.person.own_times` contam as
 // operações tiradas dos tempos próprios.
 //
-// Os números são de exemplo, sem medição real.
+// Os números são de exemplo, sem medição real. As leituras de ana estão em `estudo`
+// (cinco horários, com uma pausa de meia hora); `utsim pessoa ajustar
+// examples/pessoas_tempos_proprios.ron --pessoa ana` refaz o ajuste e mostra quanto a
+// curva tirada de 60 leituras difere da que gerou os dados.
 //
 //   chegada -> fila -> torno (operado por ana ou bruno) -> expedicao
 Model(
@@ -33,6 +36,16 @@ Model(
             visual: Some((asset: Some("pessoa"))),
             person: Some((
                 sexo: Some(Feminino),
+                estudo: Some((
+                    leituras: [
+                    (tarefa: "torno", metodo: "A", hora: 0.5, tempos: [44.0, 46.8, 39.2, 46.7, 43.1, 47.5, 47.2, 46.7, 41.3, 43.9, 40.9, 43.5]),
+                    (tarefa: "torno", metodo: "A", hora: 2.0, tempos: [48.8, 52.2, 51.4, 48.9, 53.0, 51.4, 51.9, 44.3, 44.6, 54.2, 49.0, 48.1]),
+                    (tarefa: "torno", metodo: "A", hora: 3.75, tempos: [48.3, 48.4, 53.0, 47.5, 50.4, 52.0, 50.7, 45.4, 49.5, 48.8, 55.8, 53.0]),
+                    (tarefa: "torno", metodo: "A", hora: 4.75, tempos: [37.9, 41.1, 41.5, 46.1, 43.5, 45.5, 44.6, 42.2, 44.6, 42.3, 38.9, 42.2]),
+                    (tarefa: "torno", metodo: "A", hora: 7.5, tempos: [42.5, 52.4, 55.9, 51.8, 54.5, 55.6, 47.5, 46.4, 46.6, 52.3, 50.8, 56.0]),
+                    ],
+                    pausas: [(4.0, 4.5)],
+                )),
                 tempos: {"torno": (distribuicao: Normal(mean: 40.0, sd: 3.0), metodo: "A")},
                 fadiga: Some(Dinamica(trabalho: 1.6667e-4, recuperacao: 1.0e-3, fator_tempo: 0.3)),
             ))),
