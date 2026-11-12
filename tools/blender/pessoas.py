@@ -1123,7 +1123,7 @@ def saia_do_avental(ob, ual):
         a = max(0.0, min(1.0, (v.co.x + 0.05) / 0.10))
         alvo = {"pelvis": 0.1, "thigh_l": 0.9 * a, "thigh_r": 0.9 * (1.0 - a)}
         atual = {nomes[e.group]: e.weight for e in v.groups}
-        for n in set(atual) | set(alvo):
+        for n in sorted(set(atual) | set(alvo)):
             w = atual.get(n, 0.0) * (1.0 - rampa) + alvo.get(n, 0.0) * rampa
             grupo = ob.vertex_groups[n]
             if w > 1e-4:
