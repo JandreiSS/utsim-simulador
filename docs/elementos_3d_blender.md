@@ -180,7 +180,7 @@ licença e o jeito de preparar a pasta estão em `assets/modelos3d/LEIA-ME.md`. 
 - `corpo`: o humano do MakeHuman, com rosto, mãos, cabelo e sobrancelhas, vestindo camiseta,
   macacão de trabalho e sapato fechado. O homem e a mulher vêm de macros diferentes do
   MakeHuman (sexo, idade, músculo, peso, proporções), então mudam no corpo (ombros, cintura,
-  quadril, busto) e no rosto. O cabelo é curto nele e uma trança presa nela. A cor vem só dos
+  quadril, busto) e no rosto. O cabelo é curto nele e um rabo de cavalo nela. A cor vem só dos
   materiais, sem textura: `pele`, `labio`, `olho`, `olho_branco`, `cabelo` (cabelo e
   sobrancelhas), `camisa`, `calca` (o macacão), `fivela`, `calcado` e `sola`;
 - `epi_<nome>`: uma malha por EPI do modelo (`capacete`, `oculos`, `protetor_auricular`,
@@ -188,8 +188,10 @@ licença e o jeito de preparar a pasta estão em `assets/modelos3d/LEIA-ME.md`. 
   veste (o `ppe` do nó dela). Cada EPI é feito sobre o corpo vestido: raios de fora para
   dentro acham a pele ou a roupa, e a peça fica com folga sobre ela. O capacete fica acima da
   testa, as lentes dos óculos são transparentes e a máscara cobre só o nariz e a boca, então
-  os olhos aparecem mesmo com tudo vestido. As luvas são a mão do corpo com folga; a botina é
-  a bota `shoes03` do pacote, um pouco por fora do sapato.
+  os olhos aparecem mesmo com tudo vestido. As luvas são a mão do corpo com folga. A botina é
+  o próprio sapato em couro, um pouco maior, para cobri-lo em qualquer pose. A saia do avental
+  segue a bacia e as duas coxas, com a parte de cada coxa variando de um lado ao outro, para
+  não rasgar no meio ao andar.
 
 ### Do MPFB ao esqueleto do UAL1
 
@@ -200,14 +202,48 @@ todos os ossos, o corpo é que se encaixa nas juntas do UAL1:
 
 - o tronco (bacia, coluna e clavículas) vai inteiro, girado e escalado, para que o meio do
   quadril e o meio dos ombros caiam nos do UAL1;
-- a cabeça vai reta para a junta da cabeça do UAL1, e o pescoço fica no meio-termo;
+- o pescoço e a cabeça vão com o tronco, com as proporções do corpo. No UAL1, a junta da
+  cabeça fica uns 10 cm mais baixa e 8 cm mais à frente em relação aos ombros, porque o boneco
+  tem o pescoço curto. Levar a cabeça até essa junta esmagava o pescoço (de 22 cm entre o ombro
+  e a cabeça para 13 cm) e afundava a cabeça nos ombros. As juntas do UAL1 ficam então mais
+  baixas dentro do pescoço, e só o centro do giro muda;
 - braços e pernas giram até a direção dos ossos do UAL1 (de braços abertos) e os ossos longos
-  esticam até o comprimento deles; mãos e pés só giram, e o pé desce até a sola tocar o chão.
+  esticam até o comprimento deles; mãos e pés só giram, e o pé desce até a sola tocar o chão;
+- cada falange dos dedos vai para a direção e o comprimento da falange do UAL1. Sem isso, os
+  clipes fecham a mão em garra;
+- a perna da calça é estreitada do joelho até a barra (a do pacote abre em boca de sino).
 
 Cada vértice vai com a média das matrizes dos seus ossos, com os pesos do próprio MPFB, que
 continuam no arquivo. Depois, cada parte é reduzida (Decimate simétrico) para caber no
 orçamento do 3D em tempo real: cerca de 19 mil triângulos e 1,2 MB por pessoa, com os oito
 EPIs.
+
+### Postura: a compensação dos clipes
+
+Os clipes do UAL1 foram feitos para um boneco de jogo. Em relação ao repouso, o `Idle_Loop` e o
+`Walk_Loop` dobram o tórax uns 12° para a frente e baixam a cabeça uns 13°, com a lombar uns 5°
+para trás. Num corpo humano isso aparece como corcunda. A correção fica na malha, e o esqueleto
+e os clipes não mudam:
+
+- em repouso, a malha é dobrada ao contrário em cada junta da coluna (`POSTURA` em
+  `pessoas.py`): `spine_01` 3° para a frente, `spine_02` 5° e `spine_03` 5° para trás,
+  `neck_01` 2° e `Head` 3° para a frente;
+- a dobra usa os pesos da pele, então fica suave, e os braços e a cabeça vão com o tórax;
+- tocado o clipe, as duas dobras se anulam e a pessoa fica ereta.
+
+Por isso a pessoa em repouso (pose T, que o 3D nunca mostra) aparece inclinada para trás. As
+medidas do catálogo (`tamanho`, `altura_base`) são as do corpo ereto, antes da compensação.
+Com o pescoço inteiro, o homem do arquivo tem 1,86 m e a mulher, 1,84 m (`altura_base`); a
+escala por pessoa leva cada um à sua altura.
+
+Sentado (`Driving_Loop`, `Sitting_Idle_Loop`), o clipe já reclina o tronco uns 18°, e a
+compensação soma uns 7°. Isso não se corrige na malha sem piorar a pessoa em pé. O catálogo traz
+`dados.sentado_inclinar` (15°): a ponte pode inclinar a pessoa sentada para a frente por esse
+ângulo, em torno do quadril.
+O teste `a_postura_de_repouso_compensa_a_curva_dos_clipes` confere a compensação.
+
+Para conferir, as prévias ficam em `.claude/previa-3d/operador-postura/` (corpo inteiro) e
+`.claude/previa-3d/operador-pescoco/` (pescoço de perto, de perfil e de 3/4).
 
 Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 
@@ -219,6 +255,7 @@ Variação por pessoa, em `dados` no catálogo, sorteada pelo 3D:
 | `altura_base` | altura do arquivo, do chão ao topo da cabeça; a escala é altura / `altura_base` |
 | `imc_base` | IMC (kg/m²) estimado do corpo do arquivo |
 | `largura` | faixa do fator de largura, `[mín, máx]` |
+| `sentado_inclinar` | graus para a frente que a ponte pode dar à pessoa sentada (ver "Postura") |
 
 Escala por pessoa. Quando o modelo traz a altura e o peso da pessoa, a ponte usa os dois.
 Sem eles, a altura é sorteada pelo nome dentro de `alturas` e a largura fica 1.
