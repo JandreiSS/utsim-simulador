@@ -270,7 +270,9 @@ Os campos também aceitam os nomes em português (`sexo`, `altura_m`, `massa_kg`
   resultados são os mesmos.
 - **3D.** O sexo escolhe o corpo (sem valor, o corpo continua escolhido pelo nome). A
   altura dá a altura do boneco, e a massa, junto com a altura, dá a largura pelo índice de
-  massa corporal.
+  massa corporal: a largura e a profundidade crescem com √(IMC ÷ IMC do corpo base), entre
+  0,85 e 1,25. Sem altura, ela é sorteada pelo nome; sem massa, a largura fica a do corpo.
+  No UTSim 3D, esses campos ficam no grupo "Pessoa" do painel de propriedades.
 - **Avisos.** Uma carga acima da capacidade medida (`capacity.load_kg`) dá aviso. Com
   `sex: Some(Female)`, uma carga acima de 20 kg dá o aviso da CLT, art. 390 (abaixo). A
   altura fora de 1,40 a 2,10 m e a massa fora de 35 a 200 kg também dão aviso, porque quase

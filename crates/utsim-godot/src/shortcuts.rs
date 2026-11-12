@@ -17,7 +17,8 @@ pub struct KeyContext {
 ///
 /// Actions: `desfazer`, `refazer`, `salvar`, `salvar_como`, `abrir`, `novo`,
 /// `organizar:<copiar|recortar|colar|duplicar>`, `selecionar_tudo`, `atalhos`,
-/// `desempenho`, `modo:alternar`, `enquadrar`, `reproduzir`, `excluir`, `cancelar`,
+/// `desempenho`, `modo:alternar`, `enquadrar` (Home; F in Editar), `andar` (F in Simular:
+/// the free first-person camera), `reproduzir`, `excluir`, `cancelar`,
 /// `painel_vivo_fechar` (Esc in Simular),
 /// `mover:<dx>:<dy>`, `girar:<graus>` (the selection, counter-clockwise seen from above),
 /// `ferramenta:<nome>` (the tool, or `selecionar` when it is already
@@ -48,7 +49,9 @@ pub fn key_action(keycode: i64, ctrl: bool, shift: bool, ctx: &KeyContext) -> Op
         Key::F1 => return s("atalhos"),
         Key::F3 => return s("desempenho"),
         Key::Tab => return s("modo:alternar"),
-        Key::F => return s("enquadrar"),
+        Key::Home => return s("enquadrar"),
+        Key::F if ctx.editing => return s("enquadrar"),
+        Key::F => return s("andar"),
         Key::Space if !ctx.editing => return s("reproduzir"),
         // Simular: Esc closes the most recent live results panel (`ui_ao_vivo`).
         Key::Escape if !ctx.editing => return s("painel_vivo_fechar"),
@@ -177,7 +180,7 @@ mod tests {
             Some("corredor_fechar")
         );
         assert_eq!(act(SPECIAL + 5, false, false, &sel), None);
-        // Simulating: the tool keys are nothing; Space plays; F frames; Tab switches.
+        // Simulating: the tool keys are nothing; Space plays; Tab switches.
         let sim = ctx(false, "selecionar");
         assert_eq!(act('L' as i64, false, false, &sim), None);
         assert_eq!(act(32, false, false, &sim).as_deref(), Some("reproduzir"));
@@ -189,6 +192,19 @@ mod tests {
         );
         assert_eq!(
             act('F' as i64, false, false, &sel).as_deref(),
+            Some("enquadrar")
+        );
+        // Simulating, F walks (the free camera) and Home frames, in both modes.
+        assert_eq!(
+            act('F' as i64, false, false, &sim).as_deref(),
+            Some("andar")
+        );
+        assert_eq!(
+            act(SPECIAL + 13, false, false, &sim).as_deref(),
+            Some("enquadrar")
+        );
+        assert_eq!(
+            act(SPECIAL + 13, false, false, &sel).as_deref(),
             Some("enquadrar")
         );
         assert_eq!(

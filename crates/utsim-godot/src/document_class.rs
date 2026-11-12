@@ -476,6 +476,17 @@ impl UtsimDocument {
         self.editor.doc.end_gesture();
     }
 
+    /// The floor's colour (`floor_marking.floor_color`, the default grey without one) and
+    /// the grid's on it (`grid.rs`), `[floor, grid]`.
+    #[func]
+    fn floor_colors(&self) -> PackedColorArray {
+        let marking = self.editor.doc.model().marking();
+        let floor = crate::grid::floor_color(marking.floor_color.as_deref());
+        let grid = crate::grid::grid_color(floor);
+        let c = |v: [f32; 3]| Color::from_rgb(v[0], v[1], v[2]);
+        PackedColorArray::from(&[c(floor), c(grid)][..])
+    }
+
     /// The saved RON text of the model.
     #[func]
     fn text(&self) -> GString {

@@ -99,6 +99,10 @@ var calor_on := false
 var _open_dialog: FileDialog
 var _save_dialog: FileDialog
 var _grid: MeshInstance3D
+## The floor plane; its colour is the model's (`floor_marking.floor_color`).
+var _ground: MeshInstance3D
+## The grid lines' colour on that floor (`grid.rs`).
+var _grid_color := Color(0.22, 0.24, 0.28)
 ## The performance line over the 3D view (F3), drawn by egui.
 var _perf_on := false
 var _revision := -1
@@ -118,6 +122,10 @@ var camera_mode := "orbita"
 var camera_aim := Vector3.ZERO
 ## Block followed by the cameras other than the orbit one.
 var follow_name := ""
+## The free first-person camera of Simular (F): `UtsimAndar` (`andar.rs`), active while
+## walking; its crosshair and hint over the view.
+var andar: Object
+var _andar_hud: CanvasLayer
 var _frames := 0
 var _replay_dialog: FileDialog
 var _data_dialog: FileDialog
@@ -209,6 +217,7 @@ func _build_world() -> void:
 	ground.position = Vector3(0, -0.004, 0)
 	ground.name = "Piso"
 	add_child(ground)
+	_ground = ground
 	cena = CenaUtsim.new()
 	cena.name = "Cena"
 	cena.show_floor = false
@@ -569,7 +578,13 @@ func _run_step(p: Dictionary) -> bool:
 		"obstaculos":
 			editor.corredores.set_obstacles_visible(on)
 			_sync_edit()
+		"andar":
+			if walking():
+				stop_walk()
+			elif not start_walk():
+				set_status("Para andar pela fábrica, simule primeiro (F no Simular, depois da rodada).")
 		"enquadrar":
+			stop_walk()
 			if mode == "simular" and cena.playback != null:
 				camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
 			else:
@@ -808,6 +823,9 @@ func _renew_lock() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_check_disk()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and walking() and not scripted:
+		# The cursor is let go when the window loses the focus: the walk ends with it.
+		stop_walk()
 
 
 ## Another app (UTSim Qualidade, UTSim Segurança do Trabalho) may have saved the model
@@ -1242,6 +1260,7 @@ func set_mode(which: String) -> bool:
 	if which == "simular":
 		return simulate(_run_reps)
 	set_playing(false)
+	stop_walk()
 	mode = "editar"
 	playing_replay = false
 	if ui != null:
@@ -1384,9 +1403,21 @@ func _update_shadows(lo: Vector3, hi: Vector3) -> void:
 	sun.directional_shadow_max_distance = camera.dist + (hi - lo).length() * 0.5 + 10.0
 
 
+## The floor in the model's colour, and the grid in a tone that stays visible on it.
+func _apply_floor() -> void:
+	if doc == null or _ground == null:
+		return
+	var c: PackedColorArray = doc.floor_colors()
+	if c.size() < 2:
+		return
+	(_ground.material_override as StandardMaterial3D).albedo_color = c[0]
+	_grid_color = c[1]
+
+
 ## The floor grid of Editar: lines every snapping step around the model (at least 40 m
-## across), a little darker than the floor.
+## across), in a tone apart from the floor's.
 func _draw_edit_grid() -> void:
+	_apply_floor()
 	if mode != "editar" or ui == null:
 		return
 	var at := PackedVector3Array()
@@ -1397,6 +1428,7 @@ func _draw_edit_grid() -> void:
 
 ## The floor grid of Simular: about 40 cells across the scene (`grid.rs`).
 func _draw_grid(info: Dictionary) -> void:
+	_apply_floor()
 	if ui != null:
 		_grid_lines(ui.sim_grid(info["bounds_min"], info["bounds_max"]))
 
@@ -1409,7 +1441,7 @@ func _grid_lines(points: PackedVector3Array) -> void:
 	if not points.is_empty():
 		var colors := PackedColorArray()
 		colors.resize(points.size())
-		colors.fill(Color(0.22, 0.24, 0.28))
+		colors.fill(_grid_color)
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = points
@@ -1461,7 +1493,11 @@ func _process(dt: float) -> void:
 		cena.apply(t, dt)
 		ui.flows_time(t)
 	_frames += 1
-	if mode == "simular" and playback != null:
+	if walking():
+		_walk_frame(dt)
+		if _frames % 10 == 0:
+			cena.limit_labels(camera)
+	elif mode == "simular" and playback != null:
 		_drive_camera()
 		if _frames % 10 == 0:
 			cena.limit_labels(camera)
@@ -1844,6 +1880,7 @@ func save_replay(path: String) -> bool:
 
 
 func set_camera_mode(which: String) -> void:
+	stop_walk()
 	camera_mode = which
 	var c: Dictionary = ui.camera_choice(which, follow_name) if ui != null else {"restore": true, "notice": ""}
 	if c["restore"]:
@@ -1880,6 +1917,182 @@ func _drive_camera() -> void:
 	camera_aim = v[1]
 	camera.transform = Transform3D(Basis.IDENTITY, v[0]).looking_at(camera_aim, Vector3.UP)
 	cena.clear_view(v[0], camera_aim, i)
+
+
+# ---------------------------------------------------------------------------
+# Andar: the free first-person camera of Simular (F)
+# ---------------------------------------------------------------------------
+
+
+func walking() -> bool:
+	return andar != null and andar.active()
+
+
+## Starts walking from where the orbit camera is (`andar.rs`): at eye height, facing its
+## target. The cursor is captured (not in a scripted run: the owner may be using the
+## mouse); the crosshair and the hint show over the view.
+func start_walk() -> bool:
+	if mode != "simular" or playback == null or not ClassDB.class_exists(&"UtsimAndar"):
+		return false
+	if andar == null:
+		andar = ClassDB.instantiate(&"UtsimAndar")
+	# The orbit's own eye and target (a following camera may have moved the camera).
+	camera.update()
+	# A drag of the orbit cut by F would go on after the walk (its release is taken here).
+	camera.set("_dragging", false)
+	andar.begin(camera.global_position, camera.target, camera.yaw)
+	# Walking needs perspective, also from the plan view; `set_plan` gives it back.
+	camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	cena.restore_view()
+	if not scripted:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_walk_hud(true)
+	walk_step(0.0, 0.0, 0.0, false, 0.0)
+	return true
+
+
+## Back to the camera chosen before (the orbit keeps its target, turn and distance).
+func stop_walk() -> void:
+	if not walking():
+		return
+	andar.end()
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_walk_hud(false)
+	camera.set_plan(camera.plan)
+	camera.update()
+	set_status("Câmera de volta.")
+
+
+## One frame of the walk: the keys held move the eye (W/S, A/D, E/Q or Space/C, Shift).
+## With Ctrl held nothing moves: the keys are a shortcut (Ctrl+S saves).
+func _walk_frame(dt: float) -> void:
+	if Input.is_physical_key_pressed(KEY_CTRL) or Input.is_physical_key_pressed(KEY_META):
+		walk_step(0.0, 0.0, 0.0, false, dt)
+		return
+	var forward := _held([KEY_W, KEY_UP]) - _held([KEY_S, KEY_DOWN])
+	var side := _held([KEY_D, KEY_RIGHT]) - _held([KEY_A, KEY_LEFT])
+	var up := _held([KEY_E, KEY_SPACE]) - _held([KEY_Q, KEY_C])
+	walk_step(forward, side, up, Input.is_physical_key_pressed(KEY_SHIFT), dt)
+
+
+func _held(keys: Array) -> float:
+	for k in keys:
+		if Input.is_physical_key_pressed(k):
+			return 1.0
+	return 0.0
+
+
+## Moves the walk `dt` seconds and places the camera (the scripts call it directly).
+func walk_step(forward: float, side: float, up: float, run: bool, dt: float) -> void:
+	if not walking():
+		return
+	var was_flying: bool = andar.flying()
+	andar.step(forward, side, up, run, dt)
+	camera_aim = andar.aim()
+	camera.transform = Transform3D(Basis.IDENTITY, andar.eye()).looking_at(camera_aim, Vector3.UP)
+	if was_flying != andar.flying():
+		_walk_hint()
+
+
+## V: flying or back on the floor.
+func walk_toggle_flight() -> void:
+	if not walking():
+		return
+	andar.toggle_flight()
+	walk_step(0.0, 0.0, 0.0, false, 0.0)
+	_walk_hint()
+
+
+## The mouse looks, the wheel sets the speed, a click opens the live panel of what is under
+## the crosshair, V flies or lands and Esc stops. The keys that move are taken here, so
+## Space does not play; with Ctrl they go on as shortcuts.
+func _input(event: InputEvent) -> void:
+	if not walking():
+		return
+	var handled := true
+	if event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			andar.look(mm.relative.x, mm.relative.y)
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			match mb.button_index:
+				MOUSE_BUTTON_WHEEL_UP:
+					andar.wheel(1)
+					_walk_hint()
+				MOUSE_BUTTON_WHEEL_DOWN:
+					andar.wheel(-1)
+					_walk_hint()
+				MOUSE_BUTTON_LEFT:
+					pick_live_panel(get_viewport().get_visible_rect().size * 0.5)
+	elif event is InputEventKey:
+		var k := event as InputEventKey
+		var code := k.physical_keycode if k.physical_keycode != KEY_NONE else k.keycode
+		if code == KEY_ESCAPE:
+			if k.pressed and not k.echo:
+				stop_walk()
+		elif code == KEY_V:
+			if k.pressed and not k.echo:
+				walk_toggle_flight()
+		elif k.ctrl_pressed or k.meta_pressed or not [KEY_W, KEY_A, KEY_S, KEY_D, KEY_E, KEY_Q,
+				KEY_C, KEY_SPACE, KEY_SHIFT, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT].has(code):
+			handled = false
+	else:
+		handled = false
+	if handled:
+		get_viewport().set_input_as_handled()
+
+
+func _walk_hint() -> void:
+	if not walking():
+		return
+	var text: String = andar.hint()
+	set_status(text)
+	if _andar_hud != null:
+		(_andar_hud.get_node("Dica") as Label).text = text
+
+
+## The crosshair in the middle of the view and the hint at the top.
+func _walk_hud(on: bool) -> void:
+	if not on:
+		if _andar_hud != null:
+			_andar_hud.queue_free()
+			_andar_hud = null
+		return
+	if _andar_hud == null:
+		_andar_hud = CanvasLayer.new()
+		_andar_hud.name = "Andar"
+		_andar_hud.layer = 5
+		var mira := Label.new()
+		mira.name = "Mira"
+		mira.text = "+"
+		mira.add_theme_font_size_override("font_size", 28)
+		mira.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+		mira.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		mira.add_theme_constant_override("outline_size", 4)
+		mira.set_anchors_preset(Control.PRESET_CENTER)
+		mira.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mira.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		mira.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		mira.grow_vertical = Control.GROW_DIRECTION_BOTH
+		mira.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_andar_hud.add_child(mira)
+		var dica := Label.new()
+		dica.name = "Dica"
+		dica.add_theme_font_size_override("font_size", 15)
+		dica.add_theme_color_override("font_color", Color(1, 1, 1))
+		dica.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+		dica.add_theme_constant_override("outline_size", 5)
+		dica.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		dica.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		dica.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		dica.position.y = 56
+		dica.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_andar_hud.add_child(dica)
+		add_child(_andar_hud)
+	_walk_hint()
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 utsim-core.workspace = true
 utsim-model.workspace = true
+utsim-nav.workspace = true
 utsim-objects.workspace = true
 utsim-scene.workspace = true
 utsim-assets.workspace = true
