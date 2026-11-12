@@ -63,6 +63,7 @@ mesmos resultados. O exemplo completo está em `examples/pessoas_fadiga.ron`.
 | `age` | nenhuma | idade em anos (registro) |
 | `experience_years` | nenhuma | anos de experiência na função (registro) |
 | `capacity` | nenhuma | capacidade medida `(load_kg, force_n)`: maior carga que a pessoa levanta na função (kg) e maior força que ela faz ao empurrar ou puxar (N) |
+| `study` | nenhum | estudo de tempos da pessoa: as cronometragens brutas (abaixo) |
 
 O perfil só vale para um `Transporter`. Ele vale para tudo o que a pessoa faz: andar,
 carregar e descarregar itens, operar um posto (`OperatorUse`) e atender a manutenção
@@ -121,6 +122,51 @@ Com `limit`, ao terminar uma tarefa com `F ≥ limit` a pessoa entra no estado `
 pelo tempo que leva para a fadiga cair até `target`, calculado em forma fechada:
 `ln(F / target) / μ`. Só depois ela pega a próxima tarefa (o despachante espera por ela e
 dá o trabalho a quem está livre). A pausa nunca interrompe uma tarefa no meio.
+
+### Curva de fadiga a partir de cronometragens
+
+A fadiga de uma pessoa pode sair das medições dela. Cronometre a mesma tarefa, pelo mesmo
+método, em momentos diferentes do turno (no início, no meio e no fim, pelo menos) e guarde
+as leituras brutas no `person.study`, para que o ajuste possa ser refeito:
+
+```ron
+person: Some((
+    study: Some((
+        readings: [
+            (task: "torno", method: "A", hour: 0.5, times: [41.2, 39.8, 40.5]),  // início
+            (task: "torno", method: "A", hour: 4.0, times: [44.0, 45.1, 43.7]),  // meio
+            (task: "torno", method: "A", hour: 7.5, times: [47.9, 48.6, 49.2]),  // fim
+        ],
+        pauses: [(4.25, 4.5)],   // pausas do turno, (início, fim) em horas
+    )),
+)),
+```
+
+`hour` são as horas desde o começo do turno; os tempos estão na unidade do modelo. Os
+nomes em português também valem (`estudo`, `leituras`, `tarefa`, `metodo`, `hora`,
+`tempos`, `pausas`). O UTSim ainda não usa o estudo na rodada: por ora ele só é guardado e
+conferido (tarefa, horas e tempos válidos). Não precisa de pausa: sem `pauses`, o turno é
+corrido.
+
+O ajuste (`utsim_fit::fatigue`) usa o mesmo modelo dinâmico do núcleo:
+
+1. **A curva.** O tempo médio na hora `h` é `t0·(1 + β·F(h))`, com
+   `F(h) = 1 − e^(−λ·h)` contando só as horas de trabalho e a recuperação nas pausas.
+   Saem `t0` (o tempo da pessoa descansada), `β` e `λ`. Com 3 horários a curva passa
+   exatamente pelas médias, e o resultado avisa que não há folga para conferi-la. Com 4 ou
+   mais, ela é ajustada por mínimos quadrados e vem com os intervalos de confiança de `t0`
+   e do acréscimo `t0·β`.
+2. **A distribuição.** Cada tempo dividido por `1 + β·F(h)` é o tempo que a pessoa levaria
+   descansada. Esses tempos passam pelo ajuste de distribuições de sempre (candidatas,
+   critério e aderência), e sai a distribuição de `t0` daquela pessoa naquela tarefa e
+   método.
+3. **A recuperação (`μ`).** Ela só é estimada quando há leituras antes e depois de uma
+   pausa e pelo menos 4 horários. Sem isso, fica o padrão do UTSim, e o resultado avisa.
+
+O resultado também avisa quando os tempos caem ao longo do turno (é aprendizado ou
+aquecimento, não fadiga: `β` fica 0 no modelo) e quando a curva é quase reta (`λ` e `β`
+não se separam: meça mais perto do fim do turno ou em mais horários). As taxas saem por
+hora e são convertidas para a unidade do modelo (por segundo, as do padrão).
 
 ## Curva de aprendizado
 
