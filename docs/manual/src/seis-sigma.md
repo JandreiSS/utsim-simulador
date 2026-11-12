@@ -788,6 +788,8 @@ Escolha o conjunto, a análise e as colunas:
 | ANOVA de dois fatores (com a interação quando há repetições) | coluna dos valores e as colunas dos dois fatores |
 | Regressão linear, simples ou múltipla | a resposta e os preditores |
 | Tamanho de amostra e poder | uma média, duas médias ou duas proporções; a diferença e o desvio (ou as proporções), o poder e a significância |
+| Carta EWMA | coluna dos valores individuais, λ (0,2), L (3), alvo e σ (opcionais) |
+| Carta CUSUM tabular | coluna dos valores individuais, k (0,5), h (5), alvo e σ (opcionais) |
 
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
@@ -807,6 +809,18 @@ de cada combinação. A **regressão** dá os coeficientes com os valores-p, o R
 VIF de cada preditor (acima de 5, os preditores estão muito ligados entre si) e o gráfico dos
 resíduos com ±2 erros padrão. O **tamanho de amostra** dá o menor n que atinge o poder pedido;
 nas comparações de dois grupos, o n é de cada grupo.
+
+As cartas **EWMA** e **CUSUM** vigiam desvios pequenos e persistentes da média, de 0,5 a 1,5 σ,
+que a carta de Shewhart só percebe tarde. A EWMA desenha a média móvel ponderada (λ é o peso do
+ponto novo) com os limites exatos, mais estreitos nos primeiros pontos. A CUSUM desenha C⁺, que
+acumula os desvios para cima, e C⁻ abaixo do zero, com os limites ±H. Sem alvo e σ, os dois
+vêm dos próprios dados (média e amplitude móvel média / 1,128). Para vigiar um processo,
+informe os da fase I ou da especificação, senão a carta mede o processo contra ele mesmo. O
+resultado mostra a **ARL**, o número médio de pontos até um sinal: sob controle é o intervalo
+entre alarmes falsos, e com um desvio de 1 σ é a demora média para perceber. Na EWMA a ARL vem
+de uma simulação com semente fixa; na CUSUM, da aproximação de Siegmund. Com os valores
+padrão, as duas dão cerca de 500 pontos entre alarmes falsos e perto de 10 para perceber um
+desvio de 1 σ.
 
 O **viés** compara a média de medições repetidas de uma peça de referência com o valor dela
 pelo teste t (viés = 0) e dá o intervalo de 95 % do viés; com a tolerância, mostra o viés em
