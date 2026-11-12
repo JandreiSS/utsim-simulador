@@ -62,6 +62,9 @@ pub struct BlockView {
     /// The seated driver of a forklift (presentation only), when the interface has the
     /// mannequin files.
     pub driver: Option<DriverMount>,
+    /// How far the seated driver leans forward, radians (`sentado_inclinar` of the
+    /// catalogue; its root and eyes are already turned about the hip).
+    pub driver_lean: f32,
     /// Model coordinates of the base, and the footprint `(x, y, z)` size.
     pub position: [f32; 3],
     pub size: [f32; 3],
@@ -427,10 +430,14 @@ impl Playback {
                 .map(modelos3d::Elemento::clip_names)
                 .unwrap_or_default();
             index_of[b] = Some(blocks.len());
-            let driver = look
+            let mut driver = look
                 .as_ref()
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
+            let lean = catalogo.as_ref().map_or(0.0, modelos3d::sentado_inclinar);
+            let driver_lean = driver
+                .as_mut()
+                .map_or(0.0, |m| modelos3d::inclinar_motorista(m, lean));
             let stack = kind == "Queue" && is_stack(model, &name);
             let sized = role.is_none()
                 && !matches!(kind.as_str(), "Conveyor" | "Rack")
@@ -461,6 +468,7 @@ impl Playback {
                 role,
                 look,
                 driver,
+                driver_lean,
                 position: e.position,
                 size: e.size,
             });
@@ -1251,7 +1259,10 @@ fn blender_look(
             .and_then(|m| Some(m.worn_ppe(m.objects.iter().find(|o| o.name == name)?)))
             .map_or_else(Vec::new, |set| set.into_iter().collect());
         let color = visual.and_then(|v| v.color.as_deref());
-        let Some(mut p) = modelos3d::pessoa(cat, name, word.as_deref(), &ppe, color) else {
+        let corpo = model
+            .and_then(|m| m.objects.iter().find(|o| o.name == name))
+            .and_then(|o| o.person.as_deref());
+        let Some(mut p) = modelos3d::pessoa(cat, name, word.as_deref(), &ppe, color, corpo) else {
             return (None, None);
         };
         p.escala_boneco = l.scale;
@@ -1898,6 +1909,17 @@ mod tests {
         // No clips of its own and no state runs: the UAL clips drive it.
         assert!(v.clips.is_empty());
         assert_eq!(pb.frame(10.0).anim_clip[ana], -1);
+        // Bruno's record: a man's body, 1,95 m tall, as wide as 120 kg asks.
+        let bruno = &pb.blocks[index(&pb, "bruno")];
+        let body = bruno.pessoa.as_ref().expect("a Blender body");
+        assert_eq!(body.arquivo, "pessoa_homem");
+        assert!((body.altura - 1.95).abs() < 1e-6);
+        assert!(
+            body.largura > 1.15 && body.largura < 1.17,
+            "{}",
+            body.largura
+        );
+        assert!((bruno.look.as_ref().unwrap().scale - body.escala).abs() < 1e-5);
         // Without the mannequin files the person keeps the procedural operator.
         let bare = blender_model(false);
         assert!(bare.blocks[ana].pessoa.is_none());

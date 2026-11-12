@@ -63,6 +63,8 @@ pub enum Passo {
     Focar(String),
     Obstaculos(bool),
     Enquadrar,
+    /// Simular: the free first-person camera on or off (`andar.rs`).
+    Andar,
     Excluir,
     CancelarEditor,
     Mover(i64, i64),
@@ -227,6 +229,7 @@ impl Passo {
                 "obstaculos"
             }
             Enquadrar => "enquadrar",
+            Andar => "andar",
             Excluir => "excluir",
             CancelarEditor => "cancelar_editor",
             Mover(x, z) => {
@@ -599,6 +602,7 @@ pub fn rotear_tecla(what: &str, st: &Estado) -> Vec<Passo> {
         "desempenho" => Desempenho,
         "modo" => AlternarModo,
         "enquadrar" => Enquadrar,
+        "andar" => Andar,
         "reproduzir" => Reproduzir,
         "excluir" => Excluir,
         "cancelar" => CancelarEditor,
