@@ -396,6 +396,15 @@ muda.
   é aceita. Avisos: os do diagnóstico, mais poucos pontos (n < 10), mistura (picos de uma
   estimativa de densidade por núcleo com a largura de Silverman, vale profundo entre
   eles) e valores além de 3·IQR.
+- **Curva de fadiga** (`utsim_fit::fatigue`, sobre o `person.study` de uma pessoa): para
+  `λ` (e `μ`) fixos, `t = t0 + (t0·β)·F(h)` é uma reta em `F`, ajustada por mínimos
+  quadrados sobre todas as leituras; `λ` e `μ` saem de uma grade logarítmica refinada por
+  seção áurea (`F(h)` pelas mesmas fórmulas fechadas do núcleo, com as pausas). `μ` só é
+  estimado com leituras dos dois lados de uma pausa e 4 horários ou mais; senão fica o
+  padrão. Intervalos de `t0` e de `t0·β` (condicionais às taxas) quando há mais horários
+  do que parâmetros. Os tempos divididos por `1 + β·F(h)` passam por `auto_fit`
+  (`fit_person`), e `FatigueFit::fatigue(unidades_por_hora)` devolve o `Fatigue::Dynamic`
+  do núcleo.
 - **Relatório**: `AutoFit::to_html` acrescenta a escolha, a justificativa, os avisos e a
   tabela pelo critério em cima da página de `FitReport` (`to_html_with`); `to_csv`;
   `auto::index_html` para o índice por modelo; `dados::write_reports` grava tudo.

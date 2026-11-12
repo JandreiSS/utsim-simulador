@@ -98,7 +98,7 @@ Model(
 | `access` | lado `-y` | ponto de acesso `(x, y)` em coordenadas do objeto (metros, gira com ele), onde os recursos param nos modos `Free` e `Network`. Não vale para recursos móveis |
 | `size` | área padrão do tipo | dimensões `(comprimento, largura, altura)` em metros, no sentido do objeto: mudam o ponto de acesso (e as distâncias), a capacidade de uma espera com `area_per_item` e o desenho 3D. Não vale para recursos móveis, esteiras e porta-paletes |
 | `area_per_item` | nenhuma | só numa `Queue`: área de cada item (m²); a capacidade passa a ser a área da espera dividida por ela, só itens inteiros, e no máximo `capacity` |
-| `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift, sex, height_m, mass_kg, age, experience_years, capacity)` ([Pessoas](pessoas.md)) |
+| `person` | nenhum | só num `Transporter`: perfil de pessoa `(fatigue, learning, skills, walk_speed_loaded, variation, weight_label, lift, sex, height_m, mass_kg, age, experience_years, capacity, study)` ([Pessoas](pessoas.md)) |
 | `preset` | nenhuma | predefinição da biblioteca de uma linha que criou o objeto, `"linha/predefinição"` (por exemplo `"lean_office/aprovacao"`): nome e papel do objeto nos relatórios da linha. A simulação não lê o campo |
 | `department` | nenhuma | departamento do objeto (`"Compras"`): raia do fluxograma multifuncional e relatórios por departamento. Não é uma das `areas` do modelo (áreas de piso). A simulação não lê o campo |
 | `symbol` | inferido | símbolo do fluxograma: `inicio`, `fim`, `operacao`, `transporte`, `inspecao`, `espera` ou `armazenagem`. Ausente, o fluxograma escolhe pelo tipo do objeto; `--simbolo` do `utsim fluxograma` ainda tem precedência |
