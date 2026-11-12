@@ -858,8 +858,8 @@ fn o_robo_quebrado_baixa_o_braco() {
 }
 
 /// A compensação de postura: os clipes do UAL1 dobram o tórax e baixam a cabeça, então a malha
-/// de repouso vai dobrada ao contrário. Em repouso, a cabeça fica sobre a bacia (antes ela
-/// ficava 5 cm à frente, e os clipes a levavam ainda mais para a frente: a corcunda).
+/// de repouso vai dobrada ao contrário. Em repouso, a cabeça fica uns 6 cm atrás da bacia (sem a
+/// compensação ela ficaria à frente, e os clipes a levariam ainda mais: a corcunda).
 #[test]
 fn a_postura_de_repouso_compensa_a_curva_dos_clipes() {
     for sexo in ["homem", "mulher"] {
@@ -882,7 +882,7 @@ fn a_postura_de_repouso_compensa_a_curva_dos_clipes() {
         let frente = soma / n as f32;
         assert!(n > 200, "{sexo}: {n} vértices na cabeça");
         assert!(
-            (-0.03..0.025).contains(&frente),
+            (-0.10..-0.02).contains(&frente),
             "{sexo}: cabeça {frente} m à frente"
         );
     }

@@ -220,12 +220,14 @@ def meio(o, a, b):
     return (o[a][0] + o[b][0]) / 2
 
 
+CORPO = {}
+
+
 def matrizes(rig, ual):
     """Para cada osso do MPFB, a matriz que leva a malha da pose dele à do UAL1.
 
     O tronco vai inteiro (girado em torno do eixo x e escalado) para que o meio do quadril e
-    o meio dos ombros caiam nos do UAL1; a cabeça vai reta para a junta da cabeça do UAL1 e o
-    pescoço fica no meio-termo. Braços e pernas giram até a direção dos ossos do UAL1 (de
+    o meio dos ombros caiam nos do UAL1; o pescoço e a cabeça vão com ele. Braços e pernas giram até a direção dos ossos do UAL1 (de
     braços abertos) e os ossos longos esticam até o comprimento deles."""
     m, u = ossos(rig), ossos(ual)
     mq, uq = meio(m, "thigh_l", "thigh_r"), meio(u, "thigh_l", "thigh_r")
@@ -240,8 +242,15 @@ def matrizes(rig, ual):
 
     tronco = rigido(mq, uq, teta)
     out = {n: tronco for n in TRONCO_RIGIDO}
-    out["neck_01"] = rigido(m["neck_01"][0], u["neck_01"][0], teta / 2)
-    out["head"] = rigido(m["head"][0], u["Head"][0], 0.0)
+    # O pescoço e a cabeça vão com o tronco, com as proporções do corpo. No UAL1 a junta da
+    # cabeça fica uns 10 cm mais baixa e 8 cm mais à frente em relação aos ombros (o boneco tem
+    # o pescoço curto): levar a cabeça até ela esmagava o pescoço e afundava a cabeça nos
+    # ombros. As juntas do UAL1 ficam então mais baixas dentro do pescoço, e só o giro muda.
+    out["neck_01"] = tronco
+    out["head"] = tronco
+    # Onde ficam o pescoço e a cabeça do corpo (as juntas do UAL1 ficam mais baixas).
+    CORPO.clear()
+    CORPO.update({n: tronco @ m[n][0] for n in ("neck_01", "head")})
 
     def calc(nome):
         if nome in out:
@@ -753,8 +762,8 @@ def epis(corpo, partes, ual):
         alca = []
         for x in (0.075, 0.12):
             cen = Vector((lado * x, 0.0, z1 - 0.04))
-            alca.append(s.anel(cen, 0.012, [15 + 150 * i / 12 for i in range(13)], plano="yz", longe=0.3,
-                               perto=0.2))
+            alca.append(s.anel(cen, 0.012, [15 + 150 * i / 12 for i in range(13)], plano="yz", longe=0.45,
+                               perto=0.32))
         m.grade(alca, "epi_laranja")
     out["colete"] = m.objeto()
 
@@ -780,8 +789,8 @@ def epis(corpo, partes, ual):
             linha.append(Vector((x, y - fo, z)))
         linhas.append(linha)
     ids = m.grade(linhas, "epi_cinza")
-    pescoco = u["neck_01"][0]
-    gola = s.anel(Vector((0.0, pescoco.y, pescoco.z + 0.02)), 0.012, [50 + 260 * i / 13 for i in range(14)],
+    pescoco = CORPO["neck_01"]
+    gola = s.anel(Vector((0.0, pescoco.y, pescoco.z - 0.045)), 0.010, [50 + 260 * i / 13 for i in range(14)],
                   longe=0.3, perto=0.1)
     m.tubo([linhas[-1][-1], gola[0] + Vector((0, 0, 0.01))] + gola + [gola[-1] + Vector((0, 0, 0.01)), linhas[-1][0]],
            (0.010, 0.003), "epi_cinza", 4)
@@ -901,7 +910,7 @@ def juntar(obs, nome):
 # coluna (graus para trás, em torno do eixo x da junta), com os pesos da pele, e o esqueleto
 # não muda. Tocado o clipe, as duas dobras se anulam e a pessoa fica ereta. Os braços e a
 # cabeça vão junto com o tórax.
-POSTURA = (("spine_01", -3.0), ("spine_02", 7.0), ("spine_03", 5.0), ("neck_01", -2.0), ("Head", 1.0))
+POSTURA = (("spine_01", -3.0), ("spine_02", 5.0), ("spine_03", 5.0), ("neck_01", -2.0), ("Head", -3.0))
 
 
 def endireitar(obs, ual):
@@ -1062,6 +1071,10 @@ def gerar(sexo, saida):
             "altura_base": round(hi[2] - lo[2], 2),
             "alturas": ALTURAS[sexo],
             "imc_base": IMC_BASE[sexo],
+            # Sentado (`Driving_Loop`, `Sitting_Idle_Loop`), o clipe reclina o tronco uns 18° e a
+            # compensação de postura soma mais uns 7°: a ponte pode inclinar a pessoa sentada
+            # para a frente por este ângulo (graus), em torno do quadril.
+            "sentado_inclinar": 15.0,
             "largura": LARGURA,
             "cabelos": CABELOS,
             "epis": EPIS,
