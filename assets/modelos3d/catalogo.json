@@ -1931,7 +1931,7 @@
   "arquivo": "pessoa_homem.glb",
   "clipes": {},
   "dados": {
-   "altura_base": 1.76,
+   "altura_base": 1.86,
    "alturas": [
     1.65,
     1.9
@@ -1973,12 +1973,13 @@
     "calca",
     "camisa",
     "pele"
-   ]
+   ],
+   "sentado_inclinar": 15.0
   },
   "estados": {},
   "minimo": [
-   -0.188,
-   -0.961,
+   -0.2,
+   -0.974,
    -0.008
   ],
   "nos": [
@@ -1995,17 +1996,17 @@
   "peca": {},
   "pontos": {},
   "tamanho": [
-   0.367,
-   1.923,
-   1.76
+   0.38,
+   1.949,
+   1.861
   ],
-  "triangulos": 18616
+  "triangulos": 18571
  },
  "pessoa_mulher": {
   "arquivo": "pessoa_mulher.glb",
   "clipes": {},
   "dados": {
-   "altura_base": 1.75,
+   "altura_base": 1.84,
    "alturas": [
     1.55,
     1.78
@@ -2047,12 +2048,13 @@
     "calca",
     "camisa",
     "pele"
-   ]
+   ],
+   "sentado_inclinar": 15.0
   },
   "estados": {},
   "minimo": [
-   -0.209,
-   -0.929,
+   -0.254,
+   -0.976,
    -0.001
   ],
   "nos": [
@@ -2069,11 +2071,11 @@
   "peca": {},
   "pontos": {},
   "tamanho": [
-   0.37,
-   1.858,
-   1.749
+   0.414,
+   1.951,
+   1.84
   ],
-  "triangulos": 19600
+  "triangulos": 19515
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",

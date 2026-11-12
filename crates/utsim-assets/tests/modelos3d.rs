@@ -857,6 +857,37 @@ fn o_robo_quebrado_baixa_o_braco() {
     }
 }
 
+/// A compensação de postura: os clipes do UAL1 dobram o tórax e baixam a cabeça, então a malha
+/// de repouso vai dobrada ao contrário. Em repouso, a cabeça fica uns 6 cm atrás da bacia (sem a
+/// compensação ela ficaria à frente, e os clipes a levariam ainda mais: a corcunda).
+#[test]
+fn a_postura_de_repouso_compensa_a_curva_dos_clipes() {
+    for sexo in ["homem", "mulher"] {
+        let g = Glb::ler(&format!("pessoa_{sexo}.glb"));
+        let corpo = g.doc.meshes().find(|m| m.name() == Some("corpo")).unwrap();
+        let (mut soma, mut n) = (0.0f32, 0u32);
+        for prim in corpo.primitives() {
+            if prim.material().name() != Some("pele") {
+                continue;
+            }
+            let r = prim.reader(|_| Some(&g.blob));
+            // glTF: y para cima, z para a frente. Só a cabeça.
+            for p in r.read_positions().expect("posições") {
+                if p[1] > 1.55 {
+                    soma += p[2];
+                    n += 1;
+                }
+            }
+        }
+        let frente = soma / n as f32;
+        assert!(n > 200, "{sexo}: {n} vértices na cabeça");
+        assert!(
+            (-0.10..-0.02).contains(&frente),
+            "{sexo}: cabeça {frente} m à frente"
+        );
+    }
+}
+
 /// O homem e a mulher têm corpos diferentes: ela tem o quadril mais largo e a cintura e o peito
 /// mais estreitos (largura da roupa do tronco, a camiseta e o macacão).
 #[test]
