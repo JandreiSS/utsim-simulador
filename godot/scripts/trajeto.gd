@@ -104,7 +104,7 @@ func active() -> bool:
 	return editor.tool == "trajeto" and tr != null
 
 
-static func is_tool(id: String) -> bool:
+static func is_route_tool(id: String) -> bool:
 	return id in IDS
 
 
@@ -299,6 +299,21 @@ func _add_point(p: Vector2) -> void:
 		_num(q.x), _num(-q.z), _num(q.y), _what(s["what"])])
 
 
+## Starts a new route at `at` (the end of another one), snapped like a click there.
+func _start_at(at: Vector3) -> void:
+	var s := _snap(at, null)
+	var q: Vector3 = s["at"]
+	_select("", false, PackedInt32Array())
+	_clear_drawing()
+	draw_z = q.y
+	if s["what"] == "porta":
+		start_port = {"object": s["object"], "output": int(s["output"])}
+	points.append(q)
+	radii.append(0.0)
+	main.set_status("%s: começa em (%s; %s) m, altura %s m. Clique os próximos nós; Enter termina." % [
+		LABELS[mode], _num(q.x), _num(-q.z), _num(q.y)])
+
+
 func _what(w: String) -> String:
 	match w:
 		"porta":
@@ -362,6 +377,13 @@ func release(_p: Vector2) -> void:
 	_press = {}
 	_readout.visible = false
 	if not _dragging:
+		# A click (no drag) on the first or last node of a route starts a new one there,
+		# as a road goes on from where another one ends.
+		var r := _route(pr["name"], pr["path"])
+		var n := (r["nodes"] as PackedVector3Array).size() if not r.is_empty() else 0
+		var i := int(pr["index"])
+		if n > 0 and (i == 0 or i == n - 1):
+			_start_at(pr["from"])
 		return
 	_dragging = false
 	var from: Vector3 = pr["from"]

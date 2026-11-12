@@ -147,7 +147,7 @@ static func belt(r: Dictionary) -> Node3D:
 		var s: Vector3 = sides[_nearest(line, p)]
 		var feet: Array[Vector3] = []
 		for side in [-1.0, 1.0]:
-			var c := p + s * side * (half + FRAME_THICK * 0.5)
+			var c: Vector3 = p + s * side * (half + FRAME_THICK * 0.5)
 			feet.append(c)
 			_post(st, Vector3(c.x, 0.0, c.z), bottom, LEG, LEG_COLOR)
 		# A cross bar under the frame, and one low down on tall legs.
@@ -303,7 +303,7 @@ static func ramp(r: Dictionary) -> Node3D:
 			var p := line[k].lerp(line[k + 1], clampf((s - along[k]) / seg, 0.0, 1.0))
 			if p.y > RAIL_FROM * 0.5:
 				for side in [-1.0, 1.0]:
-					var c := p + sides[k] * side * (half - 0.02)
+					var c: Vector3 = p + sides[k] * side * (half - 0.02)
 					_post(st, c, c.y + RAIL_HEIGHT, 0.04, EDGE_COLOR)
 			# Posts under the deck, down to the floor.
 			if p.y > 0.3:

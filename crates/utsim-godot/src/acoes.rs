@@ -136,6 +136,12 @@ pub enum Passo {
         campo: String,
         valor: String,
     },
+    /// An edit of the panel of the belts and paths drawn by nodes (`trajeto.gd`):
+    /// `trajeto_<o quê>` and the value.
+    Trajeto {
+        acao: String,
+        valor: String,
+    },
     MostrarPropriedades,
 }
 
@@ -380,6 +386,11 @@ impl Passo {
                 a.s2 = valor.clone();
                 "zona_campo"
             }
+            Trajeto { acao, valor } => {
+                a.s = acao.clone();
+                a.s2 = valor.clone();
+                "trajeto"
+            }
             MostrarPropriedades => "mostrar_propriedades",
         };
         (op, a)
@@ -575,6 +586,10 @@ fn formulario(what: &str) -> Vec<Passo> {
         "zona_nome" => Some(campo("name")),
         "zona_tipo" => Some(campo("kind")),
         "zona_nivel" => Some(campo("level")),
+        _ if acao.starts_with("trajeto_") => Some(Trajeto {
+            acao: acao.into(),
+            valor: valor.into(),
+        }),
         _ => acao.strip_prefix("zona_epi_").map(|epi| ZonaCampo {
             campo: "ppe".into(),
             valor: epi.into(),
@@ -775,6 +790,16 @@ mod tests {
                 ZonaCampo {
                     campo: "ppe".into(),
                     valor: "luvas".into()
+                },
+                MostrarPropriedades
+            ]
+        );
+        assert_eq!(
+            rotear("form:trajeto_z:1,25", &s),
+            vec![
+                Trajeto {
+                    acao: "trajeto_z".into(),
+                    valor: "1,25".into()
                 },
                 MostrarPropriedades
             ]
