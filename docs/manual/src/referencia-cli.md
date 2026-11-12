@@ -16,6 +16,7 @@ O programa se chama `utsim`. Todos os comandos aceitam `--help`. Códigos de sa�
 | `utsim emular` | emula em tempo real com OPC UA | [Emulação OPC UA](emulacao-opcua.md) |
 | `utsim gemeo` | gêmeo digital em modo sombra: lê sensores (OPC UA, MQTT, Sparkplug B), só leitura, compara com o modelo, grava; `reproduzir` reexecuta sem rede | [Gêmeo digital](gemeo-digital.md) |
 | `utsim fluxograma` | desenha o fluxograma do processo e a carta de processo | [Fluxograma do processo](fluxograma.md) |
+| `utsim pessoa ajustar` | ajusta a curva de fadiga e o tempo descansado de uma pessoa a partir das cronometragens dela e, com `--gravar`, grava no perfil | [Pessoas](pessoas.md) |
 | `utsim tempos` | estudo de tempos e métodos: ciclo homem-máquina, tempos por elemento, máquinas por operador, tempo padrão e comparação de métodos | [Estudo de tempos e métodos](tempos-e-metodos.md) |
 | `utsim linha` | linhas especializadas (Lean Office, Serviços e atendimento, Logística e armazém, Saúde e hospital, Manufatura discreta, Processos contínuos e batelada, Alimentação e food service; [Serviços](linhas/servicos/index.md), [Logística](linhas/logistica/index.md), [Saúde](linhas/saude/index.md), [Manufatura](linhas/manufatura/index.md), [Processos](linhas/processos/index.md), [Alimentação](linhas/alimentacao/index.md)): predefinições, vocabulário, modelos prontos, colocar uma predefinição num modelo, indicadores e relatório da linha com VSM de escritório e raias | [Lean Office](linhas/lean-office/index.md) |
 | `utsim gerar-modelo` | gera modelos sintéticos grandes (testes de desempenho) | `docs/desempenho.md` |
@@ -52,6 +53,7 @@ utsim gemeo reproduzir gravacoes/ --json relatorio.json
 utsim cena examples/agvs.ron --fps 10 --ate 600 --saida agvs.jsonl
 utsim fluxograma examples/centro_de_distribuicao.ron --html fluxograma.html --com-resultados
 utsim tempos examples/homem_maquina.ron --tolerancia 15 --html estudo.html
+utsim pessoa ajustar examples/pessoas_tempos_proprios.ron --pessoa ana --gravar --saida ajustado.ron
 utsim tempos examples/homem_maquina.ron --comparar examples/homem_maquina_melhorado.ron --csv elementos.csv
 utsim linha lean_office relatorio examples/aprovacao_de_compras.ron --html relatorio.html
 utsim linha lean_office colocar processo.ron posto --departamento Compras --campo ca=0.9
@@ -554,6 +556,28 @@ Options:
       --corridas <CORRIDAS>          Corridas simuladas [default: 10000]
       --semente <SEMENTE>            Semente dos números aleatórios [default: 1]
   -h, --help                         Print help
+```
+
+### `utsim pessoa ajustar --help`
+
+```text
+Ajusta a curva de fadiga e o tempo descansado de uma pessoa a partir das cronometragens dela (person.study); com --gravar, grava o resultado no perfil
+
+Usage: utsim pessoa ajustar [OPTIONS] --pessoa <PESSOA> <MODEL>
+
+Arguments:
+  <MODEL>  Modelo (.ron)
+
+Options:
+      --pessoa <PESSOA>        Pessoa (o nome do Transporter com o perfil e o estudo)
+      --tarefa <TAREFA>        Só esta tarefa (padrão: todas as do estudo)
+      --metodo <METODO>        Só este método (padrão: todos os da tarefa; "" é o método sem nome)
+      --unidade <UNIDADE>      Unidade de tempo do modelo: s, min ou h (as taxas do ajuste saem por hora) [default: s]
+      --fadiga-de <FADIGA_DE>  Tarefa cuja curva vira a fadiga do perfil, quando há mais de uma (padrão: a que tem mais leituras)
+      --gravar                 Grava os tempos próprios e a fadiga no perfil da pessoa (sem isso, só mostra)
+      --saida <SAIDA>          Com --gravar, grava neste arquivo em vez de regravar o modelo
+      --json <JSON>            Grava o resultado em JSON
+  -h, --help                   Print help
 ```
 
 ### `utsim tempos --help`
