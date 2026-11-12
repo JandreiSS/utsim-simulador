@@ -175,6 +175,26 @@ estimada, `recovery` da fadiga `Dynamic`. Os outros campos da fadiga (`walk`, `c
 `speed_factor`, `limit`, `target`), e a recuperação que não foi estimada, ficam como
 estavam no perfil.
 
+Pela linha de comando:
+
+```sh
+utsim pessoa ajustar examples/pessoas_tempos_proprios.ron --pessoa ana
+utsim pessoa ajustar modelo.ron --pessoa ana --gravar --saida ajustado.ron
+```
+
+Sem `--gravar`, o comando só mostra o ajuste de cada tarefa e método do estudo: `t0`, o
+acréscimo da fadiga, `λ`, `μ` (estimada ou padrão), os intervalos, a média de cada
+horário ao lado da curva, a distribuição escolhida e os avisos. Com `--gravar`, ele grava
+o resultado no perfil, no próprio modelo ou em `--saida`. O estudo fica no perfil, para o
+ajuste poder ser refeito. Para gravar, cada tarefa precisa de um método só: com leituras
+de dois métodos, o comando mostra os dois para comparar e pede `--metodo`. Com várias
+tarefas, todas ganham tempo próprio, e a curva da que tem mais leituras vira a fadiga do
+perfil (ou a de `--fadiga-de`). `--unidade` diz a unidade de tempo do modelo (`s`, `min`
+ou `h`; as taxas saem por hora), e `--json` grava tudo, com a comparação de todas as
+distribuições candidatas. Gravar regrava o modelo inteiro pelo editor, que mantém o
+comentário do começo do arquivo, mas não os comentários do meio. Por isso, use
+`--saida` se o modelo tiver comentários que você quer manter.
+
 ### Tempos próprios
 
 Com `times`, a pessoa tem o seu próprio tempo numa tarefa:
