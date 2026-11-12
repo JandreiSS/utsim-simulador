@@ -180,6 +180,11 @@ func build(pb: Object, keep_templates := false) -> void:
 				var fb: Dictionary = (b["asset"] as Dictionary)["fallback"]
 				asset.scale = Vector3.ONE * float(fb.get("scale", b.get("scale", 1.0)))
 				asset.position = fb.get("offset", asset.position)
+			elif b.has("pessoa"):
+				# The Blender body follows the person's mass: width and depth by the body
+				# mass index (`largura`, 1 without a mass), the height by `scale`.
+				var w := float((b["pessoa"] as Dictionary).get("largura", 1.0))
+				asset.scale = Vector3(asset.scale.x * w, asset.scale.y, asset.scale.z * w)
 			root.add_child(asset)
 			rig["asset"] = asset
 			if b.get("sized", false) and not fell_back:
@@ -455,8 +460,12 @@ func _add_driver(rig: Dictionary, root: Node3D, b: Dictionary, names: PackedStri
 		return
 	node.name = "Motorista"
 	node.position = info["position"]
-	node.rotation = Vector3(0, float(info["yaw"]), 0)
-	node.scale = Vector3.ONE * float(info["scale"])
+	# Turned by `yaw`, then leaned forward about its side axis (`sentado_inclinar`; the
+	# bridge already turned the root and the eyes about the hip).
+	var yaw_basis := Basis(Vector3.UP, float(info["yaw"]))
+	var lean := float(info.get("lean", 0.0))
+	var side := yaw_basis * Vector3.RIGHT
+	node.basis = (Basis(side, lean) * yaw_basis).scaled(Vector3.ONE * float(info["scale"]))
 	root.add_child(node)
 	var p := Pessoa.new()
 	if not p.bind(node, _clips2, names):
