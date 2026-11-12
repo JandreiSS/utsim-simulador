@@ -564,8 +564,8 @@
     "giro": 90,
     "pai": "cnc",
     "pos": [
-     -0.15,
-     -1.2,
+     0.85,
+     -1.4,
      0.0
     ]
    },
@@ -582,8 +582,8 @@
     "giro": 90,
     "pai": "cnc",
     "pos": [
-     -0.15,
-     -1.8,
+     0.85,
+     -2.0,
      0.0
     ]
    },
@@ -803,8 +803,8 @@
     "giro": 90,
     "pai": "cnc",
     "pos": [
-     -0.15,
-     -1.2,
+     0.85,
+     -1.4,
      0.0
     ]
    },
@@ -821,8 +821,8 @@
     "giro": 90,
     "pai": "cnc",
     "pos": [
-     -0.15,
-     -1.8,
+     0.85,
+     -2.0,
      0.0
     ]
    },
@@ -938,9 +938,9 @@
     "giro": 0,
     "pai": "cabine",
     "pos": [
-     -0.4,
+     -0.44,
      0.0,
-     1.06
+     1.19
     ]
    }
   },
@@ -949,7 +949,7 @@
    1.16,
    2.62
   ],
-  "triangulos": 1392
+  "triangulos": 1416
  },
  "empilhadeira_medio": {
   "arquivo": "empilhadeira_medio.glb",
@@ -1046,9 +1046,9 @@
     "giro": 0,
     "pai": "cabine",
     "pos": [
-     -0.4,
+     -0.44,
      0.0,
-     1.06
+     1.19
     ]
    }
   },
@@ -1057,7 +1057,7 @@
    1.24,
    2.62
   ],
-  "triangulos": 2676
+  "triangulos": 2764
  },
  "espera": {
   "arquivo": "espera.glb",
@@ -1656,8 +1656,8 @@
     "giro": 90,
     "pai": "injetora",
     "pos": [
-     -0.8,
-     -1.05,
+     0.72,
+     -1.2,
      0.0
     ]
    },
@@ -1674,8 +1674,8 @@
     "giro": 90,
     "pai": "injetora",
     "pos": [
-     -0.8,
-     -1.65,
+     0.72,
+     -1.8,
      0.0
     ]
    },
@@ -1893,8 +1893,8 @@
     "giro": 90,
     "pai": "injetora",
     "pos": [
-     -0.8,
-     -1.05,
+     0.72,
+     -1.2,
      0.0
     ]
    },
@@ -1911,8 +1911,8 @@
     "giro": 90,
     "pai": "injetora",
     "pos": [
-     -0.8,
-     -1.65,
+     0.72,
+     -1.8,
      0.0
     ]
    },
@@ -2024,6 +2024,36 @@
    0.12
   ],
   "triangulos": 120
+ },
+ "pessoa_clipes": {
+  "arquivo": "pessoa_clipes.glb",
+  "clipes": {
+   "Walk_Carry_Loop": {
+    "laco": true,
+    "nos": []
+   }
+  },
+  "dados": {
+   "esqueleto": "UAL1",
+   "substitui": [
+    "Walk_Carry_Loop"
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "nos": [],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "triangulos": 0
  },
  "pessoa_homem": {
   "arquivo": "pessoa_homem.glb",

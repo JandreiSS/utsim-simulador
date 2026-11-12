@@ -21,6 +21,7 @@ import movimentacao  # noqa: E402
 import armazenagem  # noqa: E402
 import postos  # noqa: E402
 import pessoas  # noqa: E402
+import clipes  # noqa: E402
 
 ELEMENTOS = {
     "cnc": maquinas.cnc,
@@ -44,6 +45,8 @@ DETALHES = {0: "", 1: "_medio"}
 
 # Pessoas (`pessoas.py`): um nível de detalhe só, no esqueleto do boneco UAL1.
 PESSOAS = {"pessoa_homem": "homem", "pessoa_mulher": "mulher"}
+# Clipes de pessoa corrigidos (`clipes.py`): só o esqueleto e as animações.
+CLIPES = "pessoa_clipes"
 
 
 def main():
@@ -54,7 +57,7 @@ def main():
     a = p.parse_args(argv)
     pasta = os.path.abspath(a.saida)
     os.makedirs(pasta, exist_ok=True)
-    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS) + list(PESSOAS)
+    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS) + list(PESSOAS) + [CLIPES]
     caminho_cat = os.path.join(pasta, "catalogo.json")
     catalogo = {}
     if a.so and os.path.exists(caminho_cat):
@@ -63,6 +66,11 @@ def main():
         with open(caminho_cat, encoding="utf-8") as f:
             catalogo = json.load(f)
     for nome in nomes:
+        if nome == CLIPES:
+            item = clipes.gerar(pasta, nome)
+            catalogo[nome] = item
+            print(f"utsim-blender: {item['arquivo']} {sorted(item['clipes'])}")
+            continue
         if nome in PESSOAS:
             item = pessoas.gerar(PESSOAS[nome], pasta)
             catalogo[nome] = item

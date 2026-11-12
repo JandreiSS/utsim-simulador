@@ -1832,7 +1832,7 @@ mod tests {
         let pb = blender_model(true);
         let cnc = index(&pb, "cnc_1");
         let ana = index(&pb, "ana");
-        // The CNC at (2, 0): its post at (-0.15, -1.2) and its door at (-0.15, -1.8) of
+        // The CNC at (2, 0): its post at (0.85, -1.4) and its door at (0.85, -2.0) of
         // its own frame, both looking at the machine (+y of the model).
         let (a, _) = pb.animados[cnc].as_ref().unwrap();
         let (post, yaw) = a.post.unwrap();
@@ -1840,8 +1840,8 @@ mod tests {
         let ((door, _), to) = a.estados[entering].1.caminho.unwrap();
         assert_eq!(to.0, post);
         let near = |a: [f32; 3], b: [f32; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-3);
-        assert!(near(post, to_godot([1.85, -1.2, 0.0])), "{post:?}");
-        assert!(near(door, to_godot([1.85, -1.8, 0.0])), "{door:?}");
+        assert!(near(post, to_godot([2.85, -1.4, 0.0])), "{post:?}");
+        assert!(near(door, to_godot([2.85, -2.0, 0.0])), "{door:?}");
         assert!((yaw - std::f32::consts::FRAC_PI_2).abs() < 1e-5);
         let mid = [0.5 * (post[0] + door[0]), 0.0, 0.5 * (post[2] + door[2])];
         for (t, want) in [
@@ -1867,7 +1867,7 @@ mod tests {
         assert!(bare.operator_post(cnc, 10.0).is_none());
         let f = bare.frame(10.0);
         assert!(
-            (f.position[ana][2] - post[2]).abs() > 0.2,
+            (f.position[ana][0] - post[0]).hypot(f.position[ana][2] - post[2]) > 0.2,
             "{:?}",
             f.position[ana]
         );

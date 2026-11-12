@@ -94,6 +94,10 @@ def _roda_emp(e, nome, x, y, r, largura):
         e.cilindro(nome, "aco_escuro", (x, y + s * (largura / 2), r), (x, y + s * (largura / 2 + 0.02), r), r * 0.22, 8)
 
 
+QUADRIL = (-0.44, 0.0, 1.19)
+VOLANTE = (0.10, 1.47)  # centro do aro (x, z)
+
+
 def empilhadeira(detalhe=0):
     """Empilhadeira contrabalançada com mastro telescópico de três estágios. Nós: `chassi`,
     `cabine`, `luz`, `torre` (estágio de fora, fixo), `mastro_m` e `mastro_i` (estágios do
@@ -121,12 +125,16 @@ def empilhadeira(detalhe=0):
             e.caixa("chassi", "vermelho", (-1.412, y0, 0.90), (-1.39, y1, 0.97), chanfro=0)
     e.caixa("chassi", "contrapeso", (-1.36, -0.28, 0.20), (-0.78, 0.28, 0.52))
     # Corpo: laterais, miolo entre as rodas da frente, capô sob o banco e painel.
-    e.caixa("chassi", "pintura", (-0.80, -0.52, 0.40), (0.08, 0.52, 0.66), chanfro=0.02)
+    # O vão dos pés fica entre as soleiras, à frente do capô: o motorista sentado (quadril em
+    # `ponto_operador`) apoia os pés no piso, e as canelas não entram no capô.
+    e.caixa("chassi", "pintura", (-0.80, -0.52, 0.40), (-0.26, 0.52, 0.66), chanfro=0.02)
+    for y0, y1 in ((0.33, 0.52), (-0.52, -0.33)):
+        e.caixa("chassi", "pintura", (-0.28, y0, 0.40), (0.08, y1, 0.66), chanfro=0.02)
     e.caixa("chassi", "contrapeso", (-0.80, -0.30, 0.18), (0.08, 0.30, 0.40))
-    e.caixa("chassi", "contrapeso", (0.08, -0.33, 0.24), (0.78, 0.33, 0.66))
-    e.caixa("chassi", "borracha", (0.08, -0.33, 0.66), (0.50, 0.33, 0.68), chanfro=0)
-    e.prisma("chassi", "pintura", [(-0.80, 0.66), (0.02, 0.66), (0.02, 0.92), (-0.10, 0.98), (-0.80, 0.98)], -0.44, 0.44)
-    e.prisma("chassi", "pintura", [(0.50, 0.66), (0.78, 0.66), (0.78, 1.02), (0.70, 1.14), (0.56, 1.14), (0.50, 1.00)], -0.44, 0.44)
+    e.caixa("chassi", "contrapeso", (-0.28, -0.33, 0.24), (0.78, 0.33, 0.56))
+    e.caixa("chassi", "borracha", (-0.26, -0.33, 0.56), (0.50, 0.33, 0.58), chanfro=0)
+    e.prisma("chassi", "pintura", [(-0.80, 0.66), (-0.26, 0.66), (-0.26, 0.94), (-0.34, 1.02), (-0.80, 1.02)], -0.44, 0.44)
+    e.prisma("chassi", "pintura", [(0.50, 0.56), (0.78, 0.56), (0.78, 1.02), (0.70, 1.14), (0.56, 1.14), (0.50, 1.00)], -0.44, 0.44)
     e.caixa("chassi", "tela", (0.57, -0.20, 1.14), (0.69, 0.20, 1.146), chanfro=0)
     # Para-lamas em arco sobre as rodas da frente.
     n = 6 if d else 3
@@ -134,8 +142,14 @@ def empilhadeira(detalhe=0):
     for y0, y1 in ((0.33, 0.58), (-0.58, -0.33)):
         e.prisma("chassi", "pintura", arco, y0, y1)
     # Volante, alavancas, degraus e os cilindros que inclinam o mastro.
-    e.cilindro("chassi", "aco_escuro", (0.58, 0.0, 1.10), (0.38, 0.0, 1.30), 0.028, 8)
-    e.cilindro("chassi", "borracha", (0.385, 0.0, 1.295), (0.365, 0.0, 1.315), 0.17, 16 if d else 10)
+    # O volante fica onde as mãos do clipe `Driving_Loop` seguram (0,5 m à frente e 0,27 m
+    # acima do quadril), numa coluna comprida que sai do painel.
+    e.cilindro("chassi", "aco_escuro", (0.58, 0.0, 1.10), (VOLANTE[0], 0.0, VOLANTE[1]), 0.028, 8)
+    ux, uz = VOLANTE[0] - 0.58, VOLANTE[1] - 1.10
+    un = (ux * ux + uz * uz) ** 0.5
+    ux, uz = ux / un, uz / un
+    e.cilindro("chassi", "borracha", (VOLANTE[0] - ux * 0.012, 0.0, VOLANTE[1] - uz * 0.012),
+               (VOLANTE[0] + ux * 0.012, 0.0, VOLANTE[1] + uz * 0.012), 0.18, 16 if d else 10)
     for y in (-0.30, 0.30):
         e.cilindro("chassi", "aco", (0.56, y, 0.74), (0.82, y, 0.98), 0.03, 8)
     if d:
@@ -152,8 +166,8 @@ def empilhadeira(detalhe=0):
             e.caixa("chassi", "aco_escuro", (-1.24, y - 0.025, 1.14), (-0.92, y + 0.025, 1.19), chanfro=0)
     # Cabine: banco e grade de proteção em tubos.
     e.no("cabine", pivo=(0.0, 0.0, 0.95))
-    e.caixa("cabine", "borracha", (-0.64, -0.24, 0.98), (-0.16, 0.24, 1.06), chanfro=0.02)
-    e.prisma("cabine", "borracha", [(-0.70, 1.04), (-0.60, 1.04), (-0.66, 1.58), (-0.75, 1.58)], -0.24, 0.24)
+    e.caixa("cabine", "borracha", (-0.66, -0.24, 1.02), (-0.24, 0.24, 1.10), chanfro=0.02)
+    e.prisma("cabine", "borracha", [(-0.72, 1.08), (-0.62, 1.08), (-0.68, 1.64), (-0.77, 1.64)], -0.24, 0.24)
     lados = 8 if d else 6
     for y in (-0.50, 0.50):
         e.cilindro("cabine", "aco_escuro", (0.74, y * 0.94, 0.70), (0.50, y, 2.14), 0.028, lados)
@@ -217,7 +231,8 @@ def empilhadeira(detalhe=0):
     _roda_emp(e, "roda_dd", 0.45, -0.46, 0.33, 0.22)
     _roda_emp(e, "roda_te", -0.95, 0.40, 0.25, 0.18)
     _roda_emp(e, "roda_td", -0.95, -0.40, 0.25, 0.18)
-    e.ponto("ponto_operador", (-0.40, 0.0, 1.06), 0, pai="cabine")
+    # O quadril do motorista sentado: 9 cm acima do assento.
+    e.ponto("ponto_operador", QUADRIL, 0, pai="cabine")
     e.dados = {"garfo_repouso": GARFO_REPOUSO, "garfo_curso": GARFO_CURSO, "garfo_centro": GARFO_CENTRO}
     # Ao carregar, o garfo tira o palete do chão (0,10 m); no porta-paletes a ponte usa a
     # altura do vão (fase = altura / `garfo_curso`).

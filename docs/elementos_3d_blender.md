@@ -280,3 +280,27 @@ O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 O teste `o_homem_e_a_mulher_tem_corpos_diferentes` confere que o quadril dela é mais largo e
 que a cintura e o peito dela são mais estreitos que os dele.
 
+## Clipes de pessoa corrigidos (`pessoa_clipes.glb`)
+
+Os clipes das pessoas vêm da biblioteca de animações CC0 em `assets/terceiros`. Alguns foram
+feitos para um boneco de jogo e ficam errados num corpo humano. `tools/blender/clipes.py` lê o
+clipe original, corrige a pose quadro a quadro e grava `pessoa_clipes.glb`: só o esqueleto e
+os clipes corrigidos, com os mesmos nomes de nó e de clipe.
+
+- `Walk_Carry_Loop` (andar com caixa, e os braços de quem está parado com caixa): no original o
+  tronco deita uns 25° para trás e a cabeça olha para o teto. O corrigido dobra a coluna, o
+  pescoço e a cabeça para a frente; a caixa fica na frente da barriga.
+- No catálogo, `pessoa_clipes.clipes` lista os clipes do arquivo e `dados.substitui` diz quais
+  clipes originais ele troca. Quem toca um clipe de pessoa usa o deste arquivo quando o nome
+  está na lista, e o original nos outros casos.
+
+## Motorista e operador
+
+- **Empilhadeira:** `ponto_operador` é o quadril do motorista sentado (0,09 m acima do
+  assento). O piso da cabine fica 0,61 m abaixo dele, entre as soleiras, e o volante fica onde
+  as mãos do clipe `Driving_Loop` seguram (0,5 m à frente e 0,27 m acima do quadril, com a
+  inclinação `sentado_inclinar`).
+- **Torno e injetora:** `ponto_operador` fica na frente do painel. A mão esquerda do clipe
+  `Interact` (0,17 m à esquerda e 0,58 m à frente do ponto, a 1,3 m do chão) cai na tela.
+  `ponto_porta` continua 0,6 m além. Na prensa o operador fica no centro, de frente para a
+  mesa, porque o painel fica junto da saída da peça.
