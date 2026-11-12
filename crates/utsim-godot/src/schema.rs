@@ -269,6 +269,7 @@ pub fn kind_label(kind: &ObjectKind) -> &'static str {
         ObjectKind::Separator { .. } => "Desmontagem",
         ObjectKind::Sink => "Saída",
         ObjectKind::Transporter { .. } => "Transportador",
+        ObjectKind::Crane { .. } => "Ponte rolante",
         ObjectKind::Dispatcher { .. } => "Despachante",
         ObjectKind::Conveyor { .. } => "Esteira",
         ObjectKind::Rack { .. } => "Porta-paletes",
@@ -1460,6 +1461,8 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 Value::Text(format!("{} posições", bays * levels)),
             ));
         }
+        // Crane fields in the inspector: Interface session (the RON is edited by hand meanwhile).
+        ObjectKind::Crane { .. } => {}
         ObjectKind::Dispatcher { team, rule, .. } => {
             let mut choices: Vec<Choice> = transporter_names(model)
                 .iter()

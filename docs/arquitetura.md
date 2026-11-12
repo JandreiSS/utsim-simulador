@@ -610,6 +610,20 @@ todos os objetos na origem; transporte ou equipe atendendo objetos na mesma posi
 atendido a mais de 50 m de qualquer nó da rede; e ligação direta de mais de 10 m sem
 transporte, esteira nem `transfer`.
 
+### Ponte rolante (`utsim_objects::crane`, `ObjectKind::Crane`)
+
+A ponte é um `Transporter` em modo ponte (`Transporter::crane`): mesma fila, mesmo
+protocolo com o despachante e o mesmo rastro de viagens. Muda só o movimento. `CraneSpec`
+guarda o retângulo coberto (centro, giro, curso e vão, tirados do `size`, da posição e do
+`visual.yaw` em `utsim_model::crane`) e os três eixos (`Axis`, com o perfil trapezoidal de
+`travel_time`). `travel` passa a `crane_travel`: a posição no piso é projetada no
+retângulo, e o tempo é o maior (`Safe`, `Parallel`) ou a soma (`Sequential`) dos tempos da
+ponte e do carro; em `Parallel` entra também o do gancho. O gancho desce antes do engate e
+do desengate, e sobe depois em um evento à parte (`RAISED_LOADED`, `RAISED_EMPTY`), para a
+peça sair da origem no fim do engate e entrar no destino no fim do desengate. Uma peça
+mais pesada que a capacidade sai da fila em `begin_trip`, é contada e não é transportada.
+A ponte não entra no piso como obstáculo nem nos roteadores.
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)

@@ -218,6 +218,7 @@ mod tests {
                     "home",
                     "agv",
                 ],
+                ObjectKind::Crane { .. } => &[],
                 ObjectKind::Dispatcher { .. } => &["team", "rule"],
                 ObjectKind::Conveyor { .. } => &["length", "speed", "item_length", "accumulating"],
                 ObjectKind::Rack { .. } => &[
