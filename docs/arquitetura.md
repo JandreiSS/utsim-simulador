@@ -404,7 +404,15 @@ muda.
   padrão. Intervalos de `t0` e de `t0·β` (condicionais às taxas) quando há mais horários
   do que parâmetros. Os tempos divididos por `1 + β·F(h)` passam por `auto_fit`
   (`fit_person`), e `FatigueFit::fatigue(unidades_por_hora)` devolve o `Fatigue::Dynamic`
-  do núcleo.
+  do núcleo. `PersonFit::apply` grava a distribuição em `person.times` e a curva na
+  fadiga do perfil.
+- **Tempos próprios no núcleo** (`person.times`): `Ctx::person_time` (e
+  `person_time_crew`, com o ganho da equipe) sorteia o tempo da tarefa da distribuição
+  da pessoa, com o stream dela, no lugar do tempo padrão já sorteado pelo posto (que
+  continua sendo sorteado, para não deslocar os outros streams); o fator de fadiga e o de
+  aprendizado se aplicam por cima e o ritmo individual não. `person_time_resumed` (o
+  restante de uma operação de um estado inicial) não sorteia. Sem `times`, a conta é a
+  mesma de antes, operação por operação.
 - **Relatório**: `AutoFit::to_html` acrescenta a escolha, a justificativa, os avisos e a
   tabela pelo critério em cima da página de `FitReport` (`to_html_with`); `to_csv`;
   `auto::index_html` para o índice por modelo; `dados::write_reports` grava tudo.

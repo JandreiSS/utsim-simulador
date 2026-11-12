@@ -64,6 +64,7 @@ mesmos resultados. O exemplo completo está em `examples/pessoas_fadiga.ron`.
 | `experience_years` | nenhuma | anos de experiência na função (registro) |
 | `capacity` | nenhuma | capacidade medida `(load_kg, force_n)`: maior carga que a pessoa levanta na função (kg) e maior força que ela faz ao empurrar ou puxar (N) |
 | `study` | nenhum | estudo de tempos da pessoa: as cronometragens brutas (abaixo) |
+| `times` | `{}` | tempos próprios da pessoa por tarefa, `{"torno": (dist: ..., method: "A")}` (abaixo) |
 
 O perfil só vale para um `Transporter`. Ele vale para tudo o que a pessoa faz: andar,
 carregar e descarregar itens, operar um posto (`OperatorUse`) e atender a manutenção
@@ -144,9 +145,9 @@ person: Some((
 
 `hour` são as horas desde o começo do turno; os tempos estão na unidade do modelo. Os
 nomes em português também valem (`estudo`, `leituras`, `tarefa`, `metodo`, `hora`,
-`tempos`, `pausas`). O UTSim ainda não usa o estudo na rodada: por ora ele só é guardado e
-conferido (tarefa, horas e tempos válidos). Não precisa de pausa: sem `pauses`, o turno é
-corrido.
+`tempos`, `pausas`). A rodada não lê o estudo: ela usa o resultado do ajuste, gravado em
+`times` e em `fatigue` (veja "Tempos próprios" abaixo). Não precisa de pausa: sem
+`pauses`, o turno é corrido.
 
 O ajuste (`utsim_fit::fatigue`) usa o mesmo modelo dinâmico do núcleo:
 
@@ -167,6 +168,44 @@ O resultado também avisa quando os tempos caem ao longo do turno (é aprendizad
 aquecimento, não fadiga: `β` fica 0 no modelo) e quando a curva é quase reta (`λ` e `β`
 não se separam: meça mais perto do fim do turno ou em mais horários). As taxas saem por
 hora e são convertidas para a unidade do modelo (por segundo, as do padrão).
+
+`PersonFit::apply` grava o resultado no perfil: a distribuição do tempo descansado vai
+para `times` (com o método medido), e a curva dá `work`, `time_factor` e, quando foi
+estimada, `recovery` da fadiga `Dynamic`. Os outros campos da fadiga (`walk`, `carry`,
+`speed_factor`, `limit`, `target`), e a recuperação que não foi estimada, ficam como
+estavam no perfil.
+
+### Tempos próprios
+
+Com `times`, a pessoa tem o seu próprio tempo numa tarefa:
+
+```ron
+person: Some((
+    times: {"torno": (dist: Normal(mean: 40.0, sd: 3.0), method: "A")},
+    fatigue: Some(Dynamic(work: 1.6667e-4, time_factor: 0.3)),
+)),
+```
+
+Quando essa pessoa faz a tarefa, o tempo é sorteado da distribuição dela, no lugar do
+tempo padrão do posto, e a fadiga (ou a tolerância) e a curva de aprendizado continuam
+valendo por cima. O ritmo individual (`variation`) não entra, porque o tempo medido da
+pessoa já tem o ritmo dela. A tarefa é o nome do posto (`Processor`), `<posto>:setup` para
+a preparação, `carga` e `descarga` para pegar e deixar itens. Uma tarefa sem entrada
+continua com o tempo padrão, e uma pessoa sem `times` continua exatamente como antes.
+
+- O sorteio sai do gerador da própria pessoa. O posto ainda sorteia o seu tempo padrão,
+  e por isso as outras sequências de números aleatórios do modelo não mudam.
+- Com mais de um operador por peça, quem demora mais manda, como no tempo padrão. Com
+  `team_speedup`, o tempo próprio também é dividido pelo ganho da equipe.
+- Uma peça que já estava no posto num estado inicial termina com o tempo padrão que
+  restava.
+- O `utsim check` mostra os tempos próprios de cada pessoa e avisa quando a tarefa não é
+  posto do modelo nem `carga` ou `descarga` (o tempo nunca seria usado).
+- Os nomes em português também valem (`tempos`, `distribuicao`, `metodo`).
+
+O exemplo `examples/pessoas_tempos_proprios.ron` põe duas pessoas no mesmo torno, com
+curvas diferentes: ana é mais rápida descansada, mas cansa depressa; bruno é mais lento,
+mas quase não cansa.
 
 ## Curva de aprendizado
 
@@ -341,6 +380,7 @@ experimentos:
 | `person.repetitions` | repetições contadas pela curva de aprendizado |
 | `person.learning_factor` | multiplicador médio do tempo padrão pela curva |
 | `person.learning_gain` | `1 − learning_factor / first`: fração do tempo da 1.ª repetição que a prática economizou |
+| `person.own_times` | operações cujo tempo saiu dos tempos próprios da pessoa (só com `times`) |
 
 O estado `resting` aparece junto dos outros estados da pessoa.
 

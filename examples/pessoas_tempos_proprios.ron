@@ -1,0 +1,54 @@
+// Tempos próprios de cada pessoa: ana e bruno operam o mesmo torno, cada um com o tempo
+// que a cronometragem mediu dele. Tempos em segundos.
+//
+// O posto tem um tempo padrão (process), que vale para quem não tem tempo próprio. Cada
+// pessoa traz, em `times` (tempos), o seu tempo descansado no torno e a sua curva de
+// fadiga, como sai do ajuste das cronometragens (`utsim_fit::fatigue`, manual, capítulo
+// "Pessoas"):
+// - ana é mais rápida descansada (média 40 s), mas cansa depressa: λ = 0,6 por hora e o
+//   tempo cresce 30 % com F = 1;
+// - bruno é mais lento descansado (média 48 s), mas quase não cansa: λ = 0,15 por hora e
+//   o tempo cresce 10 % com F = 1.
+// No começo do turno ana faz a peça em menos tempo; perto do fim, cansada, fica mais lenta
+// que bruno. As métricas `ana.person.own_times` e `bruno.person.own_times` contam as
+// operações tiradas dos tempos próprios.
+//
+// Os números são de exemplo, sem medição real.
+//
+//   chegada -> fila -> torno (operado por ana ou bruno) -> expedicao
+Model(
+    name: "Tempos próprios de cada pessoa",
+    description: "Duas pessoas com curvas diferentes no mesmo torno",
+    run: (stop_time: 28800.0, seed: 11, replications: 3),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 30.0)), position: (0.0, 0.0, 0.0)),
+        (name: "fila", kind: Queue(), position: (3.0, 0.0, 0.0)),
+        (name: "torno", kind: Processor(
+            process: Triangular(min: 40.0, mode: 45.0, max: 60.0),
+            capacity: 2,
+            operators: Some(OperatorUse(team: "equipe")),
+        ), position: (6.0, 0.0, 0.0)),
+        (name: "expedicao", kind: Sink, position: (10.0, 0.0, 0.0)),
+        (name: "ana", kind: Transporter(speed: 1.3), position: (6.0, 1.0, 0.0),
+            visual: Some((asset: Some("pessoa"))),
+            person: Some((
+                sexo: Some(Feminino),
+                tempos: {"torno": (distribuicao: Normal(mean: 40.0, sd: 3.0), metodo: "A")},
+                fadiga: Some(Dinamica(trabalho: 1.6667e-4, recuperacao: 1.0e-3, fator_tempo: 0.3)),
+            ))),
+        (name: "bruno", kind: Transporter(speed: 1.3), position: (6.0, -1.0, 0.0),
+            visual: Some((asset: Some("pessoa"))),
+            person: Some((
+                sexo: Some(Masculino),
+                tempos: {"torno": (distribuicao: Normal(mean: 48.0, sd: 4.0), metodo: "A")},
+                fadiga: Some(Dinamica(trabalho: 4.1667e-5, recuperacao: 1.0e-3, fator_tempo: 0.1)),
+            ))),
+        (name: "equipe", kind: Dispatcher(team: ["ana", "bruno"], rule: FirstAvailable),
+            position: (6.0, 3.0, 0.0)),
+    ],
+    connections: [
+        ("chegada", "fila"),
+        ("fila", "torno"),
+        ("torno", "expedicao"),
+    ],
+)
