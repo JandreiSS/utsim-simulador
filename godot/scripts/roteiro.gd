@@ -1201,7 +1201,7 @@ func _check(c: Dictionary, k: int) -> void:
 				var dd: float = _main.camera.dist / _cam_scale
 				report.call("distância da câmera entre %s e %s" % [want[0], want[1]], dd >= float(want[0]) and dd <= float(want[1]), str(dd))
 			"motorista":
-				# {"objeto", "existe", "visivel", "t", "clipe"}: the seated driver of a forklift
+				# {"objeto", "existe", "visivel", "t", "clipe", "inclinado"}: the seated driver of a forklift
 				# (`clipe`: the animation playing, without the "_Loop" suffix).
 				if want.has("t"):
 					_main.seek(float(want["t"]), true)
@@ -1214,6 +1214,13 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("visivel"):
 						var shown: bool = (cena.rigs[i]["driver_node"] as Node3D).is_visible_in_tree()
 						report.call("motorista de %s visível" % want["objeto"], shown == bool(want["visivel"]), str(shown))
+					if want.has("inclinado"):
+						# Leaned forward as the bridge says (`sentado_inclinar` of the catalogue):
+						# the angle of its up axis from the vertical, in degrees.
+						var dn: Node3D = cena.rigs[i]["driver_node"]
+						var tilt := rad_to_deg(dn.basis.y.normalized().angle_to(Vector3.UP))
+						var want_tilt := rad_to_deg(float((cena.rigs[i]["driver_info"] as Dictionary).get("lean", 0.0)))
+						report.call("motorista de %s inclinado %.1f°" % [want["objeto"], want_tilt], absf(tilt - want_tilt) < 0.5, "%.2f°" % tilt)
 					if want.has("clipe"):
 						var clip: String = (cena.rigs[i]["driver"] as Pessoa).clip_name()
 						report.call("clipe do motorista de %s" % want["objeto"], clip == String(want["clipe"]), clip)
@@ -1255,7 +1262,7 @@ func _check(c: Dictionary, k: int) -> void:
 					report.call("altura de %s de %s" % [want["ponto"], want["objeto"]], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.2f m" % h)
 			"pessoa3d":
 				# {"objeto", "corpo_blender": true, "epis": [...], "animada": true, "arquivo",
-				# "altura_entre", "largura_entre"}: a person drawn with a Blender body, the
+				# "altura_entre", "altura_real_entre", "largura_entre"}: a person drawn with a Blender body, the
 				# protective equipment shown, a clip playing, the body file and its size.
 				var cena: CenaUtsim = _main.cena
 				var i: int = cena.block_index(String(want["objeto"]))
@@ -1270,7 +1277,7 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("arquivo"):
 						var file := String((rig.get("pessoa", {}) as Dictionary).get("arquivo", ""))
 						report.call("corpo de %s" % want["objeto"], file == String(want["arquivo"]), file)
-					if (want.has("altura_entre") or want.has("largura_entre")) and rig.has("asset"):
+					if (want.has("altura_entre") or want.has("altura_real_entre") or want.has("largura_entre")) and rig.has("asset"):
 						# {"altura_entre": [a, b]} in metres (the body's height over its
 						# skeleton's), {"largura_entre": [a, b]} the width over the height scale.
 						var sc: Vector3 = (rig["asset"] as Node3D).scale
@@ -1278,6 +1285,20 @@ func _check(c: Dictionary, k: int) -> void:
 						if want.has("altura_entre"):
 							var h := float(body.get("altura", 0.0)) * sc.y / maxf(float(body.get("escala", 1.0)), 1e-6)
 							report.call("altura de %s" % want["objeto"], h >= float(want["altura_entre"][0]) and h <= float(want["altura_entre"][1]), "%.3f m" % h)
+						if want.has("altura_real_entre"):
+							# The drawn body itself: the box of its visible meshes, floor to top,
+							# in the root's frame (the hidden protective equipment left out).
+							var top := -INF
+							var bottom := INF
+							for mi in (rig["asset"] as Node).find_children("*", "MeshInstance3D", true, false):
+								var m := mi as MeshInstance3D
+								if m.mesh == null or not m.is_visible_in_tree():
+									continue
+								var bb: AABB = cena._rel(rig["root"], m) * m.get_aabb()
+								top = maxf(top, bb.end.y)
+								bottom = minf(bottom, bb.position.y)
+							var real := top - bottom
+							report.call("altura desenhada de %s" % want["objeto"], real >= float(want["altura_real_entre"][0]) and real <= float(want["altura_real_entre"][1]), "%.3f m" % real)
 						if want.has("largura_entre"):
 							var w := sc.x / maxf(sc.y, 1e-6)
 							report.call("largura de %s" % want["objeto"], w >= float(want["largura_entre"][0]) and w <= float(want["largura_entre"][1]) and absf(sc.z / maxf(sc.y, 1e-6) - w) < 1e-4, "%.3f (z %.3f)" % [w, sc.z / maxf(sc.y, 1e-6)])

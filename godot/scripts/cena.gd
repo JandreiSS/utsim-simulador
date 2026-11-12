@@ -460,8 +460,12 @@ func _add_driver(rig: Dictionary, root: Node3D, b: Dictionary, names: PackedStri
 		return
 	node.name = "Motorista"
 	node.position = info["position"]
-	node.rotation = Vector3(0, float(info["yaw"]), 0)
-	node.scale = Vector3.ONE * float(info["scale"])
+	# Turned by `yaw`, then leaned forward about its side axis (`sentado_inclinar`; the
+	# bridge already turned the root and the eyes about the hip).
+	var yaw_basis := Basis(Vector3.UP, float(info["yaw"]))
+	var lean := float(info.get("lean", 0.0))
+	var side := yaw_basis * Vector3.RIGHT
+	node.basis = (Basis(side, lean) * yaw_basis).scaled(Vector3.ONE * float(info["scale"]))
 	root.add_child(node)
 	var p := Pessoa.new()
 	if not p.bind(node, _clips2, names):

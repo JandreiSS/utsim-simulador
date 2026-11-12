@@ -762,6 +762,49 @@ pub fn pessoa(
     })
 }
 
+/// Degrees the seated person leans forward (`dados.sentado_inclinar` of the person
+/// bodies): the clips sit it too far back. 0 when the catalogue does not say.
+pub fn sentado_inclinar(cat: &Catalogo) -> f32 {
+    PESSOAS
+        .iter()
+        .filter_map(|p| cat.get(p))
+        .find_map(|e| e.dados["sentado_inclinar"].as_f64())
+        .filter(|g| g.is_finite())
+        .map_or(0.0, |g| g as f32)
+}
+
+/// Leans the seated driver `graus` forward about its hip: the root and the eyes turn
+/// about the hip, on the driver's own side axis (its `x`, turned by its `yaw`). Returns
+/// the lean in radians, for the scene to turn the mannequin by.
+pub fn inclinar_motorista(m: &mut utsim_look::driver::DriverMount, graus: f32) -> f32 {
+    let a = graus.to_radians();
+    if a == 0.0 {
+        return 0.0;
+    }
+    // The side axis of the driver in the vehicle's frame (+x of the mannequin, turned by
+    // `yaw` as the engines turn: +z towards +x).
+    let (s, c) = m.yaw.sin_cos();
+    let axis = [c, 0.0, -s];
+    let turn = |v: [f32; 3]| {
+        let d = [v[0] - m.hip[0], v[1] - m.hip[1], v[2] - m.hip[2]];
+        // Rodrigues: d cos a + (k × d) sin a + k (k·d)(1 − cos a).
+        let (sa, ca) = a.sin_cos();
+        let k = axis;
+        let cross = [
+            k[1] * d[2] - k[2] * d[1],
+            k[2] * d[0] - k[0] * d[2],
+            k[0] * d[1] - k[1] * d[0],
+        ];
+        let dot = k[0] * d[0] + k[1] * d[1] + k[2] * d[2];
+        let r: [f32; 3] =
+            std::array::from_fn(|i| d[i] * ca + cross[i] * sa + k[i] * dot * (1.0 - ca));
+        [m.hip[0] + r[0], m.hip[1] + r[1], m.hip[2] + r[2]]
+    };
+    m.position = turn(m.position);
+    m.eye = turn(m.eye);
+    a
+}
+
 /// Width factor of a body (`dados` of its catalogue entry) for a person `height_m` tall
 /// and `mass_kg` heavy: `sqrt(IMC / imc_base)`, IMC = mass / height², kept within the
 /// body's `largura` range. 1 without a mass or a height (a drawn height has no mass to
@@ -807,6 +850,37 @@ mod tests {
         root: [0.0; 3],
         turn: 0.0,
     };
+
+    #[test]
+    fn the_seated_driver_leans_forward_about_the_hip() {
+        let mount = |yaw: f32| utsim_look::driver::DriverMount {
+            position: [0.0, 0.2, -0.1],
+            yaw,
+            scale: 1.0,
+            eye: [0.0, 1.3, 0.0],
+            hip: [0.0, 0.7, 0.0],
+        };
+        // Facing +z: the eyes go forward (+z) and down, the hip stays, distances kept.
+        let mut m = mount(0.0);
+        let a = inclinar_motorista(&mut m, 15.0);
+        assert!((a - 15f32.to_radians()).abs() < 1e-6);
+        let s = 15f32.to_radians().sin();
+        let c = 15f32.to_radians().cos();
+        assert!(close(m.eye, [0.0, 0.7 + 0.6 * c, 0.6 * s]), "{:?}", m.eye);
+        assert_eq!(m.hip, [0.0, 0.7, 0.0]);
+        // Turned a quarter (facing +x): the lean goes towards +x.
+        let mut q = mount(FRAC_PI_2);
+        q.eye = [0.0, 1.3, 0.0];
+        inclinar_motorista(&mut q, 15.0);
+        assert!(q.eye[0] > 0.15 && q.eye[2].abs() < 1e-5, "{:?}", q.eye);
+        // No lean: nothing moves.
+        let mut z = mount(0.3);
+        assert_eq!(inclinar_motorista(&mut z, 0.0), 0.0);
+        assert_eq!(z, mount(0.3));
+        // The catalogue says how much (0 when it does not).
+        let g = sentado_inclinar(&cat());
+        assert!((0.0..=30.0).contains(&g), "{g}");
+    }
 
     #[test]
     fn the_record_of_a_person_sets_the_body_its_height_and_its_width() {

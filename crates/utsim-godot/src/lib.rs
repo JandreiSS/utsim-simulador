@@ -650,6 +650,7 @@ impl UtsimPlayback {
                 put(&mut driver, "scale", m.scale);
                 put(&mut driver, "eye", v3(m.eye));
                 put(&mut driver, "hip", v3(m.hip));
+                put(&mut driver, "lean", v.driver_lean);
                 put(&mut e, "driver", driver);
             }
             blocks.push(&e.to_variant());

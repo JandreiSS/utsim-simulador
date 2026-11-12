@@ -62,6 +62,9 @@ pub struct BlockView {
     /// The seated driver of a forklift (presentation only), when the interface has the
     /// mannequin files.
     pub driver: Option<DriverMount>,
+    /// How far the seated driver leans forward, radians (`sentado_inclinar` of the
+    /// catalogue; its root and eyes are already turned about the hip).
+    pub driver_lean: f32,
     /// Model coordinates of the base, and the footprint `(x, y, z)` size.
     pub position: [f32; 3],
     pub size: [f32; 3],
@@ -427,10 +430,14 @@ impl Playback {
                 .map(modelos3d::Elemento::clip_names)
                 .unwrap_or_default();
             index_of[b] = Some(blocks.len());
-            let driver = look
+            let mut driver = look
                 .as_ref()
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
+            let lean = catalogo.as_ref().map_or(0.0, modelos3d::sentado_inclinar);
+            let driver_lean = driver
+                .as_mut()
+                .map_or(0.0, |m| modelos3d::inclinar_motorista(m, lean));
             let stack = kind == "Queue" && is_stack(model, &name);
             let sized = role.is_none()
                 && !matches!(kind.as_str(), "Conveyor" | "Rack")
@@ -461,6 +468,7 @@ impl Playback {
                 role,
                 look,
                 driver,
+                driver_lean,
                 position: e.position,
                 size: e.size,
             });
