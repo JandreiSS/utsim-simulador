@@ -264,6 +264,33 @@ pub struct FrameData {
 /// point) and still be put at the station's `ponto_operador`, metres.
 pub const POST_REACH: f32 = 2.0;
 
+/// Distance between operators who work at the same station together (operators per
+/// piece), side by side across its post, metres.
+pub const POST_SPACING: f32 = 0.7;
+
+/// Operators at the same station (the drawn index each pose was put at) stand side by
+/// side across its post, in the order of the blocks, the middle of the row on the post:
+/// two operators per piece do not stand inside each other.
+fn spread_at_posts(poses: &mut [Option<(utsim_scene::MobilePose, Option<usize>)>]) {
+    let mut by: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (k, p) in poses.iter().enumerate() {
+        if let Some((_, Some(st))) = p {
+            by.entry(*st).or_default().push(k);
+        }
+    }
+    for list in by.values().filter(|l| l.len() > 1) {
+        let n = list.len() as f32;
+        for (r, &k) in list.iter().enumerate() {
+            if let Some((p, _)) = poses[k].as_mut() {
+                let off = (r as f32 - (n - 1.0) / 2.0) * POST_SPACING;
+                let side = turned([0.0, 0.0, 1.0], p.yaw);
+                p.position[0] += side[0] * off;
+                p.position[2] += side[2] * off;
+            }
+        }
+    }
+}
+
 /// How long (simulated seconds) a source blinks after losing an item.
 pub const FLASH_SECONDS: f64 = 1.0;
 /// Gap between the items a source holds at its output, side by side (a batch waiting).
@@ -372,6 +399,9 @@ pub struct Playback {
     /// post and walks in the layout) and the runs of its states as the table sees them
     /// ([`Animado::runs`]); `None` for the others.
     pub animados: Vec<Option<(Animado, modelos3d::Runs)>>,
+    /// Per drawn block, the top of the waiting table a queue is drawn with (`espera`) and
+    /// where the table is placed; `None` for the others.
+    pub tampos: Vec<Option<(modelos3d::Tampo, modelos3d::Placement)>>,
     /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
     /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
     vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
@@ -553,6 +583,7 @@ impl Playback {
             dropped,
             modelos3d: catalogo,
             animados: Vec::new(),
+            tampos: Vec::new(),
             vivo: std::sync::OnceLock::new(),
             rastro: std::sync::Mutex::new(None),
         }
@@ -592,6 +623,16 @@ impl Playback {
             }
         }
         self.animados = animados;
+        self.tampos = (0..self.blocks.len())
+            .map(|i| {
+                let v = &self.blocks[i];
+                if v.kind != "Queue" {
+                    return None;
+                }
+                let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
+                Some((modelos3d::Tampo::of(e)?, self.placement(i)?))
+            })
+            .collect();
         self
     }
 
@@ -815,8 +856,14 @@ impl Playback {
             .collect()
     }
 
-    /// Mobile pose as drawn (`models::drawn_pose` of the viewer), layout space.
-    fn drawn_pose(&self, b: usize, t: f64, look: &Look) -> Option<utsim_scene::MobilePose> {
+    /// Mobile pose as drawn (`models::drawn_pose` of the viewer), layout space, and the
+    /// station (drawn index) whose post it was put at.
+    fn drawn_pose(
+        &self,
+        b: usize,
+        t: f64,
+        look: &Look,
+    ) -> Option<(utsim_scene::MobilePose, Option<usize>)> {
         let s = &self.scene;
         let mut p = s.mobile_at(b, t)?;
         let original = p.position;
@@ -835,6 +882,7 @@ impl Playback {
                 reach,
             );
         }
+        let mut at_post = None;
         if look.carry == Carry::Hands && p.motion == Motion::Working {
             let station = self.stations.iter().copied().find(|&st| {
                 [0, 2]
@@ -844,25 +892,30 @@ impl Playback {
             // The Blender element's operator point (and the walk from its door), else the
             // front of the footprint. An operator working at the station's access point
             // (outside the footprint) goes to the element's point too.
-            let post = match station {
-                Some(st) => self.drawn_index(st).and_then(|i| self.operator_post(i, t)),
-                None => self.near_post(original, t),
+            let placed = match station {
+                Some(st) => {
+                    let i = self.drawn_index(st);
+                    let post = i.and_then(|i| self.operator_post(i, t)).unwrap_or_else(|| {
+                        looks::station_front(s.positions[st], s.geoms[st].half, s.turn(st))
+                    });
+                    Some((post, i))
+                }
+                None => self
+                    .near_station(original)
+                    .and_then(|i| Some((self.operator_post(i, t)?, Some(i)))),
             };
-            if let Some(post) = post {
+            if let Some((post, i)) = placed {
                 (p.position, p.yaw) = post;
-            } else if let Some(st) = station {
-                (p.position, p.yaw) =
-                    looks::station_front(s.positions[st], s.geoms[st].half, s.turn(st));
+                at_post = i;
             }
         }
-        Some(p)
+        Some((p, at_post))
     }
 
-    /// The operator post of the nearest station (machine or bench) whose footprint, grown
-    /// by [`POST_REACH`], holds `at` (layout): where an operator working at that station's
-    /// access point stands. `None` when that station has no Blender post: an operator is
-    /// never sent to a neighbour's post.
-    fn near_post(&self, at: [f32; 3], t: f64) -> Option<([f32; 3], f32)> {
+    /// The nearest station (machine or bench, drawn index) whose footprint, grown by
+    /// [`POST_REACH`], holds `at` (layout): an operator working at that station's access
+    /// point goes to its post, if it has one (never to a neighbour's).
+    fn near_station(&self, at: [f32; 3]) -> Option<usize> {
         let s = &self.scene;
         self.stations
             .iter()
@@ -875,7 +928,7 @@ impl Playback {
                 inside.then(|| (d[0] * d[0] + d[2] * d[2], i))
             })
             .min_by(|a, b| a.0.total_cmp(&b.0))
-            .and_then(|(_, i)| self.operator_post(i, t))
+            .map(|(_, i)| i)
     }
 
     /// Everything that changes at `t`.
@@ -890,15 +943,21 @@ impl Playback {
         let mut poses: Vec<Option<utsim_scene::MobilePose>> = Vec::with_capacity(n);
         // Where the part each block works on (or carries) goes, from its part table.
         let mut anchors: Vec<Option<usize>> = Vec::with_capacity(n);
-        for v in &self.blocks {
+        let mut drawn: Vec<_> = self
+            .blocks
+            .iter()
+            .map(|v| match (&v.look, v.role) {
+                (Some(look), Some(_)) => self.drawn_pose(v.b, t, look),
+                (None, Some(_)) => s.mobile_at(v.b, t).map(|p| (p, None)),
+                _ => None,
+            })
+            .collect();
+        spread_at_posts(&mut drawn);
+        for (v, pose) in self.blocks.iter().zip(drawn) {
             let b = v.b;
             let state = s.timeline.block_state(b, t);
             let scale = v.look.as_ref().map_or(1.0, |l| l.scale);
-            let pose = match (&v.look, v.role) {
-                (Some(look), Some(_)) => self.drawn_pose(b, t, look),
-                (None, Some(_)) => s.mobile_at(b, t),
-                _ => None,
-            };
+            let pose = pose.map(|p| p.0);
             let lost = self.dropped[b].partition_point(|&d| d <= t);
             f.flash
                 .push(match lost.checked_sub(1).map(|k| t - self.dropped[b][k]) {
@@ -1001,12 +1060,17 @@ impl Playback {
                     shown.push_str(&format!(" · {made} criados"));
                 }
             }
-            // A queue drawn as a conveyor counts what does not fit on its belt.
-            let hidden = v
-                .look
-                .as_ref()
-                .and_then(|l| looks::queue_belt(&v.kind, l))
-                .map_or(0, |belt| belt.hidden(content, ITEM_SIZE));
+            // A queue drawn as a conveyor (or on a waiting table) counts what does not fit
+            // on its belt (its top).
+            let i = self.index_of[b].unwrap_or(usize::MAX);
+            let hidden = match self.tampos.get(i) {
+                Some(Some((tampo, at))) => tampo.hidden(content, ITEM_SIZE / at.scale.max(1e-6)),
+                _ => v
+                    .look
+                    .as_ref()
+                    .and_then(|l| looks::queue_belt(&v.kind, l))
+                    .map_or(0, |belt| belt.hidden(content, ITEM_SIZE)),
+            };
             f.label
                 .push(style::label_text(&shown, content, hidden, received));
         }
@@ -1130,6 +1194,15 @@ impl Playback {
                         center[1] - simple[1] + at[1],
                         center[2] - simple[2] + at[2],
                     ];
+                } else if let Some(Some((tampo, at))) = self.tampos.get(i) {
+                    // On the top of the waiting table, in its grid.
+                    let k = resting.entry(i).or_default();
+                    let Some(cell) = tampo.slot(*k, ITEM_SIZE / at.scale.max(1e-6)) else {
+                        continue;
+                    };
+                    *k += 1;
+                    let (on, _) = modelos3d::point_to_layout(&cell, at);
+                    center = [on[0], on[1] + ITEM_SIZE / 2.0, on[2]];
                 } else if v.kind == "Queue" {
                     center[1] -= looks::queue_drop();
                 } else if poses[i].is_none()
@@ -1825,6 +1898,79 @@ mod tests {
         assert_eq!(anchored(18.45, cnc).unwrap().0, "ponto_saida");
         // Idle: no part, no anchor anywhere.
         assert!(pb.frame(60.0).item_ancora_bloco.iter().all(|&b| b == -1));
+    }
+
+    fn espera_dupla() -> Playback {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../godot/roteiros/g4_espera_dupla.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        Playback::new(&replay, Some(&model), path.parent(), true)
+    }
+
+    #[test]
+    fn a_queue_on_the_waiting_table_keeps_its_items_on_the_top() {
+        let pb = espera_dupla();
+        let q = index(&pb, "fila");
+        assert_eq!(pb.blocks[q].modelo3d.as_deref(), Some("espera"));
+        let (tampo, at) = pb.tampos[q].expect("a mesa tem tampo");
+        let base = layout_to_godot(at.root);
+        let top = at.root[1] + tampo.altura * at.scale;
+        // At 40 s the 16 items came (none in flight) and one is on the machine: the top
+        // holds 12, the label counts the rest.
+        let f = pb.frame(40.0);
+        let mut on = 0;
+        for (k, p) in f.item_position.iter().enumerate() {
+            let d = [p[0] - base[0], p[1] - base[1], p[2] - base[2]];
+            if d[0].abs() <= 0.7 && d[2].abs() <= 0.5 {
+                assert!(d[0].abs() + ITEM_SIZE / 2.0 <= 0.55 + 1e-3, "{d:?}");
+                assert!(d[2].abs() + ITEM_SIZE / 2.0 <= 0.33 + 1e-3, "{d:?}");
+                let layer = ((d[1] - top - ITEM_SIZE / 2.0) / ITEM_SIZE).round();
+                assert!(
+                    (d[1] - (top + ITEM_SIZE / 2.0 + layer * ITEM_SIZE)).abs() < 1e-3
+                        && (0.0..2.0).contains(&layer),
+                    "{k}: {d:?}"
+                );
+                on += 1;
+            }
+        }
+        let i = pb.blocks[q].b;
+        let content = pb.scene.timeline.block_content(i, 40.0);
+        assert_eq!(content, 14);
+        assert_eq!(on, 12, "{content} na fila");
+        assert!(
+            f.label[q].contains(&format!("+{}", content - 12)),
+            "{}",
+            f.label[q]
+        );
+    }
+
+    #[test]
+    fn two_operators_per_piece_stand_side_by_side_at_the_post() {
+        let pb = espera_dupla();
+        let cnc = index(&pb, "cnc_1");
+        let (carla, davi) = (index(&pb, "carla"), index(&pb, "davi"));
+        let (a, _) = pb.animados[cnc].as_ref().unwrap();
+        let (post, yaw) = a.post.unwrap();
+        let f = pb.frame(15.0);
+        for m in [carla, davi] {
+            assert_eq!(f.motion[m], motion_code(Motion::Working).0);
+            assert!((f.yaw[m] - yaw).abs() < 1e-5);
+        }
+        let (c, d) = (f.position[carla], f.position[davi]);
+        // Across the post, the post in the middle.
+        let gap = ((c[0] - d[0]).powi(2) + (c[2] - d[2]).powi(2)).sqrt();
+        assert!((gap - POST_SPACING).abs() < 1e-3, "{c:?} {d:?}");
+        let mid = [(c[0] + d[0]) / 2.0, (c[2] + d[2]) / 2.0];
+        assert!((mid[0] - post[0]).abs() < 1e-3 && (mid[1] - post[2]).abs() < 1e-3);
+        // One operator alone stays on the post.
+        let mut one = vec![Some((
+            pb.scene.mobile_at(pb.blocks[carla].b, 15.0).unwrap(),
+            Some(cnc),
+        ))];
+        let before = one[0].unwrap().0.position;
+        spread_at_posts(&mut one);
+        assert_eq!(one[0].unwrap().0.position, before);
     }
 
     #[test]

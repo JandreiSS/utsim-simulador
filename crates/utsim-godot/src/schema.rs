@@ -1766,6 +1766,25 @@ pub fn asset_choices() -> Vec<Choice> {
             group: "Terceiros (assets/terceiros)".into(),
         });
     }
+    // The Blender elements of their own (`cnc`, `prensa`, `espera`...); not the person
+    // bodies (the person's sex picks them) nor the `_medio` files.
+    if let Some(cat) = crate::modelos3d::Catalogo::find(None) {
+        for (stem, e) in &cat.elementos {
+            if stem.ends_with("_medio")
+                || crate::modelos3d::PESSOAS.contains(&stem.as_str())
+                || out.iter().any(|c| &c.value == stem)
+            {
+                continue;
+            }
+            let t = e.tamanho;
+            out.push(Choice {
+                value: stem.clone(),
+                label: stem.clone(),
+                help: format!("{} ({:.2} x {:.2} x {:.2} m)", e.arquivo, t[0], t[1], t[2]),
+                group: "Elementos 3D (assets/modelos3d)".into(),
+            });
+        }
+    }
     out
 }
 
