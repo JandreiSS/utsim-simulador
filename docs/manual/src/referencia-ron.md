@@ -58,7 +58,7 @@ Model(
 | `obstacles` | `[]` | polígonos que os recursos não atravessam nos modos `Free` e `Network`: `(name, polygon: [(x, y), ...])`, ao menos 3 pontos, nomes únicos. Veja [Movimentação e obstáculos](movimentacao.md) |
 | `floor_plan` | nenhuma | registro da planta CAD (arquivo, hash, transformação, calibração, camadas); a simulação não lê o arquivo. Gravado por `utsim planta --obstaculos` |
 | `aisles` | `[]` | corredores de circulação: `(name, kind: Pedestrian \| Forklift \| Mixed, points: [(x, y), ...], width, two_way: true, secondary: false, profile: None)`; geram a rede do modo `Aisles`. Veja [Corredores e faixas de segurança](corredores.md) |
-| `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0)` |
+| `floor_marking` | perfil Brasil | marcação do piso: `(profile: Brasil \| Branco \| Custom((...)), line_width: 0.10, crossing_stop: 2.0, floor_color: Some("#d8d2bc"))`; `floor_color` é a cor do chão no 3D (ausente, o cinza de sempre) |
 | `line` | nenhuma | linha especializada do modelo (`"lean_office"`): vocabulário, biblioteca e indicadores da linha. A simulação não lê o campo. Veja [Lean Office](linhas/lean-office/index.md) |
 
 ## `run`

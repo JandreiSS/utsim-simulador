@@ -4,7 +4,7 @@
 		{"nota": "Motorista nas empilhadeiras (G4): um boneco sentado e animado em cada empilhadeira, parado (Sitting) ou andando (Driving), girando com o veículo; opção Mostrar motorista no painel de aparência; a câmera Do recurso fica na cabeça do motorista e o esconde."},
 		{"abrir": "g4_motorista.ron"},
 		{"modo": "simular"},
-		{"conferir": {"modo": "simular", "motorista": {"objeto": "empilhadeira_1", "existe": true, "visivel": true}}},
+		{"conferir": {"modo": "simular", "motorista": {"objeto": "empilhadeira_1", "existe": true, "visivel": true, "inclinado": true}}},
 		{"conferir": {"motorista": {"objeto": "empilhadeira_2", "existe": true, "visivel": true}}},
 		{"conferir": {"motorista": {"objeto": "chegada", "existe": false}}},
 		{"nota": "Parada no começo: sentado."},

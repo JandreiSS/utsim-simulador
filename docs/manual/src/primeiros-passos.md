@@ -154,7 +154,8 @@ Depois de **▶ Simular**, o visualizador toca a rodada gravada.
 | Velocidade | `+` e `-` |
 | Evento anterior e seguinte | `←` e `→` |
 | Estatísticas de um objeto | clique nele |
-| Enquadrar | `F` |
+| Enquadrar | `Home` (no Editar, também `F`) |
+| Andar pela fábrica em primeira pessoa | `F` no Simular (`Esc` sai) |
 
 Itens, operadores e veículos aparecem em movimento. As estatísticas finais da replicação (janela depois do aquecimento) ficam no painel de cada objeto.
 

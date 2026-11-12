@@ -257,6 +257,7 @@ pub const S_RUN: &str = "Simulação";
 pub const S_MOVE: &str = "Movimentação";
 pub const S_FLOOR: &str = "Piso e corredores";
 pub const S_MODEL: &str = "Modelo";
+pub const S_PERSON: &str = "Pessoa";
 
 /// Portuguese name of an object kind.
 pub fn kind_label(kind: &ObjectKind) -> &'static str {
@@ -1877,9 +1878,182 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         out.extend(output_fields(model, obj));
         out.extend(access_fields(obj));
     }
+    out.extend(person_fields(model, obj));
     out.extend(downtime_fields(model, obj));
     out.extend(look_fields(obj));
     out
+}
+
+/// Who a person is (`person`: sex, height, mass, age, experience and measured capacity),
+/// for a mobile resource drawn as a person or one that already has the block. Only a
+/// record for the run; the 3D body follows sex, height and mass.
+fn person_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
+    if !matches!(obj.kind, ObjectKind::Transporter { .. }) {
+        return Vec::new();
+    }
+    if obj.person.is_none() && model.role_of(obj) != utsim_nav::Role::Person {
+        return Vec::new();
+    }
+    let s = S_PERSON;
+    let p = obj.person.as_deref().cloned().unwrap_or_default();
+    let cap = p.capacity.unwrap_or_default();
+    let opt = |path: &str, label: &str, v: Option<f64>, unit: &'static str, help: &str| {
+        Field::new(
+            s,
+            path,
+            label,
+            FieldType::Float,
+            v.map_or(Value::Null, Value::Float),
+        )
+        .optional(v.is_some())
+        .min(0.0)
+        .unit(unit)
+        .help(help)
+    };
+    vec![
+        pick(
+            s,
+            "person.sex",
+            "Sexo",
+            match p.sex {
+                Some(utsim_core::Sex::Female) => "Female",
+                Some(utsim_core::Sex::Male) => "Male",
+                None => "",
+            },
+            &[
+                ("", "Não informado"),
+                ("Female", "Feminino"),
+                ("Male", "Masculino"),
+            ],
+        )
+        .help(
+            "Escolhe o corpo no 3D (não informado, o corpo sai do nome). Nenhum padrão de \
+             fadiga depende dele; com Feminino, carga acima de 20 kg dá o aviso da CLT, art. 390.",
+        ),
+        opt(
+            "person.height_m",
+            "Altura",
+            p.height_m,
+            "m",
+            "A altura do boneco no 3D. Desligada, ela é sorteada pelo nome.",
+        ),
+        opt(
+            "person.mass_kg",
+            "Massa",
+            p.mass_kg,
+            "kg",
+            "Com a altura, dá a largura do boneco no 3D pelo índice de massa corporal.",
+        ),
+        Field::new(
+            s,
+            "person.age",
+            "Idade",
+            FieldType::Int,
+            p.age.map_or(Value::Null, |a| Value::Int(i64::from(a))),
+        )
+        .optional(p.age.is_some())
+        .min(0.0)
+        .unit("anos")
+        .help("Só registro: a simulação não lê."),
+        opt(
+            "person.experience_years",
+            "Experiência na função",
+            p.experience_years,
+            "anos",
+            "Só registro: a simulação não lê.",
+        ),
+        opt(
+            "person.capacity.load_kg",
+            "Carga máxima medida",
+            cap.load_kg,
+            "kg",
+            "Uma carga acima dela dá aviso no modelo.",
+        ),
+        opt(
+            "person.capacity.force_n",
+            "Força máxima medida",
+            cap.force_n,
+            "N",
+            "Empurrar ou puxar. Só registro.",
+        ),
+    ]
+}
+
+/// The edit of the `person` fields, or `None` for other fields. A block already there stays,
+/// even empty.
+fn edit_person(
+    obj: &ObjectDef,
+    head: &str,
+    rest: &str,
+    value: &Value,
+) -> Option<Result<Command, String>> {
+    if head != "person" {
+        return None;
+    }
+    Some((|| {
+        let mut p = obj.person.as_deref().cloned().unwrap_or_default();
+        let (field, on) = match rest.strip_suffix(".on") {
+            Some(f) => (f, true),
+            None => (rest, false),
+        };
+        // A number field turned on starts from a usual value; off (or Null) clears it.
+        let number = |start: f64| -> Result<Option<f64>, String> {
+            if on {
+                return Ok(bool_of(value, "ligado")?.then_some(start));
+            }
+            match value {
+                Value::Null => Ok(None),
+                v => {
+                    let x = f64_of(v, field)?;
+                    if !(x.is_finite() && x > 0.0) {
+                        return Err(format!("{field}: precisa ser maior que zero"));
+                    }
+                    Ok(Some(x))
+                }
+            }
+        };
+        let mut cap = p.capacity.unwrap_or_default();
+        match field {
+            "sex" => {
+                p.sex = match value.as_text().unwrap_or("") {
+                    "" => None,
+                    "Female" | "Feminino" => Some(utsim_core::Sex::Female),
+                    "Male" | "Masculino" => Some(utsim_core::Sex::Male),
+                    other => return Err(format!("sexo: Female, Male ou vazio, não {other}")),
+                }
+            }
+            "height_m" => p.height_m = number(1.70)?,
+            "mass_kg" => p.mass_kg = number(70.0)?,
+            "experience_years" => p.experience_years = number(1.0)?,
+            "age" => {
+                p.age = if on {
+                    bool_of(value, "ligado")?.then_some(30)
+                } else {
+                    match value {
+                        Value::Null => None,
+                        v => Some(
+                            u32::try_from(usize_of(v, "idade", 0)?)
+                                .map_err(|_| "idade grande demais")?,
+                        ),
+                    }
+                }
+            }
+            "capacity.load_kg" => cap.load_kg = number(20.0)?,
+            "capacity.force_n" => cap.force_n = number(200.0)?,
+            _ => return Err(format!("pessoa não tem o campo \"{field}\"")),
+        }
+        p.capacity = (cap != utsim_core::Capacity::default()).then_some(cap);
+        // An empty block (`person: Some(())`) still marks a person: it is kept once there.
+        let text = if p == utsim_core::Person::default() && obj.person.is_none() {
+            "None".to_string()
+        } else {
+            format!(
+                "Some({})",
+                ::ron::to_string(&p).map_err(|e| format!("pessoa: {e}"))?
+            )
+        };
+        Ok(set(&obj.name, "person", text))
+    })())
 }
 
 /// The value of the "Política de acesso" of a wait: `Fifo`, `Lifo`, or `Desc` / `Asc` when
@@ -2022,6 +2196,18 @@ pub fn run_fields(model: &Model) -> Vec<Field> {
         .min(0.0)
         .unit("s")
         .help("O veículo para esse tempo antes de um cruzamento com pedestres."),
+        Field::new(
+            S_FLOOR,
+            "marking.floor_color",
+            "Cor do chão",
+            FieldType::Color,
+            marking.floor_color.clone().map_or(Value::Null, Value::Text),
+        )
+        .optional(marking.floor_color.is_some())
+        .help(
+            "A cor do piso na cena 3D, gravada no modelo; a grade muda de tom para continuar \
+             visível. Desligada, o cinza de sempre.",
+        ),
     ]
 }
 
@@ -2398,6 +2584,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     if let Some(command) = edit_size(model, obj, head, rest, value) {
         return command;
     }
+    if let Some(command) = edit_person(obj, head, rest, value) {
+        return command;
+    }
     if rest == "on" {
         let on = bool_of(value, path)?;
         let text = if on {
@@ -2638,6 +2827,29 @@ fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String>
             marking.crossing_stop = f64_of(value, "parada no cruzamento")?;
             return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
         }
+        "marking.floor_color" | "marking.floor_color.on" => {
+            marking.floor_color = match value {
+                Value::Null | Value::Bool(false) => None,
+                Value::Bool(true) => Some(marking.floor_color.unwrap_or_else(|| "#4d4f52".into())),
+                Value::Text(t) if t.trim().is_empty() => None,
+                Value::Text(t) => {
+                    let t = t.trim();
+                    let t = if t.starts_with('#') {
+                        t.to_string()
+                    } else {
+                        format!("#{t}")
+                    };
+                    if looks::parse_color(&t).is_none() {
+                        return Err(format!("cor inválida: {t} (use #rrggbb)"));
+                    }
+                    Some(t.to_lowercase())
+                }
+                _ => return Err("cor: #rrggbb".into()),
+            };
+            // Back to the default profile with no colour: no `floor_marking` at all.
+            let none = marking == utsim_model::FloorMarking::default();
+            return Ok(Command::SetFloorMarking((!none).then(|| Box::new(marking))));
+        }
         _ => {}
     }
     let text = match path {
@@ -2806,6 +3018,57 @@ mod tests {
     }
 
     #[test]
+    fn who_the_person_is_is_edited_through_the_panel() {
+        let mut d = doc();
+        // A person: the group shows, empty.
+        apply(&mut d, "emp", "visual.asset", Value::Text("pessoa".into()));
+        assert_eq!(
+            field(&d, "emp", "person.sex").value,
+            Value::Text(String::new())
+        );
+        assert_eq!(field(&d, "emp", "person.height_m").value, Value::Null);
+        apply(&mut d, "emp", "person.sex", Value::Text("Female".into()));
+        apply(&mut d, "emp", "person.height_m.on", Value::Bool(true));
+        apply(&mut d, "emp", "person.height_m", Value::Float(1.62));
+        apply(&mut d, "emp", "person.mass_kg", Value::Float(58.0));
+        apply(&mut d, "emp", "person.age", Value::Int(34));
+        apply(&mut d, "emp", "person.capacity.load_kg", Value::Float(18.0));
+        let p = object(&d, "emp").person.as_deref().cloned().unwrap();
+        assert_eq!(p.sex, Some(utsim_core::Sex::Female));
+        assert_eq!(
+            (p.height_m, p.mass_kg, p.age),
+            (Some(1.62), Some(58.0), Some(34))
+        );
+        assert_eq!(p.capacity.unwrap().load_kg, Some(18.0));
+        assert_eq!(
+            field(&d, "emp", "person.height_m").value,
+            Value::Float(1.62)
+        );
+        assert!(d.to_text().contains("height_m"), "{}", d.to_text());
+        // Bad values are refused; clearing everything keeps the (empty) block.
+        assert!(edit(d.model(), "emp", "person.mass_kg", &Value::Float(-3.0)).is_err());
+        assert!(edit(d.model(), "emp", "person.sex", &Value::Text("X".into())).is_err());
+        for f in ["sex", "height_m", "mass_kg", "age", "capacity.load_kg"] {
+            let v = if f == "sex" {
+                Value::Text(String::new())
+            } else {
+                Value::Null
+            };
+            apply(&mut d, "emp", &format!("person.{f}"), v);
+        }
+        assert_eq!(
+            object(&d, "emp").person.as_deref(),
+            Some(&utsim_core::Person::default())
+        );
+        // Not on a machine.
+        assert!(
+            !object_fields(d.model(), object(&d, "p"))
+                .iter()
+                .any(|f| f.path.starts_with("person."))
+        );
+    }
+
+    #[test]
     fn movement_clearance_access_and_marking_are_edited_through_the_panel() {
         let mut d = doc();
         assert_eq!(
@@ -2852,6 +3115,26 @@ mod tests {
             Value::Text("Branco".into()),
         );
         apply(&mut d, "run", "marking.crossing_stop", Value::Float(3.0));
+        // The floor colour: kept as #rrggbb, off again with Null; a bad colour is refused.
+        apply(
+            &mut d,
+            "run",
+            "marking.floor_color",
+            Value::Text("D0C8A0".into()),
+        );
+        assert_eq!(d.model().marking().floor_color.as_deref(), Some("#d0c8a0"));
+        assert!(d.to_text().contains("floor_color"), "{}", d.to_text());
+        assert!(
+            edit(
+                d.model(),
+                "run",
+                "marking.floor_color",
+                &Value::Text("bege".into())
+            )
+            .is_err()
+        );
+        apply(&mut d, "run", "marking.floor_color", Value::Null);
+        assert_eq!(d.model().marking().floor_color, None);
         apply(&mut d, "run", "marking.line_width", Value::Float(0.12));
         let m = d.model().marking();
         assert_eq!(
