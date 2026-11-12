@@ -938,9 +938,9 @@
     "giro": 0,
     "pai": "cabine",
     "pos": [
-     -0.44,
+     -0.34,
      0.0,
-     1.19
+     1.07
     ]
    }
   },
@@ -1046,9 +1046,9 @@
     "giro": 0,
     "pai": "cabine",
     "pos": [
-     -0.44,
+     -0.34,
      0.0,
-     1.19
+     1.07
     ]
    }
   },
@@ -2204,6 +2204,222 @@
    1.84
   ],
   "triangulos": 19531
+ },
+ "ponte_rolante": {
+  "arquivo": "ponte_rolante.glb",
+  "clipes": {
+   "carro_andar": {
+    "laco": false,
+    "nos": [
+     "carro"
+    ]
+   },
+   "gancho_descer": {
+    "laco": false,
+    "nos": [
+     "cabo",
+     "gancho"
+    ]
+   },
+   "ponte_andar": {
+    "laco": false,
+    "nos": [
+     "ponte"
+    ]
+   }
+  },
+  "dados": {
+   "altura_trilho": 6.0,
+   "botoeira_altura": 1.25,
+   "cabo_base": 2.05,
+   "cabo_botoeira_base": 4.79,
+   "comprimento": 12.0,
+   "curso_gancho": 4.18,
+   "curso_x": 8.4,
+   "curso_y": 5.6,
+   "estica": {
+    "cabo": "z",
+    "cabo_botoeira": "z",
+    "coluna_d0": "z",
+    "coluna_d1": "z",
+    "coluna_d2": "z",
+    "coluna_e0": "z",
+    "coluna_e1": "z",
+    "coluna_e2": "z",
+    "trilho_d": "x",
+    "trilho_e": "x",
+    "viga_a": "y",
+    "viga_b": "y"
+   },
+   "gancho_repouso": 4.58,
+   "margem_x": 1.8,
+   "margem_y": 1.2,
+   "vao": 8.0
+  },
+  "estados": {},
+  "minimo": [
+   -6.0,
+   -4.25,
+   0.0
+  ],
+  "nos": [
+   "botoeira",
+   "cabeceira_d",
+   "cabeceira_e",
+   "cabine",
+   "cabo",
+   "cabo_botoeira",
+   "carro",
+   "coluna_d0",
+   "coluna_d1",
+   "coluna_d2",
+   "coluna_e0",
+   "coluna_e1",
+   "coluna_e2",
+   "gancho",
+   "luz",
+   "ponte",
+   "ponte_rolante",
+   "trilho_d",
+   "trilho_e",
+   "viga_a",
+   "viga_b"
+  ],
+  "peca": {},
+  "pontos": {
+   "ponto_gancho": {
+    "giro": 0,
+    "pai": "gancho",
+    "pos": [
+     -4.2,
+     -2.8,
+     4.58
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "ponte",
+    "pos": [
+     -3.6,
+     -2.8,
+     0.0
+    ]
+   }
+  },
+  "tamanho": [
+   12.0,
+   8.5,
+   7.75
+  ],
+  "triangulos": 1204
+ },
+ "ponte_rolante_medio": {
+  "arquivo": "ponte_rolante_medio.glb",
+  "clipes": {
+   "carro_andar": {
+    "laco": false,
+    "nos": [
+     "carro"
+    ]
+   },
+   "gancho_descer": {
+    "laco": false,
+    "nos": [
+     "cabo",
+     "gancho"
+    ]
+   },
+   "ponte_andar": {
+    "laco": false,
+    "nos": [
+     "ponte"
+    ]
+   }
+  },
+  "dados": {
+   "altura_trilho": 6.0,
+   "botoeira_altura": 1.25,
+   "cabo_base": 2.05,
+   "cabo_botoeira_base": 4.79,
+   "comprimento": 12.0,
+   "curso_gancho": 4.18,
+   "curso_x": 8.4,
+   "curso_y": 5.6,
+   "estica": {
+    "cabo": "z",
+    "cabo_botoeira": "z",
+    "coluna_d0": "z",
+    "coluna_d1": "z",
+    "coluna_d2": "z",
+    "coluna_e0": "z",
+    "coluna_e1": "z",
+    "coluna_e2": "z",
+    "trilho_d": "x",
+    "trilho_e": "x",
+    "viga_a": "y",
+    "viga_b": "y"
+   },
+   "gancho_repouso": 4.58,
+   "margem_x": 1.8,
+   "margem_y": 1.2,
+   "vao": 8.0
+  },
+  "estados": {},
+  "minimo": [
+   -6.0,
+   -4.25,
+   0.0
+  ],
+  "nos": [
+   "botoeira",
+   "cabeceira_d",
+   "cabeceira_e",
+   "cabine",
+   "cabo",
+   "cabo_botoeira",
+   "carro",
+   "coluna_d0",
+   "coluna_d1",
+   "coluna_d2",
+   "coluna_e0",
+   "coluna_e1",
+   "coluna_e2",
+   "gancho",
+   "luz",
+   "ponte",
+   "ponte_rolante",
+   "trilho_d",
+   "trilho_e",
+   "viga_a",
+   "viga_b"
+  ],
+  "peca": {},
+  "pontos": {
+   "ponto_gancho": {
+    "giro": 0,
+    "pai": "gancho",
+    "pos": [
+     -4.2,
+     -2.8,
+     4.58
+    ]
+   },
+   "ponto_operador": {
+    "giro": 0,
+    "pai": "ponte",
+    "pos": [
+     -3.6,
+     -2.8,
+     0.0
+    ]
+   }
+  },
+  "tamanho": [
+   12.0,
+   8.5,
+   7.75
+  ],
+  "triangulos": 2516
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",

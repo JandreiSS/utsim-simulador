@@ -383,6 +383,29 @@ const CONTRATO: &[Contrato] = &[
         &["porta_abrir"],
     ),
     (
+        "ponte_rolante",
+        &[
+            "trilho_e",
+            "trilho_d",
+            "coluna_e0",
+            "coluna_d2",
+            "ponte",
+            "viga_a",
+            "viga_b",
+            "cabeceira_e",
+            "cabeceira_d",
+            "luz",
+            "cabine",
+            "cabo_botoeira",
+            "botoeira",
+            "carro",
+            "cabo",
+            "gancho",
+        ],
+        &["ponto_gancho", "ponto_operador"],
+        &["ponte_andar", "carro_andar", "gancho_descer"],
+    ),
+    (
         "espera",
         &["estrutura", "faixa"],
         &["ponto_entrada", "ponto_saida"],
@@ -950,8 +973,57 @@ fn o_motorista_senta_acima_do_banco_da_empilhadeira() {
         let item = &cat[chave];
         let p = v3(&item["pontos"]["ponto_operador"]["pos"]);
         let topo = v3(&item["minimo"])[2] + v3(&item["tamanho"])[2];
-        assert!((1.1..1.3).contains(&p[2]), "{chave}: quadril a {}", p[2]);
+        // O mesmo assento que a ponte do 3D usa (`FORKLIFT_HIP` do `utsim-look`).
+        assert!(
+            perto(p, [-0.34, 0.0, 1.07], 1e-3),
+            "{chave}: quadril em {p:?}"
+        );
         assert!(topo - p[2] > 0.95, "{chave}: sem altura para o tronco");
+    }
+}
+
+#[test]
+fn a_ponte_rolante_anda_nos_tres_eixos() {
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        let chave = format!("ponte_rolante{sufixo}");
+        let d = &cat[&chave]["dados"];
+        let n = |k: &str| d[k].as_f64().unwrap() as f32;
+        let g = Glb::ler(&format!("{chave}.glb"));
+        // A ponte anda em x, o carro em y e o gancho desce em z, cada um pelo seu curso.
+        let a = g.pose(None, false);
+        let ponte = g.pose(Some("ponte_andar"), true);
+        let carro = g.pose(Some("carro_andar"), true);
+        let gancho = g.pose(Some("gancho_descer"), true);
+        let dif = |p: &HashMap<String, [f32; 3]>, no: &str| {
+            let (u, v) = (p[no], a[no]);
+            [u[0] - v[0], u[1] - v[1], u[2] - v[2]]
+        };
+        assert!(perto(dif(&ponte, "ponte"), [n("curso_x"), 0.0, 0.0], 1e-3));
+        assert!(perto(
+            dif(&ponte, "ponto_gancho"),
+            [n("curso_x"), 0.0, 0.0],
+            1e-3
+        ));
+        assert!(perto(dif(&carro, "carro"), [0.0, n("curso_y"), 0.0], 1e-3));
+        assert!(perto(dif(&carro, "ponte"), [0.0, 0.0, 0.0], 1e-3));
+        assert!(perto(
+            dif(&gancho, "gancho"),
+            [0.0, 0.0, -n("curso_gancho")],
+            1e-3
+        ));
+        assert!(perto(dif(&gancho, "carro"), [0.0, 0.0, 0.0], 1e-3));
+        // Em repouso o gancho está recolhido na altura dita, e desce até perto do chão.
+        assert!((a["ponto_gancho"][2] - n("gancho_repouso")).abs() < 1e-3);
+        let baixo = gancho["ponto_gancho"][2];
+        assert!(
+            (0.2..0.8).contains(&baixo),
+            "{chave}: gancho desce até {baixo}"
+        );
+        // O curso cabe no caminho e no vão.
+        assert!(n("curso_x") < n("comprimento") && n("curso_y") < n("vao"));
+        assert!((n("curso_x") + 2.0 * n("margem_x") - n("comprimento")).abs() < 1e-3);
+        assert!((n("curso_y") + 2.0 * n("margem_y") - n("vao")).abs() < 1e-3);
     }
 }
 

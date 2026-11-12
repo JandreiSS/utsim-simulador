@@ -20,6 +20,7 @@ import maquinas  # noqa: E402
 import movimentacao  # noqa: E402
 import armazenagem  # noqa: E402
 import postos  # noqa: E402
+import ponte  # noqa: E402
 import pessoas  # noqa: E402
 import clipes  # noqa: E402
 
@@ -34,6 +35,7 @@ ELEMENTOS = {
     "esteira": movimentacao.esteira,
     "empilhadeira": movimentacao.empilhadeira,
     "agv": movimentacao.agv,
+    "ponte_rolante": ponte.ponte_rolante,
     "porta_paletes": armazenagem.porta_paletes,
     "estante": armazenagem.estante,
     "peca": armazenagem.peca,
