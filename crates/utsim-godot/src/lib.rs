@@ -57,6 +57,8 @@ pub mod modelos3d;
 pub mod network_edit;
 pub mod outro_app;
 pub mod overlay_mesh;
+pub mod path_edit;
+mod path_godot;
 pub mod pert_view;
 pub mod playback;
 pub mod relogio;
