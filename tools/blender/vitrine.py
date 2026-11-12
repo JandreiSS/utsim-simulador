@@ -51,6 +51,7 @@ CENA = [
     ("agv", "agv", 0.6, -3.2, 0, {"mesa_subir": 1.0}, None),
     ("cx2", "caixa", 0, 0, 0, {}, ("agv", "ponto_carga")),
     ("estante", "estante", 8.6, -3.8, 180, {}, None),
+    ("espera", "espera", 6.6, -3.6, 0, {}, None),
     ("cel", "celula", -6.0, -5.0, 0, {"porta_abrir": 1.0}, None),
     ("rob2", "robo", -6.0, -4.6, 0, {"ciclo": 0.15}, None),
 ]

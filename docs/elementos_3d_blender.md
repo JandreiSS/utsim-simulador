@@ -1,7 +1,7 @@
 # Elementos 3D gerados no Blender
 
-Os elementos da fábrica (máquinas, posto, robô, célula, esteira, veículos, estantes e
-cargas) são gerados por scripts Python no Blender, sem janela, e versionados em
+Os elementos da fábrica (máquinas, posto, robô, célula, esteira, mesa de espera, veículos,
+estantes e cargas) são gerados por scripts Python no Blender, sem janela, e versionados em
 `assets/modelos3d/`. Os modelos em Rust de `assets/modelos/` (`utsim-assets`) continuam
 valendo como reserva e para os tamanhos por parâmetro.
 
@@ -58,6 +58,7 @@ peça anda.
 | `ponto_porta` | por onde a pessoa chega: nas máquinas, 0,6 m além de `ponto_operador`; na célula, fora do portão |
 | `ponto_peca` | onde a peça fica durante o processo |
 | `ponto_entrada`, `ponto_saida` | onde a peça chega e de onde sai (ligam um elemento ao próximo) |
+| (mesa de espera) | `espera` tem só `ponto_entrada` (`-x`) e `ponto_saida` (`+x`), no tampo a 0,76 m, a altura da esteira. Os nós são `estrutura` e `faixa` (a faixa amarela no chão, que o 3D pode esconder). `dados.tampo` é a altura do tampo e `dados.area` o retângulo livre do tampo (1,10 × 0,66 m) para distribuir as peças da fila |
 | `ponto_garra` | ponta dos dedos do robô (a base da peça presa) |
 | `ponto_carga` | garfo da empilhadeira, mesa do AGV |
 | `ponto_vao_<b>_<n>` | vão `b`, nível `n` do porta-paletes e da estante (`+x` aponta para o corredor) |
@@ -188,7 +189,9 @@ licença e o jeito de preparar a pasta estão em `assets/modelos3d/LEIA-ME.md`. 
   veste (o `ppe` do nó dela). Cada EPI é feito sobre o corpo vestido: raios de fora para
   dentro acham a pele ou a roupa, e a peça fica com folga sobre ela. O capacete fica acima da
   testa, as lentes dos óculos são transparentes e a máscara cobre só o nariz e a boca, então
-  os olhos aparecem mesmo com tudo vestido. As luvas são a mão do corpo com folga. A botina é
+  os olhos aparecem mesmo com tudo vestido. Os dois elásticos da máscara saem da borda da
+  concha inclinados: o de cima sobe por cima das orelhas, o de baixo desce para a nuca, e os
+  dois passam por fora do cabelo. As luvas são a mão do corpo com folga. A botina é
   o próprio sapato em couro, um pouco maior, para cobri-lo em qualquer pose. A saia do avental
   segue a bacia e as duas coxas, com a parte de cada coxa variando de um lado ao outro, para
   não rasgar no meio ao andar.

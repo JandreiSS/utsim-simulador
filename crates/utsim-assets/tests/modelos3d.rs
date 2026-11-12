@@ -383,6 +383,12 @@ const CONTRATO: &[Contrato] = &[
         &["porta_abrir"],
     ),
     (
+        "espera",
+        &["estrutura", "faixa"],
+        &["ponto_entrada", "ponto_saida"],
+        &[],
+    ),
+    (
         "esteira",
         &["estrutura", "rolo_00"],
         &["ponto_entrada", "ponto_saida"],

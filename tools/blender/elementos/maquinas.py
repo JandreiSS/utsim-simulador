@@ -81,6 +81,23 @@ def cnc(detalhe=0):
     e.caixa("chassi", "base", (-0.90, -0.65, 1.85), (0.90, 0.65, 1.95))
     # Esteira de cavaco atrás, à direita.
     e.caixa("chassi", "aco_escuro", (0.55, 0.70, 0.15), (0.95, 1.00, 0.90))
+    # Armário elétrico atrás, com duas portas e puxadores.
+    e.caixa("chassi", "painel", (-0.90, 0.70, 0.15), (0.45, 0.98, 1.80))
+    for x in (-0.26, -0.19):
+        e.caixa("chassi", "aco", (x - 0.01, 0.98, 0.90), (x + 0.01, 1.0, 1.15), chanfro=0)
+    e.caixa("chassi", "base", (-0.228, 0.98, 0.20), (-0.222, 0.985, 1.75), chanfro=0)
+    # Grelha de ventilação no lado -x.
+    for k in range(6):
+        z = 0.24 + k * 0.05
+        e.caixa("chassi", "interior", (-0.957, -0.35, z), (-0.95, 0.35, z + 0.025), chanfro=0)
+    # Gaveta de cavaco na frente, sob a porta, e o trilho da porta.
+    e.caixa("chassi", "aco_escuro", (-0.50, -0.715, 0.22), (0.20, -0.70, 0.52))
+    e.caixa("chassi", "aco", (-0.28, -0.74, 0.40), (-0.02, -0.715, 0.43), chanfro=0)
+    e.caixa("chassi", "aco", (-0.98, -0.78, 1.63), (0.30, -0.765, 1.66), chanfro=0)
+    # Carenagem do cabeçote no topo, com a saída de ar, e a calha de cabos.
+    e.caixa("chassi", "pintura", (-0.88, -0.45, 1.95), (-0.30, 0.45, 2.12))
+    e.caixa("chassi", "interior", (-0.80, -0.35, 2.12), (-0.38, 0.35, 2.125), chanfro=0)
+    e.caixa("chassi", "aco", (-0.30, 0.20, 1.95), (0.70, 0.32, 2.01))
     _painel(e, 0.45, 0.90, 0.95, 1.50, -0.70)
     # Placa (fuso) e castanhas, girando em torno de x.
     e.no("fuso", pivo=(-0.55, -0.45, 1.10))

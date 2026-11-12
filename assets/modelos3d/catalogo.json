@@ -291,7 +291,7 @@
    3.13,
    2.3
   ],
-  "triangulos": 360
+  "triangulos": 1356
  },
  "celula_medio": {
   "arquivo": "celula_medio.glb",
@@ -363,7 +363,7 @@
    3.13,
    2.3
   ],
-  "triangulos": 1144
+  "triangulos": 2300
  },
  "cnc": {
   "arquivo": "cnc.glb",
@@ -602,7 +602,7 @@
    1.84,
    2.3
   ],
-  "triangulos": 488
+  "triangulos": 680
  },
  "cnc_medio": {
   "arquivo": "cnc_medio.glb",
@@ -841,7 +841,7 @@
    1.84,
    2.3
   ],
-  "triangulos": 1288
+  "triangulos": 1608
  },
  "empilhadeira": {
   "arquivo": "empilhadeira.glb",
@@ -1059,6 +1059,104 @@
   ],
   "triangulos": 2676
  },
+ "espera": {
+  "arquivo": "espera.glb",
+  "clipes": {},
+  "dados": {
+   "area": [
+    1.1,
+    0.66
+   ],
+   "tampo": 0.76
+  },
+  "estados": {},
+  "minimo": [
+   -0.7,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "espera",
+   "estrutura",
+   "faixa"
+  ],
+  "peca": {},
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "espera",
+    "pos": [
+     -0.45,
+     0.0,
+     0.76
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "espera",
+    "pos": [
+     0.45,
+     0.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   1.4,
+   1.0,
+   0.82
+  ],
+  "triangulos": 468
+ },
+ "espera_medio": {
+  "arquivo": "espera_medio.glb",
+  "clipes": {},
+  "dados": {
+   "area": [
+    1.1,
+    0.66
+   ],
+   "tampo": 0.76
+  },
+  "estados": {},
+  "minimo": [
+   -0.7,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "espera",
+   "estrutura",
+   "faixa"
+  ],
+  "peca": {},
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "espera",
+    "pos": [
+     -0.45,
+     0.0,
+     0.76
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "espera",
+    "pos": [
+     0.45,
+     0.0,
+     0.76
+    ]
+   }
+  },
+  "tamanho": [
+   1.4,
+   1.0,
+   0.82
+  ],
+  "triangulos": 756
+ },
  "estante": {
   "arquivo": "estante.glb",
   "clipes": {},
@@ -1117,7 +1215,7 @@
    0.5,
    2.0
   ],
-  "triangulos": 108
+  "triangulos": 192
  },
  "estante_medio": {
   "arquivo": "estante_medio.glb",
@@ -1177,7 +1275,7 @@
    0.5,
    2.0
   ],
-  "triangulos": 396
+  "triangulos": 480
  },
  "esteira": {
   "arquivo": "esteira.glb",
@@ -2000,7 +2098,7 @@
    1.949,
    1.861
   ],
-  "triangulos": 18571
+  "triangulos": 18587
  },
  "pessoa_mulher": {
   "arquivo": "pessoa_mulher.glb",
@@ -2075,7 +2173,7 @@
    1.951,
    1.84
   ],
-  "triangulos": 19515
+  "triangulos": 19531
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",
@@ -2234,7 +2332,7 @@
    1.14,
    6.08
   ],
-  "triangulos": 576
+  "triangulos": 960
  },
  "porta_paletes_medio": {
   "arquivo": "porta_paletes_medio.glb",
@@ -2393,7 +2491,7 @@
    1.14,
    6.08
   ],
-  "triangulos": 2112
+  "triangulos": 1856
  },
  "posto": {
   "arquivo": "posto.glb",
@@ -2547,7 +2645,7 @@
    0.765,
    1.92
   ],
-  "triangulos": 228
+  "triangulos": 408
  },
  "posto_medio": {
   "arquivo": "posto_medio.glb",
@@ -2701,7 +2799,7 @@
    0.765,
    1.92
   ],
-  "triangulos": 660
+  "triangulos": 904
  },
  "prensa": {
   "arquivo": "prensa.glb",

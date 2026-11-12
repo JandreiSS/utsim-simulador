@@ -29,6 +29,7 @@ ELEMENTOS = {
     "posto": postos.posto,
     "robo": postos.robo,
     "celula": postos.celula,
+    "espera": postos.espera,
     "esteira": movimentacao.esteira,
     "empilhadeira": movimentacao.empilhadeira,
     "agv": movimentacao.agv,
