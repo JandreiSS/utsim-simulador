@@ -57,7 +57,7 @@ CORES = {
     "fivela": (0xB4, 0xB8, 0xBD),
     "olho": (0x3A, 0x2A, 0x20),
     "olho_branco": (0xEE, 0xEA, 0xE4),
-    "labio": (0xA8, 0x62, 0x58),
+    "labio": (0xB4, 0x76, 0x68),
     "faixa": (0xD9, 0xDD, 0xE0),
     "epi_amarelo": (0xF2, 0xC1, 0x1D),
     "epi_lente": (0x5C, 0x6E, 0x7A),
@@ -108,7 +108,7 @@ HUMANOS = {
     "mulher": {
         "macro": {"gender": 0.0, "age": 0.45, "muscle": 0.5, "weight": 0.5, "proportions": 0.6,
                   "height": 0.5, "cupsize": 0.55, "firmness": 0.6},
-        "cabelo": "hair/braid01/braid01.mhclo",
+        "cabelo": "hair/ponytail01/ponytail01.mhclo",
         "sobrancelha": "eyebrows/eyebrow010/eyebrow010.mhclo",
     },
 }
@@ -116,7 +116,6 @@ RACA = {"african": 0.33, "asian": 0.33, "caucasian": 0.34}
 OLHOS = "eyes/low-poly/low-poly.mhclo"
 ROUPA = "clothes/male_worksuit01/male_worksuit01.mhclo"
 SAPATO = "clothes/shoes04/shoes04.mhclo"
-BOTINA = "clothes/shoes03/shoes03.mhclo"
 
 
 def carregar_mpfb():
@@ -162,7 +161,6 @@ def humano(sexo):
     partes = {"pele": h}
     partes["roupa"] = asset(hs, h, ROUPA, "Clothes")
     partes["calcado"] = asset(hs, h, SAPATO, "Clothes")
-    partes["botina"] = asset(hs, h, BOTINA, "Clothes")
     partes["cabelo"] = asset(hs, h, HUMANOS[sexo]["cabelo"], "Hair")
     partes["sobrancelha"] = asset(hs, h, HUMANOS[sexo]["sobrancelha"], "Eyebrows")
     partes["olhos"] = asset(hs, h, OLHOS, "Eyes")
@@ -249,15 +247,34 @@ def matrizes(rig, ual):
         if nome in out:
             return out[nome]
         base = nome.split("_")[0]
-        if base in DEDOS:
-            out[nome] = calc(f"hand_{nome[-1]}")
+        if base in DEDOS and not rig.data.bones[nome].children:
+            # A ponta do dedo não tem direção própria no UAL1: gira com a falange anterior e
+            # vai para a junta dela no UAL1.
+            pai = calc(rig.data.bones[nome].parent.name)
+            h = m[nome][0]
+            out[nome] = Matrix.Translation(u[nome][0] - pai @ h) @ pai
         elif base == "ball":
             out[nome] = calc(f"foot_{nome[-1]}")
         else:
             h, t, R = m[nome]
             uh, ut, _ = u[nome]
             rot = quadro(nome, u) @ quadro(nome, m).transposed() @ R.to_3x3().normalized()
-            esc = (s, (ut - uh).length / (t - h).length, s) if nome.startswith(ESTICA) else (s, s, s)
+            if base in DEDOS:
+                # Cada falange vai para a direção e o comprimento da do UAL1 (os dedos dele
+                # abrem em leque no repouso); sem isso, os clipes fecham a mão em garra.
+                filho = rig.data.bones[nome].children[0].name
+                t, ut = m[filho][0], u[filho][0]
+                y = (ut - uh).normalized()
+                r = quadro(nome, u).col[0].to_3d()
+                x = (r - r.dot(y) * y).normalized()
+                qu = Matrix((x, y, x.cross(y))).transposed()
+                ym = (t - h).normalized()
+                rm = quadro(nome, m).col[0].to_3d()
+                xm = (rm - rm.dot(ym) * ym).normalized()
+                qm = Matrix((xm, ym, xm.cross(ym))).transposed()
+                rot = qu @ qm.transposed() @ R.to_3x3().normalized()
+            estica = nome.startswith(ESTICA) or base in DEDOS
+            esc = (s, (ut - uh).length / (t - h).length, s) if estica else (s, s, s)
             out[nome] = Matrix.Translation(uh) @ rot.to_4x4() @ Matrix.Diagonal((*esc, 1.0)) @ R.inverted()
             if base == "foot":
                 # A junta do pé do UAL1 é mais alta: o pé desce até o chão do MPFB virar o chão.
@@ -268,6 +285,36 @@ def matrizes(rig, ual):
     for b in rig.data.bones:
         calc(b.name)
     return out
+
+
+BARRA = 0.09  # raio da barra da calça (m), em volta do tornozelo
+
+
+def afinar_calca(roupa, ual):
+    """Estreita a perna da calça do joelho para baixo: a do pacote abre em boca de sino."""
+    u = ossos(ual)
+    for lado, sinal in (("l", 1), ("r", -1)):
+        joelho, tornozelo = u[f"calf_{lado}"][0], u[f"foot_{lado}"][0]
+        meus = [v for v in roupa.data.vertices if v.co.x * sinal > 0 and v.co.z < joelho.z]
+        if not meus:
+            continue
+        zmin = min(v.co.z for v in meus)
+
+        def eixo(z):
+            k = (joelho.z - z) / (joelho.z - tornozelo.z)
+            return joelho + (tornozelo - joelho) * k
+
+        raios = sorted((Vector((v.co.x, v.co.y)) - eixo(v.co.z).to_2d()).length
+                       for v in meus if v.co.z < zmin + 0.05)
+        r_barra = raios[int(len(raios) * 0.9)]
+        k = max(0.42, min(1.0, BARRA / r_barra))
+        for v in meus:
+            t = (joelho.z - v.co.z) / (joelho.z - zmin)
+            f = 1.0 - (1.0 - k) * t ** 1.5
+            c = eixo(v.co.z)
+            v.co.x = c.x + (v.co.x - c.x) * f
+            v.co.y = c.y + (v.co.y - c.y) * f
+    roupa.data.update()
 
 
 def deformar(ob, M):
@@ -348,6 +395,10 @@ def pintar(ob, escolher):
         ob.data.uv_layers.remove(ob.data.uv_layers[0])
 
 
+def sola_ou(cor):
+    return lambda f: "sola" if f.center.z < 0.022 and f.normal.z < -0.3 else cor
+
+
 def pintar_partes(partes, ual):
     u = ossos(ual)
     pele = partes["pele"]
@@ -385,10 +436,7 @@ def pintar_partes(partes, ual):
         return "calca"
 
     pintar(roupa, da_roupa)
-    for papel in ("calcado", "botina"):
-        ob = partes[papel]
-        cor = "calcado" if papel == "calcado" else "epi_couro"
-        pintar(ob, lambda f, c=cor: "sola" if f.center.z < 0.022 and f.normal.z < -0.3 else c)
+    pintar(partes["calcado"], sola_ou("calcado"))
     pintar(partes["cabelo"], lambda f: "cabelo")
     pintar(partes["sobrancelha"], lambda f: "cabelo")
     # Olhos: a íris é o miolo da frente de cada olho.
@@ -557,13 +605,15 @@ def medidas(corpo, partes, ual):
         olho[lado] = (centro, min(c.y for c in meus), (max(c.x for c in meus) - min(c.x for c in meus)) / 2)
     cab = [v.co for ob in (partes["pele"], partes["cabelo"]) for v in ob.data.vertices
            if v.co.z > u["neck_01"][1].z]
+    cranio = [v.co for v in partes["pele"].data.vertices if v.co.z > u["Head"][0].z]
     labios = [(partes["pele"].matrix_world @ partes["pele"].data.vertices[i].co)
               for i in no_grupo(partes["pele"], "lips")]
     return {
         "olho": olho,
         "olho_z": (olho[1][0].z + olho[-1][0].z) / 2,
         "topo": max(c.z for c in cab),
-        "cab_y": (min(c.y for c in cab) + max(c.y for c in cab)) / 2,
+        # O meio da cabeça é o da pele: um rabo de cavalo não o desloca.
+        "cab_y": (min(c.y for c in cranio) + max(c.y for c in cranio)) / 2,
         "boca_z": sum(c.z for c in labios) / len(labios),
         "boca_y": min(c.y for c in labios),
         "u": u,
@@ -583,7 +633,8 @@ def epis(corpo, partes, ual):
     c = Vector((0.0, cy, oz + 0.03))
     na = 36
     angs = [360.0 * i / na for i in range(na)]
-    topo = s.ate(c, (0, 0, 1), 0.016)
+    # `perto`: o que fica longe do crânio (o nó de um rabo de cavalo) não levanta a casca.
+    topo = s.ate(c, (0, 0, 1), 0.016, perto=0.15)
     linhas = []
     for k in range(1, 9):
         linha = []
@@ -592,7 +643,7 @@ def epis(corpo, partes, ual):
             fi = math.radians(lim * k / 8)
             r = math.radians(a)
             d = Vector((math.sin(fi) * math.sin(r), -math.sin(fi) * math.cos(r), math.cos(fi)))
-            linha.append(s.ate(c, d, 0.016) or c + d * 0.12)
+            linha.append(s.ate(c, d, 0.016, perto=0.15) or c + d * 0.12)
         linhas.append(linha)
     aba = []
     for p, a in zip(linhas[-1], angs):
@@ -686,7 +737,7 @@ def epis(corpo, partes, ual):
         m.grade(linhas, "epi_laranja", fechar=True)
     out["luvas"] = m.objeto()
 
-    # Botina: a bota do pacote (cano curto), um pouco por fora do sapato.
+    # Botina: o sapato em couro, um pouco por fora dele (feita em `gerar`).
     out["botina"] = partes["botina"]
 
     # Colete: veste o tronco da cintura às axilas, com alças nos ombros e duas faixas.
@@ -709,12 +760,13 @@ def epis(corpo, partes, ual):
 
     # Avental: peitilho e saia que caem da frente do corpo, com alça no pescoço e tira nas costas.
     m = Malha("epi_avental")
-    fo = 0.02
+    fo = 0.03
     zc = u["thigh_l"][0].z - 0.06
-    zs = faixa(0.52, 1.40, 17)
+    zs = faixa(0.60, 1.40, 17)
     linhas = []
     for z in zs:
-        larg = 0.20 if z < 1.13 else 0.13
+        # Saia larga, peitilho estreito, com a passagem em rampa na cintura.
+        larg = 0.13 + 0.07 * max(0.0, min(1.0, (1.20 - z) / 0.12))
         xs = faixa(-larg, larg, 13)
         ys = []
         for x in xs:
@@ -842,6 +894,49 @@ def juntar(obs, nome):
     return ob
 
 
+# Postura. Os clipes do UAL1 foram feitos para um boneco de jogo: parado (`Idle_Loop`) e
+# andando (`Walk_Loop`), eles dobram o tórax uns 12° para a frente e baixam a cabeça uns 13°
+# em relação ao repouso, com a lombar uns 5° para trás. Num corpo humano isso vira corcunda.
+# A compensação fica na malha: em repouso, o corpo é dobrado ao contrário em cada junta da
+# coluna (graus para trás, em torno do eixo x da junta), com os pesos da pele, e o esqueleto
+# não muda. Tocado o clipe, as duas dobras se anulam e a pessoa fica ereta. Os braços e a
+# cabeça vão junto com o tórax.
+POSTURA = (("spine_01", -3.0), ("spine_02", 7.0), ("spine_03", 5.0), ("neck_01", -2.0), ("Head", 1.0))
+
+
+def endireitar(obs, ual):
+    """Dobra a malha de repouso ao contrário da curva dos clipes (ver `POSTURA`)."""
+    mw = ual.matrix_world
+    ossos_ = ual.data.bones
+    proprio = {}
+    for nome, graus in POSTURA:
+        j = mw @ ossos_[nome].head_local
+        proprio[nome] = (Matrix.Translation(j) @ Matrix.Rotation(math.radians(-graus), 4, "X")
+                         @ Matrix.Translation(-j))
+    C = {}
+
+    def corr(b):
+        if b.name not in C:
+            pai = corr(b.parent) if b.parent else Matrix.Identity(4)
+            # A junta do filho já foi levada pelo pai: a dobra dele entra antes.
+            C[b.name] = pai @ proprio.get(b.name, Matrix.Identity(4))
+        return C[b.name]
+
+    for b in ossos_:
+        corr(b)
+    for ob in obs:
+        nomes = {g.index: g.name for g in ob.vertex_groups}
+        for v in ob.data.vertices:
+            acc, tot = Vector((0.0, 0.0, 0.0)), 0.0
+            for e in v.groups:
+                if e.weight > 0.0:
+                    acc += e.weight * (C[nomes[e.group]] @ v.co)
+                    tot += e.weight
+            if tot > 1e-6:
+                v.co = acc / tot
+        ob.data.update()
+
+
 TRONCO = ("pelvis", "spine", "neck", "clavicle", "thigh")
 
 
@@ -873,7 +968,7 @@ EPIS = ["avental", "botina", "capacete", "colete", "luvas", "mascara", "oculos",
 
 # Fração dos triângulos que fica em cada parte (o MakeHuman é denso demais para o 3D em tempo
 # real, com várias pessoas na cena); a redução é simétrica, igual dos dois lados.
-ENXUGAR = {"pele": 0.35, "roupa": 0.45, "calcado": 0.35, "botina": 0.3, "cabelo": 0.5}
+ENXUGAR = {"pele": 0.35, "roupa": 0.45, "calcado": 0.35, "cabelo": 0.5}
 
 
 def enxugar(ob, fracao):
@@ -894,14 +989,26 @@ def gerar(sexo, saida):
     for ob in partes.values():
         deformar(ob, M)
     bpy.data.objects.remove(rig)
+    afinar_calca(partes["roupa"], ual)
     pintar_partes(partes, ual)
     for papel, fracao in ENXUGAR.items():
         enxugar(partes[papel], fracao)
+    # A botina é o próprio sapato, de couro e um pouco maior: assim ela o cobre em qualquer
+    # pose (uma bota de outro molde deixava o sapato aparecer e furava a barra da calça).
+    partes["botina"] = _copia(partes["calcado"])
+    partes["botina"].data.materials.clear()
+    pintar(partes["botina"], sola_ou("epi_couro"))
     pecas = epis_e_corpo(partes, ual)
     for ob in list(bpy.data.objects):
         # O que sobrou do MPFB (ajudantes escondidos) não vai para o arquivo.
         if ob.type != "ARMATURE" and ob not in pecas:
             bpy.data.objects.remove(ob)
+    # As medidas são as do corpo ereto, antes da compensação de postura.
+    corpo = bpy.data.objects["corpo"]
+    pts = [corpo.matrix_world @ v.co for v in corpo.data.vertices]
+    lo = [min(p[i] for p in pts) for i in range(3)]
+    hi = [max(p[i] for p in pts) for i in range(3)]
+    endireitar(pecas, ual)
     for ob in pecas:
         prender(ob, ual)
     for ob in bpy.data.objects:
@@ -936,10 +1043,6 @@ def gerar(sexo, saida):
         export_morph=False,
         export_apply=False,
     )
-    corpo = bpy.data.objects["corpo"]
-    pts = [corpo.matrix_world @ v.co for v in corpo.data.vertices]
-    lo = [min(p[i] for p in pts) for i in range(3)]
-    hi = [max(p[i] for p in pts) for i in range(3)]
     # Medidas no sistema do UTSim (+x frente, +y esquerda): a pessoa olha para -y do Blender.
     tamanho = [hi[1] - lo[1], hi[0] - lo[0], hi[2] - lo[2]]
     minimo = [-hi[1], lo[0], lo[2]]
@@ -978,7 +1081,8 @@ def epis_e_corpo(partes, ual):
     bpy.data.objects.remove(vestido)
     botina = pecas["botina"]
     for v in botina.data.vertices:
-        v.co += v.normal * 0.004
+        # No cano, quase sem folga: ele fica por dentro da barra da calça.
+        v.co += v.normal * (0.002 + 0.005 * max(0.0, min(1.0, (0.11 - v.co.z) / 0.04)))
     for ob in corpo_partes + [botina]:
         limpar_pesos(ob)
     corpo = juntar(corpo_partes, "corpo")
@@ -988,7 +1092,31 @@ def epis_e_corpo(partes, ual):
     transferir(pecas["luvas"], corpo, familia("bracos"))
     transferir(pecas["colete"], corpo, familia("tronco"))
     transferir(pecas["avental"], corpo, familia("tronco"))
+    saia_do_avental(pecas["avental"], ual)
     return [corpo] + list(pecas.values())
+
+
+def saia_do_avental(ob, ual):
+    """A saia do avental é um pano só: abaixo do quadril, cada vértice segue a bacia e as duas
+    coxas, com a parte de cada coxa variando de um lado ao outro. Com o peso da coxa mais
+    próxima (o que a transferência dá), a saia rasga no meio ao andar."""
+    zq = ossos(ual)["thigh_l"][0].z
+    g = {n: ob.vertex_groups.get(n) or ob.vertex_groups.new(name=n) for n in ("pelvis", "thigh_l", "thigh_r")}
+    nomes = {x.index: x.name for x in ob.vertex_groups}
+    for v in ob.data.vertices:
+        rampa = max(0.0, min(1.0, (zq - v.co.z) / 0.08))
+        if rampa <= 0.0:
+            continue
+        a = max(0.0, min(1.0, (v.co.x + 0.05) / 0.10))
+        alvo = {"pelvis": 0.1, "thigh_l": 0.9 * a, "thigh_r": 0.9 * (1.0 - a)}
+        atual = {nomes[e.group]: e.weight for e in v.groups}
+        for n in set(atual) | set(alvo):
+            w = atual.get(n, 0.0) * (1.0 - rampa) + alvo.get(n, 0.0) * rampa
+            grupo = ob.vertex_groups[n]
+            if w > 1e-4:
+                grupo.add([v.index], w, "REPLACE")
+            else:
+                grupo.remove([v.index])
 
 
 def _copia(ob):

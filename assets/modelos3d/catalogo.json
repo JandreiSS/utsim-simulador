@@ -1978,7 +1978,7 @@
   "estados": {},
   "minimo": [
    -0.188,
-   -0.961,
+   -0.974,
    -0.008
   ],
   "nos": [
@@ -1996,10 +1996,10 @@
   "pontos": {},
   "tamanho": [
    0.367,
-   1.923,
+   1.949,
    1.76
   ],
-  "triangulos": 18616
+  "triangulos": 18565
  },
  "pessoa_mulher": {
   "arquivo": "pessoa_mulher.glb",
@@ -2051,8 +2051,8 @@
   },
   "estados": {},
   "minimo": [
-   -0.209,
-   -0.929,
+   -0.231,
+   -0.976,
    -0.001
   ],
   "nos": [
@@ -2069,11 +2069,11 @@
   "peca": {},
   "pontos": {},
   "tamanho": [
-   0.37,
-   1.858,
-   1.749
+   0.391,
+   1.951,
+   1.745
   ],
-  "triangulos": 19600
+  "triangulos": 19511
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",

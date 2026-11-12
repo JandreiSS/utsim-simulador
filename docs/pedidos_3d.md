@@ -1,18 +1,20 @@
-# Pedidos de modelos 3D (gerador por texto ou imagem)
+# Fichas dos modelos 3D
 
-Uma ficha por item. Cada ficha traz o texto para colar no gerador 3D (Tripo 3D é o previsto), as
-medidas, a pose, as peças móveis, o limite de triângulos e o nome do arquivo. Depois de gerar, o
-dono salva o GLB, e a sessão do Blender encaixa o modelo no UTSim (veja "Caminho de volta", no
-fim).
+Uma ficha por item, com as medidas, a pose, as peças móveis, o limite de triângulos e o nome do
+arquivo. As fichas valem como especificação de cada elemento.
 
-## Por que o operador atual ficou corcunda
+**Situação em 2026-11-11:** o dono decidiu não usar o gerador 3D externo, porque o plano gratuito
+é público e não comercial. Os modelos continuam feitos por script no Blender
+(`docs/elementos_3d_blender.md`). Os prompts e o "Caminho de volta" ficam guardados para o caso de
+um gerador com licença adequada ser usado no futuro.
 
-A pose de repouso do corpo atual é ereta. A corcunda aparece ao tocar os clipes do UAL1: o
-`Idle` e o `Walk` curvam o alto da coluna e baixam a cabeça. Como o tronco foi encaixado como um
-bloco rígido, toda essa curva se juntou no alto das costas e no pescoço. No modelo novo, o
-tronco dobra pelos ossos `spine_01` a `spine_03` com pesos suaves, e a inclinação que os clipes
-trazem é corrigida. Antes de publicar, a pessoa é conferida de perfil em `Idle`, `Walk` e
-`Interact`.
+## Por que o operador ficou corcunda
+
+A pose de repouso do corpo era ereta. A corcunda aparecia ao tocar os clipes do UAL1: medidos
+contra o repouso, o `Idle` e o `Walk` dobram o tórax uns 12° para a frente e baixam a cabeça uns
+13°. Isso já foi corrigido no corpo atual, com uma dobra contrária na malha de repouso (veja
+"Postura" em `docs/elementos_3d_blender.md`). Qualquer corpo novo precisa da mesma compensação e
+da conferência de perfil em `Idle`, `Walk` e `Interact`.
 
 ## Regras comuns a todos os itens
 

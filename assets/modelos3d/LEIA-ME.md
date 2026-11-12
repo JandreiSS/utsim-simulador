@@ -17,8 +17,8 @@ repositório ficam só os `.glb` e o script. Os arquivos de origem ficam fora de
 | Malha base, alvos do corpo e pesos do rig `game_engine` (dentro do MPFB) | a do MPFB 2.0.18 | a mesma | CC0 1.0 (o MakeHuman liberou os assets em CC0 em 2020; está no cabeçalho dos arquivos) |
 | Pacote de assets de sistema do MakeHuman | `makehuman_system_assets_cc0`, baixado em 2026-11-10 | https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip (página: https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html; sha256 `b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107`) | CC0 1.0 |
 
-Do pacote, o UTSim usa: o macacão `male_worksuit01` (com a camiseta), o sapato `shoes04`, a
-bota `shoes03` (o EPI botina), os cabelos `short02` (homem) e `braid01` (mulher), as
+Do pacote, o UTSim usa: o macacão `male_worksuit01` (com a camiseta), o sapato `shoes04`
+(também o molde do EPI botina), os cabelos `short02` (homem) e `ponytail01` (mulher), as
 sobrancelhas `eyebrow001` e `eyebrow010` e os olhos `low-poly`. As texturas não vão para o
 arquivo: cada parte vira uma cor lisa, que o 3D pode recolorir.
 
