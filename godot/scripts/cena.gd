@@ -802,6 +802,7 @@ func _draw_marks() -> void:
 ## asset gives way to the shape built along its route. The belts that scroll, by block:
 ## [material, speed (m/s)].
 var route_belts: Array = []
+var _trajetos: Object
 
 
 func _build_routes() -> void:
@@ -809,6 +810,7 @@ func _build_routes() -> void:
 	if playback == null or not ClassDB.class_exists("UtsimTrajetos"):
 		return
 	var tr: Object = ClassDB.instantiate("UtsimTrajetos")
+	_trajetos = tr
 	for r in tr.call("da_cena", playback):
 		var i := int(r["block"])
 		if i < 0 or i >= rigs.size():
@@ -820,8 +822,8 @@ func _build_routes() -> void:
 		var node := TrajetoMalha.belt(r)
 		(rig["root"] as Node3D).add_child(node)
 		rig["trajeto"] = node
-		var m = node.get_meta("belt_material", null)
-		route_belts.append([m, float(r.get("speed", 0.0)), node.get_meta("drums", [])])
+		var m = (node.get_meta("belt_material") if node.has_meta("belt_material") else null)
+		route_belts.append([m, float(r.get("speed", 0.0)), node.get_meta("drums", []), (node.get_meta("rollers") if node.has_meta("rollers") else null)])
 		# The label over the middle of the route, above its highest point.
 		var line: PackedVector3Array = r["line"]
 		var top := 0.0
@@ -837,13 +839,24 @@ func _build_routes() -> void:
 			add_child(deck)
 
 
-## Scrolls the belts drawn by nodes: the surface moves `speed × t` (in stripes).
+## Scrolls the belts drawn by nodes as far as their surface really moved by `t`
+## (`UtsimTrajetos.avancos`: stopped by a breakdown, a shift or, without accumulation,
+## the front item waiting); the drums and rollers turn with it.
 func _scroll_routes(t: float) -> void:
-	for b in route_belts:
+	if route_belts.is_empty() or playback == null:
+		return
+	var moved := PackedFloat64Array()
+	if _trajetos != null:
+		moved = _trajetos.call("avancos", playback, t)
+	for k in route_belts.size():
+		var b: Array = route_belts[k]
+		var s: float = moved[k] if k < moved.size() else t * float(b[1])
 		if b[0] != null:
 			var m: StandardMaterial3D = b[0]
-			m.uv1_offset.x = -fposmod(t * float(b[1]) / TrajetoMalha.STRIPE, 1.0)
-		TrajetoMalha.roll(b[2], t * float(b[1]))
+			m.uv1_offset.x = -fposmod(s / TrajetoMalha.STRIPE, 1.0)
+		TrajetoMalha.roll(b[2], s)
+		if b.size() > 3 and b[3] != null:
+			TrajetoMalha.roll_rollers(b[3], s)
 
 
 ## Applies the frame at `t`. `dt`: real time since the last call (clip crossfades);

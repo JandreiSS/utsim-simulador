@@ -172,8 +172,10 @@ static func belt(r: Dictionary) -> Node3D:
 	frame.material_override = _material(Color.WHITE, 0.45, 0.55)
 	root.add_child(frame)
 	if gravity:
-		root.add_child(_rollers(line, sides, w))
+		var rollers := _rollers(line, sides, w)
+		root.add_child(rollers)
 		root.set_meta("belt_material", null)
+		root.set_meta("rollers", rollers)
 	else:
 		var along := _along(line)
 		var bt := SurfaceTool.new()
@@ -323,6 +325,17 @@ static func roll(players: Array, distance: float) -> void:
 		player.seek(fposmod(turns, 1.0) * anim.length, true)
 
 
+## Turns the rollers of a gravity belt for a travel of `distance` metres (each roller
+## about its own axis, as the items roll over it).
+static func roll_rollers(rollers: MultiMeshInstance3D, distance: float) -> void:
+	var base: Array = rollers.get_meta("base", [])
+	var angle := fposmod(distance / ROLLER_RADIUS, TAU)
+	var mm := rollers.multimesh
+	for i in mini(base.size(), mm.instance_count):
+		var t: Transform3D = base[i]
+		mm.set_instance_transform(i, Transform3D(t.basis * Basis(Vector3.UP, angle), t.origin))
+
+
 ## The brackets of the side channels, one every `BRACKET_PITCH` on both sides.
 static func _guide_brackets(root: Node3D, line: PackedVector3Array, sides: PackedVector3Array, half: float) -> void:
 	var along := _along(line)
@@ -441,6 +454,10 @@ static func _rollers(line: PackedVector3Array, sides: PackedVector3Array, w: flo
 	var mi := MultiMeshInstance3D.new()
 	mi.name = "Roletes"
 	mi.multimesh = mm
+	var base: Array[Transform3D] = []
+	for i in count:
+		base.append(mm.get_instance_transform(i))
+	mi.set_meta("base", base)
 	mi.material_override = _material(ROLLER_COLOR, 0.35, 0.8)
 	return mi
 

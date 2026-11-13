@@ -81,6 +81,8 @@ var _press := {}
 var _dragging := false
 var _drag_at := Vector3.ZERO
 var _readout: Label3D
+## The profile of the selected route (`trajeto_perfil.gd`), over the bottom of the view.
+var _perfil: TrajetoPerfil
 ## The length of the next segment being typed (digits and a comma), "" when none.
 var typed := ""
 ## Where the mouse points while drawing (the direction a typed length goes).
@@ -107,6 +109,15 @@ func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
 	_readout.outline_render_priority = 11
 	_readout.visible = false
 	add_child(_readout)
+	_perfil = TrajetoPerfil.new()
+	_perfil.name = "PerfilTrajeto"
+	_perfil.visible = false
+	_perfil.node_height.connect(_on_profile_height)
+	var canvas := editor._box_rect.get_parent() if editor._box_rect != null else null
+	if canvas != null:
+		canvas.add_child(_perfil)
+	else:
+		add_child(_perfil)
 
 
 func doc() -> Object:
@@ -783,22 +794,22 @@ func panel() -> Array:
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
 		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"]], "value": r["drive"], "action": "trajeto_acionamento"})
-		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": float(r["width"]), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
+		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
 	if sel_nodes.size() == 1:
 		var i := sel_nodes[0]
 		var n := nodes[i]
 		rows.append({"kind": "section", "text": "Nó %d" % (i + 1)})
-		rows.append({"kind": "number", "name": "Trajeto_X", "label": "X (m)", "value": n.x, "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_x"})
-		rows.append({"kind": "number", "name": "Trajeto_Y", "label": "Y (m)", "value": -n.z, "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_y"})
-		rows.append({"kind": "number", "name": "Trajeto_Z", "label": "Altura (m)", "value": n.y, "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
+		rows.append({"kind": "number", "name": "Trajeto_X", "label": "X (m)", "value": snappedf(n.x, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_x"})
+		rows.append({"kind": "number", "name": "Trajeto_Y", "label": "Y (m)", "value": snappedf(-n.z, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_y"})
+		rows.append({"kind": "number", "name": "Trajeto_Z", "label": "Altura (m)", "value": snappedf(n.y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
 		if i > 0 and i < nodes.size() - 1:
-			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": "Raio da curva (m; 0 = quina)", "value": rs[i], "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
+			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": "Raio da curva (m; 0 = quina)", "value": snappedf(rs[i], 0.001), "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
 			if not sel_path:
 				rows.append({"kind": "button", "name": "Trajeto_Dividir", "text": "Dividir a esteira neste nó", "action": "trajeto_dividir"})
 	elif sel_nodes.size() > 1:
 		rows.append({"kind": "section", "text": "%d nós selecionados" % sel_nodes.size()})
 	if sel_nodes.size() > 1 or sel_nodes.is_empty():
-		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": "Nivelar na altura (m)", "value": nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
+		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": "Nivelar na altura (m)", "value": snappedf(nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
@@ -929,7 +940,35 @@ func form(what: String, value: String) -> void:
 # ---------------------------------------------------------------------------
 
 
+## A node dropped in the profile: only its height changes.
+func _on_profile_height(index: int, height: float) -> void:
+	var r := _route(sel_name, sel_path)
+	if r.is_empty():
+		return
+	var n: Vector3 = (r["nodes"] as PackedVector3Array)[index]
+	n.y = height
+	if tr.por_no(sel_name, sel_path, index, n):
+		main.after_edit()
+		_select(sel_name, sel_path, PackedInt32Array([index]))
+		main.set_status("%s, nó %d a %s m de altura (perfil; Ctrl+Z desfaz)." % [sel_name, index + 1, _num(height)])
+	else:
+		main.set_status("Não mudou a altura: %s" % tr.last_error())
+
+
+## Shows the profile of the selected route at the bottom of the view.
+func _update_profile() -> void:
+	var r := _route(sel_name, sel_path)
+	if not active() or r.is_empty() or not points.is_empty():
+		_perfil.show_route({}, PackedInt32Array())
+		return
+	var vp := get_viewport().get_visible_rect().size
+	_perfil.size = Vector2(minf(560.0, vp.x * 0.45), 180.0)
+	_perfil.position = Vector2(300.0, vp.y - _perfil.size.y - 48.0)
+	_perfil.show_route(r, sel_nodes)
+
+
 func draw(e: EditorUtsim) -> void:
+	_update_profile()
 	if not active():
 		_readout.visible = false
 		return

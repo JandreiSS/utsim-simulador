@@ -57,6 +57,8 @@ A esteira pode seguir um trajeto desenhado por nós, como se desenham ruas: reta
 | `max_slope` | do tipo | inclinação máxima em graus |
 | `width` | `0.6` | largura da esteira em metros |
 
+Na animação, a correia anda só quando a esteira anda de verdade: para com uma quebra ou fora do turno e, sem acúmulo, enquanto a peça da frente espera na saída. Os tambores das pontas giram com ela, e os roletes da esteira por gravidade giram enquanto há peças rolando sobre eles.
+
 O que a geometria muda no resultado:
 
 - **Comprimento:** é o do trajeto em 3D, com as curvas e as subidas. Subir 1 m em 4 m de planta dá √(4² + 1²) ≈ 4,12 m.
@@ -97,6 +99,7 @@ No Editar, o grupo Mover da Biblioteca tem três ferramentas: "Esteira desenhada
 - **Terminar:** Enter ou duplo clique. Backspace volta um nó, e Esc cancela. A esteira se liga ao objeto ou à esteira onde começa e onde acaba.
 - **Continuar:** um clique no primeiro ou no último nó de uma esteira começa outra ali, como uma rua que segue.
 - **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó.
+- **Perfil:** com um trajeto selecionado, um painel embaixo da vista mostra o corte dele: altura × distância em planta, a altura de cada nó e a inclinação de cada trecho, em vermelho acima do limite. Arraste um nó no perfil para cima ou para baixo para mudar só a altura dele (de 5 em 5 cm; com Shift, de 1 em 1 cm).
 - **Curvar um trecho:** com o trajeto selecionado, cada trecho mostra um losango laranja no meio. Arraste-o: nasce ali um nó com o maior raio que cabe, e o trecho vira uma curva suave.
 - **Paralelo:** no painel, "Paralelo a (m)" e "Desenhar paralelo" criam outro trajeto ao lado, à esquerda do sentido (negativo: à direita), com as mesmas alturas e as curvas concêntricas (o raio de dentro diminui, o de fora aumenta). A esteira paralela é do mesmo tipo e não se liga a nada.
 
