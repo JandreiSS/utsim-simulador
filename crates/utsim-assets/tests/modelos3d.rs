@@ -258,9 +258,12 @@ fn o_catalogo_e_os_arquivos_batem() {
                 .collect();
             assert_eq!(alvos, listados, "{chave}/{nome}: nós animados");
         }
-        // No piso e com o tamanho do catálogo.
+        // No piso e com o tamanho do catálogo. A ponteira e o suporte da canaleta da esteira
+        // por trajeto têm a origem no ponto de apoio (a linha da esteira, o topo da longarina).
+        let no_apoio =
+            chave.starts_with("esteira_ponteira") || chave.starts_with("esteira_canaleta");
         assert!(
-            item["minimo"][2].as_f64().unwrap().abs() < 2e-3,
+            no_apoio || item["minimo"][2].as_f64().unwrap().abs() < 2e-3,
             "{chave}: fora do piso"
         );
     }
@@ -405,6 +408,14 @@ const CONTRATO: &[Contrato] = &[
         &["ponto_gancho", "ponto_operador"],
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
+    ("esteira_pe", &["sapata", "perna"], &[], &[]),
+    (
+        "esteira_ponteira",
+        &["tambor", "mancal_e", "mancal_d"],
+        &[],
+        &["rolar"],
+    ),
+    ("esteira_canaleta", &["suporte"], &[], &[]),
     (
         "espera",
         &["estrutura", "faixa"],
@@ -979,6 +990,36 @@ fn o_motorista_senta_acima_do_banco_da_empilhadeira() {
             "{chave}: quadril em {p:?}"
         );
         assert!(topo - p[2] > 0.95, "{chave}: sem altura para o tronco");
+    }
+}
+
+#[test]
+fn as_pecas_da_esteira_por_trajeto_tem_a_origem_no_apoio() {
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        // Pé: a sapata no chão, a perna começa em cima dela e tem o comprimento dito.
+        let pe = &cat[&format!("esteira_pe{sufixo}")];
+        let d = &pe["dados"];
+        let sapata = d["sapata_altura"].as_f64().unwrap();
+        let perna = d["perna_base"].as_f64().unwrap();
+        assert!((v3(&pe["tamanho"])[2] as f64 - (sapata + perna)).abs() < 1e-3);
+        let g = Glb::ler(&format!("esteira_pe{sufixo}.glb"));
+        assert!((g.pose(None, false)["perna"][2] as f64 - sapata).abs() < 1e-4);
+        // Ponteira: o topo do tambor na linha (z = 0), o eixo um raio abaixo, os mancais nas
+        // pontas do tambor.
+        let p = &cat[&format!("esteira_ponteira{sufixo}")];
+        let raio = p["dados"]["raio"].as_f64().unwrap() as f32;
+        let meia = p["dados"]["largura_base"].as_f64().unwrap() as f32 / 2.0;
+        let g = Glb::ler(&format!("esteira_ponteira{sufixo}.glb"));
+        let pose = g.pose(None, false);
+        assert!(perto(pose["tambor"], [0.0, 0.0, -raio], 1e-4));
+        assert!(perto(pose["mancal_e"], [0.0, meia, -raio], 1e-4));
+        assert!(perto(pose["mancal_d"], [0.0, -meia, -raio], 1e-4));
+        // Suporte da canaleta: sobe a altura da guia a partir da origem.
+        let c = &cat[&format!("esteira_canaleta{sufixo}")];
+        let topo = v3(&c["minimo"])[2] + v3(&c["tamanho"])[2];
+        let altura = c["dados"]["altura"].as_f64().unwrap() as f32;
+        assert!(topo >= altura && topo < altura + 0.02, "suporte até {topo}");
     }
 }
 
