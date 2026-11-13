@@ -63,6 +63,9 @@
 		{"tempo": 20.0},
 		{"esperar": 5},
 		{"capturar": "g4_trajetos_02_simulando"},
+		{"camera": {"alvo": [2, 3], "distancia": 6.0, "giro": 0.7, "inclinacao": 0.35}},
+		{"esperar": 5},
+		{"capturar": "g4_trajetos_03_pecas"},
 		{"modo": "editar"}
 	]
 }

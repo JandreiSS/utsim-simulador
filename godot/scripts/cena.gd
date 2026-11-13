@@ -821,8 +821,7 @@ func _build_routes() -> void:
 		(rig["root"] as Node3D).add_child(node)
 		rig["trajeto"] = node
 		var m = node.get_meta("belt_material", null)
-		if m != null:
-			route_belts.append([m, float(r.get("speed", 0.0))])
+		route_belts.append([m, float(r.get("speed", 0.0)), node.get_meta("drums", [])])
 		# The label over the middle of the route, above its highest point.
 		var line: PackedVector3Array = r["line"]
 		var top := 0.0
@@ -841,8 +840,10 @@ func _build_routes() -> void:
 ## Scrolls the belts drawn by nodes: the surface moves `speed × t` (in stripes).
 func _scroll_routes(t: float) -> void:
 	for b in route_belts:
-		var m: StandardMaterial3D = b[0]
-		m.uv1_offset.x = -fposmod(t * float(b[1]) / TrajetoMalha.STRIPE, 1.0)
+		if b[0] != null:
+			var m: StandardMaterial3D = b[0]
+			m.uv1_offset.x = -fposmod(t * float(b[1]) / TrajetoMalha.STRIPE, 1.0)
+		TrajetoMalha.roll(b[2], t * float(b[1]))
 
 
 ## Applies the frame at `t`. `dt`: real time since the last call (clip crossfades);
