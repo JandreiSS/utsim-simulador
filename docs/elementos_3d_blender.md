@@ -353,3 +353,23 @@ ponte em `x`, o carro em `y` e o gancho na altura `h`, `ponte` vai para `x`, `ca
 (dentro de `ponte`), `gancho` desce `gancho_repouso - h`, e o `cabo` ganha esse mesmo comprimento.
 
 O teste `a_ponte_rolante_anda_nos_tres_eixos` confere os três movimentos e os cursos.
+
+## Peças da esteira por trajeto
+
+A esteira desenhada por trajeto é feita na cena, ao longo da linha
+(`godot/scripts/trajeto_malha.gd`). Três peças pequenas completam o desenho, para repetir ao
+longo dela (`tools/blender/elementos/trajeto.py`). Em todas, a origem é o ponto de apoio, `+x`
+vai ao longo da esteira e `z` para cima. As medidas seguem as da malha: a linha é o topo da
+superfície, a longarina vai de 0,14 m abaixo a 0,02 m acima da linha e tem 0,045 m de
+espessura, por fora da largura.
+
+| Arquivo | Origem | Nós | Como usar |
+|---|---|---|---|
+| `esteira_pe` | no chão, no centro da sapata | `sapata` (disco de borracha, haste roscada e porca; fixa, `dados.sapata_altura` = 0,06) e `perna` (tubo de `dados.lado` = 0,05; origem na base dela; comprimento `dados.perna_base` = 1,0) | uma perna por arquivo, sob o meio da longarina. Escala de `perna` em z = (altura da base da longarina − `sapata_altura`) / `perna_base` |
+| `esteira_ponteira` | na linha, no fim da esteira | `tambor` (ao longo de y, raio `dados.raio` = 0,07, comprimento `dados.largura_base` = 1,0; o topo fica na linha) e `mancal_e`, `mancal_d` (origem no eixo do tambor, em `y = ±0,5`) | escala de `tambor` em y = largura / `largura_base`; os mancais vão para `y = ±largura/2` e cobrem a ponta da longarina. Clipe `rolar` (laço): o tambor dá uma volta |
+| `esteira_canaleta` | no topo da longarina, na face de fora, do lado direito do sentido (`-y`) | `suporte` (sapata aparafusada na longarina, haste por fora da guia e gancho sobre o topo dela) | tamanho fixo; do lado esquerdo, gira 180°. `dados.altura` = 0,14 (o topo da guia acima do topo da longarina), `guia_fora` = 0,015 e `guia_espessura` = 0,035 |
+
+`dados.estica` diz o nó que estica e o eixo (`perna` em z, `tambor` em y). A ponteira e o
+suporte não ficam no piso: o `minimo` deles é negativo em z.
+
+O teste `as_pecas_da_esteira_por_trajeto_tem_a_origem_no_apoio` confere as origens e as medidas.
