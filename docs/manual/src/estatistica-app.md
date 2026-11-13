@@ -110,10 +110,12 @@ Histograma, boxplot, gráfico de probabilidade normal e dispersão (com a reta d
 
 A planilha traz a ordem padrão, a ordem de execução (sorteada pela semente, dentro de cada bloco), o bloco, o tipo do ponto e os fatores codificados: −1 e +1 nos níveis baixo e alto, 0 no centro. Rode as corridas nessa ordem, preencha a coluna Resposta (ou acrescente outras colunas de resposta) e grave.
 
+Para receber os fatores nas unidades do processo, preencha "Nível baixo (−1) no processo" e "Nível alto (+1) no processo", um valor por fator, separados por ponto e vírgula (por exemplo `150; 1,5` e `200; 2,5` para temperatura e pressão). Um fator sem níveis fica codificado. A planilha traz então 150 e 200 nos pontos do fatorial, 175 no centro e, nos axiais, o centro ± α vezes a meia-amplitude. Ela guarda os níveis de cada coluna (mesmo se a coluna for renomeada), e as análises abaixo codificam esses fatores sozinhas.
+
 - **Analisar superfície de resposta:** ajusta o modelo de segunda ordem (ou de primeira, com ou sem interações) aos fatores codificados. Mostra os coeficientes com valor-p, o R² e os resíduos, e acha o ponto estacionário, dizendo se ele é um máximo, um mínimo ou uma sela. Avisa quando o ponto fica fora da região do experimento.
 - **Otimizar respostas (desejabilidade):** para uma ou duas respostas, escolha maximizar, minimizar ou chegar a um alvo, com os limites aceitáveis. O app procura dentro da região do experimento o ponto de maior desejabilidade geral e mostra as respostas previstas nele.
 
-Para voltar às unidades do processo, use: valor = centro + nível codificado × (alto − baixo)/2.
+Quando a planilha tem os níveis no processo, o ponto estacionário e o melhor ponto aparecem nas duas escalas: a coluna "nível no processo" da tabela e o fim da conclusão. Numa planilha sem níveis, volte às unidades do processo com: valor = centro + nível codificado × (alto − baixo)/2.
 
 ## Histórico
 
