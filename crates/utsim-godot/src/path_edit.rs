@@ -27,6 +27,8 @@ pub const IDS: [&str; 3] = [BELT_SIMPLE, BELT_CHANNELED, FLOOR_PATH];
 pub const BELT_HEIGHT: f64 = 0.8;
 /// Largura padrão de um caminho novo (m): a passagem principal de pedestres.
 pub const PATH_WIDTH: f64 = 1.2;
+/// Comprimento em planta de uma rampa de pedestre por metro de altura (1:12, 8,33 %).
+pub const RAMP_RUN: f64 = 12.0;
 /// Passo do encaixe de ângulo (graus).
 pub const ANGLE_STEP: f64 = 15.0;
 
@@ -744,6 +746,53 @@ impl Editor {
         })
     }
 
+    /// Rampas de acesso de pedestre (1:12) nas pontas de um caminho que termina no alto (uma
+    /// passarela): um nó novo no piso, em linha com a ponta, a 12 vezes a altura dela. Um
+    /// passo de desfazer; devolve quantas rampas pôs.
+    pub fn access_ramps(&mut self, name: &str) -> Result<usize, String> {
+        let a = self
+            .model()
+            .aisles
+            .iter()
+            .find(|a| a.name == name)
+            .cloned()
+            .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+        let nodes = a.nodes();
+        let n = nodes.len();
+        if n < 2 {
+            return Err("o caminho precisa de ao menos 2 pontos".into());
+        }
+        let mut added = 0;
+        let mut out = a.clone();
+        let foot = |end: [f64; 3], next: [f64; 3]| {
+            let (dx, dy) = (end[0] - next[0], end[1] - next[1]);
+            let l = (dx * dx + dy * dy).sqrt().max(1e-9);
+            let run = end[2] * RAMP_RUN;
+            [
+                round_mm(end[0] + dx / l * run),
+                round_mm(end[1] + dy / l * run),
+            ]
+        };
+        if nodes[n - 1].at[2] > 1e-6 {
+            let p = foot(nodes[n - 1].at, nodes[n - 2].at);
+            out.insert_point(out.points.len(), p, 0.0);
+            added += 1;
+        }
+        if nodes[0].at[2] > 1e-6 {
+            let p = foot(nodes[0].at, nodes[1].at);
+            out.insert_point(0, p, 0.0);
+            added += 1;
+        }
+        if added == 0 {
+            return Err("as duas pontas já estão no piso".into());
+        }
+        self.apply(Command::SetAisle {
+            name: name.to_string(),
+            aisle: Box::new(out),
+        })?;
+        Ok(added)
+    }
+
     /// Prolonga a esteira pela ponta de saída (ou de entrada, com `at_start`) até `p`.
     pub fn extend_route(&mut self, name: &str, at_start: bool, p: [f64; 3]) -> Result<(), String> {
         let p = round3(p);
@@ -1087,6 +1136,24 @@ mod tests {
         let paths: Vec<&str> = fields.iter().map(|f| f.path.as_str()).collect();
         assert!(paths.contains(&"route.info") && paths.contains(&"route.editar"));
         assert!(!paths.contains(&"length"));
+    }
+
+    #[test]
+    fn a_walkway_gets_its_access_ramps_at_1_in_12() {
+        let mut e = Editor::new("t");
+        let name = e
+            .add_floor_path(&[[0.0, 0.0, 3.0], [10.0, 0.0, 3.0]], &[], 0.0)
+            .unwrap();
+        assert_eq!(e.access_ramps(&name).unwrap(), 2);
+        let a = &e.model().aisles[0];
+        assert_eq!(
+            a.points,
+            vec![[-36.0, 0.0], [0.0, 0.0], [10.0, 0.0], [46.0, 0.0]]
+        );
+        assert_eq!(a.heights, vec![0.0, 3.0, 3.0, 0.0]);
+        assert!(e.access_ramps(&name).is_err());
+        e.doc.undo();
+        assert_eq!(e.model().aisles[0].points.len(), 2);
     }
 
     #[test]

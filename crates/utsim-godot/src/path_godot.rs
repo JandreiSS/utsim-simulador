@@ -411,6 +411,14 @@ impl UtsimTrajetos {
             .is_some()
     }
 
+    /// Rampas de acesso de pedestre (1:12) nas pontas altas de um caminho; devolve
+    /// quantas pôs (0: nenhuma, ver `last_error`).
+    #[func]
+    fn rampas_de_acesso(&mut self, name: GString) -> i64 {
+        let n = name.to_string();
+        self.edit(|e| e.access_ramps(&n)).map_or(0, |k| k as i64)
+    }
+
     /// Prolonga a esteira pela saída (ou pela entrada, com `at_start`) até `at`.
     #[func]
     fn prolongar(&mut self, name: GString, at_start: bool, at: Vector3) -> bool {
