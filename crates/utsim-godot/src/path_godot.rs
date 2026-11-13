@@ -180,11 +180,30 @@ impl UtsimTrajetos {
         prev: Variant,
         skip: GString,
     ) -> VarDictionary {
+        self.encaixe_tangente(at, step, radius, prev, Variant::nil(), skip)
+    }
+
+    /// `encaixe` com a direção do trecho anterior (`tangent`, um Vector3 do Godot, ou
+    /// null): perto dela o nó segue reto (`what` = "tangente").
+    #[func]
+    fn encaixe_tangente(
+        &self,
+        at: Vector3,
+        step: f64,
+        radius: f64,
+        prev: Variant,
+        tangent: Variant,
+        skip: GString,
+    ) -> VarDictionary {
         let prev = prev.try_to::<Vector3>().ok().map(m);
+        let tangent = tangent
+            .try_to::<Vector3>()
+            .ok()
+            .map(|v| [f64::from(v.x), -f64::from(v.z)]);
         let skip = skip.to_string();
         let skip = (!skip.is_empty()).then_some(skip.as_str());
         let s = self
-            .model(|model| pe::snap(model, m(at), step, radius, prev, skip))
+            .model(|model| pe::snap_along(model, m(at), step, radius, prev, tangent, skip))
             .unwrap_or(pe::Snap {
                 at: m(at),
                 what: "livre",
@@ -390,6 +409,14 @@ impl UtsimTrajetos {
         let n = name.to_string();
         self.edit(|e| e.remove_route_node(&n, path, index.max(0) as usize))
             .is_some()
+    }
+
+    /// Rampas de acesso de pedestre (1:12) nas pontas altas de um caminho; devolve
+    /// quantas pôs (0: nenhuma, ver `last_error`).
+    #[func]
+    fn rampas_de_acesso(&mut self, name: GString) -> i64 {
+        let n = name.to_string();
+        self.edit(|e| e.access_ramps(&n)).map_or(0, |k| k as i64)
     }
 
     /// Prolonga a esteira pela saída (ou pela entrada, com `at_start`) até `at`.

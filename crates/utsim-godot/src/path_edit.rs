@@ -27,6 +27,8 @@ pub const IDS: [&str; 3] = [BELT_SIMPLE, BELT_CHANNELED, FLOOR_PATH];
 pub const BELT_HEIGHT: f64 = 0.8;
 /// Largura padrão de um caminho novo (m): a passagem principal de pedestres.
 pub const PATH_WIDTH: f64 = 1.2;
+/// Comprimento em planta de uma rampa de pedestre por metro de altura (1:12, 8,33 %).
+pub const RAMP_RUN: f64 = 12.0;
 /// Passo do encaixe de ângulo (graus).
 pub const ANGLE_STEP: f64 = 15.0;
 
@@ -101,6 +103,25 @@ pub fn snap(
     step: f64,
     radius: f64,
     prev: Option<[f64; 3]>,
+    skip: Option<&str>,
+) -> Snap {
+    snap_along(model, p, step, radius, prev, None, skip)
+}
+
+/// Até quantos graus da direção do trecho anterior o próximo nó segue reto
+/// ([`snap_along`]).
+pub const TANGENT_DEG: f64 = 6.0;
+
+/// [`snap`] com a direção do trecho anterior (`tangent`, em planta): perto dela, o nó
+/// segue na mesma direção, sem quebrar a linha (o trecho continua a curva ou a reta que
+/// chega), antes do encaixe de 15°.
+pub fn snap_along(
+    model: &Model,
+    p: [f64; 3],
+    step: f64,
+    radius: f64,
+    prev: Option<[f64; 3]>,
+    tangent: Option<[f64; 2]>,
     skip: Option<&str>,
 ) -> Snap {
     let mut best: Option<(f64, Snap)> = None;
@@ -211,6 +232,29 @@ pub fn snap(
     }
     if let Some((_, s)) = best {
         return s;
+    }
+    if let (Some(q), Some(t)) = (prev, tangent) {
+        let tl = (t[0] * t[0] + t[1] * t[1]).sqrt();
+        let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
+        let len = (dx * dx + dy * dy).sqrt();
+        if tl > 1e-9 && len > 1e-9 {
+            let u = [t[0] / tl, t[1] / tl];
+            let along = dx * u[0] + dy * u[1];
+            let cos = (along / len).clamp(-1.0, 1.0);
+            if along > 0.0 && cos.acos().to_degrees() < TANGENT_DEG {
+                let l = if step > 0.0 {
+                    snap_to(along, step).max(step)
+                } else {
+                    along
+                };
+                return Snap {
+                    at: [q[0] + u[0] * l, q[1] + u[1] * l, p[2]],
+                    what: "tangente",
+                    object: None,
+                    output: None,
+                };
+            }
+        }
     }
     if let Some(q) = prev {
         let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
@@ -417,6 +461,16 @@ pub fn segment_near(model: &Model, p: [f64; 3], radius: f64) -> Option<(String, 
     best.map(|(_, v)| v)
 }
 
+/// Where a drawn belt stands: the middle of its route (half its length), on the floor,
+/// rounded to the millimetre. The nodes are relative to it; the label and the click are
+/// there, away from the objects at its ends.
+fn middle(points: &[[f64; 3]], radii: &[f64]) -> [f64; 3] {
+    let line = tr::sample(&nodes_of(points, radii, [0.0; 3]));
+    let half = utsim_nav::path3d::length3(&line) / 2.0;
+    let p = utsim_nav::path3d::point_at(&line, half).map_or(points[0], |(p, _)| p);
+    [round_mm(p[0]), round_mm(p[1]), 0.0]
+}
+
 fn round_mm(v: f64) -> f64 {
     (v * 1000.0).round() / 1000.0 + 0.0
 }
@@ -463,7 +517,7 @@ impl Editor {
         if pts.len() < 2 {
             return Err("a esteira precisa de ao menos 2 nós diferentes".into());
         }
-        let origin = [pts[0][0], pts[0][1], 0.0];
+        let origin = middle(&pts, radii);
         let route = BeltRoute {
             nodes: nodes_of(&pts, radii, origin),
             style: style_of(tool),
@@ -692,6 +746,53 @@ impl Editor {
         })
     }
 
+    /// Rampas de acesso de pedestre (1:12) nas pontas de um caminho que termina no alto (uma
+    /// passarela): um nó novo no piso, em linha com a ponta, a 12 vezes a altura dela. Um
+    /// passo de desfazer; devolve quantas rampas pôs.
+    pub fn access_ramps(&mut self, name: &str) -> Result<usize, String> {
+        let a = self
+            .model()
+            .aisles
+            .iter()
+            .find(|a| a.name == name)
+            .cloned()
+            .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+        let nodes = a.nodes();
+        let n = nodes.len();
+        if n < 2 {
+            return Err("o caminho precisa de ao menos 2 pontos".into());
+        }
+        let mut added = 0;
+        let mut out = a.clone();
+        let foot = |end: [f64; 3], next: [f64; 3]| {
+            let (dx, dy) = (end[0] - next[0], end[1] - next[1]);
+            let l = (dx * dx + dy * dy).sqrt().max(1e-9);
+            let run = end[2] * RAMP_RUN;
+            [
+                round_mm(end[0] + dx / l * run),
+                round_mm(end[1] + dy / l * run),
+            ]
+        };
+        if nodes[n - 1].at[2] > 1e-6 {
+            let p = foot(nodes[n - 1].at, nodes[n - 2].at);
+            out.insert_point(out.points.len(), p, 0.0);
+            added += 1;
+        }
+        if nodes[0].at[2] > 1e-6 {
+            let p = foot(nodes[0].at, nodes[1].at);
+            out.insert_point(0, p, 0.0);
+            added += 1;
+        }
+        if added == 0 {
+            return Err("as duas pontas já estão no piso".into());
+        }
+        self.apply(Command::SetAisle {
+            name: name.to_string(),
+            aisle: Box::new(out),
+        })?;
+        Ok(added)
+    }
+
     /// Prolonga a esteira pela ponta de saída (ou de entrada, com `at_start`) até `p`.
     pub fn extend_route(&mut self, name: &str, at_start: bool, p: [f64; 3]) -> Result<(), String> {
         let p = round3(p);
@@ -814,7 +915,11 @@ impl Editor {
             n.radius = None;
         }
         let tail: Vec<[f64; 3]> = abs[index..].to_vec();
-        let o2 = [tail[0][0], tail[0][1], origin[2]];
+        let tail_radii: Vec<f64> = r.nodes[index..]
+            .iter()
+            .map(|n| n.radius.unwrap_or(0.0))
+            .collect();
+        let o2 = middle(&tail, &tail_radii);
         let mut second = r.clone();
         second.nodes = tail
             .iter()
@@ -910,9 +1015,12 @@ mod tests {
     fn moving_the_belt_moves_its_nodes() {
         let mut e = Editor::new("t");
         let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        // The belt stands in the middle of its route.
+        let at = e.model().objects[0].position;
+        assert_eq!(at, [2.0, 0.0, 0.0]);
         e.apply(Command::Move {
             name: name.clone(),
-            position: [10.0, 0.0, 0.0],
+            position: [12.0, 0.0, 0.0],
         })
         .unwrap();
         assert_eq!(routes(e.model())[0].nodes[1], [14.0, 0.0, 0.8]);
@@ -973,6 +1081,24 @@ mod tests {
     }
 
     #[test]
+    fn the_next_node_goes_on_along_the_last_segment() {
+        let e = Editor::new("t");
+        // The last segment went at 20° (not a multiple of 15°): pointing about that way
+        // keeps the line straight.
+        let r = 20f64.to_radians();
+        let t = [r.cos(), r.sin()];
+        let p = [
+            3.0 * (21f64.to_radians()).cos(),
+            3.0 * (21f64.to_radians()).sin(),
+            0.8,
+        ];
+        let s = snap_along(e.model(), p, 0.5, 0.3, Some([0.0, 0.0, 0.8]), Some(t), None);
+        assert_eq!(s.what, "tangente");
+        assert!((s.at[1] / s.at[0] - r.tan()).abs() < 1e-9);
+        assert!(((s.at[0].powi(2) + s.at[1].powi(2)).sqrt() - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
     fn angles_snap_in_steps_of_15_degrees() {
         let e = Editor::new("t");
         let s = snap(
@@ -999,6 +1125,35 @@ mod tests {
             "{:?}",
             s.at
         );
+    }
+
+    #[test]
+    fn the_panel_of_a_drawn_belt_shows_the_route_and_hides_the_length() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        let obj = e.model().objects.iter().find(|o| o.name == name).unwrap();
+        let fields = crate::schema::object_fields(e.model(), obj);
+        let paths: Vec<&str> = fields.iter().map(|f| f.path.as_str()).collect();
+        assert!(paths.contains(&"route.info") && paths.contains(&"route.editar"));
+        assert!(!paths.contains(&"length"));
+    }
+
+    #[test]
+    fn a_walkway_gets_its_access_ramps_at_1_in_12() {
+        let mut e = Editor::new("t");
+        let name = e
+            .add_floor_path(&[[0.0, 0.0, 3.0], [10.0, 0.0, 3.0]], &[], 0.0)
+            .unwrap();
+        assert_eq!(e.access_ramps(&name).unwrap(), 2);
+        let a = &e.model().aisles[0];
+        assert_eq!(
+            a.points,
+            vec![[-36.0, 0.0], [0.0, 0.0], [10.0, 0.0], [46.0, 0.0]]
+        );
+        assert_eq!(a.heights, vec![0.0, 3.0, 3.0, 0.0]);
+        assert!(e.access_ramps(&name).is_err());
+        e.doc.undo();
+        assert_eq!(e.model().aisles[0].points.len(), 2);
     }
 
     #[test]

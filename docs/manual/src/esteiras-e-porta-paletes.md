@@ -64,7 +64,7 @@ O que a geometria muda no resultado:
 - **Capacidade:** comprimento ÷ `item_length`.
 - **Curva:** o arco é tangente aos dois trechos e fica no plano do piso. Se o raio não cabe, ele diminui até o ponto de tangência chegar à metade do trecho mais curto. O arco de raio `r` que vira θ encurta o caminho em `2r·tan(θ/2) − r·θ`.
 - **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
-- **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora.
+- **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora. Onde a parte de baixo da estrutura (0,14 m abaixo da superfície) fica a 2,2 m do piso ou mais, dá para passar por baixo: ali só as pernas, sob os nós, são obstáculo.
 
 #### Inclinação máxima
 
@@ -89,11 +89,12 @@ Nos roletes livres, a peça desce pela inclinação, e os roletes de freio a seg
 
 No Editar, o grupo Mover da Biblioteca tem três ferramentas: "Esteira desenhada", "Esteira com canaletas" e "Caminho no piso" (um corredor de pedestres com rampas e curvas).
 
-- **Desenhar:** cada clique no chão põe um nó. O nó encaixa numa porta (a ponta de uma esteira, na altura dela, ou o centro de um objeto), num nó de outro trajeto, na linha de um caminho, de 15 em 15° a partir do nó anterior ou na grade. Enquanto se desenha, o trecho mostra o comprimento, a inclinação e o total, em vermelho quando passa do limite.
+- **Desenhar:** cada clique no chão põe um nó. O nó encaixa numa porta (a ponta de uma esteira, na altura dela, ou o centro de um objeto), num nó de outro trajeto, na linha de um caminho, na direção do trecho anterior (até 6° dela, para seguir reto sem quebrar a linha, também ao continuar do fim de outra esteira), de 15 em 15° a partir do nó anterior ou na grade. Enquanto se desenha, o trecho mostra o comprimento, a inclinação e o total, em vermelho quando passa do limite.
 - **Altura e curva:** PageUp e PageDown sobem e descem o próximo nó 10 cm (com Shift, 1 cm). A esteira começa a 0,8 m, e o caminho no piso. `[` e `]` mudam o raio da próxima curva.
+- **Comprimento exato:** com o cursor apontando a direção, digite o comprimento do trecho (por exemplo `3,5`) e tecle Enter: o nó vai a exatamente essa distância (em 3D, com a altura do próximo nó). Backspace apaga o que foi digitado.
 - **Terminar:** Enter ou duplo clique. Backspace volta um nó, e Esc cancela. A esteira se liga ao objeto ou à esteira onde começa e onde acaba.
 - **Continuar:** um clique no primeiro ou no último nó de uma esteira começa outra ali, como uma rua que segue.
-- **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y, e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó. Tudo se desfaz com Ctrl+Z.
+- **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó. Tudo se desfaz com Ctrl+Z.
 
 ## Rack (Porta-paletes)
 

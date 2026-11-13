@@ -762,6 +762,71 @@ pub fn pessoa(
     })
 }
 
+/// The top of a waiting table (`espera`: `dados.tampo` and `dados.area`): where a queue
+/// drawn with it lays its resting items, in a grid over the free rectangle of the top, the
+/// oldest at the exit (`+x`, the `ponto_saida` side), then a second layer on top; what does
+/// not fit in [`utsim_scene::style::MAX_LAYERS`] layers is only counted. Element units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Tampo {
+    /// Free rectangle of the top, along `x` and across (`y`), centred on the origin.
+    pub area: [f32; 2],
+    /// Height of the top.
+    pub altura: f32,
+}
+
+/// Gap between two items on a table top, as a fraction of the item size.
+const TAMPO_FOLGA: f32 = 0.1;
+
+impl Tampo {
+    /// The top of element `e`, when its `dados` say where it is.
+    pub fn of(e: &Elemento) -> Option<Tampo> {
+        let area = e.dados.get("area")?.as_array()?;
+        let x = area.first()?.as_f64()? as f32;
+        let y = area.get(1)?.as_f64()? as f32;
+        let altura = e.dados.get("tampo")?.as_f64()? as f32;
+        (x > 0.0 && y > 0.0 && altura.is_finite()).then_some(Tampo {
+            area: [x, y],
+            altura,
+        })
+    }
+
+    /// Columns (along `x`) and rows (across) of items of `size`.
+    pub fn grade(&self, size: f32) -> (usize, usize) {
+        let pitch = size.max(1e-3) * (1.0 + TAMPO_FOLGA);
+        let n = |l: f32| ((l / pitch).floor() as usize).max(1);
+        (n(self.area[0]), n(self.area[1]))
+    }
+
+    /// Items of `size` in one layer.
+    pub fn per_layer(&self, size: f32) -> usize {
+        let (c, r) = self.grade(size);
+        c * r
+    }
+
+    /// The point under resting item `i` (0: the oldest) of `size`: the centre of its cell
+    /// on the top of its layer. `None` past the layers drawn.
+    pub fn slot(&self, i: usize, size: f32) -> Option<Ponto> {
+        let (c, r) = self.grade(size);
+        let layer = i / (c * r);
+        if layer >= utsim_scene::style::MAX_LAYERS {
+            return None;
+        }
+        let k = i % (c * r);
+        let (col, row) = (k / r, k % r);
+        let x = self.area[0] / 2.0 - self.area[0] / c as f32 * (col as f32 + 0.5);
+        let y = -self.area[1] / 2.0 + self.area[1] / r as f32 * (row as f32 + 0.5);
+        Some(Ponto {
+            pos: [x, y, self.altura + layer as f32 * size],
+            ..Ponto::default()
+        })
+    }
+
+    /// Resting items not drawn.
+    pub fn hidden(&self, resting: usize, size: f32) -> usize {
+        resting.saturating_sub(self.per_layer(size) * utsim_scene::style::MAX_LAYERS)
+    }
+}
+
 /// Degrees the seated person leans forward (`dados.sentado_inclinar` of the person
 /// bodies): the clips sit it too far back. 0 when the catalogue does not say.
 pub fn sentado_inclinar(cat: &Catalogo) -> f32 {
@@ -850,6 +915,46 @@ mod tests {
         root: [0.0; 3],
         turn: 0.0,
     };
+
+    #[test]
+    fn the_waiting_table_lays_its_items_on_the_top() {
+        let c = cat();
+        let e = c.get("espera").expect("espera no catálogo");
+        let t = Tampo::of(e).unwrap();
+        assert!(
+            (t.altura - 0.76).abs() < 1e-6 && t.area == [1.1, 0.66],
+            "{t:?}"
+        );
+        // Items of 0.3 m: 3 along, 2 across, two layers.
+        assert_eq!(t.grade(0.3), (3, 2));
+        let first = t.slot(0, 0.3).unwrap();
+        let last = t.slot(5, 0.3).unwrap();
+        // The oldest at the exit (+x), all inside the free rectangle, on the top.
+        assert!(
+            first.pos[0] > 0.3 && last.pos[0] < -0.3,
+            "{first:?} {last:?}"
+        );
+        for i in 0..12 {
+            let p = t.slot(i, 0.3).unwrap().pos;
+            assert!(
+                p[0].abs() + 0.15 <= 0.55 + 1e-4 && p[1].abs() + 0.15 <= 0.33 + 1e-4,
+                "{i}: {p:?}"
+            );
+            assert!(
+                (p[2] - if i < 6 { 0.76 } else { 1.06 }).abs() < 1e-5,
+                "{i}: {p:?}"
+            );
+        }
+        assert!(t.slot(12, 0.3).is_none());
+        assert_eq!((t.hidden(12, 0.3), t.hidden(20, 0.3)), (0, 8));
+        // The other elements have no top.
+        assert!(Tampo::of(c.get("cnc").unwrap()).is_none());
+        // `visual.asset: "espera"` asks for it.
+        assert_eq!(
+            pedido(&c, Some("espera")),
+            Some(Pedido::Elemento("espera".into()))
+        );
+    }
 
     #[test]
     fn the_seated_driver_leans_forward_about_the_hip() {
