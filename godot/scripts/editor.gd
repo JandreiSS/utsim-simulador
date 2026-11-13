@@ -105,6 +105,8 @@ var critical: Array = []
 var rede: EditorRede
 ## The circulation aisles tool, and the overlay of obstacles and access points.
 var corredores: EditorCorredores
+## Belts and floor paths drawn by nodes (`trajeto.gd`): the "trajeto" tool.
+var trajetos: EditorTrajetos
 var place_id := ""
 var connect_from := ""
 ## The start of a team link begun by a click (the next click ends it).
@@ -215,6 +217,10 @@ func setup(owner_main: Node, canvas: CanvasLayer) -> void:
 	corredores.name = "Corredores"
 	add_child(corredores)
 	corredores.setup(owner_main, self)
+	trajetos = EditorTrajetos.new()
+	trajetos.name = "Trajetos"
+	add_child(trajetos)
+	trajetos.setup(owner_main, self)
 
 
 func doc() -> Object:
@@ -252,6 +258,13 @@ func set_tool(name: String, id := "") -> void:
 	if ed != null and ed.is_turning():
 		doc().end_drag()
 	_rotate_cursor(false)
+	# The library entries of the belts and paths drawn by nodes arm their own tool.
+	if name == "colocar" and EditorTrajetos.is_route_tool(id):
+		name = "trajeto"
+		trajetos.start(id)
+	elif tool == "trajeto" and name != "trajeto":
+		trajetos.cancel()
+		trajetos.cancel()
 	tool = name
 	place_id = id if name == "colocar" else ""
 	team_from = ""
@@ -670,6 +683,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 				corredores.drag(mm.position)
 			return
+		if tool == "trajeto":
+			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+				trajetos.drag(mm.position)
+			_redraw()
+			return
 		if corredores.access_active():
 			if (mm.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 				corredores.access_drag(mm.position)
@@ -696,6 +714,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			corredores.press(mb.position, mb.shift_pressed)
 		else:
 			corredores.release(mb.position)
+		get_viewport().set_input_as_handled()
+		return
+	if tool == "trajeto":
+		if mb.pressed:
+			get_viewport().gui_release_focus()
+			trajetos.press(mb.position, mb.shift_pressed)
+			# A double click ends the route (after putting its last node).
+			if mb.double_click:
+				trajetos.finish()
+		else:
+			trajetos.release(mb.position)
+		main.on_aisle_selection()
+		_redraw()
 		get_viewport().set_input_as_handled()
 		return
 	if tool == "selecionar":
@@ -764,6 +795,10 @@ func cancel() -> void:
 		if not corredores.cancel():
 			set_tool("selecionar")
 		return
+	if tool == "trajeto":
+		if not trajetos.cancel():
+			set_tool("selecionar")
+		return
 	if tool == "colocar":
 		set_tool("selecionar")
 	elif ed.team_cancel():
@@ -818,6 +853,10 @@ func delete_selected() -> void:
 	if tool == "corredor":
 		if not corredores.delete_selected():
 			main.set_status("Nenhum corredor selecionado para excluir.")
+		return
+	if tool == "trajeto":
+		if not trajetos.delete_selected():
+			main.set_status("Nenhum nó selecionado para remover.")
 		return
 	if tool == "zona" and int(ed.zone_drawing_count()) > 0:
 		ed.zone_back()
@@ -934,6 +973,7 @@ func _redraw() -> void:
 		_feed()
 		corredores.draw(self)
 		rede.draw(self)
+		trajetos.draw(self)
 		var d: Dictionary = ed.draw(PackedStringArray(critical))
 		_surface(_rust_mesh, d["lines"])
 		_surface(_zone_mesh, d["fill"])

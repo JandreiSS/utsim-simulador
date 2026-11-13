@@ -707,6 +707,8 @@ func _run_step(p: Dictionary) -> bool:
 			ai.reverse()
 		"zona_campo":
 			editor.set_zone_field(s, p["s2"])
+		"trajeto":
+			editor.trajetos.form(s, p["s2"])
 		"mostrar_propriedades":
 			_show_properties.call_deferred()
 	return true
@@ -945,6 +947,7 @@ func after_edit(force := false) -> void:
 	editor.sync(objects, doc.connections())
 	editor.rede.sync(doc.network())
 	editor.corredores.sync()
+	editor.trajetos.sync()
 	if mode == "editar":
 		_build_edit_scene()
 	_sync_edit()
@@ -987,6 +990,9 @@ func _show_properties() -> void:
 		return
 	if editor.tool == "zona":
 		_show_zones()
+		return
+	if editor.tool == "trajeto":
+		_show_form(editor.trajetos.panel())
 		return
 	ui.show_form("")
 	var sel: Array = editor.selected
