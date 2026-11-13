@@ -74,6 +74,10 @@ var _press := {}
 var _dragging := false
 var _drag_at := Vector3.ZERO
 var _readout: Label3D
+## The length of the next segment being typed (digits and a comma), "" when none.
+var typed := ""
+## Where the mouse points while drawing (the direction a typed length goes).
+var _cursor: Variant = null
 
 
 func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
@@ -154,6 +158,7 @@ func _clear_drawing() -> void:
 	radii = PackedFloat64Array()
 	start_port = {}
 	end_port = {}
+	typed = ""
 	_readout.visible = false
 
 
@@ -420,10 +425,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func key(code: int, shift: bool) -> bool:
 	var drawing := not points.is_empty()
 	var fine := FINE_STEP if shift else HEIGHT_STEP
+	# Typing a length while drawing: digits and a comma, Enter puts the node.
+	if drawing:
+		var ch := _digit(code)
+		if ch != "":
+			if ch != "," or not typed.contains(","):
+				typed += ch
+			main.set_status("Comprimento do trecho: %s m (Enter põe o nó na direção do cursor, Backspace apaga)." % typed)
+			return true
 	match code:
 		KEY_ENTER, KEY_KP_ENTER:
+			if drawing and typed != "":
+				return _place_typed()
 			return finish()
 		KEY_BACKSPACE:
+			if drawing and typed != "":
+				typed = typed.left(typed.length() - 1)
+				return true
 			if drawing:
 				_back()
 				return true
@@ -457,6 +475,47 @@ func key(code: int, shift: bool) -> bool:
 					d.z = step
 			return nudge(d)
 	return false
+
+
+static func _digit(code: int) -> String:
+	if code >= KEY_0 and code <= KEY_9:
+		return str(code - KEY_0)
+	if code >= KEY_KP_0 and code <= KEY_KP_9:
+		return str(code - KEY_KP_0)
+	if code in [KEY_COMMA, KEY_PERIOD, KEY_KP_PERIOD]:
+		return ","
+	return ""
+
+
+## The node `typed` metres (3D, along the segment) from the last one, towards the cursor,
+## at the height of the next node.
+func _place_typed() -> bool:
+	var length := typed.replace(",", ".").to_float()
+	typed = ""
+	var last := points[points.size() - 1]
+	var dir := Vector3.RIGHT
+	if _cursor != null:
+		dir = (_cursor as Vector3) - last
+	elif points.size() >= 2:
+		dir = last - points[points.size() - 2]
+	dir.y = 0.0
+	if dir.length() < 1e-6:
+		dir = Vector3.RIGHT
+	dir = dir.normalized()
+	var dz := draw_z - last.y
+	if length <= absf(dz):
+		main.set_status("O trecho de %s m não alcança a altura de %s m." % [_num(length), _num(draw_z)])
+		return true
+	var run := sqrt(length * length - dz * dz)
+	var q := last + dir * run
+	q.y = draw_z
+	points.append(q)
+	radii.append(0.0)
+	if points.size() >= 2 and new_radius > 0.0:
+		radii[points.size() - 2] = new_radius
+	end_port = {}
+	main.set_status("%s: nó %d a %s m do anterior." % [LABELS[mode], points.size(), _num(length)])
+	return true
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -784,6 +843,18 @@ func _draw_drawing(e: EditorUtsim) -> void:
 	var at = _aim(e.mouse)
 	if at != null and not main.over_ui(e.mouse):
 		cursor = _snap(at, points[points.size() - 1])["at"]
+	_cursor = cursor
+	# A typed length puts the preview node at that distance.
+	if cursor != null and typed != "":
+		var l := typed.replace(",", ".").to_float()
+		var last := points[points.size() - 1]
+		var d := (cursor as Vector3) - last
+		d.y = 0.0
+		var dz := draw_z - last.y
+		if d.length() > 1e-6 and l > absf(dz):
+			cursor = last + d.normalized() * sqrt(l * l - dz * dz)
+			cursor.y = draw_z
+	if cursor != null:
 		pts.append(cursor)
 		rs.append(0.0)
 		if new_radius > 0.0 and rs.size() >= 3:
@@ -800,6 +871,8 @@ func _draw_drawing(e: EditorUtsim) -> void:
 			_num(float(draft["length"])), _num((cursor as Vector3).y)]
 		if steep:
 			text += "\nAcima do máximo de %s°" % _num(float(pv["limit"]), 1)
+		if typed != "":
+			text = "Digitado: %s m\n" % typed + text
 		_readout_at(cursor, text, steep)
 	else:
 		_readout.visible = false
