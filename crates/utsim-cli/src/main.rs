@@ -16,6 +16,7 @@ mod linha;
 mod optimize;
 mod painel;
 mod pert;
+mod pessoa;
 mod planta;
 mod prever;
 mod qualidade;
@@ -405,6 +406,13 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Pessoas do modelo: `pessoa ajustar` ajusta a curva de fadiga e o tempo descansado
+    /// de uma pessoa a partir das cronometragens dela e os grava no perfil
+    #[command(disable_help_flag = true)]
+    Pessoa {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Estudo de tempos e métodos (homem-máquina): ciclo de trabalho, tempos por elemento,
     /// máquinas por operador, tempo padrão e comparação de métodos
     #[command(disable_help_flag = true)]
@@ -496,6 +504,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::Qualidade { args } => qualidade::run_args(args)?,
         Cmd::Estatistica { args } => estatistica::run_args(args)?,
         Cmd::Tempos { args } => tempos::run_args(args)?,
+        Cmd::Pessoa { args } => pessoa::run_args(args)?,
         Cmd::Linha { args } => linha::run_args(args)?,
         Cmd::Exposicao { args } => exposicao::run_args(args)?,
         Cmd::Ergonomia { args } => ergonomia::run_args(args)?,

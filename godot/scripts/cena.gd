@@ -110,6 +110,7 @@ func clear(keep_templates := false) -> void:
 		_templates.clear()
 		_materials.clear()
 	blocks.clear()
+	route_belts.clear()
 	rigs.clear()
 	items.clear()
 	_item_spare.clear()
@@ -267,6 +268,7 @@ func build(pb: Object, keep_templates := false) -> void:
 	_draw_lines()
 	_draw_marks()
 	_build_fluids()
+	_build_routes()
 
 
 ## The AnimationLibrary of an imported scene with clips (the UAL files), or null.
@@ -796,12 +798,60 @@ func _draw_marks() -> void:
 	add_child(mi)
 
 
+## Belts drawn by nodes and ramps of the floor paths (`trajeto_malha.gd`): the belt's
+## asset gives way to the shape built along its route. The belts that scroll, by block:
+## [material, speed (m/s)].
+var route_belts: Array = []
+
+
+func _build_routes() -> void:
+	route_belts = []
+	if playback == null or not ClassDB.class_exists("UtsimTrajetos"):
+		return
+	var tr: Object = ClassDB.instantiate("UtsimTrajetos")
+	for r in tr.call("da_cena", playback):
+		var i := int(r["block"])
+		if i < 0 or i >= rigs.size():
+			continue
+		var rig: Dictionary = rigs[i]
+		for key in ["asset", "simple"]:
+			if rig.has(key):
+				(rig[key] as Node3D).visible = false
+		var node := TrajetoMalha.belt(r)
+		(rig["root"] as Node3D).add_child(node)
+		rig["trajeto"] = node
+		var m = node.get_meta("belt_material", null)
+		if m != null:
+			route_belts.append([m, float(r.get("speed", 0.0))])
+		# The label over the middle of the route, above its highest point.
+		var line: PackedVector3Array = r["line"]
+		var top := 0.0
+		for p in line:
+			top = maxf(top, p.y)
+		if rig.has("label"):
+			var mid := line[line.size() / 2]
+			var root: Node3D = rig["root"]
+			(rig["label"] as Node3D).position = root.to_local(Vector3(mid.x, top + 0.6, mid.z))
+	for c in tr.call("caminhos_da_cena", playback):
+		var deck := TrajetoMalha.ramp(c)
+		if deck != null:
+			add_child(deck)
+
+
+## Scrolls the belts drawn by nodes: the surface moves `speed × t` (in stripes).
+func _scroll_routes(t: float) -> void:
+	for b in route_belts:
+		var m: StandardMaterial3D = b[0]
+		m.uv1_offset.x = -fposmod(t * float(b[1]) / TrajetoMalha.STRIPE, 1.0)
+
+
 ## Applies the frame at `t`. `dt`: real time since the last call (clip crossfades);
 ## `snap`: no crossfade (a jump, a capture).
 func apply(t: float, dt: float, snap := false) -> void:
 	if playback == null:
 		return
 	var t0 := Time.get_ticks_usec()
+	_scroll_routes(t)
 	var f: Dictionary = playback.frame(t)
 	var t1 := Time.get_ticks_usec()
 	var pos: PackedVector3Array = f["position"]
