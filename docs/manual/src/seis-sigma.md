@@ -782,6 +782,7 @@ Escolha o conjunto, a análise e as colunas:
 | MSA: linearidade | coluna da referência e coluna da medida, a variação do processo opcional |
 | MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
 | Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
+| Superfície de resposta | as colunas dos fatores (codificadas, 2 a 6) e a resposta |
 | Igualdade de variâncias (Levene com a mediana e Bartlett) | coluna dos valores e coluna dos grupos |
 | Kruskal-Wallis e teste da mediana de Mood | coluna dos valores e coluna dos grupos |
 | Friedman | coluna dos valores, do tratamento e do bloco (um valor de cada tratamento em cada bloco) |
@@ -871,6 +872,16 @@ fatores mexem no Y e se eles agem juntos.
   principais. Por isso a triagem serve para escolher os fatores, e o estudo deles fica para
   um fatorial depois. Com mais de 8 fatores é o único plano oferecido. As colunas da matriz
   que sobram sem fator dão graus de liberdade ao erro.
+- **Superfície de resposta**: depois de achar os poucos fatores que importam, para achar o
+  melhor ajuste deles. O **composto central rotacionável** (2 a 6 fatores) junta o fatorial,
+  dois pontos axiais por fator a ±α do centro (α = 1,414 com 2 fatores, 1,682 com 3) e os
+  pontos centrais; os axiais saem da faixa do fatorial, então os níveis precisam ser números.
+  O **composto de face centrada** põe os axiais nas faces (α = 1) e usa só três níveis por
+  fator. O **Box-Behnken** (3 a 5 fatores) usa os pontos no meio das arestas e nunca põe
+  todos os fatores no extremo ao mesmo tempo, bom quando essa combinação é cara ou
+  arriscada; ele precisa de ao menos um ponto central. Na planilha, a coluna `centro` diz
+  `axial` nos pontos axiais. As réplicas não se aplicam: o erro vem dos pontos centrais
+  (use de 3 a 5).
 - **Réplicas** repetem cada corrida (dão o erro puro); **pontos centrais** são corridas com
   todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
 - **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma
@@ -893,7 +904,18 @@ da planilha (ou escolha as colunas dos fatores; níveis reais são codificados p
 resposta e a ordem máxima das interações (2 por padrão). O resultado traz o efeito de cada
 termo (média no alto menos média no baixo), os valores-p, o R², a curvatura pelos pontos
 centrais e os termos confundidos. Numa triagem de Plackett-Burman as interações não se separam
-dos efeitos principais: o app estima só os efeitos principais e avisa nas notas. O erro vem das réplicas, dos pontos centrais e dos termos
+dos efeitos principais: o app estima só os efeitos principais e avisa nas notas.
+
+Para a planilha de uma superfície, use "Superfície de resposta": escolha as colunas `A`, `B`...
+e a resposta. O app ajusta o modelo de segunda ordem (constante, efeitos principais,
+interações de dois fatores e quadrados) e mostra os coeficientes com os valores-p, o R² e o R²
+ajustado e o **ponto estacionário**, em unidades codificadas e, quando a planilha traz os
+níveis reais, também nelas. Os autovalores dizem o que esse ponto é: todos negativos, um
+máximo; todos positivos, um mínimo; sinais trocados, uma sela (a resposta sobe numa direção e
+desce noutra); um perto de zero, uma crista. Se o ponto cai fora da região do experimento, o
+veredito avisa que é extrapolação, e o ponto deve ser confirmado com novas corridas. Os
+gráficos são o |t| de cada termo e a resposta prevista ao longo de cada fator, com os outros
+no centro. O erro vem das réplicas, dos pontos centrais e dos termos
 deixados fora do modelo; sem nenhum grau de liberdade para o erro, os valores-p vêm do pseudo
 erro padrão de Lenth. Os gráficos são o Pareto dos efeitos, os efeitos principais e um gráfico
 de interação para cada interação de dois fatores do modelo (linhas que se cruzam ou se abrem
