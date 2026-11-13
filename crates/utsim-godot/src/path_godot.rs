@@ -300,6 +300,34 @@ impl UtsimTrajetos {
             .collect()
     }
 
+    /// Quanto a superfície de cada esteira desenhada andou até `t` (m), na ordem de
+    /// `da_cena`: para quando a esteira quebra, sai do turno ou, sem acúmulo, enquanto a
+    /// peça da frente espera; na de gravidade, só enquanto leva peças (os roletes giram
+    /// sob elas).
+    #[func]
+    fn avancos(pb: Gd<UtsimPlayback>, t: f64) -> PackedFloat64Array {
+        let b = pb.bind();
+        let Some(core) = b.core.as_ref() else {
+            return PackedFloat64Array::new();
+        };
+        let Some(model) = core.model.as_ref() else {
+            return PackedFloat64Array::new();
+        };
+        pe::routes(model)
+            .iter()
+            .filter_map(|r| {
+                let view = core.blocks.iter().find(|v| v.name == r.name)?;
+                let gravity = r.drive == utsim_model::BeltDrive::Gravity;
+                Some(
+                    core.scene
+                        .timeline
+                        .belt_track(view.b)
+                        .map_or(0.0, |tr| tr.surface_travel(t, gravity)),
+                )
+            })
+            .collect()
+    }
+
     /// Os caminhos no piso de uma reprodução (a cena desenha as rampas).
     #[func]
     fn caminhos_da_cena(pb: Gd<UtsimPlayback>) -> VarArray {
@@ -451,6 +479,21 @@ impl UtsimTrajetos {
     fn por_escada(&mut self, name: GString, on: bool) -> bool {
         let n = name.to_string();
         self.edit(|e| e.set_stair(&n, on)).is_some()
+    }
+
+    /// Move o trajeto inteiro por `d` (Godot).
+    #[func]
+    fn mover_trajeto(&mut self, name: GString, path: bool, d: Vector3) -> bool {
+        let n = name.to_string();
+        let dm = [f64::from(d.x), -f64::from(d.z), f64::from(d.y)];
+        self.edit(|e| e.move_route(&n, path, dm)).is_some()
+    }
+
+    /// Gira o trajeto inteiro `degrees` (anti-horário visto de cima) em volta do meio.
+    #[func]
+    fn girar_trajeto(&mut self, name: GString, path: bool, degrees: f64) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.rotate_route(&n, path, degrees)).is_some()
     }
 
     /// Curva o trecho que sai do nó `index` pela alça do meio arrastada até `at`.
