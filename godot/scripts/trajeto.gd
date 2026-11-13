@@ -629,9 +629,28 @@ func _span() -> Array:
 	return [a[0], a[a.size() - 1]]
 
 
+## "Editar nós" of the properties panel: the tool of the belt's type, with the belt
+## selected (all its nodes, so the arrows and PageUp/PageDown move it whole).
+func edit_belt(name: String) -> void:
+	sync()
+	var r := _route(name, false)
+	if r.is_empty():
+		main.set_status("%s não é uma esteira desenhada." % name)
+		return
+	editor.set_tool("colocar", BELT_CHANNELED if r["style"] == "canaletas" else BELT_SIMPLE)
+	var all := PackedInt32Array()
+	for i in (r["nodes"] as PackedVector3Array).size():
+		all.append(i)
+	_select(name, false, all)
+	main.set_status("Esteira %s: clique num nó para editá-lo; setas e PageUp/PageDown movem os nós selecionados." % name)
+
+
 ## An edit from the panel (`form:trajeto_<what>:<value>`).
 func form(what: String, value: String) -> void:
 	var v := value.replace(",", ".").to_float()
+	if what == "trajeto_editar":
+		edit_belt(value)
+		return
 	var r := _route(sel_name, sel_path)
 	match what:
 		"trajeto_altura_desenho":

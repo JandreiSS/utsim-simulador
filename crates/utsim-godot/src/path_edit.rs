@@ -417,6 +417,16 @@ pub fn segment_near(model: &Model, p: [f64; 3], radius: f64) -> Option<(String, 
     best.map(|(_, v)| v)
 }
 
+/// Where a drawn belt stands: the middle of its route (half its length), on the floor,
+/// rounded to the millimetre. The nodes are relative to it; the label and the click are
+/// there, away from the objects at its ends.
+fn middle(points: &[[f64; 3]], radii: &[f64]) -> [f64; 3] {
+    let line = tr::sample(&nodes_of(points, radii, [0.0; 3]));
+    let half = utsim_nav::path3d::length3(&line) / 2.0;
+    let p = utsim_nav::path3d::point_at(&line, half).map_or(points[0], |(p, _)| p);
+    [round_mm(p[0]), round_mm(p[1]), 0.0]
+}
+
 fn round_mm(v: f64) -> f64 {
     (v * 1000.0).round() / 1000.0 + 0.0
 }
@@ -463,7 +473,7 @@ impl Editor {
         if pts.len() < 2 {
             return Err("a esteira precisa de ao menos 2 nós diferentes".into());
         }
-        let origin = [pts[0][0], pts[0][1], 0.0];
+        let origin = middle(&pts, radii);
         let route = BeltRoute {
             nodes: nodes_of(&pts, radii, origin),
             style: style_of(tool),
@@ -814,7 +824,11 @@ impl Editor {
             n.radius = None;
         }
         let tail: Vec<[f64; 3]> = abs[index..].to_vec();
-        let o2 = [tail[0][0], tail[0][1], origin[2]];
+        let tail_radii: Vec<f64> = r.nodes[index..]
+            .iter()
+            .map(|n| n.radius.unwrap_or(0.0))
+            .collect();
+        let o2 = middle(&tail, &tail_radii);
         let mut second = r.clone();
         second.nodes = tail
             .iter()
@@ -910,9 +924,12 @@ mod tests {
     fn moving_the_belt_moves_its_nodes() {
         let mut e = Editor::new("t");
         let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        // The belt stands in the middle of its route.
+        let at = e.model().objects[0].position;
+        assert_eq!(at, [2.0, 0.0, 0.0]);
         e.apply(Command::Move {
             name: name.clone(),
-            position: [10.0, 0.0, 0.0],
+            position: [12.0, 0.0, 0.0],
         })
         .unwrap();
         assert_eq!(routes(e.model())[0].nodes[1], [14.0, 0.0, 0.8]);
@@ -999,6 +1016,17 @@ mod tests {
             "{:?}",
             s.at
         );
+    }
+
+    #[test]
+    fn the_panel_of_a_drawn_belt_shows_the_route_and_hides_the_length() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        let obj = e.model().objects.iter().find(|o| o.name == name).unwrap();
+        let fields = crate::schema::object_fields(e.model(), obj);
+        let paths: Vec<&str> = fields.iter().map(|f| f.path.as_str()).collect();
+        assert!(paths.contains(&"route.info") && paths.contains(&"route.editar"));
+        assert!(!paths.contains(&"length"));
     }
 
     #[test]
