@@ -81,6 +81,8 @@ var _press := {}
 var _dragging := false
 var _drag_at := Vector3.ZERO
 var _readout: Label3D
+## The profile of the selected route (`trajeto_perfil.gd`), over the bottom of the view.
+var _perfil: TrajetoPerfil
 ## The length of the next segment being typed (digits and a comma), "" when none.
 var typed := ""
 ## Where the mouse points while drawing (the direction a typed length goes).
@@ -107,6 +109,15 @@ func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
 	_readout.outline_render_priority = 11
 	_readout.visible = false
 	add_child(_readout)
+	_perfil = TrajetoPerfil.new()
+	_perfil.name = "PerfilTrajeto"
+	_perfil.visible = false
+	_perfil.node_height.connect(_on_profile_height)
+	var canvas := editor._box_rect.get_parent() if editor._box_rect != null else null
+	if canvas != null:
+		canvas.add_child(_perfil)
+	else:
+		add_child(_perfil)
 
 
 func doc() -> Object:
@@ -242,6 +253,10 @@ func _handle_at(p: Vector2) -> Dictionary:
 			# The curve handles: the middle of each segment of the selected route.
 			if r["name"] != sel_name or path != sel_path:
 				continue
+			var mid_sp = _screen(_middle(r))
+			if mid_sp != null and (mid_sp as Vector2).distance_to(p) <= best_d:
+				best_d = (mid_sp as Vector2).distance_to(p)
+				best = {"name": r["name"], "path": path, "index": -1, "handle": "mover"}
 			for i in nodes.size() - 1:
 				var sp = _screen(nodes[i].lerp(nodes[i + 1], 0.5))
 				if sp == null:
@@ -259,6 +274,13 @@ func press(p: Vector2, shift: bool) -> void:
 		_add_point(p)
 		return
 	var h := _handle_at(p)
+	if not h.is_empty() and h["handle"] == "mover":
+		_press = h.duplicate()
+		_press["pos"] = p
+		_press["from"] = _middle(_route(h["name"], h["path"]))
+		_dragging = false
+		main.set_status("Arraste para mover %s inteiro; R e Shift+R giram 15°." % sel_name)
+		return
 	if not h.is_empty() and h["handle"] == "curva":
 		var rc := _route(h["name"], h["path"])
 		var ns: PackedVector3Array = rc["nodes"]
@@ -394,6 +416,15 @@ func drag(p: Vector2) -> void:
 	var from: Vector3 = _press["from"]
 	if _press["handle"] == "z":
 		_drag_at = Vector3(from.x, _height_under(p, from), from.z)
+	elif _press["handle"] == "mover":
+		var at = editor.floor_at(p)
+		if at == null:
+			return
+		var step: float = main.snap_step()
+		var d: Vector3 = (at as Vector3) - Vector3(from.x, 0.0, from.z)
+		if step > 0.0:
+			d = Vector3(snappedf(d.x, step), 0.0, snappedf(d.z, step))
+		_drag_at = from + Vector3(d.x, 0.0, d.z)
 	elif _press["handle"] == "curva":
 		var at = editor.floor_at(p)
 		if at == null:
@@ -482,6 +513,14 @@ func release(_p: Vector2) -> void:
 	var name: String = pr["name"]
 	var path: bool = pr["path"]
 	var ok: bool
+	if pr["handle"] == "mover":
+		var d: Vector3 = _drag_at - from
+		if tr.mover_trajeto(name, path, Vector3(d.x, 0.0, d.z)):
+			main.after_edit()
+			main.set_status("%s movido %s m em X e %s m em Y (Ctrl+Z desfaz)." % [name, _num(d.x), _num(-d.z)])
+		else:
+			main.set_status("Não moveu: %s" % tr.last_error())
+		return
 	if pr["handle"] == "curva":
 		ok = tr.curvar(name, path, int(pr["index"]), _drag_at)
 		if ok:
@@ -556,7 +595,26 @@ func key(code: int, shift: bool) -> bool:
 				main.set_status("Raio das próximas curvas: %s m." % _num(new_radius))
 				return true
 			return _radius_step(dr)
+		KEY_R:
+			if drawing or sel_name == "":
+				return false
+			return turn_route(-15.0 if shift else 15.0)
 		KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN:
+			if sel_nodes.is_empty() and sel_name != "" and not drawing:
+				var st: float = FINE_STEP if shift else (main.snap_step() if main.snap_step() > 0.0 else HEIGHT_STEP)
+				var dm := Vector3.ZERO
+				match code:
+					KEY_LEFT:
+						dm.x = -st
+					KEY_RIGHT:
+						dm.x = st
+					KEY_UP:
+						dm.z = -st
+					KEY_DOWN:
+						dm.z = st
+				if tr.mover_trajeto(sel_name, sel_path, dm):
+					main.after_edit()
+				return true
 			if sel_nodes.is_empty():
 				return false
 			var step: float = FINE_STEP if shift else (main.snap_step() if main.snap_step() > 0.0 else HEIGHT_STEP)
@@ -632,6 +690,25 @@ func _place_typed() -> bool:
 	end_port = {}
 	main.set_status("%s: nó %d a %s m do anterior." % [LABELS[mode], points.size(), _num(length)])
 	return true
+
+
+## Turns the selected route `degrees` about its middle (one undo step).
+func turn_route(degrees: float) -> bool:
+	if tr.girar_trajeto(sel_name, sel_path, degrees):
+		main.after_edit()
+		main.set_status("%s girado %s° (R gira de novo; Shift+R para o outro lado)." % [sel_name, _num(degrees, 0)])
+	else:
+		main.set_status("Não girou: %s" % tr.last_error())
+	return true
+
+
+## The middle of a route: its position for a belt (the middle of the line), the mean of
+## the points for a path.
+func _middle(r: Dictionary) -> Vector3:
+	var line: PackedVector3Array = r["line"]
+	if line.is_empty():
+		return Vector3.ZERO
+	return line[line.size() / 2]
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -774,6 +851,8 @@ func panel() -> Array:
 	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
 	if r["too_steep"]:
 		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
+	rows.append({"kind": "button", "name": "Trajeto_GirarEsq", "text": "Girar 15° (anti-horário, R)", "action": "trajeto_girar_esq"})
+	rows.append({"kind": "button", "name": "Trajeto_GirarDir", "text": "Girar 15° (horário, Shift+R)", "action": "trajeto_girar_dir"})
 	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
 	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": "Desenhar paralelo", "action": "trajeto_paralelo"})
 	if sel_path:
@@ -783,26 +862,26 @@ func panel() -> Array:
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
 		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"]], "value": r["drive"], "action": "trajeto_acionamento"})
-		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": float(r["width"]), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
+		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
 	if sel_nodes.size() == 1:
 		var i := sel_nodes[0]
 		var n := nodes[i]
 		rows.append({"kind": "section", "text": "Nó %d" % (i + 1)})
-		rows.append({"kind": "number", "name": "Trajeto_X", "label": "X (m)", "value": n.x, "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_x"})
-		rows.append({"kind": "number", "name": "Trajeto_Y", "label": "Y (m)", "value": -n.z, "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_y"})
-		rows.append({"kind": "number", "name": "Trajeto_Z", "label": "Altura (m)", "value": n.y, "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
+		rows.append({"kind": "number", "name": "Trajeto_X", "label": "X (m)", "value": snappedf(n.x, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_x"})
+		rows.append({"kind": "number", "name": "Trajeto_Y", "label": "Y (m)", "value": snappedf(-n.z, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_y"})
+		rows.append({"kind": "number", "name": "Trajeto_Z", "label": "Altura (m)", "value": snappedf(n.y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
 		if i > 0 and i < nodes.size() - 1:
-			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": "Raio da curva (m; 0 = quina)", "value": rs[i], "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
+			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": "Raio da curva (m; 0 = quina)", "value": snappedf(rs[i], 0.001), "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
 			if not sel_path:
 				rows.append({"kind": "button", "name": "Trajeto_Dividir", "text": "Dividir a esteira neste nó", "action": "trajeto_dividir"})
 	elif sel_nodes.size() > 1:
 		rows.append({"kind": "section", "text": "%d nós selecionados" % sel_nodes.size()})
 	if sel_nodes.size() > 1 or sel_nodes.is_empty():
-		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": "Nivelar na altura (m)", "value": nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
+		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": "Nivelar na altura (m)", "value": snappedf(nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo."})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro; sem nó selecionado, as setas movem e R gira o trajeto."})
 	return rows
 
 
@@ -901,6 +980,12 @@ func form(what: String, value: String) -> void:
 		"trajeto_excluir_no":
 			delete_selected()
 			return
+		"trajeto_girar_esq":
+			turn_route(15.0)
+			return
+		"trajeto_girar_dir":
+			turn_route(-15.0)
+			return
 		"trajeto_paralelo":
 			var other: String = tr.paralelo(sel_name, sel_path, parallel_dist)
 			ok = other != ""
@@ -929,7 +1014,35 @@ func form(what: String, value: String) -> void:
 # ---------------------------------------------------------------------------
 
 
+## A node dropped in the profile: only its height changes.
+func _on_profile_height(index: int, height: float) -> void:
+	var r := _route(sel_name, sel_path)
+	if r.is_empty():
+		return
+	var n: Vector3 = (r["nodes"] as PackedVector3Array)[index]
+	n.y = height
+	if tr.por_no(sel_name, sel_path, index, n):
+		main.after_edit()
+		_select(sel_name, sel_path, PackedInt32Array([index]))
+		main.set_status("%s, nó %d a %s m de altura (perfil; Ctrl+Z desfaz)." % [sel_name, index + 1, _num(height)])
+	else:
+		main.set_status("Não mudou a altura: %s" % tr.last_error())
+
+
+## Shows the profile of the selected route at the bottom of the view.
+func _update_profile() -> void:
+	var r := _route(sel_name, sel_path)
+	if not active() or r.is_empty() or not points.is_empty():
+		_perfil.show_route({}, PackedInt32Array())
+		return
+	var vp := get_viewport().get_visible_rect().size
+	_perfil.size = Vector2(minf(560.0, vp.x * 0.45), 180.0)
+	_perfil.position = Vector2(300.0, vp.y - _perfil.size.y - 48.0)
+	_perfil.show_route(r, sel_nodes)
+
+
 func draw(e: EditorUtsim) -> void:
+	_update_profile()
 	if not active():
 		_readout.visible = false
 		return
@@ -960,6 +1073,13 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 				e._ribbon(_drag_at + lift, nodes[i + 1] + lift, 0.08, CURVE)
 				mid = _drag_at
 			_diamond(e, mid + Vector3(0, 0.02, 0), 0.16, CURVE)
+		var c := _middle(r)
+		if _dragging and _press.get("handle", "") == "mover":
+			var d := _drag_at - c
+			for i in line.size() - 1:
+				e._ribbon(line[i] + d + lift, line[i + 1] + d + lift, 0.08, DRAWING)
+			c = _drag_at
+		_square(e, c + Vector3(0, 0.05, 0), 0.28, DRAWING)
 	for i in nodes.size():
 		var n := nodes[i]
 		if _dragging and sel and not bending and i == int(_press.get("index", -1)):
@@ -976,6 +1096,14 @@ func _handle(e: EditorUtsim, n: Vector3, r: float, color: Color) -> void:
 	if n.y > 0.05:
 		_post(e, floor, n, 0.03, STICK)
 		_diamond(e, n + Vector3(0, 0.02, 0), r * 0.8, color)
+
+
+func _square(e: EditorUtsim, c: Vector3, r: float, color: Color) -> void:
+	var pts := [c + Vector3(r, 0, r), c + Vector3(-r, 0, r), c + Vector3(-r, 0, -r), c + Vector3(r, 0, -r)]
+	for k in [[0, 1, 2], [0, 2, 3]]:
+		for j in k:
+			e._mesh.surface_set_color(color)
+			e._mesh.surface_add_vertex(pts[j])
 
 
 func _diamond(e: EditorUtsim, c: Vector3, r: float, color: Color) -> void:

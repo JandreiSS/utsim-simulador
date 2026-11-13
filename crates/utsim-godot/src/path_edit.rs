@@ -711,6 +711,66 @@ impl Editor {
         })
     }
 
+    /// Move o trajeto inteiro por `d` (m; a altura também). Na esteira, muda só a posição
+    /// dela (os nós são relativos); no caminho, todos os pontos.
+    pub fn move_route(&mut self, name: &str, path: bool, d: [f64; 3]) -> Result<(), String> {
+        if path {
+            return self.edit_path(name, |a| {
+                for i in 0..a.points.len() {
+                    a.points[i] = [
+                        round_mm(a.points[i][0] + d[0]),
+                        round_mm(a.points[i][1] + d[1]),
+                    ];
+                    let z = a.heights.get(i).copied().unwrap_or(0.0);
+                    a.set_height(i, round_mm((z + d[2]).max(0.0)));
+                }
+            });
+        }
+        let pos = self
+            .model()
+            .objects
+            .iter()
+            .find(|o| o.name == name)
+            .map(|o| o.position)
+            .ok_or_else(|| format!("'{name}' não existe"))?;
+        self.apply(Command::Move {
+            name: name.to_string(),
+            position: round3([pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]),
+        })
+    }
+
+    /// Gira o trajeto inteiro `degrees` (anti-horário, visto de cima) em volta do meio
+    /// dele; as alturas e os raios ficam.
+    pub fn rotate_route(&mut self, name: &str, path: bool, degrees: f64) -> Result<(), String> {
+        let (s, c) = degrees.to_radians().sin_cos();
+        let turn = |p: [f64; 2], o: [f64; 2]| {
+            let (x, y) = (p[0] - o[0], p[1] - o[1]);
+            [
+                round_mm(o[0] + c * x - s * y),
+                round_mm(o[1] + s * x + c * y),
+            ]
+        };
+        if path {
+            return self.edit_path(name, |a| {
+                let n = a.points.len() as f64;
+                let o = [
+                    a.points.iter().map(|p| p[0]).sum::<f64>() / n,
+                    a.points.iter().map(|p| p[1]).sum::<f64>() / n,
+                ];
+                for p in a.points.iter_mut() {
+                    *p = turn(*p, o);
+                }
+            });
+        }
+        // A belt turns about its own position (the middle of its route).
+        self.edit_route(name, |r, _| {
+            for n in r.nodes.iter_mut() {
+                let q = turn([n.at[0], n.at[1]], [0.0, 0.0]);
+                n.at = [q[0], q[1], n.at[2]];
+            }
+        })
+    }
+
     /// Raio da curva no nó `index` (0: quina viva).
     pub fn set_route_radius(
         &mut self,
@@ -1494,6 +1554,28 @@ mod tests {
             .unwrap();
         assert!(e.model().connections.contains(&(main.clone(), side)));
         assert_eq!(routes(e.model()).len(), 3);
+    }
+
+    #[test]
+    fn a_whole_route_moves_and_turns_in_one_step() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 1.2]]);
+        e.move_route(&name, false, [1.0, 2.0, 0.0]).unwrap();
+        assert_eq!(routes(e.model())[0].nodes[0], [1.0, 2.0, 0.8]);
+        e.rotate_route(&name, false, 90.0).unwrap();
+        // About its middle (3, 2): the ends go to (3, 0) and (3, 4), heights kept.
+        let r = &routes(e.model())[0];
+        assert_eq!(r.nodes[0], [3.0, 0.0, 0.8]);
+        assert_eq!(r.nodes[1], [3.0, 4.0, 1.2]);
+        e.doc.undo();
+        assert_eq!(routes(e.model())[0].nodes[1], [5.0, 2.0, 1.2]);
+        let p = e
+            .add_floor_path(&[[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]], &[], 0.0)
+            .unwrap();
+        e.rotate_route(&p, true, 90.0).unwrap();
+        assert_eq!(e.model().aisles[0].points, vec![[1.0, -1.0], [1.0, 1.0]]);
+        e.move_route(&p, true, [0.0, 1.0, 0.0]).unwrap();
+        assert_eq!(e.model().aisles[0].points[0], [1.0, 0.0]);
     }
 
     #[test]
