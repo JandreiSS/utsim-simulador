@@ -1,0 +1,28 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Espera real: mesa, palete, estante e chão. Cada peça ocupa o seu lugar na grade do tipo (o lugar que o núcleo deu, no rastro); as que não cabem esperam numa fila no chão, depois da saída da espera. O Tipo de espera é a primeira opção do painel."},
+		{"abrir": "g4_espera_real.ron"},
+		{"conferir": {"campo_painel": {"objeto": "fila_mesa", "caminho": "waiting_area.kind", "valor": "Table"}}},
+		{"conferir": {"campo_painel": {"objeto": "fila_palete", "caminho": "waiting_area.info", "valor": "18 lugares"}}},
+		{"modo": "simular"},
+		{"nota": "Em 19 s, 13 peças em cada espera (uma está no posto). Mesa: 12 lugares no tampo (0,76 m, duas camadas) e 1 ao lado; palete: as 13 em cima dele, até a terceira camada; estante: 9 nas prateleiras e 4 ao lado; chão: as 13 no chão, em duas camadas."},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_mesa", "t": 19.0, "quantos": 12, "dentro": [0.7, 0.5], "altura_entre": [0.75, 1.07]}}},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_palete", "t": 19.0, "quantos": 13, "dentro": [0.65, 0.55], "altura_entre": [0.13, 0.75]}}},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_estante", "t": 19.0, "quantos": 9, "dentro": [0.65, 0.35], "altura_entre": [0.29, 1.21]}}},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_chao", "t": 19.0, "quantos": 13, "dentro": [0.7, 0.6], "altura_entre": [-0.01, 0.31]}}},
+		{"tempo": 19.0},
+		{"focar": {"objeto": "fila_palete", "distancia": 9.0, "giro": 0.7, "inclinacao": 0.5}},
+		{"capturar": "g4_espera_real_01_tipos"},
+		{"nota": "Dimensões: a mesa com 2,4 m de comprimento tem 24 lugares (6 × 2, duas camadas); as 13 peças cabem no tampo."},
+		{"modo": "editar"},
+		{"propriedade": {"objeto": "fila_mesa", "caminho": "size.on", "valor": true}},
+		{"propriedade": {"objeto": "fila_mesa", "caminho": "size.x", "valor": 2.4}},
+		{"conferir": {"campo_painel": {"objeto": "fila_mesa", "caminho": "waiting_area.info", "valor": "24 lugares"}}},
+		{"modo": "simular"},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_mesa", "t": 19.0, "quantos": 13, "dentro": [1.2, 0.5], "altura_entre": [0.75, 1.07]}}},
+		{"tempo": 19.0},
+		{"focar": {"objeto": "fila_mesa", "distancia": 4.0, "giro": 0.6, "inclinacao": 0.45}},
+		{"capturar": "g4_espera_real_02_mesa_maior"}
+	]
+}

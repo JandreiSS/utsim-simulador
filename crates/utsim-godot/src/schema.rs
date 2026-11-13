@@ -775,6 +775,10 @@ fn default_height(obj: &ObjectDef) -> f64 {
     let visual = obj.visual.as_ref();
     let asset = visual.and_then(|v| v.asset.as_deref());
     let scale = visual.and_then(|v| v.scale).unwrap_or(1.0);
+    // A real waiting area: the height of its element (a table, a shelf...).
+    if let Some(w) = obj.waiting_area {
+        return w.default_size()[2];
+    }
     if let Some(e) = asset.and_then(|a| catalogue::entries().iter().find(|e| e.nome == a)) {
         return f64::from(e.tamanho_real_m.1) * scale;
     }

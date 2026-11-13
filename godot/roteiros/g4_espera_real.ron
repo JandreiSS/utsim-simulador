@@ -1,0 +1,34 @@
+// Ponto de partida do roteiro g4_espera_real.json: as quatro esperas reais lado a lado, cada
+// uma alimentando um posto lento (20 s por peça). As peças chegam a cada segundo (14 por
+// linha): em 20 s a espera tem 13 peças, cada uma no seu lugar (a grade do tipo), e as que
+// não cabem esperam ao lado.
+Model(
+    format: 2,
+    name: "esperas reais",
+    run: (stop_time: 120.0, seed: 1, replications: 1),
+    objects: [
+        (name: "fonte_mesa", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(14)),
+         position: (-4.0, 0.0, 0.0)),
+        (name: "fila_mesa", kind: Queue(), position: (0.0, 0.0, 0.0), waiting_area: Some((kind: Table))),
+        (name: "posto_mesa", kind: Processor(process: Const(20.0)), position: (4.0, 0.0, 0.0)),
+        (name: "fonte_palete", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(14)),
+         position: (-4.0, 4.0, 0.0)),
+        (name: "fila_palete", kind: Queue(), position: (0.0, 4.0, 0.0), waiting_area: Some((kind: Pallet))),
+        (name: "posto_palete", kind: Processor(process: Const(20.0)), position: (4.0, 4.0, 0.0)),
+        (name: "fonte_estante", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(14)),
+         position: (-4.0, 8.0, 0.0)),
+        (name: "fila_estante", kind: Queue(), position: (0.0, 8.0, 0.0), waiting_area: Some((kind: Shelf))),
+        (name: "posto_estante", kind: Processor(process: Const(20.0)), position: (4.0, 8.0, 0.0)),
+        (name: "fonte_chao", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(14)),
+         position: (-4.0, 12.0, 0.0)),
+        (name: "fila_chao", kind: Queue(), position: (0.0, 12.0, 0.0), waiting_area: Some((kind: Floor))),
+        (name: "posto_chao", kind: Processor(process: Const(20.0)), position: (4.0, 12.0, 0.0)),
+        (name: "saida", kind: Sink, position: (8.0, 6.0, 0.0)),
+    ],
+    connections: [
+        ("fonte_mesa", "fila_mesa"), ("fila_mesa", "posto_mesa"), ("posto_mesa", "saida"),
+        ("fonte_palete", "fila_palete"), ("fila_palete", "posto_palete"), ("posto_palete", "saida"),
+        ("fonte_estante", "fila_estante"), ("fila_estante", "posto_estante"), ("posto_estante", "saida"),
+        ("fonte_chao", "fila_chao"), ("fila_chao", "posto_chao"), ("posto_chao", "saida"),
+    ],
+)
