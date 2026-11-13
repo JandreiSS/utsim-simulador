@@ -115,6 +115,17 @@ Para receber os fatores nas unidades do processo, preencha "Nível baixo (−1) 
 - **Analisar superfície de resposta:** ajusta o modelo de segunda ordem (ou de primeira, com ou sem interações) aos fatores codificados. Mostra os coeficientes com valor-p, o R² e os resíduos, e acha o ponto estacionário, dizendo se ele é um máximo, um mínimo ou uma sela. Avisa quando o ponto fica fora da região do experimento.
 - **Otimizar respostas (desejabilidade):** para uma ou duas respostas, escolha maximizar, minimizar ou chegar a um alvo, com os limites aceitáveis. O app procura dentro da região do experimento o ponto de maior desejabilidade geral e mostra as respostas previstas nele.
 
+**DOE > Rodar o plano no modelo** roda o plano aberto no simulador. Escolha o modelo do UTSim (`.ron`) e as replicações de cada corrida. Para cada fator, diga o campo do modelo que ele muda e o valor em RON, com `{x}` no lugar do nível:
+
+| Fator | Campo do modelo | Valor (RON) | Inteiro |
+|---|---|---|---|
+| Tempo | `maquina.process` | `Exp(mean: {x})` | não |
+| Servidores | `maquina.capacity` | `{x}` | sim |
+
+"Inteiro" arredonda o nível, para campos que só aceitam números inteiros (num composto central, os pontos axiais caem entre os níveis). Os campos usam as mesmas chaves dos cenários do UTSim. Cada linha do plano vira uma corrida, e todas usam as mesmas sementes. O resultado abre como planilha nova, "Simulado", com as colunas do plano, a coluna `replicacao` e uma coluna por indicador do relatório. Analise essa planilha pelo menu DOE, escolhendo o indicador como resposta.
+
+Em **Otimizar respostas** sobre essa planilha, o melhor ponto aparece em "Gravar no modelo do UTSim", como valores dos campos. Abra o modelo (o app toma a trava) e clique "Aplicar ao modelo": todos os campos mudam num só passo de desfazer, e nada vai ao disco até "Gravar".
+
 Quando a planilha tem os níveis no processo, o ponto estacionário e o melhor ponto aparecem nas duas escalas: a coluna "nível no processo" da tabela e o fim da conclusão. Numa planilha sem níveis, volte às unidades do processo com: valor = centro + nível codificado × (alto − baixo)/2.
 
 ## Histórico

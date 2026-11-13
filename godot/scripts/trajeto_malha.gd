@@ -141,11 +141,14 @@ static func belt(r: Dictionary) -> Node3D:
 		_sweep(st, line, sides, half - 0.005, half + GUIDE_THICK, 0.02, GUIDE_HEIGHT, GUIDE_COLOR)
 	var nodes: PackedVector3Array = r.get("nodes", line)
 	for k in nodes.size():
-		var p := nodes[k]
+		# Under the line: at a rounded corner the node itself is off the arc, so the legs
+		# go under the point of the arc nearest to it.
+		var j := _nearest(line, nodes[k])
+		var p := line[j]
 		var bottom := p.y - FRAME_DEPTH
 		if bottom < 0.12:
 			continue
-		var s: Vector3 = sides[_nearest(line, p)]
+		var s: Vector3 = sides[j]
 		var feet: Array[Vector3] = []
 		for side in [-1.0, 1.0]:
 			var c: Vector3 = p + s * side * (half + FRAME_THICK * 0.5)
