@@ -629,6 +629,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             for line in m.person_lines() {
                 println!("pessoa: {line}");
             }
+            for line in m.crane_lines() {
+                println!("ponte rolante: {line}");
+            }
             for line in m.arrival_lines() {
                 println!("chegadas: {line}");
             }

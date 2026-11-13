@@ -1,0 +1,47 @@
+// Ponte rolante numa baia de caldeiraria: chapas de 2 a 8 t chegam ao recebimento e a
+// ponte as leva até o corte; do corte, até a solda; da solda, até a expedição. Tempos em
+// segundos, distâncias em metros, pesos em kg (rótulo "weight").
+//
+// A ponte cobre o retângulo do seu `size`: 40 m de caminho de rolamento (x, onde a ponte
+// anda) por 18 m de vão (y, onde o carro anda), com 8 m de altura útil, centrado na sua
+// posição. Cada eixo tem velocidade e aceleração próprias. Com `motion: Safe` (o padrão)
+// o gancho anda a 6 m de altura; a ponte e o carro andam juntos só com o gancho em cima,
+// e o gancho desce e sobe sozinho em cada ponta (descer, engatar ou soltar, subir).
+// Capacidade de 10 t: uma peça mais pesada seria recusada e contada em
+// `ponte.crane.refused` (o `utsim check` avisa antes).
+//
+// Métricas da ponte: `crane.trips`, `crane.loaded_time` (tempo com carga suspensa) e o
+// tempo de cada eixo (`crane.bridge_time`, `crane.trolley_time`, `crane.hoist_time`).
+//
+//   recebimento (3, 3) -> corte (14, 15) -> solda (28, 4) -> expedicao (37, 14)
+Model(
+    name: "Ponte rolante na caldeiraria",
+    description: "Uma ponte rolante leva chapas entre os postos de uma baia",
+    run: (stop_time: 28800.0, warmup: 1800.0, seed: 7, replications: 3),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 2400.0),
+            labels: {"weight": Uniform(min: 2000.0, max: 8000.0)}), position: (1.0, 3.0, 0.0)),
+        (name: "recebimento", kind: Queue(), transport: "ponte", position: (3.0, 3.0, 0.0)),
+        (name: "corte", kind: Processor(process: Triangular(min: 240.0, mode: 300.0, max: 420.0)),
+            transport: "ponte", position: (14.0, 15.0, 0.8)),
+        (name: "solda", kind: Processor(process: Triangular(min: 360.0, mode: 480.0, max: 600.0)),
+            transport: "ponte", position: (28.0, 4.0, 0.8)),
+        (name: "expedicao", kind: Sink, position: (37.0, 14.0, 0.0)),
+        (name: "ponte", kind: Crane(
+            bridge: (speed: 0.8, acceleration: 0.2, deceleration: 0.2),
+            trolley: (speed: 0.4, acceleration: 0.2, deceleration: 0.2),
+            hoist: (speed: 0.1, acceleration: 0.1, deceleration: 0.1),
+            hook_height: 6.0,
+            attach: Triangular(min: 40.0, mode: 60.0, max: 90.0),
+            detach: Triangular(min: 20.0, mode: 30.0, max: 45.0),
+            capacity_t: 10.0,
+            motion: Safe,
+        ), position: (20.0, 9.0, 0.0), size: Some((40.0, 18.0, 8.0))),
+    ],
+    connections: [
+        ("chegada", "recebimento"),
+        ("recebimento", "corte"),
+        ("corte", "solda"),
+        ("solda", "expedicao"),
+    ],
+)

@@ -89,7 +89,7 @@ Model(
 | `position` | `(0.0, 0.0, 0.0)` | `(x, y, z)` |
 | `downtime` | nenhuma | `(mtbf: Dist, mttr: Dist)`, mais os campos opcionais de manutenção `repair_crew`, `wear`, `basis`, `repair`, `preventive`, `cost` e `oee` ([Manutenção de máquinas e OEE](manutencao.md)) |
 | `shifts` | nenhuma | `(period: n, off: [(start: n, duration: n), ...], on_end: Pause)` ou `Calendar("nome")` (veja abaixo) |
-| `transport` | nenhum | nome de um `Transporter` ou `Dispatcher` que leva os itens que saem do objeto |
+| `transport` | nenhum | nome de um `Transporter`, `Crane` ou `Dispatcher` que leva os itens que saem do objeto |
 | `transport_priority` | `0` | só com `transport`: prioridade dos pedidos de transporte (maior vai primeiro) |
 | `transport_priority_label` | nenhum | só com `transport`: rótulo do item que substitui `transport_priority` |
 | `transfer` | nenhuma | tempo de viagem das ligações diretas que saem do objeto |
@@ -223,11 +223,25 @@ Sem campos. Escreva `kind: Sink`.
 | `break_at` / `break_object` | nenhum: local de pausa num ponto, ou num objeto ou área (um ou outro) |
 | `multitask` | nenhuma: um serviço por vez. `Some((max_open: n, slice: Dist, switch: Dist))`: até `n` serviços de operador abertos ao mesmo tempo (`max_open` maior ou igual a 1; com 1, igual a não ter o campo), trabalhados em turnos de `slice` (não pode ser `Const(0.0)`), perdendo `switch` (padrão `Const(0.0)`) a cada troca. Veja [Multitarefa](linhas/lean-office/multitarefa.md) |
 
+### `Crane` (ponte rolante)
+
+| Campo | Padrão |
+|---|---|
+| `bridge`, `trolley`, `hoist` | obrigatórios: `(speed, acceleration, deceleration)` de cada eixo |
+| `hook_height` | obrigatória (maior que 0, até a altura do `size`) |
+| `attach`, `detach` | `Const(0.0)` |
+| `capacity_t` | obrigatória (toneladas, maior que 0) |
+| `motion` | `Safe` (ou `Sequential`, `Parallel`) |
+| `weight_label` | `"weight"` |
+| `home` | `false` |
+
+Precisa de `size` (curso da ponte, vão, altura útil). Veja [Ponte rolante](ponte-rolante.md).
+
 ### `Dispatcher`
 
 | Campo | Padrão |
 |---|---|
-| `team` | obrigatório (lista de nomes de `Transporter`; não vazia; um transportador só em uma equipe) |
+| `team` | obrigatório (lista de nomes de `Transporter` ou `Crane`; não vazia; um transportador só em uma equipe) |
 | `rule` | `FirstAvailable` (ou `RoundRobin`, `Nearest`, `LeastBusy`, `LongestIdle`, `Random`) |
 | `pick` | `Priority` (ou `Nearest`, `NearestAny`): qual serviço da fila o membro que fica livre pega |
 | `preempt` | `Never` (ou `Empty`: um pedido de prioridade maior tira o serviço de um membro que vai vazio buscá-lo; `Full`: também tira um membro que está trabalhando num posto, e o posto guarda o tempo que faltava e espera outro operador, veja [Interrupções](linhas/lean-office/interrupcoes.md)) |
