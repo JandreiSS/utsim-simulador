@@ -1687,6 +1687,11 @@ impl UtsimUi {
     /// and tells the main scene; the rest goes to the main scene as actions.
     fn prop_action(&mut self, a: PropAction) {
         match a {
+            // "Editar nós" of a belt drawn by nodes changes the tool, not the model.
+            PropAction::Set { path, .. } if path == "route.editar" => {
+                let object = self.object.clone();
+                self.emit(&format!("trajeto_editar	{object}"));
+            }
             PropAction::Set {
                 path,
                 value,

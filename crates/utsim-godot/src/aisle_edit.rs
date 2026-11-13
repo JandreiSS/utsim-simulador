@@ -336,6 +336,7 @@ impl Editor {
             profile: None,
             heights: Vec::new(),
             radii: Vec::new(),
+            stair: false,
         })))?;
         Ok(name)
     }

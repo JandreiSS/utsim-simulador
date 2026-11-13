@@ -1372,11 +1372,46 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             accumulating,
             ..
         } => {
-            out.push(
-                float(s, "length", "Comprimento", *length)
-                    .min(0.001)
-                    .unit("m"),
-            );
+            // A belt drawn by nodes: its length is the route's (read only), and the nodes
+            // are edited with the drawing tool (`path_edit.rs`).
+            match crate::path_edit::routes(model)
+                .into_iter()
+                .find(|r| r.name == obj.name)
+            {
+                Some(r) => {
+                    let num = |v: f64, d: usize| format!("{v:.d$}").replace('.', ",");
+                    out.push(Field::new(
+                        s,
+                        "route.info",
+                        "Trajeto desenhado",
+                        FieldType::Info,
+                        Value::Text(format!(
+                            "{} m em {} nós; passagem {} u.t.; cabem {}; maior inclinação {}° (máx. {}°)",
+                            num(r.length, 2),
+                            r.nodes.len(),
+                            num(r.transit, 1),
+                            r.capacity,
+                            num(r.max_degrees, 1),
+                            num(r.limit, 0)
+                        )),
+                    ));
+                    out.push(
+                        Field::new(
+                            s,
+                            "route.editar",
+                            "Editar nós",
+                            FieldType::Action,
+                            Value::Bool(true),
+                        )
+                        .help("Abre a ferramenta de desenho com esta esteira: arraste os nós, mude a altura e o raio."),
+                    );
+                }
+                None => out.push(
+                    float(s, "length", "Comprimento", *length)
+                        .min(0.001)
+                        .unit("m"),
+                ),
+            }
             out.push(
                 float(s, "speed", "Velocidade", *speed)
                     .min(0.001)
@@ -1768,6 +1803,25 @@ pub fn asset_choices() -> Vec<Choice> {
             ),
             group: "Terceiros (assets/terceiros)".into(),
         });
+    }
+    // The Blender elements of their own (`cnc`, `prensa`, `espera`...); not the person
+    // bodies (the person's sex picks them) nor the `_medio` files.
+    if let Some(cat) = crate::modelos3d::Catalogo::find(None) {
+        for (stem, e) in &cat.elementos {
+            if stem.ends_with("_medio")
+                || crate::modelos3d::PESSOAS.contains(&stem.as_str())
+                || out.iter().any(|c| &c.value == stem)
+            {
+                continue;
+            }
+            let t = e.tamanho;
+            out.push(Choice {
+                value: stem.clone(),
+                label: stem.clone(),
+                help: format!("{} ({:.2} x {:.2} x {:.2} m)", e.arquivo, t[0], t[1], t[2]),
+                group: "Elementos 3D (assets/modelos3d)".into(),
+            });
+        }
     }
     out
 }

@@ -80,6 +80,8 @@ O resultado aparece ao lado dos dados, com os indicadores, os achados (o que o r
 
 Na tela **Modelo**, o painel do nó mostra quantos estudos o nó tem, e "Abrir em Ferramentas" leva aos estudos dele (ou prepara um estudo novo do nó).
 
+O caminho de volta também existe. No histograma e na capacidade com dados simulados de uma característica, "Gravar LIE e LSE no nó" grava os limites dos parâmetros na característica do modelo (aba Qualidade do nó). O app toma a trava do modelo só durante a gravação. Se outra pessoa ou outro app edita o modelo, nada muda e a barra de estado diz quem edita. Um limite em branco apaga o do nó.
+
 ## Abrir pelo UTSim e pelo Ensino
 
 Outros programas da família abrem o UTSim Qualidade já no lugar certo:
