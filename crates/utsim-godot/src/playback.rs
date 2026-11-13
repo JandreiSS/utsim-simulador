@@ -303,7 +303,7 @@ impl Espera3d {
     /// The `k`-th item beside the area (on the floor, in a row past its exit end), or
     /// `None` past [`BESIDE_MAX`].
     pub fn beside(&self, k: usize) -> Option<[f32; 3]> {
-        (k < BESIDE_MAX).then(|| [self.beside_x + k as f32 * ITEM_SIZE * 1.1, 0.0, 0.0])
+        (k < BESIDE_MAX).then_some([self.beside_x + k as f32 * ITEM_SIZE * 1.1, 0.0, 0.0])
     }
 
     /// The centre of an item whose base is at `local` (the object's frame), in the layout.
