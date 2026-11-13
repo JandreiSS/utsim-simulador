@@ -481,6 +481,21 @@ impl UtsimTrajetos {
         self.edit(|e| e.set_stair(&n, on)).is_some()
     }
 
+    /// Move o trajeto inteiro por `d` (Godot).
+    #[func]
+    fn mover_trajeto(&mut self, name: GString, path: bool, d: Vector3) -> bool {
+        let n = name.to_string();
+        let dm = [f64::from(d.x), -f64::from(d.z), f64::from(d.y)];
+        self.edit(|e| e.move_route(&n, path, dm)).is_some()
+    }
+
+    /// Gira o trajeto inteiro `degrees` (anti-horário visto de cima) em volta do meio.
+    #[func]
+    fn girar_trajeto(&mut self, name: GString, path: bool, degrees: f64) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.rotate_route(&n, path, degrees)).is_some()
+    }
+
     /// Curva o trecho que sai do nó `index` pela alça do meio arrastada até `at`.
     #[func]
     fn curvar(&mut self, name: GString, path: bool, index: i64, at: Vector3) -> bool {
