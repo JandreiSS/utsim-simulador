@@ -1068,6 +1068,8 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             order,
             ..
         } => {
+            // First: the kind of waiting area (a real one has places for the items).
+            out.extend(waiting_fields(s, obj));
             out.push(
                 Field::new(
                     s,
@@ -2035,6 +2037,96 @@ fn person_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
 
 /// The edit of the `person` fields, or `None` for other fields. A block already there stays,
 /// even empty.
+/// The kind of waiting area of a queue, and, for a real one, its layers and pitch.
+fn waiting_fields(s: &'static str, obj: &ObjectDef) -> Vec<Field> {
+    let w = obj.waiting_area;
+    let mut out = vec![
+        pick(
+            s,
+            "waiting_area.kind",
+            "Tipo de espera",
+            w.map_or("", |w| w.kind.name()),
+            &[
+                ("", "Fila simples (sem lugares)"),
+                ("Table", "Mesa"),
+                ("Pallet", "Palete"),
+                ("Shelf", "Estante"),
+                ("Floor", "Chão (área demarcada)"),
+            ],
+        )
+        .help(
+            "Numa espera real cada peça ocupa um lugar (o arranjo do tipo, recalculado pelas \
+             Dimensões): só sai a peça sem nada em cima, a mais antiga delas primeiro, e quem \
+             retira vai até a frente da peça. Muda o resultado. Fila simples: como antes.",
+        ),
+    ];
+    if let Some(w) = w {
+        out.push(
+            Field::new(
+                s,
+                "waiting_area.layers",
+                "Camadas",
+                FieldType::Int,
+                Value::Int(i64::from(w.layers())),
+            )
+            .min(1.0)
+            .help("Quantas peças empilhadas em cada lugar (na estante, em cada prateleira)."),
+        );
+        out.push(
+            float(s, "waiting_area.pitch", "Passo entre peças", w.pitch())
+                .min(utsim_model::espera::ITEM)
+                .unit("m")
+                .help("Distância entre os centros de duas peças vizinhas."),
+        );
+        let n = w.places(obj.size).len();
+        out.push(Field::new(
+            s,
+            "waiting_area.info",
+            "Lugares",
+            FieldType::Info,
+            Value::Text(format!("{n} lugares")),
+        ));
+    }
+    out
+}
+
+/// The edit of the `waiting_area` fields, or `None` for other fields.
+fn edit_waiting(
+    obj: &ObjectDef,
+    head: &str,
+    rest: &str,
+    value: &Value,
+) -> Option<Result<Command, String>> {
+    if head != "waiting_area" {
+        return None;
+    }
+    Some((|| {
+        let mut w = obj.waiting_area.unwrap_or_default();
+        match rest {
+            "kind" => {
+                let k = value.as_text().unwrap_or("");
+                if k.is_empty() {
+                    return Ok(set(&obj.name, "waiting_area", "None".into()));
+                }
+                w.kind = utsim_model::WaitingKind::by_name(k).ok_or_else(|| {
+                    format!("tipo de espera: Table, Pallet, Shelf ou Floor, não {k}")
+                })?;
+            }
+            "layers" => {
+                let n = usize_of(value, "camadas", 1)?;
+                w.layers = Some(u32::try_from(n).map_err(|_| "camadas demais")?);
+            }
+            "pitch" => w.pitch = Some(f64_of(value, "passo")?),
+            _ => return Err(format!("espera não tem o campo \"{rest}\"")),
+        }
+        if let Some(e) = w.problem() {
+            return Err(e);
+        }
+        let text = ::ron::to_string(&w).map_err(|e| format!("espera: {e}"))?;
+        Ok(set(&obj.name, "waiting_area", format!("Some({text})")))
+    })())
+}
+
 fn edit_person(
     obj: &ObjectDef,
     head: &str,
@@ -2641,6 +2733,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     if let Some(command) = edit_person(obj, head, rest, value) {
         return command;
     }
+    if let Some(command) = edit_waiting(obj, head, rest, value) {
+        return command;
+    }
     if rest == "on" {
         let on = bool_of(value, path)?;
         let text = if on {
@@ -3069,6 +3164,53 @@ mod tests {
             .into_iter()
             .find(|f| f.path == path)
             .unwrap_or_else(|| panic!("no field {path}"))
+    }
+
+    #[test]
+    fn the_kind_of_waiting_area_comes_first_and_is_edited_through_the_panel() {
+        let mut d = doc();
+        let fields = object_fields(d.model(), object(&d, "q"));
+        let first = fields
+            .iter()
+            .position(|f| f.path == "waiting_area.kind")
+            .unwrap();
+        let cap = fields.iter().position(|f| f.path == "capacity").unwrap();
+        assert!(first < cap);
+        assert_eq!(fields[first].value, Value::Text(String::new()));
+        assert!(!fields.iter().any(|f| f.path == "waiting_area.layers"));
+        // A pallet: its layers and pitch show, and the count of places.
+        apply(
+            &mut d,
+            "q",
+            "waiting_area.kind",
+            Value::Text("Pallet".into()),
+        );
+        let w = object(&d, "q").waiting_area.unwrap();
+        assert_eq!(w.kind, utsim_model::WaitingKind::Pallet);
+        assert_eq!(field(&d, "q", "waiting_area.layers").value, Value::Int(3));
+        assert_eq!(
+            field(&d, "q", "waiting_area.info").value,
+            Value::Text("18 lugares".into())
+        );
+        apply(&mut d, "q", "waiting_area.layers", Value::Int(2));
+        assert_eq!(
+            field(&d, "q", "waiting_area.info").value,
+            Value::Text("12 lugares".into())
+        );
+        assert!(d.to_text().contains("waiting_area"), "{}", d.to_text());
+        // Bad values are refused; back to a plain queue.
+        assert!(edit(d.model(), "q", "waiting_area.pitch", &Value::Float(0.1)).is_err());
+        assert!(
+            edit(
+                d.model(),
+                "q",
+                "waiting_area.kind",
+                &Value::Text("Mesa".into())
+            )
+            .is_err()
+        );
+        apply(&mut d, "q", "waiting_area.kind", Value::Text(String::new()));
+        assert!(object(&d, "q").waiting_area.is_none());
     }
 
     #[test]

@@ -228,6 +228,36 @@ Na interface 3D a Queue se chama **Espera**: há um só item na Biblioteca (os n
 
 Com prioridade aparece o campo **Rótulo da prioridade**, o nome do rótulo lido em cada item; empates e itens sem o rótulo saem na ordem de chegada. LIFO e `order` nunca vão juntos: escolher uma política limpa a outra. O arquivo `.ron` não muda de formato, e um modelo antigo com uma pilha abre como Espera LIFO (na cena o rótulo diz `· LIFO`).
 
+### Espera real (`waiting_area`)
+
+Uma espera pode ser um lugar de verdade: uma mesa, um palete, uma estante ou uma área marcada no chão. Cada peça ocupa então um lugar, e a física da pilha entra no resultado.
+
+```ron
+(name: "fila", kind: Queue(), position: (4.0, 0.0, 0.0), waiting_area: Some((kind: Pallet)))
+```
+
+| Tipo (`kind`) | Arranjo padrão (peças de 0,3 m, passo de 0,33 m) | Elemento 3D |
+|---|---|---|
+| `Table` (Mesa) | tampo de 1,10 × 0,66 m a 0,76 m: 3 ao longo, 2 de través, 2 camadas (12 lugares) | `espera` |
+| `Pallet` (Palete) | 1,16 × 0,96 m a 0,14 m: 3 × 2, 3 camadas (18) | `palete` |
+| `Shelf` (Estante) | 3 prateleiras (0,30, 0,75 e 1,20 m) de 1,10 × 0,52 m: 3 em cada, uma camada (9) | `estante_espera` |
+| `Floor` (Chão) | área de 1,20 × 1,00 m: 3 × 3, 2 camadas (18) | `espera_chao` |
+
+Os campos opcionais são `layers` (as camadas de cada lugar; na estante, de cada prateleira) e `pitch` (a distância entre os centros de duas peças, no mínimo 0,3 m). O `size` do objeto estica o retângulo livre na mesma medida em que o objeto cresce, e as alturas em proporção: mudar as **Dimensões** recalcula os lugares.
+
+As regras, as mesmas na simulação e no 3D:
+
+- a peça que chega ocupa o **primeiro lugar livre com apoio**. A ordem é a prateleira de baixo, a camada, a coluna a partir da saída (`+x`) e a fila a partir do lado do acesso (`-y`). Um lugar de cima só vale com o de baixo ocupado;
+- só sai a peça **sem nada em cima**. Entre essas, sai a mais antiga (FIFO), ou a mais nova com `discipline: Lifo`, ou pela prioridade com `order`. A camada de cima sai antes da de baixo, mesmo que seja mais nova;
+- a peça que sai deixa o **lugar vazio**. Ninguém arruma a espera: a próxima peça que chega ocupa o primeiro lugar livre, que pode ser esse;
+- uma peça já prometida a um transportador nunca é coberta;
+- com todos os lugares ocupados, a peça espera **ao lado** (no 3D, numa fila no chão depois da saída). Quando um lugar abre, a mais antiga delas vai para ele antes de qualquer peça nova;
+- quem retira (operador, empilhadeira) vai até a **frente do lugar da peça**, no lado do acesso, e não ao meio do objeto. Essa distância entra no tempo de deslocamento e muda o resultado.
+
+Uma espera real ainda não combina com `batch`, `gather` nem `waves`. Sem `waiting_area`, a fila é a de sempre, com o mesmo resultado.
+
+No painel, **Tipo de espera** é a primeira opção da Espera: Fila simples (sem lugares), Mesa, Palete, Estante ou Chão. Com um tipo escolhido aparecem **Camadas**, **Passo entre peças** e a contagem de lugares. No 3D cada peça aparece no seu lugar e o lugar fica vazio quando ela sai.
+
 **Use** uma Queue entre duas etapas para absorver variações. Uma fila de capacidade pequena cria **bloqueio**: a etapa anterior para quando o buffer enche. Estados: `empty` e `releasing`. A fila é o lugar certo para medir o tempo de espera (`staytime`).
 
 ## Processor (Processo)

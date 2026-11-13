@@ -264,6 +264,64 @@ pub struct FrameData {
 /// point) and still be put at the station's `ponto_operador`, metres.
 pub const POST_REACH: f32 = 2.0;
 
+/// A real waiting area in the 3D view ([`utsim_model::WaitingArea`]): the centre of the
+/// base of each place in the object's own frame (Godot axes: `x` towards the exit, `y`
+/// up, `z` towards the back), and where the object stands.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Espera3d {
+    pub places: Vec<[f32; 3]>,
+    /// Where the row of items waiting beside the area starts (past its exit end).
+    pub beside_x: f32,
+    pub root: [f32; 3],
+    pub turn: f32,
+}
+
+/// Items drawn in the row beside a full waiting area; the others are only counted.
+pub const BESIDE_MAX: usize = 6;
+
+impl Espera3d {
+    pub fn new(
+        w: &utsim_model::WaitingArea,
+        size: Option<[f64; 3]>,
+        root: [f32; 3],
+        turn: f32,
+    ) -> Espera3d {
+        let places = w
+            .places(size)
+            .iter()
+            .map(|p| to_godot(p.center.map(|v| v as f32)))
+            .collect();
+        let half = size.unwrap_or_else(|| w.default_size())[0] as f32 / 2.0;
+        Espera3d {
+            places,
+            beside_x: half + ITEM_SIZE,
+            root,
+            turn,
+        }
+    }
+
+    /// The `k`-th item beside the area (on the floor, in a row past its exit end), or
+    /// `None` past [`BESIDE_MAX`].
+    pub fn beside(&self, k: usize) -> Option<[f32; 3]> {
+        (k < BESIDE_MAX).then(|| [self.beside_x + k as f32 * ITEM_SIZE * 1.1, 0.0, 0.0])
+    }
+
+    /// The centre of an item whose base is at `local` (the object's frame), in the layout.
+    pub fn to_layout(&self, local: [f32; 3]) -> [f32; 3] {
+        let w = turned(local, self.turn);
+        [
+            self.root[0] + w[0],
+            self.root[1] + w[1] + ITEM_SIZE / 2.0,
+            self.root[2] + w[2],
+        ]
+    }
+
+    /// Items not drawn (past the places and the row beside the area).
+    pub fn hidden(&self, content: usize) -> usize {
+        content.saturating_sub(self.places.len() + BESIDE_MAX)
+    }
+}
+
 /// Distance between operators who work at the same station together (operators per
 /// piece), side by side across its post, metres.
 pub const POST_SPACING: f32 = 0.7;
@@ -402,6 +460,9 @@ pub struct Playback {
     /// Per drawn block, the top of the waiting table a queue is drawn with (`espera`) and
     /// where the table is placed; `None` for the others.
     pub tampos: Vec<Option<(modelos3d::Tampo, modelos3d::Placement)>>,
+    /// Per drawn block, the real waiting area of a queue (`waiting_area`): its places and
+    /// where it stands; `None` for the others.
+    pub esperas: Vec<Option<Espera3d>>,
     /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
     /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
     vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
@@ -445,7 +506,21 @@ impl Playback {
                 }
                 _ => continue,
             };
-            let visual = scene.visual(b);
+            // A queue with a real waiting area is drawn with the element of its kind (the
+            // table, the pallet, the shelf, the marked floor).
+            let espera_visual = model
+                .and_then(|m| m.objects.iter().find(|o| o.name == name))
+                .and_then(|o| o.waiting_area.filter(|_| kind == "Queue"))
+                .filter(|w| {
+                    catalogo
+                        .as_ref()
+                        .is_some_and(|c| c.get(w.element()).is_some())
+                })
+                .map(|w| utsim_model::VisualDef {
+                    asset: Some(w.element().to_string()),
+                    ..scene.visual(b).cloned().unwrap_or_default()
+                });
+            let visual = espera_visual.as_ref().or(scene.visual(b));
             let mut look = looks::look_of(&kind, role, visual, &scene.geoms[b], ctx, model_dir);
             let (modelo3d, pessoa) = match &catalogo {
                 Some(cat) => blender_look(cat, &mut look, &name, visual, model, |v| {
@@ -584,6 +659,7 @@ impl Playback {
             modelos3d: catalogo,
             animados: Vec::new(),
             tampos: Vec::new(),
+            esperas: Vec::new(),
             vivo: std::sync::OnceLock::new(),
             rastro: std::sync::Mutex::new(None),
         }
@@ -623,10 +699,28 @@ impl Playback {
             }
         }
         self.animados = animados;
+        self.esperas = (0..self.blocks.len())
+            .map(|i| {
+                let v = &self.blocks[i];
+                let o = self
+                    .model
+                    .as_ref()?
+                    .objects
+                    .iter()
+                    .find(|o| o.name == v.name)?;
+                let w = o.waiting_area.filter(|_| v.kind == "Queue")?;
+                Some(Espera3d::new(
+                    &w,
+                    o.size,
+                    self.static_pose(i).0,
+                    self.turn(i),
+                ))
+            })
+            .collect();
         self.tampos = (0..self.blocks.len())
             .map(|i| {
                 let v = &self.blocks[i];
-                if v.kind != "Queue" {
+                if v.kind != "Queue" || self.esperas[i].is_some() {
                     return None;
                 }
                 let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
@@ -1063,8 +1157,11 @@ impl Playback {
             // A queue drawn as a conveyor (or on a waiting table) counts what does not fit
             // on its belt (its top).
             let i = self.index_of[b].unwrap_or(usize::MAX);
-            let hidden = match self.tampos.get(i) {
-                Some(Some((tampo, at))) => tampo.hidden(content, ITEM_SIZE / at.scale.max(1e-6)),
+            let hidden = match (self.esperas.get(i), self.tampos.get(i)) {
+                (Some(Some(e)), _) => e.hidden(content),
+                (_, Some(Some((tampo, at)))) => {
+                    tampo.hidden(content, ITEM_SIZE / at.scale.max(1e-6))
+                }
                 _ => v
                     .look
                     .as_ref()
@@ -1088,6 +1185,8 @@ impl Playback {
         let mut stacked: HashMap<usize, usize> = HashMap::new();
 
         let mut resting: HashMap<usize, usize> = HashMap::new();
+        // Items beside a full waiting area, per block.
+        let mut beside: HashMap<usize, usize> = HashMap::new();
         // Queues drawn as conveyors: an item flying in or out does not sink into the belt.
         let belts: Vec<([f32; 3], looks::QueueBelt)> = (0..self.blocks.len())
             .filter_map(|i| {
@@ -1194,6 +1293,25 @@ impl Playback {
                         center[1] - simple[1] + at[1],
                         center[2] - simple[2] + at[2],
                     ];
+                } else if let Some(Some(e)) = self.esperas.get(i) {
+                    // On its own place (the one the simulation gave it), or beside the area
+                    // while every place is taken.
+                    let place = s
+                        .timeline
+                        .rack_slot(v.b, p.item, t)
+                        .and_then(|k| e.places.get(k).copied());
+                    let local = match place {
+                        Some(c) => c,
+                        None => {
+                            let k = beside.entry(i).or_default();
+                            let Some(c) = e.beside(*k) else {
+                                continue;
+                            };
+                            *k += 1;
+                            c
+                        }
+                    };
+                    center = e.to_layout(local);
                 } else if let Some(Some((tampo, at))) = self.tampos.get(i) {
                     // On the top of the waiting table, in its grid.
                     let k = resting.entry(i).or_default();
@@ -1943,6 +2061,61 @@ mod tests {
             "{}",
             f.label[q]
         );
+    }
+
+    #[test]
+    fn a_real_waiting_area_draws_each_item_on_its_place() {
+        let text = |area: &str| {
+            format!(
+                r#"Model(
+                    name: "espera real",
+                    run: (stop_time: 60.0, seed: 1, replications: 1),
+                    objects: [
+                        (name: "fonte", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(5)),
+                         position: (0.0, 0.0, 0.0)),
+                        (name: "fila", kind: Queue(), position: (4.0, 0.0, 0.0), visual: (yaw: 90.0){area}),
+                        (name: "maquina", kind: Processor(process: Const(10.0)), position: (8.0, 0.0, 0.0)),
+                        (name: "saida", kind: Sink, position: (12.0, 0.0, 0.0)),
+                    ],
+                    connections: [("fonte", "fila"), ("fila", "maquina"), ("maquina", "saida")],
+                )"#
+            )
+        };
+        // One column, two layers: 2 under, 3 on top, 4 and 5 beside the table.
+        let model = Model::parse(&text(
+            ", waiting_area: Some((kind: Table, pitch: Some(0.6)))",
+        ))
+        .unwrap();
+        let replay = model.replay(0).unwrap();
+        let pb = Playback::new(&replay, Some(&model), None, false);
+        let q = pb.blocks.iter().position(|v| v.name == "fila").unwrap();
+        let e = pb.esperas[q].as_ref().expect("espera real");
+        assert_eq!(e.places.len(), 2);
+        assert!(pb.tampos[q].is_none());
+        // At 8 s every item has arrived (the last one flies in until a little after 4 s).
+        let f = pb.frame(8.0);
+        let at = |local: [f32; 3]| e.to_layout(local);
+        let near = |a: [f32; 3], b: [f32; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-4);
+        let drawn: Vec<[f32; 3]> = f.item_position.clone();
+        // The two places (turned with the queue: 90 degrees) and the row beside it.
+        for want in [
+            at(e.places[0]),
+            at(e.places[1]),
+            at(e.beside(0).unwrap()),
+            at(e.beside(1).unwrap()),
+        ] {
+            assert!(
+                drawn.iter().any(|p| near(*p, want)),
+                "{want:?} not in {drawn:?}"
+            );
+        }
+        // The one on top is right above the one under it.
+        assert!((at(e.places[1])[1] - at(e.places[0])[1] - ITEM_SIZE).abs() < 1e-5);
+        // Nothing hidden yet: 4 waiting, 2 places + the row.
+        assert!(!f.label[q].contains('+'), "{}", f.label[q]);
+        // At 15 s the top one left: its place was taken by one from beside the table.
+        let f = pb.frame(15.0);
+        assert!(f.item_position.iter().any(|p| near(*p, at(e.places[1]))));
     }
 
     #[test]
