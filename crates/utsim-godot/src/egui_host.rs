@@ -64,6 +64,9 @@ pub struct Host {
     pub form_mem: FormMemory,
     /// The modal dialog shown over everything (discard changes, shortcuts), if any.
     pub dialog: Option<ui_form::Dialog>,
+    /// The preferences of this computer (Configurações), and whether their window is open.
+    pub preferencias: crate::preferencias::Preferencias,
+    pub config_open: bool,
     /// The "Valores reais…" window of a distribution field, if open.
     pub fitwin: Option<crate::ui_fitwin::FitWin>,
     /// The window just closed by a choice, for the bridge to read the values from.
@@ -103,14 +106,24 @@ impl Host {
     pub fn new() -> Self {
         let ctx = Context::default();
         utsim_ui_tema::install(&ctx);
+        // The tests of this crate never read the user's file.
+        let preferencias = if cfg!(test) {
+            crate::preferencias::Preferencias::default()
+        } else {
+            crate::preferencias::Preferencias::carregar()
+        };
+        let mut props_state = PropsState::default();
+        props_state.code_default = preferencias.distribuicao_codigo;
         Host {
+            preferencias,
+            config_open: false,
             ctx,
             events: Vec::new(),
             reg: Registry::default(),
             bar: BarState::default(),
             bar_mem: BarMemory::default(),
             props: None,
-            props_state: PropsState::default(),
+            props_state,
             left: false,
             edit: EditView::default(),
             sim: SimView::default(),
@@ -383,6 +396,7 @@ impl Host {
         let mut central = self.central;
         let mut panels = Vec::new();
         let (reg, bar, mem) = (&mut self.reg, &self.bar, &mut self.bar_mem);
+        let mut codigo = self.props_state.code_default;
         let (props, pst) = (&self.props, &mut self.props_state);
         let (left, edit, sim, lmem) = (self.left, &self.edit, &self.sim, &mut self.left_mem);
         let (status, play) = (&self.status, &self.play);
@@ -394,6 +408,8 @@ impl Host {
         let (form, fmem) = (self.form.as_ref(), &mut self.form_mem);
         let (dialog, perf) = (self.dialog.as_ref(), self.perf.as_str());
         let fitwin = &mut self.fitwin;
+        let config_open = self.config_open;
+        let mut config_changed = false;
         let (flows, flmem) = (
             self.flows.as_ref().filter(|_| self.flows_open),
             &mut self.flows_mem,
@@ -502,6 +518,10 @@ impl Host {
                 crate::ui_fitwin::show(ui.ctx(), fw, reg, &mut actions);
                 panels.push(screen);
             }
+            if config_open {
+                config_changed |= crate::ui_config::show(ui.ctx(), &mut codigo, reg, &mut actions);
+                panels.push(screen);
+            }
             if let Some(d) = dialog {
                 // Over everything; egui's modal keeps the panels under it from clicks.
                 if let Some(a) = ui_form::show_dialog(ui.ctx(), d, reg) {
@@ -509,6 +529,38 @@ impl Host {
                 }
             }
         });
+        // Configurações is the host's: open, close, and the mode chosen (saved at once).
+        if config_changed {
+            self.props_state.code_default = codigo;
+            self.preferencias.distribuicao_codigo = codigo;
+            if !cfg!(test)
+                && let Err(e) = self.preferencias.gravar()
+            {
+                eprintln!("UTSim 3D: as configurações não foram gravadas: {e}");
+            }
+        }
+        let before = actions.len();
+        let mut opened = false;
+        let mut closed = false;
+        actions.retain(|a| match a.as_str() {
+            "configuracoes" => {
+                opened = true;
+                false
+            }
+            "configuracoes:fechar" => {
+                closed = true;
+                false
+            }
+            _ => true,
+        });
+        if opened {
+            self.config_open = true;
+        } else if closed {
+            self.config_open = false;
+        }
+        if actions.len() != before || config_changed {
+            self.dirty = true;
+        }
         if actions.iter().any(|a| a == "resultados:fechar") {
             self.results_open = false;
             self.dirty = true;
