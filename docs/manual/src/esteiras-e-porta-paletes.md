@@ -64,7 +64,7 @@ O que a geometria muda no resultado:
 - **Capacidade:** comprimento ÷ `item_length`.
 - **Curva:** o arco é tangente aos dois trechos e fica no plano do piso. Se o raio não cabe, ele diminui até o ponto de tangência chegar à metade do trecho mais curto. O arco de raio `r` que vira θ encurta o caminho em `2r·tan(θ/2) − r·θ`.
 - **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
-- **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora.
+- **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora. Onde a parte de baixo da estrutura (0,14 m abaixo da superfície) fica a 2,2 m do piso ou mais, dá para passar por baixo: ali só as pernas, sob os nós, são obstáculo.
 
 #### Inclinação máxima
 
