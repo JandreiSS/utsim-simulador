@@ -411,6 +411,23 @@ impl UtsimTrajetos {
             .is_some()
     }
 
+    /// Curva o trecho que sai do nó `index` pela alça do meio arrastada até `at`.
+    #[func]
+    fn curvar(&mut self, name: GString, path: bool, index: i64, at: Vector3) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.bend(&n, path, index.max(0) as usize, m(at)))
+            .is_some()
+    }
+
+    /// Trajeto paralelo a `offset` m (positivo: à esquerda do sentido); devolve o nome ou "".
+    #[func]
+    fn paralelo(&mut self, name: GString, path: bool, offset: f64) -> GString {
+        let n = name.to_string();
+        self.edit(|e| e.parallel(&n, path, offset))
+            .map(|s| GString::from(s.as_str()))
+            .unwrap_or_default()
+    }
+
     /// Rampas de acesso de pedestre (1:12) nas pontas altas de um caminho; devolve
     /// quantas pôs (0: nenhuma, ver `last_error`).
     #[func]

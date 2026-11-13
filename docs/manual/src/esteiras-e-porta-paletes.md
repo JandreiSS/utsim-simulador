@@ -94,7 +94,11 @@ No Editar, o grupo Mover da Biblioteca tem três ferramentas: "Esteira desenhada
 - **Comprimento exato:** com o cursor apontando a direção, digite o comprimento do trecho (por exemplo `3,5`) e tecle Enter: o nó vai a exatamente essa distância (em 3D, com a altura do próximo nó). Backspace apaga o que foi digitado.
 - **Terminar:** Enter ou duplo clique. Backspace volta um nó, e Esc cancela. A esteira se liga ao objeto ou à esteira onde começa e onde acaba.
 - **Continuar:** um clique no primeiro ou no último nó de uma esteira começa outra ali, como uma rua que segue.
-- **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó. Tudo se desfaz com Ctrl+Z.
+- **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó.
+- **Curvar um trecho:** com o trajeto selecionado, cada trecho mostra um losango laranja no meio. Arraste-o: nasce ali um nó com o maior raio que cabe, e o trecho vira uma curva suave.
+- **Paralelo:** no painel, "Paralelo a (m)" e "Desenhar paralelo" criam outro trajeto ao lado, à esquerda do sentido (negativo: à direita), com as mesmas alturas e as curvas concêntricas (o raio de dentro diminui, o de fora aumenta). A esteira paralela é do mesmo tipo e não se liga a nada.
+
+Tudo se desfaz com Ctrl+Z.
 
 ## Rack (Porta-paletes)
 

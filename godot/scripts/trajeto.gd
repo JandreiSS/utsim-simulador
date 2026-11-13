@@ -47,6 +47,8 @@ const PATH := Color(0.95, 0.85, 0.30)
 const SELECTED := Color(1.0, 0.97, 0.60)
 const STEEP := Color(1.0, 0.35, 0.25)
 const STICK := Color(0.85, 0.88, 0.95, 0.8)
+## The curve handles in the middle of the segments of the selected route.
+const CURVE := Color(1.0, 0.62, 0.20)
 
 var main: Node
 var editor: EditorUtsim
@@ -63,6 +65,8 @@ var end_port := {}
 var draw_z := BELT_HEIGHT
 var new_radius := 0.0
 var path_width := 1.2
+## Distance (m) of a parallel route; positive is to the left of the way.
+var parallel_dist := 1.0
 ## `UtsimTrajetos.esteiras()` and `caminhos()`.
 var belts: Array = []
 var paths: Array = []
@@ -232,6 +236,17 @@ func _handle_at(p: Vector2) -> Dictionary:
 					if d <= best_d:
 						best_d = d
 						best = {"name": r["name"], "path": path, "index": i, "handle": s[1]}
+			# The curve handles: the middle of each segment of the selected route.
+			if r["name"] != sel_name or path != sel_path:
+				continue
+			for i in nodes.size() - 1:
+				var sp = _screen(nodes[i].lerp(nodes[i + 1], 0.5))
+				if sp == null:
+					continue
+				var d: float = (sp as Vector2).distance_to(p)
+				if d <= best_d:
+					best_d = d
+					best = {"name": r["name"], "path": path, "index": i, "handle": "curva"}
 	return best
 
 
@@ -241,6 +256,15 @@ func press(p: Vector2, shift: bool) -> void:
 		_add_point(p)
 		return
 	var h := _handle_at(p)
+	if not h.is_empty() and h["handle"] == "curva":
+		var rc := _route(h["name"], h["path"])
+		var ns: PackedVector3Array = rc["nodes"]
+		_press = h.duplicate()
+		_press["pos"] = p
+		_press["from"] = ns[int(h["index"])].lerp(ns[int(h["index"]) + 1], 0.5)
+		_dragging = false
+		main.set_status("Arraste para curvar o trecho %d de %s." % [int(h["index"]) + 1, sel_name])
+		return
 	if not h.is_empty():
 		var same: bool = h["name"] == sel_name and h["path"] == sel_path
 		if shift and same:
@@ -357,6 +381,15 @@ func drag(p: Vector2) -> void:
 	var from: Vector3 = _press["from"]
 	if _press["handle"] == "z":
 		_drag_at = Vector3(from.x, _height_under(p, from), from.z)
+	elif _press["handle"] == "curva":
+		var at = editor.floor_at(p)
+		if at == null:
+			return
+		var step: float = main.snap_step()
+		var v: Vector3 = at
+		if step > 0.0:
+			v = Vector3(snappedf(v.x, step), 0.0, snappedf(v.z, step))
+		_drag_at = Vector3(v.x, from.y, v.z)
 	else:
 		var at = editor.floor_at(p)
 		if at == null:
@@ -436,6 +469,16 @@ func release(_p: Vector2) -> void:
 	var name: String = pr["name"]
 	var path: bool = pr["path"]
 	var ok: bool
+	if pr["handle"] == "curva":
+		ok = tr.curvar(name, path, int(pr["index"]), _drag_at)
+		if ok:
+			main.after_edit()
+			_select(name, path, PackedInt32Array([int(pr["index"]) + 1]))
+			main.set_status("Trecho curvado: nó %d com raio de %s m (Ctrl+Z desfaz)." % [int(pr["index"]) + 2,
+				_num((_route(name, path)["radii"] as PackedFloat64Array)[int(pr["index"]) + 1])])
+		else:
+			main.set_status("Não curvou: %s" % tr.last_error())
+		return
 	if sel_nodes.size() > 1 and int(pr["index"]) in sel_nodes:
 		ok = tr.deslocar(name, path, sel_nodes, _drag_at - from)
 	else:
@@ -691,6 +734,8 @@ func panel() -> Array:
 	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
 	if r["too_steep"]:
 		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
+	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
+	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": "Desenhar paralelo", "action": "trajeto_paralelo"})
 	if sel_path and (nodes[0].y > 0.001 or nodes[nodes.size() - 1].y > 0.001):
 		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": "Rampas de acesso nas pontas (1:12)", "action": "trajeto_rampas"})
 	if not sel_path:
@@ -715,7 +760,7 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó."})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo."})
 	return rows
 
 
@@ -764,6 +809,9 @@ func form(what: String, value: String) -> void:
 		"trajeto_largura_caminho":
 			path_width = maxf(v, 0.3)
 			return
+		"trajeto_paralelo_dist":
+			parallel_dist = v
+			return
 	if r.is_empty():
 		return
 	var ok := true
@@ -804,6 +852,14 @@ func form(what: String, value: String) -> void:
 		"trajeto_excluir_no":
 			delete_selected()
 			return
+		"trajeto_paralelo":
+			var other: String = tr.paralelo(sel_name, sel_path, parallel_dist)
+			ok = other != ""
+			if ok:
+				main.after_edit()
+				_select(other, sel_path, PackedInt32Array())
+				main.set_status("%s desenhado a %s m de %s." % [other, _num(parallel_dist), r["name"]])
+				return
 		"trajeto_rampas":
 			var k: int = tr.rampas_de_acesso(sel_name)
 			ok = k > 0
@@ -843,9 +899,19 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 	for i in line.size() - 1:
 		e._ribbon(line[i] + lift, line[i + 1] + lift, 0.10 if sel else 0.06, color)
 	var nodes: PackedVector3Array = r["nodes"]
+	var bending: bool = sel and _dragging and _press.get("handle", "") == "curva"
+	if sel:
+		for i in nodes.size() - 1:
+			var mid := nodes[i].lerp(nodes[i + 1], 0.5)
+			if bending and i == int(_press["index"]):
+				# The bend being dragged: the two legs to the new node.
+				e._ribbon(nodes[i] + lift, _drag_at + lift, 0.08, CURVE)
+				e._ribbon(_drag_at + lift, nodes[i + 1] + lift, 0.08, CURVE)
+				mid = _drag_at
+			_diamond(e, mid + Vector3(0, 0.02, 0), 0.16, CURVE)
 	for i in nodes.size():
 		var n := nodes[i]
-		if _dragging and sel and i == int(_press.get("index", -1)):
+		if _dragging and sel and not bending and i == int(_press.get("index", -1)):
 			n = _drag_at
 		var picked := sel and i in sel_nodes
 		var c := DRAWING if picked else (SELECTED if sel else Color(0.92, 0.94, 0.98))

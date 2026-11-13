@@ -27,6 +27,8 @@ pub const IDS: [&str; 3] = [BELT_SIMPLE, BELT_CHANNELED, FLOOR_PATH];
 pub const BELT_HEIGHT: f64 = 0.8;
 /// Largura padrão de um caminho novo (m): a passagem principal de pedestres.
 pub const PATH_WIDTH: f64 = 1.2;
+/// Raio pedido ao curvar um trecho pela alça do meio: reduzido ao maior que cabe.
+pub const BEND_RADIUS: f64 = 1000.0;
 /// Comprimento em planta de uma rampa de pedestre por metro de altura (1:12, 8,33 %).
 pub const RAMP_RUN: f64 = 12.0;
 /// Passo do encaixe de ângulo (graus).
@@ -697,6 +699,125 @@ impl Editor {
         })
     }
 
+    /// Curva o trecho que sai do nó `index` (a alça do meio dele arrastada até `p`): um nó
+    /// novo em `p` com o maior raio que cabe, para o trajeto fazer uma curva suave no lugar
+    /// da reta. Um passo de desfazer.
+    pub fn bend(
+        &mut self,
+        name: &str,
+        path: bool,
+        index: usize,
+        p: [f64; 3],
+    ) -> Result<(), String> {
+        let p = round3(p);
+        let fit = |nodes: &mut Vec<PathNode>, at: usize| {
+            nodes[at].radius = Some(BEND_RADIUS);
+            let r = utsim_nav::path3d::fillet(nodes, at).map_or(0.0, |f| f.radius);
+            nodes[at].radius = (r > 0.0).then_some(round_mm(r));
+        };
+        if path {
+            return self.edit_path(name, |a| {
+                let at = (index + 1).min(a.points.len());
+                a.insert_point(at, [p[0], p[1]], p[2]);
+                let mut nodes = a.nodes();
+                fit(&mut nodes, at);
+                a.set_radius(at, nodes[at].radius.unwrap_or(0.0));
+            });
+        }
+        self.edit_route(name, |r, o| {
+            let at = (index + 1).min(r.nodes.len());
+            r.nodes
+                .insert(at, PathNode::new([p[0] - o[0], p[1] - o[1], p[2] - o[2]]));
+            fit(&mut r.nodes, at);
+        })
+    }
+
+    /// Um trajeto novo ao lado deste, a `offset` m (positivo: à esquerda do sentido), com
+    /// as mesmas alturas e as curvas concêntricas (o raio de dentro diminui, o de fora
+    /// aumenta). A esteira nova é do mesmo tipo e não se liga a nada. Devolve o nome.
+    pub fn parallel(&mut self, name: &str, path: bool, offset: f64) -> Result<String, String> {
+        if !(offset.is_finite() && offset.abs() > 1e-3) {
+            return Err("a distância do paralelo deve ser diferente de zero".into());
+        }
+        let (nodes, kind_width): (Vec<PathNode>, Option<(AisleKind, f64)>) = if path {
+            let a = self
+                .model()
+                .aisles
+                .iter()
+                .find(|a| a.name == name)
+                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+            (a.nodes(), Some((a.kind, a.width)))
+        } else {
+            let (o, r) = self.route_of(name)?;
+            let abs = abs_nodes(o, &r);
+            (
+                r.nodes
+                    .iter()
+                    .zip(abs)
+                    .map(|(n, at)| PathNode {
+                        at,
+                        radius: n.radius,
+                    })
+                    .collect(),
+                None,
+            )
+        };
+        let plan: Vec<[f64; 2]> = nodes.iter().map(|n| [n.at[0], n.at[1]]).collect();
+        let moved = utsim_nav::aisles::offset_polyline(&plan, offset);
+        let n = nodes.len();
+        let mut pts = Vec::with_capacity(n);
+        let mut radii = Vec::with_capacity(n);
+        for i in 0..n {
+            pts.push([moved[i][0], moved[i][1], nodes[i].at[2]]);
+            let r = nodes[i].radius.unwrap_or(0.0);
+            let turn = if i > 0 && i + 1 < n {
+                let (a, b, c) = (plan[i - 1], plan[i], plan[i + 1]);
+                let cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+                cross.signum()
+            } else {
+                0.0
+            };
+            // Turning left, the left side is the inside of the curve.
+            radii.push(if r > 0.0 {
+                (r - offset * turn).max(0.0)
+            } else {
+                0.0
+            });
+        }
+        if let Some((kind, width)) = kind_width {
+            let made = self.add_floor_path(&pts, &radii, width)?;
+            if kind != AisleKind::Pedestrian {
+                let mut a = self
+                    .model()
+                    .aisles
+                    .iter()
+                    .find(|a| a.name == made)
+                    .cloned()
+                    .ok_or("o caminho novo sumiu")?;
+                a.kind = kind;
+                self.apply(Command::SetAisle {
+                    name: made.clone(),
+                    aisle: Box::new(a),
+                })?;
+            }
+            return Ok(made);
+        }
+        let (_, r) = self.route_of(name)?;
+        let tool = if r.style == BeltStyle::Channeled {
+            BELT_CHANNELED
+        } else {
+            BELT_SIMPLE
+        };
+        let made = self.add_belt_route(tool, &pts, &radii, None, None)?;
+        // Same drive and width as the original.
+        let (_, mut nr) = self.route_of(&made)?;
+        nr.drive = r.drive;
+        nr.width = r.width;
+        nr.max_slope = r.max_slope;
+        self.put_route(&made, nr)?;
+        Ok(made)
+    }
+
     /// Divide o trecho que sai do nó `index` com um nó novo em `p` (absoluto).
     pub fn insert_route_node(
         &mut self,
@@ -1154,6 +1275,49 @@ mod tests {
         assert!(e.access_ramps(&name).is_err());
         e.doc.undo();
         assert_eq!(e.model().aisles[0].points.len(), 2);
+    }
+
+    #[test]
+    fn dragging_the_middle_of_a_segment_bends_it() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [10.0, 0.0, 0.8]]);
+        e.bend(&name, false, 0, [5.0, 3.0, 0.8]).unwrap();
+        let r = &routes(e.model())[0];
+        assert_eq!(r.nodes.len(), 3);
+        // The largest radius that fits: tangent points halfway along both legs.
+        assert!(r.radii[1] > 1.0);
+        let straight = 2.0 * (25.0f64 + 9.0).sqrt();
+        assert!(r.length < straight && r.length > 10.0, "{}", r.length);
+        e.doc.undo();
+        assert_eq!(routes(e.model())[0].nodes.len(), 2);
+    }
+
+    #[test]
+    fn a_parallel_belt_keeps_heights_and_concentric_curves() {
+        let mut e = Editor::new("t");
+        let name = e
+            .add_belt_route(
+                BELT_CHANNELED,
+                &[[0.0, 0.0, 0.8], [10.0, 0.0, 0.8], [10.0, 10.0, 1.8]],
+                &[0.0, 3.0, 0.0],
+                None,
+                None,
+            )
+            .unwrap();
+        // 1 m to the left: the left is the inside of this left turn.
+        let other = e.parallel(&name, false, 1.0).unwrap();
+        let rows = routes(e.model());
+        let r = rows.iter().find(|r| r.name == other).unwrap();
+        assert_eq!(r.style, BeltStyle::Channeled);
+        assert_eq!(r.nodes[0], [0.0, 1.0, 0.8]);
+        assert_eq!(r.nodes[2][2], 1.8);
+        assert!((r.radii[1] - 2.0).abs() < 1e-9);
+        let path = e
+            .add_floor_path(&[[0.0, -5.0, 0.0], [10.0, -5.0, 0.0]], &[], 0.0)
+            .unwrap();
+        let p2 = e.parallel(&path, true, -2.0).unwrap();
+        let a = e.model().aisles.iter().find(|a| a.name == p2).unwrap();
+        assert_eq!(a.points[0], [0.0, -7.0]);
     }
 
     #[test]
