@@ -404,6 +404,7 @@ mod tests {
             speed,
             item_length,
             accumulating,
+            ..
         } = object(&doc, "esteira").kind
         else {
             unreachable!()

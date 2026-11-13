@@ -1377,6 +1377,7 @@ impl Editor<'_> {
                 speed,
                 item_length,
                 accumulating,
+                ..
             } => {
                 self.float_field(ui, "Comprimento", "length", *length);
                 self.float_field(ui, "Velocidade", "speed", *speed);

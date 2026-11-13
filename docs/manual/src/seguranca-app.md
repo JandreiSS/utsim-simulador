@@ -28,6 +28,8 @@ As edições ficam num rascunho até você usar "Gravar", para que cada tecla di
 
 Quando o posto está ligado a um nó do modelo, os perigos gravados no próprio nó (aba Segurança do nó, no UTSim ou na tela Modelo) também aparecem no inventário, marcados "no nó do modelo". Eles entram nos alertas e no relatório, e as ações e as reavaliações deles ficam na unidade, como as dos outros perigos. Para mudar a descrição, o grupo, os controles, a probabilidade ou a severidade, edite no nó. O inventário relê o modelo quando o arquivo muda.
 
+Na etapa 2, o botão "Editar no nó" de um perigo do nó abre a tela Modelo já nesse nó. Um perigo da unidade, num posto ligado a um nó, tem o botão "Levar para o nó": ele grava o perigo na aba Segurança do nó e o tira da unidade, e as ações e as reavaliações dele passam a valer para o perigo no nó. Para isso o app toma a trava do modelo por um instante. Se outra pessoa ou outro app edita o modelo, nada muda e a barra de estado diz quem edita. Se a tela Modelo tem mudança por gravar no mesmo arquivo, grave ou desfaça antes.
+
 ## Matriz
 
 A matriz padrão é uma grade própria de 5 por 5, com níveis baixo, médio, alto e crítico. Na tela Matriz, clique numa célula para trocar o nível dela e edite os nomes, as cores e as decisões dos níveis. É possível importar a matriz da sua empresa por CSV (de 3 por 3 até 5 por 5) e exportá-la. Uma matriz em que mais probabilidade ou mais severidade baixa o nível é recusada, e o programa mostra o motivo. "Gravar na unidade" faz a matriz valer para toda a unidade.
