@@ -334,6 +334,8 @@ impl Editor {
             two_way,
             secondary: false,
             profile: None,
+            heights: Vec::new(),
+            radii: Vec::new(),
         })))?;
         Ok(name)
     }
@@ -370,7 +372,10 @@ impl Editor {
         if index >= self.aisle(name)?.points.len() {
             return Err("vértice inexistente".into());
         }
-        self.replace_aisle(name, |a| a.points.insert(index + 1, rounded(p)))
+        self.replace_aisle(name, |a| {
+            let z = a.heights.get(index).copied().unwrap_or(0.0);
+            a.insert_point(index + 1, rounded(p), z)
+        })
     }
 
     /// Removes a vertex; an aisle keeps at least two.
@@ -383,7 +388,7 @@ impl Editor {
             return Err("vértice inexistente".into());
         }
         self.replace_aisle(name, |a| {
-            a.points.remove(index);
+            a.remove_point(index);
         })
     }
 
@@ -431,7 +436,7 @@ impl Editor {
 
     /// Turns a one-way aisle around.
     pub fn reverse_aisle(&mut self, name: &str) -> Result<(), String> {
-        self.replace_aisle(name, |a| a.points.reverse())
+        self.replace_aisle(name, |a| a.reverse())
     }
 
     /// The access point of `object` as the floor point `p` (snapped to `step`, 0: no

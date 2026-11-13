@@ -138,7 +138,34 @@ pub fn palette() -> Vec<PaletteEntry> {
                 e
             }
         })
+        .chain(path_tools())
         .collect()
+}
+
+/// As três ferramentas de desenho por nós ([`crate::path_edit`]): não se colocam com um
+/// clique, armam a ferramenta "trajeto" (cada clique põe um nó).
+fn path_tools() -> [PaletteEntry; 3] {
+    let belt = |id, label, name_base| PaletteEntry {
+        id,
+        kind: "Conveyor",
+        label,
+        category: utsim_edit::CATEGORIES[2],
+        name_base,
+        asset: None,
+    };
+    [
+        belt(
+            crate::path_edit::BELT_SIMPLE,
+            "Esteira desenhada",
+            "esteira",
+        ),
+        belt(
+            crate::path_edit::BELT_CHANNELED,
+            "Esteira com canaletas",
+            "esteira_canaletas",
+        ),
+        belt(crate::path_edit::FLOOR_PATH, "Caminho no piso", "caminho"),
+    ]
 }
 
 pub fn palette_entry(id: &str) -> Option<PaletteEntry> {
@@ -392,6 +419,9 @@ impl Editor {
             let (name, command) = placed?;
             self.apply(command)?;
             return Ok(name);
+        }
+        if crate::path_edit::tool_of(id).is_some() {
+            return Err("desenhe clicando os nós no chão (Enter termina)".into());
         }
         let entry = palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
         let name = self.doc.unique_name(entry.name_base);
@@ -993,6 +1023,12 @@ pub fn palette_model(id: &str) -> Option<Model> {
     if id.contains('/') {
         return crate::linha::preset_model(id);
     }
+    // The drawing tools have no ghost of their own: a straight belt stands for them.
+    let id = if crate::path_edit::tool_of(id).is_some() {
+        "Conveyor"
+    } else {
+        id
+    };
     let mut doc = Document::new("fantasma");
     let base = palette_entry(id)?.name_base;
     doc.apply(add_command(id, base, [0.0; 3])?).ok()?;

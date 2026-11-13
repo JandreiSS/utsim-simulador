@@ -280,3 +280,76 @@ O teste `as_pessoas_tem_corpo_epis_e_o_esqueleto_do_ual1` confere quatro coisas:
 O teste `o_homem_e_a_mulher_tem_corpos_diferentes` confere que o quadril dela é mais largo e
 que a cintura e o peito dela são mais estreitos que os dele.
 
+## Clipes de pessoa corrigidos (`pessoa_clipes.glb`)
+
+Os clipes das pessoas vêm da biblioteca de animações CC0 em `assets/terceiros`. Alguns foram
+feitos para um boneco de jogo e ficam errados num corpo humano. `tools/blender/clipes.py` lê o
+clipe original, corrige a pose quadro a quadro e grava `pessoa_clipes.glb`: só o esqueleto e
+os clipes corrigidos, com os mesmos nomes de nó e de clipe.
+
+- `Walk_Carry_Loop` (andar com caixa, e os braços de quem está parado com caixa): no original o
+  tronco deita uns 25° para trás e a cabeça olha para o teto. O corrigido dobra a coluna, o
+  pescoço e a cabeça para a frente; a caixa fica na frente da barriga.
+- No catálogo, `pessoa_clipes.clipes` lista os clipes do arquivo e `dados.substitui` diz quais
+  clipes originais ele troca. Quem toca um clipe de pessoa usa o deste arquivo quando o nome
+  está na lista, e o original nos outros casos.
+
+## Motorista e operador
+
+- **Empilhadeira:** `ponto_operador` é o quadril do motorista sentado (0,09 m acima do
+  assento), em (-0,34; 0; 1,07): o mesmo assento que a ponte do 3D usa para a empilhadeira
+  (`FORKLIFT_HIP`). O piso da cabine fica 0,61 m abaixo dele, entre as soleiras, e o volante
+  fica onde as mãos do clipe `Driving_Loop` seguram (0,54 m à frente e 0,28 m acima do
+  quadril, com a inclinação `sentado_inclinar`).
+- **Torno e injetora:** `ponto_operador` fica na frente do painel. A mão esquerda do clipe
+  `Interact` (0,17 m à esquerda e 0,58 m à frente do ponto, a 1,3 m do chão) cai na tela.
+  `ponto_porta` continua 0,6 m além. Na prensa o operador fica no centro, de frente para a
+  mesa, porque o painel fica junto da saída da peça.
+
+## Ponte rolante (`ponte_rolante.glb`)
+
+Ponte rolante birrail sobre caminho de rolamento em colunas (`tools/blender/elementos/ponte.py`).
+Origem no chão, no centro. `+x` é o caminho de rolamento, `y` é o vão e `z` é a altura.
+Tamanho base: caminho de 12 m, vão de 8 m entre trilhos, trilho a 6 m do chão.
+
+Em repouso a ponte e o carro ficam no começo do curso (`-curso_x/2` e `-curso_y/2`) e o gancho
+fica recolhido.
+
+| Nó | Pai | O que é | Com outro tamanho |
+|---|---|---|---|
+| `trilho_e`, `trilho_d` | raiz | viga de rolamento com trilho, em `y = ±vao/2`; origem no centro, no topo do trilho | escala em x = comprimento / `comprimento`; posição y e z |
+| `coluna_e0..2`, `coluna_d0..2` | raiz | colunas sob a viga (pontas e meio), com o pé amarelo e preto; origem no chão | escala em z = altura do trilho / `altura_trilho`; posição x e y |
+| `ponte` | raiz | a ponte: anda em x; origem no eixo dela, na altura do trilho | posição z |
+| `viga_a`, `viga_b` | `ponte` | as duas vigas-caixão amarelas, com o trilho do carro em cima | escala em y = vão / `vao` |
+| `cabeceira_e`, `cabeceira_d` | `ponte` | cabeceiras com rodas, para-choques e faixa amarela e preta | posição y = ±vão/2 |
+| `luz` | `ponte` | luz de aviso (emissiva) | posição y |
+| `cabine` | `ponte` | cabine do operador pendurada sob a ponte; opcional, pode ser escondida | posição y |
+| `cabo_botoeira` | `ponte` | cabo da botoeira; origem em cima | escala em z |
+| `botoeira` | `ponte` | botoeira pendente, a `botoeira_altura` do chão | posição z |
+| `carro` | `ponte` | o trole: anda em y sobre as vigas; tambor, motor e redutor | — |
+| `cabo` | `carro` | cabo do tambor ao moitão; origem em cima, comprimento `cabo_base` em repouso | escala em z = comprimento do cabo / `cabo_base` |
+| `gancho` | `carro` | moitão com gancho, amarelo e preto: desce em z; origem no eixo das polias | — |
+
+Pontos:
+
+- `ponto_gancho` (pai `gancho`): o fundo da sela do gancho. Serve para pegar e para soltar; a
+  carga fica pendurada abaixo dele.
+- `ponto_operador` (pai `ponte`, no chão): onde fica quem opera pela botoeira; anda com a ponte.
+
+Clipes, fase de 0 a 1, no tamanho base:
+
+- `ponte_andar`: `ponte` anda `curso_x` em x.
+- `carro_andar`: `carro` anda `curso_y` em y.
+- `gancho_descer`: `gancho` desce `curso_gancho`, e `cabo` estica por escala em z.
+
+`dados`: `comprimento`, `vao`, `altura_trilho`, `curso_x`, `curso_y`, `margem_x`, `margem_y`
+(metade do que o curso é menor que o tamanho), `curso_gancho`, `gancho_repouso` (altura de
+`ponto_gancho` recolhido), `cabo_base`, `cabo_botoeira_base`, `botoeira_altura` e `estica` (os
+nós que esticam e o eixo de cada um: `x`, `y` ou `z`).
+
+Para outro vão, curso ou altura, quem desenha não escala a raiz (as vigas e as rodas
+deformariam): escala só os nós da tabela e põe os outros no lugar, a partir de `dados`. Com a
+ponte em `x`, o carro em `y` e o gancho na altura `h`, `ponte` vai para `x`, `carro` para `y`
+(dentro de `ponte`), `gancho` desce `gancho_repouso - h`, e o `cabo` ganha esse mesmo comprimento.
+
+O teste `a_ponte_rolante_anda_nos_tres_eixos` confere os três movimentos e os cursos.
