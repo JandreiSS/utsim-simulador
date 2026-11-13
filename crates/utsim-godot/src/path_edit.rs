@@ -27,6 +27,8 @@ pub const IDS: [&str; 3] = [BELT_SIMPLE, BELT_CHANNELED, FLOOR_PATH];
 pub const BELT_HEIGHT: f64 = 0.8;
 /// Largura padrão de um caminho novo (m): a passagem principal de pedestres.
 pub const PATH_WIDTH: f64 = 1.2;
+/// Distância mínima (m) de uma junção em T às pontas da esteira atravessada.
+pub const T_GAP: f64 = 0.3;
 /// Raio pedido ao curvar um trecho pela alça do meio: reduzido ao maior que cabe.
 pub const BEND_RADIUS: f64 = 1000.0;
 /// Comprimento em planta de uma rampa de pedestre por metro de altura (1:12, 8,33 %).
@@ -207,6 +209,36 @@ pub fn snap_along(
     }
     if let Some((_, s)) = best {
         return s;
+    }
+    // On the line of a drawn belt, away from its ends: a T joint (merge or divert).
+    for r in routes(model) {
+        if skip == Some(r.name.as_str()) {
+            continue;
+        }
+        let (first, last) = (r.line[0], r.line[r.line.len() - 1]);
+        for w in r.line.windows(2) {
+            let (u, v) = (w[0], w[1]);
+            let (dx, dy) = (v[0] - u[0], v[1] - u[1]);
+            let len2 = dx * dx + dy * dy;
+            if len2 <= 0.0 {
+                continue;
+            }
+            let t = (((p[0] - u[0]) * dx + (p[1] - u[1]) * dy) / len2).clamp(0.0, 1.0);
+            let q = [u[0] + dx * t, u[1] + dy * t, u[2] + (v[2] - u[2]) * t];
+            if d2(q, first) < T_GAP || d2(q, last) < T_GAP {
+                continue;
+            }
+            offer(
+                d2(p, q),
+                Snap {
+                    at: q,
+                    what: "linha",
+                    object: Some(r.name.clone()),
+                    output: None,
+                },
+                &mut best,
+            );
+        }
     }
     // On the line of a floor path: a T-junction (the aisle network joins there).
     for a in &model.aisles {
@@ -585,6 +617,7 @@ impl Editor {
             profile: None,
             heights: Vec::new(),
             radii: Vec::new(),
+            stair: false,
         };
         for (i, p) in pts.iter().enumerate() {
             aisle.set_height(i, p[2]);
@@ -863,6 +896,82 @@ impl Editor {
         self.edit_route(name, |r, _| {
             if index < r.nodes.len() {
                 r.nodes.remove(index);
+            }
+        })
+    }
+
+    /// Divide a esteira `name` no ponto da linha dela mais perto de `p` (em planta): um nó
+    /// novo ali e as duas metades em série. Devolve o nome da segunda metade.
+    pub fn split_at(&mut self, name: &str, p: [f64; 3]) -> Result<String, String> {
+        let row = routes(self.model())
+            .into_iter()
+            .find(|r| r.name == name)
+            .ok_or_else(|| format!("'{name}' não é uma esteira desenhada"))?;
+        let mut best = (f64::INFINITY, 0usize, row.nodes[0]);
+        for (i, w) in row.nodes.windows(2).enumerate() {
+            let (u, v) = (w[0], w[1]);
+            let (dx, dy) = (v[0] - u[0], v[1] - u[1]);
+            let len2 = (dx * dx + dy * dy).max(1e-12);
+            let t = (((p[0] - u[0]) * dx + (p[1] - u[1]) * dy) / len2).clamp(0.0, 1.0);
+            let q = [u[0] + dx * t, u[1] + dy * t, u[2] + (v[2] - u[2]) * t];
+            let d = d2(p, q);
+            if d < best.0 {
+                best = (d, i, q);
+            }
+        }
+        let (_, i, q) = best;
+        self.insert_route_node(name, false, i, q)?;
+        self.split_route(name, i + 1)
+    }
+
+    /// Esteira nova como em [`Editor::add_belt_route`], podendo começar ou acabar na linha
+    /// de outra esteira desenhada: acabando (`to_line`), a outra é dividida ali e a nova
+    /// entra na segunda metade (junção); começando (`from_line`), a primeira metade da
+    /// outra também sai para a nova (desvio). Um passo de desfazer; devolve o nome.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_belt_joined(
+        &mut self,
+        tool: &str,
+        points: &[[f64; 3]],
+        radii: &[f64],
+        from: Option<&str>,
+        to: Option<&str>,
+        from_line: Option<&str>,
+        to_line: Option<&str>,
+    ) -> Result<String, String> {
+        if from_line.is_none() && to_line.is_none() {
+            return self.add_belt_route(tool, points, radii, from, to);
+        }
+        let (first, last) = match (points.first(), points.last()) {
+            (Some(a), Some(b)) => (*a, *b),
+            _ => return Err("a esteira precisa de ao menos 2 nós".into()),
+        };
+        self.group(|e| {
+            let made = e.add_belt_route(tool, points, radii, from, to)?;
+            if let Some(target) = to_line {
+                let second = e.split_at(target, last)?;
+                e.apply(Command::Connect {
+                    from: made.clone(),
+                    to: second,
+                })?;
+            }
+            if let Some(source) = from_line {
+                e.split_at(source, first)?;
+                e.apply(Command::Connect {
+                    from: source.to_string(),
+                    to: made.clone(),
+                })?;
+            }
+            Ok(made)
+        })
+    }
+
+    /// Caminho como escada (degraus, só pedestres) ou de volta a rampa ou piso.
+    pub fn set_stair(&mut self, name: &str, on: bool) -> Result<(), String> {
+        self.edit_path(name, |a| {
+            a.stair = on;
+            if on {
+                a.kind = AisleKind::Pedestrian;
             }
         })
     }
@@ -1318,6 +1427,73 @@ mod tests {
         let p2 = e.parallel(&path, true, -2.0).unwrap();
         let a = e.model().aisles.iter().find(|a| a.name == p2).unwrap();
         assert_eq!(a.points[0], [0.0, -7.0]);
+    }
+
+    #[test]
+    fn a_belt_ending_on_another_one_merges_into_it_in_one_step() {
+        let mut e = Editor::new("t");
+        let main = belt(&mut e, &[[0.0, 0.0, 0.8], [10.0, 0.0, 0.8]]);
+        let out = e.add("Sink", [12.0, 0.0, 0.0]).unwrap();
+        e.apply(Command::Connect {
+            from: main.clone(),
+            to: out.clone(),
+        })
+        .unwrap();
+        let s = snap(e.model(), [6.0, 0.2, 0.8], 0.0, 0.5, None, None);
+        assert_eq!(
+            (s.what, s.object.as_deref()),
+            ("linha", Some(main.as_str()))
+        );
+        let side = e
+            .add_belt_joined(
+                BELT_SIMPLE,
+                &[[6.0, -5.0, 0.8], s.at],
+                &[],
+                None,
+                None,
+                None,
+                Some(&main),
+            )
+            .unwrap();
+        let m = e.model();
+        let second = m
+            .connections
+            .iter()
+            .find(|(f, _)| *f == side)
+            .map(|(_, t)| t.clone())
+            .unwrap();
+        assert!(m.connections.contains(&(main.clone(), second.clone())));
+        assert!(m.connections.contains(&(second.clone(), out)));
+        assert!(m.validate().is_ok());
+        // The main line is as long as before, in two parts.
+        let total: f64 = routes(m)
+            .iter()
+            .filter(|r| r.name == main || r.name == second)
+            .map(|r| r.length)
+            .sum();
+        assert!((total - 10.0).abs() < 1e-9);
+        // One undo takes all of it back.
+        e.doc.undo();
+        assert_eq!(routes(e.model()).len(), 1);
+    }
+
+    #[test]
+    fn a_belt_starting_on_another_one_diverts_from_it() {
+        let mut e = Editor::new("t");
+        let main = belt(&mut e, &[[0.0, 0.0, 0.8], [10.0, 0.0, 0.8]]);
+        let side = e
+            .add_belt_joined(
+                BELT_SIMPLE,
+                &[[4.0, 0.0, 0.8], [4.0, 5.0, 0.8]],
+                &[],
+                None,
+                None,
+                Some(&main),
+                None,
+            )
+            .unwrap();
+        assert!(e.model().connections.contains(&(main.clone(), side)));
+        assert_eq!(routes(e.model()).len(), 3);
     }
 
     #[test]

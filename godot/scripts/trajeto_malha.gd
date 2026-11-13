@@ -344,6 +344,32 @@ static func _guide_brackets(root: Node3D, line: PackedVector3Array, sides: Packe
 		s += BRACKET_PITCH
 
 
+## Rise of a step of a stair (m).
+const STEP_RISE := 0.18
+
+
+## The steps of a stair: on each piece of the line that climbs, as many steps as fit the
+## rise, each a block from the floor of the piece to its tread; level pieces are landings.
+static func _steps(st: SurfaceTool, line: PackedVector3Array, sides: PackedVector3Array, half: float) -> void:
+	for k in line.size() - 1:
+		var a := line[k]
+		var b := line[k + 1]
+		var rise := b.y - a.y
+		if absf(rise) < 0.01:
+			_sweep(st, PackedVector3Array([a, b]), PackedVector3Array([sides[k], sides[k + 1]]), -half, half, -DECK, 0.0, DECK_COLOR)
+			continue
+		var n := maxi(int(ceil(absf(rise) / STEP_RISE)), 1)
+		for j in n:
+			# Tread j: from j/n to (j+1)/n along the piece, at the height of its upper end.
+			var p0 := a.lerp(b, float(j) / n)
+			var p1 := a.lerp(b, float(j + 1) / n)
+			var top := maxf(p0.y, p1.y) if rise > 0.0 else minf(p0.y, p1.y) + absf(rise) / n
+			var base := minf(p0.y, p1.y) - DECK
+			var q0 := Vector3(p0.x, top, p0.z)
+			var q1 := Vector3(p1.x, top, p1.z)
+			_sweep(st, PackedVector3Array([q0, q1]), PackedVector3Array([sides[k], sides[k + 1]]), -half, half, base - top, 0.0, DECK_COLOR)
+
+
 static func _nearest(line: PackedVector3Array, p: Vector3) -> int:
 	var best := 0
 	var bd := INF
@@ -430,7 +456,10 @@ static func ramp(r: Dictionary) -> Node3D:
 	var sides := _sides(line)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_sweep(st, line, sides, -half, half, -DECK, 0.0, DECK_COLOR)
+	if bool(r.get("stair", false)):
+		_steps(st, line, sides, half)
+	else:
+		_sweep(st, line, sides, -half, half, -DECK, 0.0, DECK_COLOR)
 	_sweep(st, line, sides, -half, -half + 0.08, 0.0, 0.004, EDGE_COLOR)
 	_sweep(st, line, sides, half - 0.08, half, 0.0, 0.004, EDGE_COLOR)
 	var tall := false
