@@ -691,6 +691,8 @@ func panel() -> Array:
 	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
 	if r["too_steep"]:
 		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
+	if sel_path and (nodes[0].y > 0.001 or nodes[nodes.size() - 1].y > 0.001):
+		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": "Rampas de acesso nas pontas (1:12)", "action": "trajeto_rampas"})
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
 		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"]], "value": r["drive"], "action": "trajeto_acionamento"})
@@ -802,6 +804,11 @@ func form(what: String, value: String) -> void:
 		"trajeto_excluir_no":
 			delete_selected()
 			return
+		"trajeto_rampas":
+			var k: int = tr.rampas_de_acesso(sel_name)
+			ok = k > 0
+			if ok:
+				main.set_status("%d rampa(s) de acesso de 1:12 acrescentada(s) a %s." % [k, sel_name])
 		_:
 			return
 	if ok:

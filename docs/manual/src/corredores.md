@@ -66,6 +66,12 @@ Numa rampa, quem anda ou dirige também vai mais devagar. Só contam os trechos 
 
 O tempo do trajeto é o de andar `Σ Lᵢ ÷ fᵢ` na velocidade do recurso, com a aceleração dele.
 
+#### Passarelas: corredores em níveis diferentes
+
+Dois corredores que se cruzam na planta só se juntam ali se estão no mesmo nível (diferença de altura menor que 0,3 m). Uma passarela que passa a 3 m sobre um corredor de empilhadeiras não tem nó em comum com ele: não nasce cruzamento, e a empilhadeira não para ali. Onde o corredor está a 2,2 m do piso ou mais, ele passa por cima das máquinas e dos outros obstáculos do piso.
+
+Os objetos ficam no piso: o operador sobe à passarela pela rampa, nunca direto. No UTSim 3D, um caminho com uma ponta no alto mostra no painel o botão "Rampas de acesso nas pontas (1:12)", que acrescenta em cada ponta alta um trecho até o piso, em linha com ela e com 12 m de comprimento por metro de altura (8,33 %).
+
 ```ron
 (name: "rampa_mezanino", kind: Pedestrian, points: [(0.0, 0.0), (12.0, 0.0), (12.0, 6.0)],
     width: 1.2, heights: [0.0, 1.0, 1.0], radii: [0.0, 2.0, 0.0])
