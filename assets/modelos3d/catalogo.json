@@ -1108,6 +1108,82 @@
   ],
   "triangulos": 468
  },
+ "espera_chao": {
+  "arquivo": "espera_chao.glb",
+  "clipes": {},
+  "dados": {
+   "area": [
+    1.2,
+    1.0
+   ],
+   "estica": {
+    "faixa_d": "y",
+    "faixa_e": "y",
+    "faixa_frente": "x",
+    "faixa_fundo": "x"
+   },
+   "faixa": 0.05
+  },
+  "estados": {},
+  "minimo": [
+   -0.65,
+   -0.55,
+   0.0
+  ],
+  "nos": [
+   "espera_chao",
+   "faixa_d",
+   "faixa_e",
+   "faixa_frente",
+   "faixa_fundo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.3,
+   1.1,
+   0.004
+  ],
+  "triangulos": 48
+ },
+ "espera_chao_medio": {
+  "arquivo": "espera_chao_medio.glb",
+  "clipes": {},
+  "dados": {
+   "area": [
+    1.2,
+    1.0
+   ],
+   "estica": {
+    "faixa_d": "y",
+    "faixa_e": "y",
+    "faixa_frente": "x",
+    "faixa_fundo": "x"
+   },
+   "faixa": 0.05
+  },
+  "estados": {},
+  "minimo": [
+   -0.65,
+   -0.55,
+   0.0
+  ],
+  "nos": [
+   "espera_chao",
+   "faixa_d",
+   "faixa_e",
+   "faixa_frente",
+   "faixa_fundo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.3,
+   1.1,
+   0.004
+  ],
+  "triangulos": 48
+ },
  "espera_medio": {
   "arquivo": "espera_medio.glb",
   "clipes": {},
@@ -1160,7 +1236,42 @@
  "estante": {
   "arquivo": "estante.glb",
   "clipes": {},
-  "dados": {},
+  "dados": {
+   "prateleiras": [
+    {
+     "altura": 0.125,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 0.5875,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 1.05,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 1.5125,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    }
+   ]
+  },
   "estados": {},
   "minimo": [
    -0.5,
@@ -1217,10 +1328,145 @@
   ],
   "triangulos": 192
  },
+ "estante_espera": {
+  "arquivo": "estante_espera.glb",
+  "clipes": {},
+  "dados": {
+   "prateleiras": [
+    {
+     "altura": 0.3,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    },
+    {
+     "altura": 0.75,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    },
+    {
+     "altura": 1.2,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    }
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.615,
+   -0.315,
+   0.0
+  ],
+  "nos": [
+   "estante_espera",
+   "estrutura"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.23,
+   0.63,
+   1.65
+  ],
+  "triangulos": 424
+ },
+ "estante_espera_medio": {
+  "arquivo": "estante_espera_medio.glb",
+  "clipes": {},
+  "dados": {
+   "prateleiras": [
+    {
+     "altura": 0.3,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    },
+    {
+     "altura": 0.75,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    },
+    {
+     "altura": 1.2,
+     "area": [
+      1.1,
+      0.52
+     ],
+     "vao": 0.395
+    }
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.615,
+   -0.315,
+   0.0
+  ],
+  "nos": [
+   "estante_espera",
+   "estrutura"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.23,
+   0.63,
+   1.65
+  ],
+  "triangulos": 552
+ },
  "estante_medio": {
   "arquivo": "estante_medio.glb",
   "clipes": {},
-  "dados": {},
+  "dados": {
+   "prateleiras": [
+    {
+     "altura": 0.125,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 0.5875,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 1.05,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    },
+    {
+     "altura": 1.5125,
+     "area": [
+      0.92,
+      0.44
+     ],
+     "vao": 0.4075
+    }
+   ]
+  },
   "estados": {},
   "minimo": [
    -0.5,
@@ -2128,7 +2374,13 @@
  "palete": {
   "arquivo": "palete.glb",
   "clipes": {},
-  "dados": {},
+  "dados": {
+   "area": [
+    1.16,
+    0.96
+   ],
+   "tampo": 0.144
+  },
   "estados": {},
   "minimo": [
    -0.6,
@@ -2151,7 +2403,13 @@
  "palete_medio": {
   "arquivo": "palete_medio.glb",
   "clipes": {},
-  "dados": {},
+  "dados": {
+   "area": [
+    1.16,
+    0.96
+   ],
+   "tampo": 0.144
+  },
   "estados": {},
   "minimo": [
    -0.6,
