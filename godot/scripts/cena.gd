@@ -53,6 +53,10 @@ var _pallets := false
 var _clips2: AnimationLibrary
 ## The clips of the UAL1 mannequin, for the people with a Blender body (same skeleton).
 var _clips1: AnimationLibrary
+## The UAL2 clips the Blender bodies play: `_clips2` with the corrected clips of
+## `pessoa_clipes.glb` (their names in `clips_fixed`); the UAL mannequins keep `_clips2`.
+var _clips2_body: AnimationLibrary
+var clips_fixed := PackedStringArray()
 ## Blocks whose Blender element plays clips (rig `anim`).
 var _animated := PackedInt32Array()
 ## Items of the last frame put on a point of a Blender element: [block, point, node].
@@ -147,6 +151,10 @@ func build(pb: Object, keep_templates := false) -> void:
 	if skeletal_available():
 		_clips2 = _library_of(UAL2)
 		_clips1 = _library_of(UAL1)
+		clips_fixed = PackedStringArray()
+		_clips2_body = _clips2
+		if _clips2 != null and info.has("clipes_corrigidos"):
+			_clips2_body = _fixed_clips(_clips2, String(info["clipes_corrigidos"]), info.get("clipes_substitui", PackedStringArray()))
 	var names: PackedStringArray = pb.person_clips()
 	var durations_set := false
 	for i in blocks.size():
@@ -205,7 +213,7 @@ func build(pb: Object, keep_templates := false) -> void:
 				var own: AnimationLibrary = null
 				if body:
 					own = _clips1
-				if p.bind(asset, _clips2, names, own):
+				if p.bind(asset, _clips2_body if body else _clips2, names, own):
 					rig["person"] = p
 					if body:
 						Pessoa.vestir(asset, b["pessoa"])
@@ -269,6 +277,63 @@ func build(pb: Object, keep_templates := false) -> void:
 	_draw_marks()
 	_build_fluids()
 	_build_routes()
+
+
+## A copy of `lib` with the clips `names` taken from the glTF at `path` (the corrected
+## clips of the Blender bodies, same skeleton). A clip is swapped only when it drives the
+## same bones as the one it replaces (the importer may have dropped the "_Loop" suffix on
+## either side); otherwise the original stays, with a warning.
+func _fixed_clips(lib: AnimationLibrary, path: String, names: PackedStringArray) -> AnimationLibrary:
+	if not FileAccess.file_exists(path):
+		return lib
+	var scene := _from_gltf(PackedByteArray(), path)
+	if scene == null:
+		return lib
+	var player := Pessoa._find(scene, "AnimationPlayer") as AnimationPlayer
+	var out := lib.duplicate() as AnimationLibrary
+	if player == null:
+		push_warning("clipes corrigidos sem AnimationPlayer: %s" % path)
+	if player != null:
+		for name in names:
+			var key := _clip_key(out, name)
+			var src := _clip_key_in_player(player, name)
+			if key == "" or src == "":
+				push_warning("clipe corrigido %s não encontrado (biblioteca: %s; arquivo: %s)" % [name, key, player.get_animation_list()])
+				continue
+			var fixed := (player.get_animation(StringName(src)) as Animation).duplicate() as Animation
+			var old := out.get_animation(StringName(key))
+			var bones := {}
+			for t in old.get_track_count():
+				bones[String(old.track_get_path(t))] = true
+			var same := 0
+			for t in fixed.get_track_count():
+				if bones.has(String(fixed.track_get_path(t))):
+					same += 1
+			if fixed.get_track_count() == 0 or same * 10 < fixed.get_track_count() * 9:
+				push_warning("clipe corrigido %s não bate com o esqueleto (%d de %d trilhas)" % [name, same, fixed.get_track_count()])
+				continue
+			fixed.loop_mode = old.loop_mode
+			out.remove_animation(StringName(key))
+			out.add_animation(StringName(key), fixed)
+			clips_fixed.append(name)
+	scene.free()
+	return out
+
+
+## The name `clip` has in `lib` ("Walk_Carry_Loop" or "Walk_Carry"), or "".
+static func _clip_key(lib: AnimationLibrary, clip: String) -> String:
+	for k in [clip, clip.trim_suffix("_Loop")]:
+		if lib.has_animation(StringName(k)):
+			return k
+	return ""
+
+
+## The name `clip` has in `player`'s animations, or "".
+static func _clip_key_in_player(player: AnimationPlayer, clip: String) -> String:
+	for k in [clip, clip.trim_suffix("_Loop")]:
+		if player.has_animation(StringName(k)):
+			return k
+	return ""
 
 
 ## The AnimationLibrary of an imported scene with clips (the UAL files), or null.

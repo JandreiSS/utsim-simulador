@@ -1246,6 +1246,12 @@ func _check(c: Dictionary, k: int) -> void:
 						var node_name := String(want["aberto"] if want_open else want["fechado"])
 						var moved = cena.element_node_moved(i, node_name)
 						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"clipes_corrigidos":
+				# ["Walk_Carry_Loop", ...]: the clips swapped for the corrected ones of
+				# pessoa_clipes.glb in the library of the Blender bodies.
+				var fixed: PackedStringArray = _main.cena.clips_fixed
+				for name in want:
+					report.call("clipe corrigido %s" % name, fixed.has(String(name)), str(fixed))
 			"itens_no_bloco":
 				# {"objeto", "t", "quantos", "dentro": [meia x, meia z], "altura_entre": [a, b],
 				# "rotulo"}: the items drawn over the block's footprint (its root, the half
