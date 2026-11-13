@@ -1246,6 +1246,39 @@ func _check(c: Dictionary, k: int) -> void:
 						var node_name := String(want["aberto"] if want_open else want["fechado"])
 						var moved = cena.element_node_moved(i, node_name)
 						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"itens_no_bloco":
+				# {"objeto", "t", "quantos", "dentro": [meia x, meia z], "altura_entre": [a, b],
+				# "rotulo"}: the items drawn over the block's footprint (its root, the half
+				# extents), their bottoms within the heights, and its label.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var root: Node3D = cena.rigs[i]["root"]
+					var half: Array = want.get("dentro", [0.7, 0.5])
+					var n := 0
+					var low := INF
+					var high := -INF
+					for id in cena.items:
+						var node: Node3D = cena.items[id]
+						if not node.visible:
+							continue
+						var local: Vector3 = root.global_transform.affine_inverse() * node.global_position
+						if absf(local.x) <= float(half[0]) and absf(local.z) <= float(half[1]):
+							n += 1
+							var bottom := node.global_position.y - node.scale.y * CenaUtsim.ITEM_SIZE * 0.5
+							low = minf(low, bottom)
+							high = maxf(high, bottom)
+					if want.has("quantos"):
+						report.call("itens sobre %s" % want["objeto"], n == int(want["quantos"]), "%d item(ns)" % n)
+					if want.has("altura_entre"):
+						var r: Array = want["altura_entre"]
+						report.call("altura dos itens de %s" % want["objeto"], n > 0 and low >= float(r[0]) and high <= float(r[1]), "de %.2f a %.2f m" % [low, high])
+					if want.has("rotulo"):
+						var text: String = (cena.rigs[i]["label"] as Label3D).text
+						report.call("rótulo de %s contém %s" % [want["objeto"], want["rotulo"]], text.contains(String(want["rotulo"])), text)
 			"item_em_ponto":
 				# {"objeto", "t", "ponto", "altura_entre": [a, b]}: an item sits on that point
 				# of the block's Blender element (the part it works on, the load on its forks

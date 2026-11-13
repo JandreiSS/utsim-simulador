@@ -4,7 +4,7 @@
 		{"nota": "Elementos do Blender na reprodução (etapa 3): a máquina padrão é o CNC de assets/modelos3d, com a tabela estados do catálogo: a porta abre enquanto a operadora entra, fica aberta no ciclo e fecha enquanto ela sai; a operadora anda do ponto_porta ao ponto_operador; a prensa faz setup; a pessoa é do Blender, com o EPI que ela veste (o do nó dela e o do posto que opera)."},
 		{"abrir": "g4_blender3d.ron"},
 		{"modo": "simular"},
-		{"nota": "Entrando (2,45 a 6,45 s): a porta pela metade em t = 4,45 e a operadora no meio do caminho entre a porta (y = -1,8) e o posto (y = -1,2)."},
+		{"nota": "Entrando (2,45 a 6,45 s): a porta pela metade em t = 4,45 e a operadora no meio do caminho entre a porta (y = -2,0) e o posto (y = -1,4)."},
 		{"conferir": {"modo": "simular", "elemento": {"objeto": "cnc_1", "t": 4.45, "clipe": "porta_abrir", "fase_entre": [0.4, 0.6]}}},
 		{"conferir": {"movel_em": {"objeto": "ana", "t": 4.45, "x": [2.8, 2.9], "y": [-1.75, -1.65]}}},
 		{"tempo": 4.45},
