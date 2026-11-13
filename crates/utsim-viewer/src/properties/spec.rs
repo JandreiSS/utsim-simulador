@@ -59,6 +59,7 @@ pub fn kind_name(kind: &ObjectKind) -> &'static str {
         ObjectKind::Separator { .. } => "Desmontagem",
         ObjectKind::Sink => "Saída",
         ObjectKind::Transporter { .. } => "Transportador",
+        ObjectKind::Crane { .. } => "Ponte rolante",
         ObjectKind::Dispatcher { .. } => "Despachante",
         ObjectKind::Conveyor { .. } => "Esteira",
         ObjectKind::Rack { .. } => "Porta-paletes",
@@ -123,6 +124,7 @@ pub fn kind_fields(kind: &ObjectKind) -> Vec<FieldSpec> {
             spec("bay_width", "Largura da coluna", Float),
             spec("level_height", "Altura do nível", Float),
         ],
+        ObjectKind::Crane { .. } => vec![],
         ObjectKind::Dispatcher { .. } => vec![
             spec("team", "Equipe", Team),
             spec("rule", "Regra de escolha", Choice),
