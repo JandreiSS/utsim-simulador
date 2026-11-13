@@ -111,6 +111,62 @@ fn spawn_block(
         ..default()
     });
     match (geom.shape, geom.belt_params(), geom.rack_params()) {
+        // A belt drawn by nodes: one slab per piece of its route, along it (the route is
+        // the top of the belt, relative to the base), and a leg to the floor under each
+        // point of the route that stands above it.
+        (Shape::Belt, Some(_), _) if geom.route.as_ref().is_some_and(|l| l.len() >= 2) => {
+            let line = geom.route.clone().unwrap_or_default();
+            let down = Vec3::new(0.0, geom.half[1], 0.0);
+            let id = commands
+                .spawn((
+                    Transform::from_translation(translation),
+                    Visibility::default(),
+                    BlockVisual,
+                ))
+                .id();
+            let leg = meshes.add(Cuboid::new(0.05, 1.0, 0.05));
+            commands.entity(id).with_children(|parent| {
+                for w in line.windows(2) {
+                    let (a, b) = (Vec3::from(w[0]), Vec3::from(w[1]));
+                    let d = b - a;
+                    let len = d.length();
+                    if len < 1e-4 {
+                        continue;
+                    }
+                    let mid = (a + b) / 2.0 - down - Vec3::new(0.0, BELT_THICKNESS / 2.0, 0.0);
+                    parent.spawn((
+                        Mesh3d(meshes.add(Cuboid::new(len + 0.01, BELT_THICKNESS, BELT_WIDTH))),
+                        MeshMaterial3d(material.clone()),
+                        Transform {
+                            translation: mid,
+                            rotation: Quat::from_rotation_arc(Vec3::X, d / len),
+                            scale: Vec3::ONE,
+                        },
+                    ));
+                }
+                // The floor is `translation.y` below the parent.
+                let floor = -translation.y;
+                for (k, p) in line.iter().enumerate() {
+                    let top = p[1] - geom.half[1] - BELT_THICKNESS;
+                    let h = top - floor;
+                    let corner = k == 0 || k + 1 == line.len();
+                    // A leg at the ends and about every 2 m of the sampled line.
+                    if h < 0.15 || !(corner || k % 8 == 0) {
+                        continue;
+                    }
+                    parent.spawn((
+                        Mesh3d(leg.clone()),
+                        MeshMaterial3d(steel.clone()),
+                        Transform {
+                            translation: Vec3::new(p[0], floor + h / 2.0, p[2]),
+                            rotation: Quat::IDENTITY,
+                            scale: Vec3::new(1.0, h, 1.0),
+                        },
+                    ));
+                }
+            });
+            id
+        }
         (Shape::Belt, Some(p), _) => {
             let length = p.length as f32;
             let id = commands

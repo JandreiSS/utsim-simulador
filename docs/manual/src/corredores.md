@@ -59,6 +59,23 @@ Um corredor fica no piso, salvo numa rampa. Duas listas opcionais, na ordem dos 
 - `heights`: a altura de cada ponto em metros. A rampa que sobe 1 m em 10 m tem √(10² + 1²) ≈ 10,05 m, e é essa distância que quem anda percorre.
 - `radii`: o raio da curva em cada ponto em metros (0 = quina viva). A curva segue a mesma regra das esteiras desenhadas, e as faixas no piso a acompanham.
 
+Numa rampa, quem anda ou dirige também vai mais devagar. Só contam os trechos de rampa da rede de corredores; a altura da ponta de uma esteira, onde a peça é deixada, não é rampa. A inclinação `g` é a subida dividida pela distância em planta:
+
+- **A pé:** a função de Tobler para caminhada, `6·e^(−3,5·|g + 0,05|)` km/h, dividida pela velocidade no plano e limitada a 1 (a descida suave não acelera ninguém). Subindo uma rampa de 1:12 (8,33 %), a pessoa anda a 75 % da velocidade; descendo 20 %, a 70 %.
+- **Veículo** (empilhadeira, AGV, carrinho): reduz por segurança, subindo ou descendo, a `limitar(1 − 4·|g|, 0,3, 1)` da velocidade. Em 10 %, 60 %.
+
+O tempo do trajeto é o de andar `Σ Lᵢ ÷ fᵢ` na velocidade do recurso, com a aceleração dele.
+
+#### Escadas
+
+Um corredor de pedestres com `stair: true` é uma escada: nos trechos com desnível, a pessoa anda ao longo da escada a 45 % da velocidade no plano subindo e a 55 % descendo (a ordem de grandeza das medidas em escadas de edifícios: cerca de 0,55 e 0,7 m/s, para 1,3 m/s no plano). Os trechos planos são patamares. Escada só serve a pedestres; um corredor de veículos com `stair` é recusado. No UTSim 3D, o painel do caminho tem "Escada (degraus; só pedestres)", e a cena desenha os degraus de 18 cm.
+
+#### Passarelas: corredores em níveis diferentes
+
+Dois corredores que se cruzam na planta só se juntam ali se estão no mesmo nível (diferença de altura menor que 0,3 m). Uma passarela que passa a 3 m sobre um corredor de empilhadeiras não tem nó em comum com ele: não nasce cruzamento, e a empilhadeira não para ali. Onde o corredor está a 2,2 m do piso ou mais, ele passa por cima das máquinas e dos outros obstáculos do piso.
+
+Os objetos ficam no piso: o operador sobe à passarela pela rampa, nunca direto. No UTSim 3D, um caminho com uma ponta no alto mostra no painel o botão "Rampas de acesso nas pontas (1:12)", que acrescenta em cada ponta alta um trecho até o piso, em linha com ela e com 12 m de comprimento por metro de altura (8,33 %).
+
 ```ron
 (name: "rampa_mezanino", kind: Pedestrian, points: [(0.0, 0.0), (12.0, 0.0), (12.0, 6.0)],
     width: 1.2, heights: [0.0, 1.0, 1.0], radii: [0.0, 2.0, 0.0])
