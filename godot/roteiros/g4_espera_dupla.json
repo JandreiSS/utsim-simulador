@@ -1,0 +1,19 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Mesa de espera do Blender (espera.glb, visual.asset \"espera\"): a fila fica no tampo, a 0,76 m, 3 peças ao longo e 2 de través, a mais antiga do lado da saída, e uma segunda camada por cima; o que não cabe só aparece no rótulo (+N). No posto, dois operadores por peça (count: 2) ficam lado a lado, 0,7 m um do outro, com o posto no meio."},
+		{"abrir": "g4_espera_dupla.ron"},
+		{"modo": "simular"},
+		{"nota": "Em 40 s já chegaram as 16 peças, uma saiu e uma está no CNC: 12 no tampo (duas camadas) e o rótulo conta as outras 2."},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila", "t": 40.0, "quantos": 12, "dentro": [0.7, 0.5], "altura_entre": [0.75, 1.07], "rotulo": "+2"}}},
+		{"tempo": 40.0},
+		{"focar": {"objeto": "fila", "distancia": 3.0, "giro": 0.6, "inclinacao": 0.45}},
+		{"capturar": "g4_espera_dupla_01_mesa"},
+		{"nota": "A Carla e o Davi trabalham juntos na peça: os dois no posto do CNC (y = -1,4), um de cada lado do ponto_operador (x = 2,85)."},
+		{"conferir": {"movel_em": {"objeto": "carla", "t": 15.0, "x": [2.45, 2.55], "y": [-1.45, -1.35]}}},
+		{"conferir": {"movel_em": {"objeto": "davi", "t": 15.0, "x": [3.15, 3.25], "y": [-1.45, -1.35]}}},
+		{"tempo": 15.0},
+		{"focar": {"objeto": "cnc_1", "distancia": 4.5, "giro": 0.5, "inclinacao": 0.3}},
+		{"capturar": "g4_espera_dupla_02_dupla"}
+	]
+}

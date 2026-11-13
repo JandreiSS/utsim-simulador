@@ -103,6 +103,25 @@ pub fn snap(
     prev: Option<[f64; 3]>,
     skip: Option<&str>,
 ) -> Snap {
+    snap_along(model, p, step, radius, prev, None, skip)
+}
+
+/// Até quantos graus da direção do trecho anterior o próximo nó segue reto
+/// ([`snap_along`]).
+pub const TANGENT_DEG: f64 = 6.0;
+
+/// [`snap`] com a direção do trecho anterior (`tangent`, em planta): perto dela, o nó
+/// segue na mesma direção, sem quebrar a linha (o trecho continua a curva ou a reta que
+/// chega), antes do encaixe de 15°.
+pub fn snap_along(
+    model: &Model,
+    p: [f64; 3],
+    step: f64,
+    radius: f64,
+    prev: Option<[f64; 3]>,
+    tangent: Option<[f64; 2]>,
+    skip: Option<&str>,
+) -> Snap {
     let mut best: Option<(f64, Snap)> = None;
     let offer = |d: f64, s: Snap, best: &mut Option<(f64, Snap)>| {
         if d < radius && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
@@ -211,6 +230,29 @@ pub fn snap(
     }
     if let Some((_, s)) = best {
         return s;
+    }
+    if let (Some(q), Some(t)) = (prev, tangent) {
+        let tl = (t[0] * t[0] + t[1] * t[1]).sqrt();
+        let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
+        let len = (dx * dx + dy * dy).sqrt();
+        if tl > 1e-9 && len > 1e-9 {
+            let u = [t[0] / tl, t[1] / tl];
+            let along = dx * u[0] + dy * u[1];
+            let cos = (along / len).clamp(-1.0, 1.0);
+            if along > 0.0 && cos.acos().to_degrees() < TANGENT_DEG {
+                let l = if step > 0.0 {
+                    snap_to(along, step).max(step)
+                } else {
+                    along
+                };
+                return Snap {
+                    at: [q[0] + u[0] * l, q[1] + u[1] * l, p[2]],
+                    what: "tangente",
+                    object: None,
+                    output: None,
+                };
+            }
+        }
     }
     if let Some(q) = prev {
         let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
@@ -417,6 +459,16 @@ pub fn segment_near(model: &Model, p: [f64; 3], radius: f64) -> Option<(String, 
     best.map(|(_, v)| v)
 }
 
+/// Where a drawn belt stands: the middle of its route (half its length), on the floor,
+/// rounded to the millimetre. The nodes are relative to it; the label and the click are
+/// there, away from the objects at its ends.
+fn middle(points: &[[f64; 3]], radii: &[f64]) -> [f64; 3] {
+    let line = tr::sample(&nodes_of(points, radii, [0.0; 3]));
+    let half = utsim_nav::path3d::length3(&line) / 2.0;
+    let p = utsim_nav::path3d::point_at(&line, half).map_or(points[0], |(p, _)| p);
+    [round_mm(p[0]), round_mm(p[1]), 0.0]
+}
+
 fn round_mm(v: f64) -> f64 {
     (v * 1000.0).round() / 1000.0 + 0.0
 }
@@ -463,7 +515,7 @@ impl Editor {
         if pts.len() < 2 {
             return Err("a esteira precisa de ao menos 2 nós diferentes".into());
         }
-        let origin = [pts[0][0], pts[0][1], 0.0];
+        let origin = middle(&pts, radii);
         let route = BeltRoute {
             nodes: nodes_of(&pts, radii, origin),
             style: style_of(tool),
@@ -814,7 +866,11 @@ impl Editor {
             n.radius = None;
         }
         let tail: Vec<[f64; 3]> = abs[index..].to_vec();
-        let o2 = [tail[0][0], tail[0][1], origin[2]];
+        let tail_radii: Vec<f64> = r.nodes[index..]
+            .iter()
+            .map(|n| n.radius.unwrap_or(0.0))
+            .collect();
+        let o2 = middle(&tail, &tail_radii);
         let mut second = r.clone();
         second.nodes = tail
             .iter()
@@ -910,9 +966,12 @@ mod tests {
     fn moving_the_belt_moves_its_nodes() {
         let mut e = Editor::new("t");
         let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        // The belt stands in the middle of its route.
+        let at = e.model().objects[0].position;
+        assert_eq!(at, [2.0, 0.0, 0.0]);
         e.apply(Command::Move {
             name: name.clone(),
-            position: [10.0, 0.0, 0.0],
+            position: [12.0, 0.0, 0.0],
         })
         .unwrap();
         assert_eq!(routes(e.model())[0].nodes[1], [14.0, 0.0, 0.8]);
@@ -973,6 +1032,24 @@ mod tests {
     }
 
     #[test]
+    fn the_next_node_goes_on_along_the_last_segment() {
+        let e = Editor::new("t");
+        // The last segment went at 20° (not a multiple of 15°): pointing about that way
+        // keeps the line straight.
+        let r = 20f64.to_radians();
+        let t = [r.cos(), r.sin()];
+        let p = [
+            3.0 * (21f64.to_radians()).cos(),
+            3.0 * (21f64.to_radians()).sin(),
+            0.8,
+        ];
+        let s = snap_along(e.model(), p, 0.5, 0.3, Some([0.0, 0.0, 0.8]), Some(t), None);
+        assert_eq!(s.what, "tangente");
+        assert!((s.at[1] / s.at[0] - r.tan()).abs() < 1e-9);
+        assert!(((s.at[0].powi(2) + s.at[1].powi(2)).sqrt() - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
     fn angles_snap_in_steps_of_15_degrees() {
         let e = Editor::new("t");
         let s = snap(
@@ -999,6 +1076,17 @@ mod tests {
             "{:?}",
             s.at
         );
+    }
+
+    #[test]
+    fn the_panel_of_a_drawn_belt_shows_the_route_and_hides_the_length() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        let obj = e.model().objects.iter().find(|o| o.name == name).unwrap();
+        let fields = crate::schema::object_fields(e.model(), obj);
+        let paths: Vec<&str> = fields.iter().map(|f| f.path.as_str()).collect();
+        assert!(paths.contains(&"route.info") && paths.contains(&"route.editar"));
+        assert!(!paths.contains(&"length"));
     }
 
     #[test]

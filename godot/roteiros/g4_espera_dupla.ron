@@ -1,0 +1,29 @@
+// Ponto de partida do roteiro g4_espera_dupla.json: a mesa de espera do Blender (`espera`)
+// com a fila em cima do tampo, e um posto com dois operadores por peça (`count: 2`): os
+// dois chegam, trabalham juntos na peça e ficam lado a lado no posto, não um dentro do
+// outro.
+// As peças chegam a cada 2 s (12 no total) e o CNC leva 20 s por peça: a fila cresce na
+// mesa, 6 por camada (3 ao longo, 2 de través), duas camadas, e o resto só no rótulo.
+Model(
+    format: 2,
+    name: "mesa de espera e dupla no posto",
+    run: (stop_time: 300.0, seed: 3, replications: 1),
+    objects: [
+        (name: "fonte", kind: Source(interarrival: Const(2.0), first_at_zero: true, max_arrivals: Some(16)),
+         position: (-6.0, 0.0, 0.0)),
+        (name: "fila", kind: Queue(), position: (-3.0, 0.0, 0.0), visual: (asset: "espera")),
+        (name: "cnc_1", kind: Processor(process: Const(20.0), operators: Some(OperatorUse(team: "dupla", count: 2))),
+         position: (2.0, 0.0, 0.0)),
+        (name: "saida", kind: Sink, position: (7.0, 0.0, 0.0)),
+        (name: "carla", kind: Transporter(speed: 1.0), position: (1.0, -4.0, 0.0),
+         visual: (asset: "pessoa", color: "#2e7d32")),
+        (name: "davi", kind: Transporter(speed: 1.0), position: (3.0, -4.0, 0.0),
+         visual: (asset: "pessoa", color: "#1565c0")),
+        (name: "dupla", kind: Dispatcher(team: ["carla", "davi"])),
+    ],
+    connections: [
+        ("fonte", "fila"),
+        ("fila", "cnc_1"),
+        ("cnc_1", "saida"),
+    ],
+)

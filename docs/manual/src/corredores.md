@@ -59,6 +59,13 @@ Um corredor fica no piso, salvo numa rampa. Duas listas opcionais, na ordem dos 
 - `heights`: a altura de cada ponto em metros. A rampa que sobe 1 m em 10 m tem √(10² + 1²) ≈ 10,05 m, e é essa distância que quem anda percorre.
 - `radii`: o raio da curva em cada ponto em metros (0 = quina viva). A curva segue a mesma regra das esteiras desenhadas, e as faixas no piso a acompanham.
 
+Numa rampa, quem anda ou dirige também vai mais devagar. Só contam os trechos de rampa da rede de corredores; a altura da ponta de uma esteira, onde a peça é deixada, não é rampa. A inclinação `g` é a subida dividida pela distância em planta:
+
+- **A pé:** a função de Tobler para caminhada, `6·e^(−3,5·|g + 0,05|)` km/h, dividida pela velocidade no plano e limitada a 1 (a descida suave não acelera ninguém). Subindo uma rampa de 1:12 (8,33 %), a pessoa anda a 75 % da velocidade; descendo 20 %, a 70 %.
+- **Veículo** (empilhadeira, AGV, carrinho): reduz por segurança, subindo ou descendo, a `limitar(1 − 4·|g|, 0,3, 1)` da velocidade. Em 10 %, 60 %.
+
+O tempo do trajeto é o de andar `Σ Lᵢ ÷ fᵢ` na velocidade do recurso, com a aceleração dele.
+
 ```ron
 (name: "rampa_mezanino", kind: Pedestrian, points: [(0.0, 0.0), (12.0, 0.0), (12.0, 6.0)],
     width: 1.2, heights: [0.0, 1.0, 1.0], radii: [0.0, 2.0, 0.0])

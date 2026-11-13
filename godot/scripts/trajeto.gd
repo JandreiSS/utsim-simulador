@@ -74,6 +74,12 @@ var _press := {}
 var _dragging := false
 var _drag_at := Vector3.ZERO
 var _readout: Label3D
+## The length of the next segment being typed (digits and a comma), "" when none.
+var typed := ""
+## Where the mouse points while drawing (the direction a typed length goes).
+var _cursor: Variant = null
+## Direction of the route a new one goes on from (its last segment), null when none.
+var _start_tangent: Variant = null
 
 
 func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
@@ -154,6 +160,8 @@ func _clear_drawing() -> void:
 	radii = PackedFloat64Array()
 	start_port = {}
 	end_port = {}
+	typed = ""
+	_start_tangent = null
 	_readout.visible = false
 
 
@@ -177,7 +185,16 @@ func _screen(w: Vector3) -> Variant:
 
 
 func _snap(at: Vector3, prev: Variant, skip := "") -> Dictionary:
+	if prev != null:
+		return tr.encaixe_tangente(at, main.snap_step(), SNAP_METRES, prev, _tangent(), skip)
 	return tr.encaixe(at, main.snap_step(), SNAP_METRES, prev, skip)
+
+
+## The way the route being drawn is going: its last segment, or the route it goes on from.
+func _tangent() -> Variant:
+	if points.size() >= 2:
+		return points[points.size() - 1] - points[points.size() - 2]
+	return _start_tangent
 
 
 ## Floor point under the mouse at the drawing height.
@@ -322,6 +339,8 @@ func _what(w: String) -> String:
 			return "encaixado num nó"
 		"caminho":
 			return "encaixado no caminho"
+		"tangente":
+			return "seguindo o trecho anterior"
 		"angulo":
 			return "ângulo de 15 em 15°"
 		"grade":
@@ -344,11 +363,35 @@ func drag(p: Vector2) -> void:
 			return
 		var v: Vector3 = at
 		v.y = from.y
-		var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
-		_drag_at = s["at"]
-		if s["what"] != "porta" and s["what"] != "no":
-			_drag_at.y = from.y
-	_readout_at(_drag_at, "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)], false)
+		var lock := ""
+		if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META):
+			lock = "x" if absf(v.x - from.x) >= absf(v.z - from.z) else "y"
+		if lock != "":
+			_drag_at = lock_axis(from, v, lock, main.snap_step())
+		else:
+			var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
+			_drag_at = s["at"]
+			if s["what"] != "porta" and s["what"] != "no":
+				_drag_at.y = from.y
+		_press["lock"] = lock
+	var text := "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)]
+	match String(_press.get("lock", "")):
+		"x":
+			text += "\neixo X travado (Ctrl)"
+		"y":
+			text += "\neixo Y travado (Ctrl)"
+	_readout_at(_drag_at, text, false)
+
+
+## `to` moved from `from` only along the model's X axis (`axis` "x") or Y axis ("y"), the
+## distance on the grid step; the height stays.
+static func lock_axis(from: Vector3, to: Vector3, axis: String, step: float) -> Vector3:
+	var out := from
+	if axis == "x":
+		out.x = from.x + (snappedf(to.x - from.x, step) if step > 0.0 else to.x - from.x)
+	else:
+		out.z = from.z + (snappedf(to.z - from.z, step) if step > 0.0 else to.z - from.z)
+	return out
 
 
 ## Height the mouse points at on the vertical plane through `at` that faces the camera.
@@ -383,7 +426,10 @@ func release(_p: Vector2) -> void:
 		var n := (r["nodes"] as PackedVector3Array).size() if not r.is_empty() else 0
 		var i := int(pr["index"])
 		if n > 0 and (i == 0 or i == n - 1):
+			var nodes: PackedVector3Array = r["nodes"]
+			var tangent: Vector3 = nodes[n - 1] - nodes[n - 2] if i == n - 1 else nodes[0] - nodes[1]
 			_start_at(pr["from"])
+			_start_tangent = tangent
 		return
 	_dragging = false
 	var from: Vector3 = pr["from"]
@@ -420,10 +466,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func key(code: int, shift: bool) -> bool:
 	var drawing := not points.is_empty()
 	var fine := FINE_STEP if shift else HEIGHT_STEP
+	# Typing a length while drawing: digits and a comma, Enter puts the node.
+	if drawing:
+		var ch := _digit(code)
+		if ch != "":
+			if ch != "," or not typed.contains(","):
+				typed += ch
+			main.set_status("Comprimento do trecho: %s m (Enter põe o nó na direção do cursor, Backspace apaga)." % typed)
+			return true
 	match code:
 		KEY_ENTER, KEY_KP_ENTER:
+			if drawing and typed != "":
+				return _place_typed()
 			return finish()
 		KEY_BACKSPACE:
+			if drawing and typed != "":
+				typed = typed.left(typed.length() - 1)
+				return true
 			if drawing:
 				_back()
 				return true
@@ -457,6 +516,47 @@ func key(code: int, shift: bool) -> bool:
 					d.z = step
 			return nudge(d)
 	return false
+
+
+static func _digit(code: int) -> String:
+	if code >= KEY_0 and code <= KEY_9:
+		return str(code - KEY_0)
+	if code >= KEY_KP_0 and code <= KEY_KP_9:
+		return str(code - KEY_KP_0)
+	if code in [KEY_COMMA, KEY_PERIOD, KEY_KP_PERIOD]:
+		return ","
+	return ""
+
+
+## The node `typed` metres (3D, along the segment) from the last one, towards the cursor,
+## at the height of the next node.
+func _place_typed() -> bool:
+	var length := typed.replace(",", ".").to_float()
+	typed = ""
+	var last := points[points.size() - 1]
+	var dir := Vector3.RIGHT
+	if _cursor != null:
+		dir = (_cursor as Vector3) - last
+	elif points.size() >= 2:
+		dir = last - points[points.size() - 2]
+	dir.y = 0.0
+	if dir.length() < 1e-6:
+		dir = Vector3.RIGHT
+	dir = dir.normalized()
+	var dz := draw_z - last.y
+	if length <= absf(dz):
+		main.set_status("O trecho de %s m não alcança a altura de %s m." % [_num(length), _num(draw_z)])
+		return true
+	var run := sqrt(length * length - dz * dz)
+	var q := last + dir * run
+	q.y = draw_z
+	points.append(q)
+	radii.append(0.0)
+	if points.size() >= 2 and new_radius > 0.0:
+		radii[points.size() - 2] = new_radius
+	end_port = {}
+	main.set_status("%s: nó %d a %s m do anterior." % [LABELS[mode], points.size(), _num(length)])
+	return true
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -629,9 +729,28 @@ func _span() -> Array:
 	return [a[0], a[a.size() - 1]]
 
 
+## "Editar nós" of the properties panel: the tool of the belt's type, with the belt
+## selected (all its nodes, so the arrows and PageUp/PageDown move it whole).
+func edit_belt(name: String) -> void:
+	sync()
+	var r := _route(name, false)
+	if r.is_empty():
+		main.set_status("%s não é uma esteira desenhada." % name)
+		return
+	editor.set_tool("colocar", BELT_CHANNELED if r["style"] == "canaletas" else BELT_SIMPLE)
+	var all := PackedInt32Array()
+	for i in (r["nodes"] as PackedVector3Array).size():
+		all.append(i)
+	_select(name, false, all)
+	main.set_status("Esteira %s: clique num nó para editá-lo; setas e PageUp/PageDown movem os nós selecionados." % name)
+
+
 ## An edit from the panel (`form:trajeto_<what>:<value>`).
 func form(what: String, value: String) -> void:
 	var v := value.replace(",", ".").to_float()
+	if what == "trajeto_editar":
+		edit_belt(value)
+		return
 	var r := _route(sel_name, sel_path)
 	match what:
 		"trajeto_altura_desenho":
@@ -765,6 +884,18 @@ func _draw_drawing(e: EditorUtsim) -> void:
 	var at = _aim(e.mouse)
 	if at != null and not main.over_ui(e.mouse):
 		cursor = _snap(at, points[points.size() - 1])["at"]
+	_cursor = cursor
+	# A typed length puts the preview node at that distance.
+	if cursor != null and typed != "":
+		var l := typed.replace(",", ".").to_float()
+		var last := points[points.size() - 1]
+		var d := (cursor as Vector3) - last
+		d.y = 0.0
+		var dz := draw_z - last.y
+		if d.length() > 1e-6 and l > absf(dz):
+			cursor = last + d.normalized() * sqrt(l * l - dz * dz)
+			cursor.y = draw_z
+	if cursor != null:
 		pts.append(cursor)
 		rs.append(0.0)
 		if new_radius > 0.0 and rs.size() >= 3:
@@ -781,6 +912,8 @@ func _draw_drawing(e: EditorUtsim) -> void:
 			_num(float(draft["length"])), _num((cursor as Vector3).y)]
 		if steep:
 			text += "\nAcima do máximo de %s°" % _num(float(pv["limit"]), 1)
+		if typed != "":
+			text = "Digitado: %s m\n" % typed + text
 		_readout_at(cursor, text, steep)
 	else:
 		_readout.visible = false
