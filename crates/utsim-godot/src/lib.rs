@@ -574,6 +574,16 @@ impl UtsimPlayback {
         put(&mut d, "bounds_min", v3(lo));
         put(&mut d, "bounds_max", v3(hi));
         put(&mut d, "pallets", c.pallets);
+        // The corrected clips of the Blender bodies (`pessoa_clipes`).
+        if let Some((path, names)) = c.modelos3d.as_ref().and_then(modelos3d::clipes_corrigidos) {
+            put(
+                &mut d,
+                "clipes_corrigidos",
+                GString::from(path.to_string_lossy().replace('\\', "/").as_str()),
+            );
+            let list: PackedStringArray = names.iter().map(|n| GString::from(n.as_str())).collect();
+            put(&mut d, "clipes_substitui", list);
+        }
         put(&mut d, "fork_size", c.fork_size);
         let mut blocks = VarArray::new();
         for (i, v) in c.blocks.iter().enumerate() {

@@ -1,0 +1,22 @@
+Model(
+    format: 2,
+    name: "trajetos_visual",
+    run: (stop_time: 600.0, movement: Aisles),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(3.0)), position: (-8.0, 0.0, 0.0)),
+        (name: "esteira", kind: Conveyor(length: 14.0, speed: 0.6, item_length: 0.6,
+            route: Some((nodes: [(at: (-7.0, 0.0, 0.8)), (at: (0.0, 0.0, 0.8), radius: Some(2.0)), (at: (0.0, 6.0, 2.4)), (at: (5.0, 6.0, 2.4))],
+                style: Channeled))),
+         position: (0.0, 3.0, 0.0)),
+        (name: "lateral", kind: Conveyor(length: 4.0, speed: 0.6, item_length: 0.6,
+            route: Some((nodes: [(at: (-2.0, -4.0, 0.8)), (at: (-2.0, 0.0, 0.8))], drive: Gravity))),
+         position: (0.0, 0.0, 0.0)),
+        (name: "saida", kind: Sink, position: (7.0, 9.0, 0.0)),
+    ],
+    connections: [("chegada", "esteira"), ("esteira", "saida"), ("lateral", "saida")],
+    aisles: [
+        (name: "escada", kind: Pedestrian, points: [(-6.0, -6.0), (-1.0, -6.0), (2.0, -6.0), (6.0, -6.0)],
+         width: 1.2, heights: [0.0, 2.4, 2.4, 0.0], stair: true),
+        (name: "corredor", kind: Forklift, points: [(0.0, -12.0), (0.0, 0.0)], width: 3.6),
+    ],
+)

@@ -1,0 +1,18 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Capturas da esteira desenhada (curva, subida, canaletas), da esteira por gravidade e da escada sobre o corredor."},
+		{"abrir": "g4_trajetos_visual.ron"},
+		{"modo": "simular"},
+		{"tempo": 60.0},
+		{"camera": {"alvo": [0, 0], "distancia": 20.0, "giro": 0.6, "inclinacao": 0.6}},
+		{"esperar": 5},
+		{"capturar": "trajetos_visual_geral"},
+		{"camera": {"alvo": [0, -6], "distancia": 9.0, "giro": 0.9, "inclinacao": 0.35}},
+		{"esperar": 5},
+		{"capturar": "trajetos_visual_escada"},
+		{"camera": {"alvo": [0, 6], "distancia": 7.0, "giro": 0.3, "inclinacao": 0.35}},
+		{"esperar": 5},
+		{"capturar": "trajetos_visual_subida"}
+	]
+}

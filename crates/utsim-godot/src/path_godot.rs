@@ -80,6 +80,7 @@ fn paths(model: &Model) -> VarArray {
             );
             put(&mut d, "line", line(&center));
             put(&mut d, "width", a.width);
+            put(&mut d, "stair", a.stair);
             put(&mut d, "length", a.length());
             let worst = utsim_nav::path3d::degrees(utsim_nav::path3d::max_grade(&center));
             let limit = pe::max_slope(pe::FLOOR_PATH);
@@ -299,6 +300,34 @@ impl UtsimTrajetos {
             .collect()
     }
 
+    /// Quanto a superfície de cada esteira desenhada andou até `t` (m), na ordem de
+    /// `da_cena`: para quando a esteira quebra, sai do turno ou, sem acúmulo, enquanto a
+    /// peça da frente espera; na de gravidade, só enquanto leva peças (os roletes giram
+    /// sob elas).
+    #[func]
+    fn avancos(pb: Gd<UtsimPlayback>, t: f64) -> PackedFloat64Array {
+        let b = pb.bind();
+        let Some(core) = b.core.as_ref() else {
+            return PackedFloat64Array::new();
+        };
+        let Some(model) = core.model.as_ref() else {
+            return PackedFloat64Array::new();
+        };
+        pe::routes(model)
+            .iter()
+            .filter_map(|r| {
+                let view = core.blocks.iter().find(|v| v.name == r.name)?;
+                let gravity = r.drive == utsim_model::BeltDrive::Gravity;
+                Some(
+                    core.scene
+                        .timeline
+                        .belt_track(view.b)
+                        .map_or(0.0, |tr| tr.surface_travel(t, gravity)),
+                )
+            })
+            .collect()
+    }
+
     /// Os caminhos no piso de uma reprodução (a cena desenha as rampas).
     #[func]
     fn caminhos_da_cena(pb: Gd<UtsimPlayback>) -> VarArray {
@@ -345,6 +374,40 @@ impl UtsimTrajetos {
         self.edit(|e| e.add_belt_route(&tool, &p, &r, from, to))
             .map(|n| GString::from(n.as_str()))
             .unwrap_or_default()
+    }
+
+    /// Esteira nova que pode começar (`from_line`: desvio) ou acabar (`to_line`: junção)
+    /// na linha de outra esteira desenhada; devolve o nome ou "".
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn nova_esteira_t(
+        &mut self,
+        tool: GString,
+        points: PackedVector3Array,
+        radii: PackedFloat64Array,
+        from: GString,
+        to: GString,
+        from_line: GString,
+        to_line: GString,
+    ) -> GString {
+        let (tool, p, r) = (tool.to_string(), pts(&points), radii.as_slice().to_vec());
+        let texts = [from, to, from_line, to_line].map(|g| g.to_string());
+        fn opt(s: &str) -> Option<&str> {
+            (!s.is_empty()).then_some(s)
+        }
+        self.edit(|e| {
+            e.add_belt_joined(
+                &tool,
+                &p,
+                &r,
+                opt(&texts[0]),
+                opt(&texts[1]),
+                opt(&texts[2]),
+                opt(&texts[3]),
+            )
+        })
+        .map(|n| GString::from(n.as_str()))
+        .unwrap_or_default()
     }
 
     /// Caminho no piso novo; devolve o nome ou "".
@@ -409,6 +472,45 @@ impl UtsimTrajetos {
         let n = name.to_string();
         self.edit(|e| e.remove_route_node(&n, path, index.max(0) as usize))
             .is_some()
+    }
+
+    /// Caminho como escada (só pedestres) ou não.
+    #[func]
+    fn por_escada(&mut self, name: GString, on: bool) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.set_stair(&n, on)).is_some()
+    }
+
+    /// Move o trajeto inteiro por `d` (Godot).
+    #[func]
+    fn mover_trajeto(&mut self, name: GString, path: bool, d: Vector3) -> bool {
+        let n = name.to_string();
+        let dm = [f64::from(d.x), -f64::from(d.z), f64::from(d.y)];
+        self.edit(|e| e.move_route(&n, path, dm)).is_some()
+    }
+
+    /// Gira o trajeto inteiro `degrees` (anti-horário visto de cima) em volta do meio.
+    #[func]
+    fn girar_trajeto(&mut self, name: GString, path: bool, degrees: f64) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.rotate_route(&n, path, degrees)).is_some()
+    }
+
+    /// Curva o trecho que sai do nó `index` pela alça do meio arrastada até `at`.
+    #[func]
+    fn curvar(&mut self, name: GString, path: bool, index: i64, at: Vector3) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.bend(&n, path, index.max(0) as usize, m(at)))
+            .is_some()
+    }
+
+    /// Trajeto paralelo a `offset` m (positivo: à esquerda do sentido); devolve o nome ou "".
+    #[func]
+    fn paralelo(&mut self, name: GString, path: bool, offset: f64) -> GString {
+        let n = name.to_string();
+        self.edit(|e| e.parallel(&n, path, offset))
+            .map(|s| GString::from(s.as_str()))
+            .unwrap_or_default()
     }
 
     /// Rampas de acesso de pedestre (1:12) nas pontas altas de um caminho; devolve

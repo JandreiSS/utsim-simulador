@@ -263,6 +263,8 @@ pub struct Editor {
     pastes: u32,
     /// Positions at the start of the current drag.
     drag: Vec<(String, [f64; 3])>,
+    /// While set, the commands applied merge into one undo step (`group`).
+    group: Option<String>,
 }
 
 impl Default for Editor {
@@ -288,7 +290,26 @@ impl Editor {
             clipboard: Clipboard::default(),
             pastes: 0,
             drag: Vec::new(),
+            group: None,
         }
+    }
+
+    /// Runs `f` with every command it applies merged into a single undo step.
+    pub fn group<T>(
+        &mut self,
+        f: impl FnOnce(&mut Editor) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.doc.end_gesture();
+        let before = self.doc.revision();
+        self.group = Some(format!("grupo:{before}"));
+        let r = f(self);
+        self.group = None;
+        // A group that failed half way leaves nothing behind.
+        if r.is_err() && self.doc.revision() != before {
+            self.doc.undo();
+        }
+        self.doc.end_gesture();
+        r
     }
 
     pub fn model(&self) -> &Model {
@@ -296,7 +317,10 @@ impl Editor {
     }
 
     pub fn apply(&mut self, command: Command) -> Result<(), String> {
-        self.doc.apply(command)
+        match self.group.clone() {
+            Some(key) => self.doc.apply_coalescing(command, Some(&key)),
+            None => self.doc.apply(command),
+        }
     }
 
     /// The drag of the Equipe tool from `from` to `to` (`docs/plano_chegadas_e_equipes_3d.md`,
