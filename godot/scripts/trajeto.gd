@@ -78,6 +78,8 @@ var _readout: Label3D
 var typed := ""
 ## Where the mouse points while drawing (the direction a typed length goes).
 var _cursor: Variant = null
+## Direction of the route a new one goes on from (its last segment), null when none.
+var _start_tangent: Variant = null
 
 
 func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
@@ -159,6 +161,7 @@ func _clear_drawing() -> void:
 	start_port = {}
 	end_port = {}
 	typed = ""
+	_start_tangent = null
 	_readout.visible = false
 
 
@@ -182,7 +185,16 @@ func _screen(w: Vector3) -> Variant:
 
 
 func _snap(at: Vector3, prev: Variant, skip := "") -> Dictionary:
+	if prev != null:
+		return tr.encaixe_tangente(at, main.snap_step(), SNAP_METRES, prev, _tangent(), skip)
 	return tr.encaixe(at, main.snap_step(), SNAP_METRES, prev, skip)
+
+
+## The way the route being drawn is going: its last segment, or the route it goes on from.
+func _tangent() -> Variant:
+	if points.size() >= 2:
+		return points[points.size() - 1] - points[points.size() - 2]
+	return _start_tangent
 
 
 ## Floor point under the mouse at the drawing height.
@@ -327,6 +339,8 @@ func _what(w: String) -> String:
 			return "encaixado num nó"
 		"caminho":
 			return "encaixado no caminho"
+		"tangente":
+			return "seguindo o trecho anterior"
 		"angulo":
 			return "ângulo de 15 em 15°"
 		"grade":
@@ -349,11 +363,35 @@ func drag(p: Vector2) -> void:
 			return
 		var v: Vector3 = at
 		v.y = from.y
-		var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
-		_drag_at = s["at"]
-		if s["what"] != "porta" and s["what"] != "no":
-			_drag_at.y = from.y
-	_readout_at(_drag_at, "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)], false)
+		var lock := ""
+		if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META):
+			lock = "x" if absf(v.x - from.x) >= absf(v.z - from.z) else "y"
+		if lock != "":
+			_drag_at = lock_axis(from, v, lock, main.snap_step())
+		else:
+			var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
+			_drag_at = s["at"]
+			if s["what"] != "porta" and s["what"] != "no":
+				_drag_at.y = from.y
+		_press["lock"] = lock
+	var text := "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)]
+	match String(_press.get("lock", "")):
+		"x":
+			text += "\neixo X travado (Ctrl)"
+		"y":
+			text += "\neixo Y travado (Ctrl)"
+	_readout_at(_drag_at, text, false)
+
+
+## `to` moved from `from` only along the model's X axis (`axis` "x") or Y axis ("y"), the
+## distance on the grid step; the height stays.
+static func lock_axis(from: Vector3, to: Vector3, axis: String, step: float) -> Vector3:
+	var out := from
+	if axis == "x":
+		out.x = from.x + (snappedf(to.x - from.x, step) if step > 0.0 else to.x - from.x)
+	else:
+		out.z = from.z + (snappedf(to.z - from.z, step) if step > 0.0 else to.z - from.z)
+	return out
 
 
 ## Height the mouse points at on the vertical plane through `at` that faces the camera.
@@ -388,7 +426,10 @@ func release(_p: Vector2) -> void:
 		var n := (r["nodes"] as PackedVector3Array).size() if not r.is_empty() else 0
 		var i := int(pr["index"])
 		if n > 0 and (i == 0 or i == n - 1):
+			var nodes: PackedVector3Array = r["nodes"]
+			var tangent: Vector3 = nodes[n - 1] - nodes[n - 2] if i == n - 1 else nodes[0] - nodes[1]
 			_start_at(pr["from"])
+			_start_tangent = tangent
 		return
 	_dragging = false
 	var from: Vector3 = pr["from"]

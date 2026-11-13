@@ -103,6 +103,25 @@ pub fn snap(
     prev: Option<[f64; 3]>,
     skip: Option<&str>,
 ) -> Snap {
+    snap_along(model, p, step, radius, prev, None, skip)
+}
+
+/// Até quantos graus da direção do trecho anterior o próximo nó segue reto
+/// ([`snap_along`]).
+pub const TANGENT_DEG: f64 = 6.0;
+
+/// [`snap`] com a direção do trecho anterior (`tangent`, em planta): perto dela, o nó
+/// segue na mesma direção, sem quebrar a linha (o trecho continua a curva ou a reta que
+/// chega), antes do encaixe de 15°.
+pub fn snap_along(
+    model: &Model,
+    p: [f64; 3],
+    step: f64,
+    radius: f64,
+    prev: Option<[f64; 3]>,
+    tangent: Option<[f64; 2]>,
+    skip: Option<&str>,
+) -> Snap {
     let mut best: Option<(f64, Snap)> = None;
     let offer = |d: f64, s: Snap, best: &mut Option<(f64, Snap)>| {
         if d < radius && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
@@ -211,6 +230,29 @@ pub fn snap(
     }
     if let Some((_, s)) = best {
         return s;
+    }
+    if let (Some(q), Some(t)) = (prev, tangent) {
+        let tl = (t[0] * t[0] + t[1] * t[1]).sqrt();
+        let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
+        let len = (dx * dx + dy * dy).sqrt();
+        if tl > 1e-9 && len > 1e-9 {
+            let u = [t[0] / tl, t[1] / tl];
+            let along = dx * u[0] + dy * u[1];
+            let cos = (along / len).clamp(-1.0, 1.0);
+            if along > 0.0 && cos.acos().to_degrees() < TANGENT_DEG {
+                let l = if step > 0.0 {
+                    snap_to(along, step).max(step)
+                } else {
+                    along
+                };
+                return Snap {
+                    at: [q[0] + u[0] * l, q[1] + u[1] * l, p[2]],
+                    what: "tangente",
+                    object: None,
+                    output: None,
+                };
+            }
+        }
     }
     if let Some(q) = prev {
         let (dx, dy) = (p[0] - q[0], p[1] - q[1]);
@@ -987,6 +1029,24 @@ mod tests {
         let s = snap(e.model(), [5.1, 0.1, 0.0], 0.5, 0.5, None, None);
         assert_eq!(s.at, [5.0, 0.0, 0.8]);
         assert_eq!(s.output, Some(true));
+    }
+
+    #[test]
+    fn the_next_node_goes_on_along_the_last_segment() {
+        let e = Editor::new("t");
+        // The last segment went at 20° (not a multiple of 15°): pointing about that way
+        // keeps the line straight.
+        let r = 20f64.to_radians();
+        let t = [r.cos(), r.sin()];
+        let p = [
+            3.0 * (21f64.to_radians()).cos(),
+            3.0 * (21f64.to_radians()).sin(),
+            0.8,
+        ];
+        let s = snap_along(e.model(), p, 0.5, 0.3, Some([0.0, 0.0, 0.8]), Some(t), None);
+        assert_eq!(s.what, "tangente");
+        assert!((s.at[1] / s.at[0] - r.tan()).abs() < 1e-9);
+        assert!(((s.at[0].powi(2) + s.at[1].powi(2)).sqrt() - 3.0).abs() < 1e-9);
     }
 
     #[test]
