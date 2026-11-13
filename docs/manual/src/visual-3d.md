@@ -67,7 +67,7 @@ Os itens aparecem como um palete com caixas numa cena com paletes (porta-paletes
 
 ### Elementos do Blender (UTSim 3D)
 
-O UTSim 3D procura primeiro os elementos de `assets/modelos3d/`, feitos no Blender, e usa a biblioteca como reserva. A máquina padrão é desenhada como o `cnc` e a bancada como o `posto`. A empilhadeira e o AGV também vêm de lá, no mesmo tamanho. Os itens que circulam continuam as caixas e os paletes da biblioteca. O porta-paletes, a esteira e a faixa da fila continuam da biblioteca, porque as medidas deles vêm do modelo. Para outro elemento, escreva o nome dele em `visual.asset`: `cnc`, `prensa`, `injetora`, `posto`, `robo`, `celula`, `estante`, ou a versão `_medio` de cada um, com mais detalhe. Em `agv_medio` e `empilhadeira_medio` o veículo continua o da biblioteca, só com o desenho mais detalhado; `esteira_medio` e `porta_paletes_medio` ficam com a esteira e o porta-paletes nas medidas do modelo.
+O UTSim 3D procura primeiro os elementos de `assets/modelos3d/`, feitos no Blender, e usa a biblioteca como reserva. A máquina padrão é desenhada como o `cnc` e a bancada como o `posto`. A empilhadeira e o AGV também vêm de lá, no mesmo tamanho. Os itens que circulam continuam as caixas e os paletes da biblioteca. O porta-paletes, a esteira e a faixa da fila continuam da biblioteca, porque as medidas deles vêm do modelo. Para outro elemento, escreva o nome dele em `visual.asset`: `cnc`, `prensa`, `injetora`, `posto`, `robo`, `celula`, `estante`, ou a versão `_medio` de cada um, com mais detalhe. Esses nomes também aparecem na lista **Ativo** do painel, no grupo "Elementos 3D". Numa fila, `espera` desenha a mesa de espera: as peças ficam no tampo, a mais antiga do lado da saída, seis por camada e duas camadas; o que não cabe aparece só no rótulo (+N). Em `agv_medio` e `empilhadeira_medio` o veículo continua o da biblioteca, só com o desenho mais detalhado; `esteira_medio` e `porta_paletes_medio` ficam com a esteira e o porta-paletes nas medidas do modelo.
 
 As máquinas se mexem conforme o estado delas na simulação:
 
@@ -183,7 +183,7 @@ Numa planta com muitos objetos, o visualizador troca o que está longe por algo 
 - O corredor da empilhadeira num porta-paletes é sempre o lado `-y` dele.
 - Os tanques da rede de fluidos ainda usam o cilindro translúcido, não o modelo `tanque`.
 - No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá, e as pessoas aparecem como `operador_simples`.
-- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto.
+- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto. Quem trabalha junto no mesmo posto (operadores por peça) já fica lado a lado, a 0,7 m.
 - Não há animação de empurrar, dirigir ou sentar, e a pessoa com a caixa anda com o mesmo passo em qualquer velocidade (não há animação de correr carregando).
 
 ## Cena 3D para outros motores

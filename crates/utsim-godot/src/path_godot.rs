@@ -80,6 +80,7 @@ fn paths(model: &Model) -> VarArray {
             );
             put(&mut d, "line", line(&center));
             put(&mut d, "width", a.width);
+            put(&mut d, "stair", a.stair);
             put(&mut d, "length", a.length());
             let worst = utsim_nav::path3d::degrees(utsim_nav::path3d::max_grade(&center));
             let limit = pe::max_slope(pe::FLOOR_PATH);
@@ -180,11 +181,30 @@ impl UtsimTrajetos {
         prev: Variant,
         skip: GString,
     ) -> VarDictionary {
+        self.encaixe_tangente(at, step, radius, prev, Variant::nil(), skip)
+    }
+
+    /// `encaixe` com a direção do trecho anterior (`tangent`, um Vector3 do Godot, ou
+    /// null): perto dela o nó segue reto (`what` = "tangente").
+    #[func]
+    fn encaixe_tangente(
+        &self,
+        at: Vector3,
+        step: f64,
+        radius: f64,
+        prev: Variant,
+        tangent: Variant,
+        skip: GString,
+    ) -> VarDictionary {
         let prev = prev.try_to::<Vector3>().ok().map(m);
+        let tangent = tangent
+            .try_to::<Vector3>()
+            .ok()
+            .map(|v| [f64::from(v.x), -f64::from(v.z)]);
         let skip = skip.to_string();
         let skip = (!skip.is_empty()).then_some(skip.as_str());
         let s = self
-            .model(|model| pe::snap(model, m(at), step, radius, prev, skip))
+            .model(|model| pe::snap_along(model, m(at), step, radius, prev, tangent, skip))
             .unwrap_or(pe::Snap {
                 at: m(at),
                 what: "livre",
@@ -328,6 +348,40 @@ impl UtsimTrajetos {
             .unwrap_or_default()
     }
 
+    /// Esteira nova que pode começar (`from_line`: desvio) ou acabar (`to_line`: junção)
+    /// na linha de outra esteira desenhada; devolve o nome ou "".
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn nova_esteira_t(
+        &mut self,
+        tool: GString,
+        points: PackedVector3Array,
+        radii: PackedFloat64Array,
+        from: GString,
+        to: GString,
+        from_line: GString,
+        to_line: GString,
+    ) -> GString {
+        let (tool, p, r) = (tool.to_string(), pts(&points), radii.as_slice().to_vec());
+        let texts = [from, to, from_line, to_line].map(|g| g.to_string());
+        fn opt(s: &str) -> Option<&str> {
+            (!s.is_empty()).then_some(s)
+        }
+        self.edit(|e| {
+            e.add_belt_joined(
+                &tool,
+                &p,
+                &r,
+                opt(&texts[0]),
+                opt(&texts[1]),
+                opt(&texts[2]),
+                opt(&texts[3]),
+            )
+        })
+        .map(|n| GString::from(n.as_str()))
+        .unwrap_or_default()
+    }
+
     /// Caminho no piso novo; devolve o nome ou "".
     #[func]
     fn novo_caminho(
@@ -390,6 +444,38 @@ impl UtsimTrajetos {
         let n = name.to_string();
         self.edit(|e| e.remove_route_node(&n, path, index.max(0) as usize))
             .is_some()
+    }
+
+    /// Caminho como escada (só pedestres) ou não.
+    #[func]
+    fn por_escada(&mut self, name: GString, on: bool) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.set_stair(&n, on)).is_some()
+    }
+
+    /// Curva o trecho que sai do nó `index` pela alça do meio arrastada até `at`.
+    #[func]
+    fn curvar(&mut self, name: GString, path: bool, index: i64, at: Vector3) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.bend(&n, path, index.max(0) as usize, m(at)))
+            .is_some()
+    }
+
+    /// Trajeto paralelo a `offset` m (positivo: à esquerda do sentido); devolve o nome ou "".
+    #[func]
+    fn paralelo(&mut self, name: GString, path: bool, offset: f64) -> GString {
+        let n = name.to_string();
+        self.edit(|e| e.parallel(&n, path, offset))
+            .map(|s| GString::from(s.as_str()))
+            .unwrap_or_default()
+    }
+
+    /// Rampas de acesso de pedestre (1:12) nas pontas altas de um caminho; devolve
+    /// quantas pôs (0: nenhuma, ver `last_error`).
+    #[func]
+    fn rampas_de_acesso(&mut self, name: GString) -> i64 {
+        let n = name.to_string();
+        self.edit(|e| e.access_ramps(&n)).map_or(0, |k| k as i64)
     }
 
     /// Prolonga a esteira pela saída (ou pela entrada, com `at_start`) até `at`.

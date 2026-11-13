@@ -541,6 +541,11 @@ fn painel(a: &[&str]) -> Vec<Passo> {
             _ => return Vec::new(),
         },
         "saida_remover" => SaidaRemover(at(1)),
+        // "Editar nós" of a belt drawn by nodes: the drawing tool, with the belt chosen.
+        "trajeto_editar" => Trajeto {
+            acao: "trajeto_editar".into(),
+            valor: at(1),
+        },
         "motorista" => Motorista {
             nome: at(1),
             visivel: at(2) == "true",
@@ -803,6 +808,13 @@ mod tests {
                 },
                 MostrarPropriedades
             ]
+        );
+        assert_eq!(
+            rotear("trajeto_editar	esteira", &s),
+            vec![Trajeto {
+                acao: "trajeto_editar".into(),
+                valor: "esteira".into()
+            }]
         );
         assert_eq!(
             rotear("form:ligacao_remover", &s),
