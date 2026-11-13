@@ -827,6 +827,20 @@ impl Tampo {
     }
 }
 
+/// The corrected clips of the person bodies (`pessoa_clipes`: only the skeleton and the
+/// clips to swap, `dados.substitui`): its file and the clip names it replaces in the
+/// clips the Blender bodies play (UAL2: `Walk_Carry_Loop`). `None` when the catalogue
+/// has no such entry.
+pub fn clipes_corrigidos(cat: &Catalogo) -> Option<(PathBuf, Vec<String>)> {
+    let e = cat.get("pessoa_clipes")?;
+    let names: Vec<String> = e.dados["substitui"]
+        .as_array()?
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect();
+    (!names.is_empty()).then(|| (cat.path("pessoa_clipes"), names))
+}
+
 /// Degrees the seated person leans forward (`dados.sentado_inclinar` of the person
 /// bodies): the clips sit it too far back. 0 when the catalogue does not say.
 pub fn sentado_inclinar(cat: &Catalogo) -> f32 {
@@ -915,6 +929,13 @@ mod tests {
         root: [0.0; 3],
         turn: 0.0,
     };
+
+    #[test]
+    fn the_corrected_clips_name_the_file_and_what_they_replace() {
+        let (path, names) = clipes_corrigidos(&cat()).expect("pessoa_clipes no catálogo");
+        assert!(path.is_file(), "{}", path.display());
+        assert!(names.contains(&"Walk_Carry_Loop".to_string()), "{names:?}");
+    }
 
     #[test]
     fn the_waiting_table_lays_its_items_on_the_top() {
