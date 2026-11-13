@@ -84,6 +84,15 @@ pub fn show_status(ui: &mut Ui, v: &StatusView, reg: &mut Registry, out: &mut Ve
                     .max_rect(bar)
                     .layout(Layout::right_to_left(Align::Center)),
             );
+            // Configurações, at the right end (the top bar has no room left).
+            let label = format!("\u{2699} {}", crate::texto::tx("barra-configuracoes"));
+            let r = child
+                .add(egui::Button::new(RichText::new(&label).small()).frame(false))
+                .on_hover_text(crate::texto::tx("barra-configuracoes-dica"));
+            named(&child, reg, "Botao_Configuracoes", &r, &label);
+            if r.clicked() {
+                out.push("configuracoes".into());
+            }
             if let Some(p) = v.progress {
                 let r = child
                     .button("Cancelar")

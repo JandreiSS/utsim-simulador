@@ -122,8 +122,11 @@ pub enum PropAction {
 pub struct PropsState {
     /// Sections closed by the user (by title).
     pub closed: HashSet<String>,
-    /// Distribution fields shown as RON text.
-    as_text: HashSet<String>,
+    /// Distribution fields switched by their "{ }" button away from the default mode (the
+    /// form, or the code when [`PropsState::code_default`]), until another object is shown.
+    flipped: HashSet<String>,
+    /// The distribution fields open as code (RON text): the preference of Configurações.
+    pub code_default: bool,
     /// Text being typed, by widget name.
     buffers: HashMap<String, String>,
     asset_filter: String,
@@ -226,6 +229,7 @@ pub fn show(
     if st.object != v.props.name {
         st.object = v.props.name.clone();
         st.buffers.clear();
+        st.flipped.clear();
         st.data_mode.clear();
         st.drafts.clear();
         st.drafts_seen.clear();
@@ -950,7 +954,8 @@ fn dist(
             }
         });
     }
-    let text_on = st.as_text.contains(path) || view.params.is_empty();
+    // The default mode, unless its "{ }" switched it; a table (no parameters) is text only.
+    let text_on = (st.code_default != st.flipped.contains(path)) || view.params.is_empty();
     let families: Vec<(String, String, String)> = v
         .families
         .iter()
@@ -978,13 +983,15 @@ fn dist(
             }
             let r = ui
                 .add(Button::new("{ }").selected(text_on))
-                .on_hover_text("Editar como texto (RON)");
-            named_toggle(ui, reg, &format!("{name}_texto"), &r, "{ }", text_on);
-            if r.clicked() {
-                if text_on {
-                    st.as_text.remove(path);
+                .on_hover_text(if text_on {
+                    crate::texto::tx("props-editar_como_formulario")
                 } else {
-                    st.as_text.insert(path.to_owned());
+                    crate::texto::tx("props-editar_como_texto")
+                });
+            named_toggle(ui, reg, &format!("{name}_texto"), &r, "{ }", text_on);
+            if r.clicked() && !view.params.is_empty() {
+                if !st.flipped.remove(path) {
+                    st.flipped.insert(path.to_owned());
                 }
                 ui.ctx().request_repaint();
             }
@@ -1931,6 +1938,36 @@ mod tests {
         let mut e = Editor::new("teste");
         let name = e.add("Processor", [0.0, 0.0, 0.0]).expect("processo");
         (e, name)
+    }
+
+    #[test]
+    fn distribution_fields_open_in_the_default_mode_on_every_object() {
+        let mut e = Editor::new("teste");
+        let a = e.add("Processor", [0.0, 0.0, 0.0]).unwrap();
+        let b = e.add("Processor", [4.0, 0.0, 0.0]).unwrap();
+        let (va, vb) = (view(&e, &a), view(&e, &b));
+        let mut p = Panel::new();
+        p.frame(&va, vec![]);
+        p.frame(&va, vec![]);
+        // The form: the parameters, no RON line.
+        let form = |p: &Panel| p.reg.get("Prop_process_ron").is_none();
+        assert!(form(&p), "{:?}", p.reg.names());
+        // "{ }" switches this field to code...
+        p.click(&va, "Prop_process_texto");
+        p.frame(&va, vec![]);
+        assert!(!form(&p));
+        // ...and another object opens in the form again (it used to stay as code).
+        p.frame(&vb, vec![]);
+        p.frame(&vb, vec![]);
+        assert!(form(&p));
+        // With the preference "Código", every field opens as code; "{ }" goes back to the
+        // form for that one.
+        p.st.code_default = true;
+        p.frame(&vb, vec![]);
+        assert!(!form(&p));
+        p.click(&vb, "Prop_process_texto");
+        p.frame(&vb, vec![]);
+        assert!(form(&p));
     }
 
     #[test]
