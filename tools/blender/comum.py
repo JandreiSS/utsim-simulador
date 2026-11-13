@@ -385,7 +385,7 @@ class Elemento:
 
     # ---------------------------------------------------------------- animação
     def clipe(self, nome, laco, chaves):
-        """Clipe de 1 s. `chaves` = {nó: [(fase, 'location'|'rotation_euler', eixo, valor)]}.
+        """Clipe de 1 s. `chaves` = {nó: [(fase, 'location'|'rotation_euler'|'scale', eixo, valor)]}.
 
         Os valores são relativos ao repouso do nó (somados à posição ou ao giro dele).
         """
@@ -394,7 +394,8 @@ class Elemento:
             o.animation_data_create()
             act = bpy.data.actions.new(f"{nome}_{no}")
             o.animation_data.action = act
-            repouso = {"location": tuple(o.location), "rotation_euler": tuple(o.rotation_euler)}
+            repouso = {"location": tuple(o.location), "rotation_euler": tuple(o.rotation_euler),
+                       "scale": tuple(o.scale)}
             for fase, caminho, eixo, valor in ks:
                 getattr(o, caminho)[eixo] = repouso[caminho][eixo] + valor
                 o.keyframe_insert(caminho, index=eixo, frame=round(fase * QUADROS))
@@ -403,6 +404,7 @@ class Elemento:
                     kp.interpolation = "LINEAR"
             o.location = repouso["location"]
             o.rotation_euler = repouso["rotation_euler"]
+            o.scale = repouso["scale"]
             trilha = o.animation_data.nla_tracks.new()
             trilha.name = nome
             trilha.strips.new(nome, 0, act)

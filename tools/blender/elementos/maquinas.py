@@ -124,8 +124,10 @@ def cnc(detalhe=0):
     e.caixa("tampa", "faixa", (0.98, -0.45, 1.20), (0.99, -0.30, 1.30))
     _torre_luz(e, 0.75, 0.45, 1.95)
     # Pontos.
-    e.ponto("ponto_operador", (-0.15, -1.20, 0.0), 90)
-    e.ponto("ponto_porta", (-0.15, -1.80, 0.0), 90)
+    # O operador trabalha no painel, à direita da porta: a mão esquerda do clipe `Interact`
+    # (0,17 m à esquerda e 0,58 m à frente do ponto, a 1,3 m do chão) cai na tela.
+    e.ponto("ponto_operador", (0.85, -1.40, 0.0), 90)
+    e.ponto("ponto_porta", (0.85, -2.00, 0.0), 90)
     e.ponto("ponto_peca", (-0.30, -0.45, 1.10), 0)
     e.ponto("ponto_entrada", (-1.30, -0.95, 0.90), 0)
     e.ponto("ponto_saida", (1.30, -0.95, 0.90), 0)
@@ -240,8 +242,9 @@ def injetora(detalhe=0):
     e.caixa("porta", "pintura", (-0.12, -0.60, 1.02), (-0.05, -0.56, 1.78))
     e.caixa("porta", "vidro", (-1.48, -0.585, 1.02), (-0.12, -0.575, 1.78))
     _torre_luz(e, -1.80, 0.40, 0.95)
-    e.ponto("ponto_operador", (-0.80, -1.05, 0.0), 90)
-    e.ponto("ponto_porta", (-0.80, -1.65, 0.0), 90)
+    # O operador trabalha no painel (a mão do clipe `Interact` cai na tela, como no torno).
+    e.ponto("ponto_operador", (0.72, -1.20, 0.0), 90)
+    e.ponto("ponto_porta", (0.72, -1.80, 0.0), 90)
     e.ponto("ponto_peca", (-0.15, 0.0, 1.35), 0)
     e.ponto("ponto_entrada", (2.30, 0.0, 1.0), 180)
     e.ponto("ponto_saida", (-0.20, -0.85, 0.90), -90)
