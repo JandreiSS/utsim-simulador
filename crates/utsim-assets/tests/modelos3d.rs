@@ -408,6 +408,13 @@ const CONTRATO: &[Contrato] = &[
         &["ponto_gancho", "ponto_operador"],
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
+    ("estante_espera", &["estrutura"], &[], &[]),
+    (
+        "espera_chao",
+        &["faixa_frente", "faixa_fundo", "faixa_e", "faixa_d"],
+        &[],
+        &[],
+    ),
     ("esteira_pe", &["sapata", "perna"], &[], &[]),
     (
         "esteira_ponteira",
@@ -1020,6 +1027,64 @@ fn as_pecas_da_esteira_por_trajeto_tem_a_origem_no_apoio() {
         let topo = v3(&c["minimo"])[2] + v3(&c["tamanho"])[2];
         let altura = c["dados"]["altura"].as_f64().unwrap() as f32;
         assert!(topo >= altura && topo < altura + 0.02, "suporte até {topo}");
+    }
+}
+
+#[test]
+fn as_esperas_dizem_onde_as_pecas_ficam() {
+    // Mesa, palete, estante e chão: o catálogo dá a altura e a área livre de cada apoio, e
+    // tudo cabe dentro do elemento.
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        for nome in ["espera", "palete"] {
+            let item = &cat[&format!("{nome}{sufixo}")];
+            let tam = v3(&item["tamanho"]);
+            let area = item["dados"]["area"].as_array().unwrap();
+            let tampo = item["dados"]["tampo"].as_f64().unwrap() as f32;
+            assert!(
+                (area[0].as_f64().unwrap() as f32) <= tam[0],
+                "{nome}: área em x"
+            );
+            assert!(
+                (area[1].as_f64().unwrap() as f32) <= tam[1],
+                "{nome}: área em y"
+            );
+            assert!(tampo > 0.0 && tampo <= tam[2], "{nome}: tampo a {tampo}");
+        }
+        for (nome, niveis) in [("estante", 4), ("estante_espera", 3)] {
+            let item = &cat[&format!("{nome}{sufixo}")];
+            let tam = v3(&item["tamanho"]);
+            let p = item["dados"]["prateleiras"].as_array().unwrap();
+            assert_eq!(p.len(), niveis, "{nome}: níveis");
+            let mut antes = 0.0;
+            for nivel in p {
+                let altura = nivel["altura"].as_f64().unwrap() as f32;
+                let vao = nivel["vao"].as_f64().unwrap() as f32;
+                let area = nivel["area"].as_array().unwrap();
+                assert!(
+                    altura > antes && altura + vao < tam[2],
+                    "{nome}: nível a {altura}"
+                );
+                assert!(vao > 0.25, "{nome}: vão de {vao}");
+                assert!((area[0].as_f64().unwrap() as f32) < tam[0]);
+                assert!((area[1].as_f64().unwrap() as f32) < tam[1]);
+                antes = altura + vao;
+            }
+        }
+        // A estante de espera fica ao alcance da mão: o nível de cima abaixo de 1,4 m.
+        let alto = cat[&format!("estante_espera{sufixo}")]["dados"]["prateleiras"][2]["altura"]
+            .as_f64()
+            .unwrap();
+        assert!(alto < 1.4, "prateleira de cima a {alto}");
+        // O quadro do chão: a área por dentro mais a faixa dos dois lados dá o tamanho.
+        let chao = &cat[&format!("espera_chao{sufixo}")];
+        let tam = v3(&chao["tamanho"]);
+        let faixa = chao["dados"]["faixa"].as_f64().unwrap() as f32;
+        let area = chao["dados"]["area"].as_array().unwrap();
+        for k in 0..2 {
+            let a = area[k].as_f64().unwrap() as f32;
+            assert!((a + 2.0 * faixa - tam[k]).abs() < 1e-3, "chão, eixo {k}");
+        }
     }
 }
 
