@@ -52,6 +52,18 @@ empilhadeiras e nos mistos. A classe vem do papel do recurso, o mesmo do desenho
 "pessoa", ou um recurso que opera máquinas (`operators`), é pessoa; empilhadeira, AGV e os
 outros são veículos.
 
+### Rampas e curvas
+
+Um corredor fica no piso, salvo numa rampa. Duas listas opcionais, na ordem dos pontos, mudam isso:
+
+- `heights`: a altura de cada ponto em metros. A rampa que sobe 1 m em 10 m tem √(10² + 1²) ≈ 10,05 m, e é essa distância que quem anda percorre.
+- `radii`: o raio da curva em cada ponto em metros (0 = quina viva). A curva segue a mesma regra das esteiras desenhadas, e as faixas no piso a acompanham.
+
+```ron
+(name: "rampa_mezanino", kind: Pedestrian, points: [(0.0, 0.0), (12.0, 0.0), (12.0, 6.0)],
+    width: 1.2, heights: [0.0, 1.0, 1.0], radii: [0.0, 2.0, 0.0])
+```
+
 ## Marcação do piso (`floor_marking`)
 
 | Campo | Padrão | O que é |
