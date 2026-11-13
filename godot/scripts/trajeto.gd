@@ -47,6 +47,8 @@ const PATH := Color(0.95, 0.85, 0.30)
 const SELECTED := Color(1.0, 0.97, 0.60)
 const STEEP := Color(1.0, 0.35, 0.25)
 const STICK := Color(0.85, 0.88, 0.95, 0.8)
+## The curve handles in the middle of the segments of the selected route.
+const CURVE := Color(1.0, 0.62, 0.20)
 
 var main: Node
 var editor: EditorUtsim
@@ -63,6 +65,11 @@ var end_port := {}
 var draw_z := BELT_HEIGHT
 var new_radius := 0.0
 var path_width := 1.2
+## Distance (m) of a parallel route; positive is to the left of the way.
+var parallel_dist := 1.0
+## Fixed slope while drawing: the next node's height follows from its distance in plan.
+var grade_on := false
+var grade_pct := 5.0
 ## `UtsimTrajetos.esteiras()` and `caminhos()`.
 var belts: Array = []
 var paths: Array = []
@@ -74,6 +81,12 @@ var _press := {}
 var _dragging := false
 var _drag_at := Vector3.ZERO
 var _readout: Label3D
+## The length of the next segment being typed (digits and a comma), "" when none.
+var typed := ""
+## Where the mouse points while drawing (the direction a typed length goes).
+var _cursor: Variant = null
+## Direction of the route a new one goes on from (its last segment), null when none.
+var _start_tangent: Variant = null
 
 
 func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
@@ -154,6 +167,8 @@ func _clear_drawing() -> void:
 	radii = PackedFloat64Array()
 	start_port = {}
 	end_port = {}
+	typed = ""
+	_start_tangent = null
 	_readout.visible = false
 
 
@@ -177,7 +192,16 @@ func _screen(w: Vector3) -> Variant:
 
 
 func _snap(at: Vector3, prev: Variant, skip := "") -> Dictionary:
+	if prev != null:
+		return tr.encaixe_tangente(at, main.snap_step(), SNAP_METRES, prev, _tangent(), skip)
 	return tr.encaixe(at, main.snap_step(), SNAP_METRES, prev, skip)
+
+
+## The way the route being drawn is going: its last segment, or the route it goes on from.
+func _tangent() -> Variant:
+	if points.size() >= 2:
+		return points[points.size() - 1] - points[points.size() - 2]
+	return _start_tangent
 
 
 ## Floor point under the mouse at the drawing height.
@@ -215,6 +239,17 @@ func _handle_at(p: Vector2) -> Dictionary:
 					if d <= best_d:
 						best_d = d
 						best = {"name": r["name"], "path": path, "index": i, "handle": s[1]}
+			# The curve handles: the middle of each segment of the selected route.
+			if r["name"] != sel_name or path != sel_path:
+				continue
+			for i in nodes.size() - 1:
+				var sp = _screen(nodes[i].lerp(nodes[i + 1], 0.5))
+				if sp == null:
+					continue
+				var d: float = (sp as Vector2).distance_to(p)
+				if d <= best_d:
+					best_d = d
+					best = {"name": r["name"], "path": path, "index": i, "handle": "curva"}
 	return best
 
 
@@ -224,6 +259,15 @@ func press(p: Vector2, shift: bool) -> void:
 		_add_point(p)
 		return
 	var h := _handle_at(p)
+	if not h.is_empty() and h["handle"] == "curva":
+		var rc := _route(h["name"], h["path"])
+		var ns: PackedVector3Array = rc["nodes"]
+		_press = h.duplicate()
+		_press["pos"] = p
+		_press["from"] = ns[int(h["index"])].lerp(ns[int(h["index"]) + 1], 0.5)
+		_dragging = false
+		main.set_status("Arraste para curvar o trecho %d de %s." % [int(h["index"]) + 1, sel_name])
+		return
 	if not h.is_empty():
 		var same: bool = h["name"] == sel_name and h["path"] == sel_path
 		if shift and same:
@@ -283,10 +327,18 @@ func _add_point(p: Vector2) -> void:
 	if not points.is_empty() and q.distance_to(points[points.size() - 1]) < 0.05:
 		finish()
 		return
+	if not (s["what"] in ["porta", "no", "caminho"]):
+		q = _graded(q)
+		if grade_on:
+			draw_z = q.y
 	var port := {}
 	if s["what"] == "porta":
 		port = {"object": s["object"], "output": int(s["output"])}
 		# A port at another height (the end of a belt) sets the height.
+		draw_z = q.y
+	elif s["what"] == "linha" and not is_path():
+		# On the line of another belt: a T joint (merge at the end, divert at the start).
+		port = {"object": s["object"], "output": -1, "line": true}
 		draw_z = q.y
 	if points.is_empty():
 		start_port = port
@@ -316,12 +368,16 @@ func _start_at(at: Vector3) -> void:
 
 func _what(w: String) -> String:
 	match w:
+		"linha":
+			return "na linha de outra esteira (junção em T)"
 		"porta":
 			return "encaixado na porta"
 		"no":
 			return "encaixado num nó"
 		"caminho":
 			return "encaixado no caminho"
+		"tangente":
+			return "seguindo o trecho anterior"
 		"angulo":
 			return "ângulo de 15 em 15°"
 		"grade":
@@ -338,17 +394,50 @@ func drag(p: Vector2) -> void:
 	var from: Vector3 = _press["from"]
 	if _press["handle"] == "z":
 		_drag_at = Vector3(from.x, _height_under(p, from), from.z)
+	elif _press["handle"] == "curva":
+		var at = editor.floor_at(p)
+		if at == null:
+			return
+		var step: float = main.snap_step()
+		var v: Vector3 = at
+		if step > 0.0:
+			v = Vector3(snappedf(v.x, step), 0.0, snappedf(v.z, step))
+		_drag_at = Vector3(v.x, from.y, v.z)
 	else:
 		var at = editor.floor_at(p)
 		if at == null:
 			return
 		var v: Vector3 = at
 		v.y = from.y
-		var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
-		_drag_at = s["at"]
-		if s["what"] != "porta" and s["what"] != "no":
-			_drag_at.y = from.y
-	_readout_at(_drag_at, "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)], false)
+		var lock := ""
+		if Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META):
+			lock = "x" if absf(v.x - from.x) >= absf(v.z - from.z) else "y"
+		if lock != "":
+			_drag_at = lock_axis(from, v, lock, main.snap_step())
+		else:
+			var s := _snap(v, null, "" if _press["path"] else String(_press["name"]))
+			_drag_at = s["at"]
+			if s["what"] != "porta" and s["what"] != "no":
+				_drag_at.y = from.y
+		_press["lock"] = lock
+	var text := "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)]
+	match String(_press.get("lock", "")):
+		"x":
+			text += "\neixo X travado (Ctrl)"
+		"y":
+			text += "\neixo Y travado (Ctrl)"
+	_readout_at(_drag_at, text, false)
+
+
+## `to` moved from `from` only along the model's X axis (`axis` "x") or Y axis ("y"), the
+## distance on the grid step; the height stays.
+static func lock_axis(from: Vector3, to: Vector3, axis: String, step: float) -> Vector3:
+	var out := from
+	if axis == "x":
+		out.x = from.x + (snappedf(to.x - from.x, step) if step > 0.0 else to.x - from.x)
+	else:
+		out.z = from.z + (snappedf(to.z - from.z, step) if step > 0.0 else to.z - from.z)
+	return out
 
 
 ## Height the mouse points at on the vertical plane through `at` that faces the camera.
@@ -383,13 +472,26 @@ func release(_p: Vector2) -> void:
 		var n := (r["nodes"] as PackedVector3Array).size() if not r.is_empty() else 0
 		var i := int(pr["index"])
 		if n > 0 and (i == 0 or i == n - 1):
+			var nodes: PackedVector3Array = r["nodes"]
+			var tangent: Vector3 = nodes[n - 1] - nodes[n - 2] if i == n - 1 else nodes[0] - nodes[1]
 			_start_at(pr["from"])
+			_start_tangent = tangent
 		return
 	_dragging = false
 	var from: Vector3 = pr["from"]
 	var name: String = pr["name"]
 	var path: bool = pr["path"]
 	var ok: bool
+	if pr["handle"] == "curva":
+		ok = tr.curvar(name, path, int(pr["index"]), _drag_at)
+		if ok:
+			main.after_edit()
+			_select(name, path, PackedInt32Array([int(pr["index"]) + 1]))
+			main.set_status("Trecho curvado: nó %d com raio de %s m (Ctrl+Z desfaz)." % [int(pr["index"]) + 2,
+				_num((_route(name, path)["radii"] as PackedFloat64Array)[int(pr["index"]) + 1])])
+		else:
+			main.set_status("Não curvou: %s" % tr.last_error())
+		return
 	if sel_nodes.size() > 1 and int(pr["index"]) in sel_nodes:
 		ok = tr.deslocar(name, path, sel_nodes, _drag_at - from)
 	else:
@@ -420,10 +522,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func key(code: int, shift: bool) -> bool:
 	var drawing := not points.is_empty()
 	var fine := FINE_STEP if shift else HEIGHT_STEP
+	# Typing a length while drawing: digits and a comma, Enter puts the node.
+	if drawing:
+		var ch := _digit(code)
+		if ch != "":
+			if ch != "," or not typed.contains(","):
+				typed += ch
+			main.set_status("Comprimento do trecho: %s m (Enter põe o nó na direção do cursor, Backspace apaga)." % typed)
+			return true
 	match code:
 		KEY_ENTER, KEY_KP_ENTER:
+			if drawing and typed != "":
+				return _place_typed()
 			return finish()
 		KEY_BACKSPACE:
+			if drawing and typed != "":
+				typed = typed.left(typed.length() - 1)
+				return true
 			if drawing:
 				_back()
 				return true
@@ -457,6 +572,66 @@ func key(code: int, shift: bool) -> bool:
 					d.z = step
 			return nudge(d)
 	return false
+
+
+## `q` at the height the fixed slope gives it from the last node (when it is on).
+func _graded(q: Vector3) -> Vector3:
+	if not grade_on or points.is_empty():
+		return q
+	var last := points[points.size() - 1]
+	var run := Vector2(q.x - last.x, q.z - last.z).length()
+	q.y = maxf(last.y + grade_pct / 100.0 * run, 0.0)
+	return q
+
+
+static func _digit(code: int) -> String:
+	if code >= KEY_0 and code <= KEY_9:
+		return str(code - KEY_0)
+	if code >= KEY_KP_0 and code <= KEY_KP_9:
+		return str(code - KEY_KP_0)
+	if code in [KEY_COMMA, KEY_PERIOD, KEY_KP_PERIOD]:
+		return ","
+	return ""
+
+
+## The node `typed` metres (3D, along the segment) from the last one, towards the cursor,
+## at the height of the next node.
+func _place_typed() -> bool:
+	var length := typed.replace(",", ".").to_float()
+	typed = ""
+	var last := points[points.size() - 1]
+	var dir := Vector3.RIGHT
+	if _cursor != null:
+		dir = (_cursor as Vector3) - last
+	elif points.size() >= 2:
+		dir = last - points[points.size() - 2]
+	dir.y = 0.0
+	if dir.length() < 1e-6:
+		dir = Vector3.RIGHT
+	dir = dir.normalized()
+	var dz := draw_z - last.y
+	var run: float
+	if grade_on:
+		run = length / sqrt(1.0 + pow(grade_pct / 100.0, 2.0))
+		dz = grade_pct / 100.0 * run
+		if last.y + dz < 0.0:
+			main.set_status("Descendo %s %% por %s m, o nó ficaria abaixo do piso." % [_num(grade_pct, 1), _num(length)])
+			return true
+		draw_z = last.y + dz
+	elif length <= absf(dz):
+		main.set_status("O trecho de %s m não alcança a altura de %s m." % [_num(length), _num(draw_z)])
+		return true
+	else:
+		run = sqrt(length * length - dz * dz)
+	var q := last + dir * run
+	q.y = draw_z
+	points.append(q)
+	radii.append(0.0)
+	if points.size() >= 2 and new_radius > 0.0:
+		radii[points.size() - 2] = new_radius
+	end_port = {}
+	main.set_status("%s: nó %d a %s m do anterior." % [LABELS[mode], points.size(), _num(length)])
+	return true
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -504,11 +679,17 @@ func finish() -> bool:
 		# From an object or a belt's output end; to an object or a belt's input end.
 		var from := ""
 		var to := ""
-		if not start_port.is_empty() and int(start_port["output"]) != 0:
+		var from_line := ""
+		var to_line := ""
+		if not start_port.is_empty() and start_port.get("line", false):
+			from_line = start_port["object"]
+		elif not start_port.is_empty() and int(start_port["output"]) != 0:
 			from = start_port["object"]
-		if not end_port.is_empty() and int(end_port["output"]) != 1:
+		if not end_port.is_empty() and end_port.get("line", false):
+			to_line = end_port["object"]
+		elif not end_port.is_empty() and int(end_port["output"]) != 1:
 			to = end_port["object"]
-		name = tr.nova_esteira(mode, pts, rs, from, to)
+		name = tr.nova_esteira_t(mode, pts, rs, from, to, from_line, to_line)
 	_clear_drawing()
 	if name == "":
 		main.set_status("Não criou: %s" % tr.last_error())
@@ -577,6 +758,8 @@ func panel() -> Array:
 	if r.is_empty():
 		rows.append({"kind": "help", "text": "Clique no chão para pôr os nós; o trecho mostra o comprimento e a inclinação. Os nós encaixam nas portas (pontas das esteiras e objetos), nos nós de outros trajetos, de 15 em 15° e na grade. PageUp/PageDown: altura do próximo nó; [ e ]: raio da curva; Enter termina; Backspace volta um nó; Esc cancela."})
 		rows.append({"kind": "number", "name": "Trajeto_AlturaDesenho", "label": "Altura do próximo nó (m)", "value": draw_z, "min": 0.0, "max": 30.0, "step": 0.01, "action": "trajeto_altura_desenho"})
+		rows.append({"kind": "check", "name": "Trajeto_InclinacaoFixa", "text": "Inclinação fixa no próximo trecho", "on": grade_on, "action": "trajeto_inclinacao_fixa"})
+		rows.append({"kind": "number", "name": "Trajeto_Inclinacao", "label": "Inclinação (%; negativa desce)", "value": grade_pct, "min": -100.0, "max": 100.0, "step": 0.5, "action": "trajeto_inclinacao"})
 		rows.append({"kind": "number", "name": "Trajeto_RaioDesenho", "label": "Raio das curvas (m; 0 = quina)", "value": new_radius, "min": 0.0, "max": 50.0, "step": 0.05, "action": "trajeto_raio_desenho"})
 		if is_path():
 			rows.append({"kind": "number", "name": "Trajeto_LarguraCaminho", "label": "Largura do caminho (m)", "value": path_width, "min": 0.6, "max": 10.0, "step": 0.05, "action": "trajeto_largura_caminho"})
@@ -591,6 +774,12 @@ func panel() -> Array:
 	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
 	if r["too_steep"]:
 		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
+	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
+	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": "Desenhar paralelo", "action": "trajeto_paralelo"})
+	if sel_path:
+		rows.append({"kind": "check", "name": "Trajeto_Escada", "text": "Escada (degraus; só pedestres)", "on": bool(r.get("stair", false)), "action": "trajeto_escada"})
+	if sel_path and (nodes[0].y > 0.001 or nodes[nodes.size() - 1].y > 0.001):
+		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": "Rampas de acesso nas pontas (1:12)", "action": "trajeto_rampas"})
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
 		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"]], "value": r["drive"], "action": "trajeto_acionamento"})
@@ -613,7 +802,7 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó."})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo."})
 	return rows
 
 
@@ -629,9 +818,28 @@ func _span() -> Array:
 	return [a[0], a[a.size() - 1]]
 
 
+## "Editar nós" of the properties panel: the tool of the belt's type, with the belt
+## selected (all its nodes, so the arrows and PageUp/PageDown move it whole).
+func edit_belt(name: String) -> void:
+	sync()
+	var r := _route(name, false)
+	if r.is_empty():
+		main.set_status("%s não é uma esteira desenhada." % name)
+		return
+	editor.set_tool("colocar", BELT_CHANNELED if r["style"] == "canaletas" else BELT_SIMPLE)
+	var all := PackedInt32Array()
+	for i in (r["nodes"] as PackedVector3Array).size():
+		all.append(i)
+	_select(name, false, all)
+	main.set_status("Esteira %s: clique num nó para editá-lo; setas e PageUp/PageDown movem os nós selecionados." % name)
+
+
 ## An edit from the panel (`form:trajeto_<what>:<value>`).
 func form(what: String, value: String) -> void:
 	var v := value.replace(",", ".").to_float()
+	if what == "trajeto_editar":
+		edit_belt(value)
+		return
 	var r := _route(sel_name, sel_path)
 	match what:
 		"trajeto_altura_desenho":
@@ -642,6 +850,16 @@ func form(what: String, value: String) -> void:
 			return
 		"trajeto_largura_caminho":
 			path_width = maxf(v, 0.3)
+			return
+		"trajeto_paralelo_dist":
+			parallel_dist = v
+			return
+		"trajeto_inclinacao_fixa":
+			grade_on = value == "1" or value == "true"
+			main.set_status("Inclinação fixa %s (%s %%)." % ["ligada" if grade_on else "desligada", _num(grade_pct, 1)])
+			return
+		"trajeto_inclinacao":
+			grade_pct = v
 			return
 	if r.is_empty():
 		return
@@ -683,6 +901,21 @@ func form(what: String, value: String) -> void:
 		"trajeto_excluir_no":
 			delete_selected()
 			return
+		"trajeto_paralelo":
+			var other: String = tr.paralelo(sel_name, sel_path, parallel_dist)
+			ok = other != ""
+			if ok:
+				main.after_edit()
+				_select(other, sel_path, PackedInt32Array())
+				main.set_status("%s desenhado a %s m de %s." % [other, _num(parallel_dist), r["name"]])
+				return
+		"trajeto_escada":
+			ok = tr.por_escada(sel_name, value == "1" or value == "true")
+		"trajeto_rampas":
+			var k: int = tr.rampas_de_acesso(sel_name)
+			ok = k > 0
+			if ok:
+				main.set_status("%d rampa(s) de acesso de 1:12 acrescentada(s) a %s." % [k, sel_name])
 		_:
 			return
 	if ok:
@@ -717,9 +950,19 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 	for i in line.size() - 1:
 		e._ribbon(line[i] + lift, line[i + 1] + lift, 0.10 if sel else 0.06, color)
 	var nodes: PackedVector3Array = r["nodes"]
+	var bending: bool = sel and _dragging and _press.get("handle", "") == "curva"
+	if sel:
+		for i in nodes.size() - 1:
+			var mid := nodes[i].lerp(nodes[i + 1], 0.5)
+			if bending and i == int(_press["index"]):
+				# The bend being dragged: the two legs to the new node.
+				e._ribbon(nodes[i] + lift, _drag_at + lift, 0.08, CURVE)
+				e._ribbon(_drag_at + lift, nodes[i + 1] + lift, 0.08, CURVE)
+				mid = _drag_at
+			_diamond(e, mid + Vector3(0, 0.02, 0), 0.16, CURVE)
 	for i in nodes.size():
 		var n := nodes[i]
-		if _dragging and sel and i == int(_press.get("index", -1)):
+		if _dragging and sel and not bending and i == int(_press.get("index", -1)):
 			n = _drag_at
 		var picked := sel and i in sel_nodes
 		var c := DRAWING if picked else (SELECTED if sel else Color(0.92, 0.94, 0.98))
@@ -765,6 +1008,24 @@ func _draw_drawing(e: EditorUtsim) -> void:
 	var at = _aim(e.mouse)
 	if at != null and not main.over_ui(e.mouse):
 		cursor = _snap(at, points[points.size() - 1])["at"]
+	if cursor != null and grade_on:
+		cursor = _graded(cursor)
+	_cursor = cursor
+	# A typed length puts the preview node at that distance.
+	if cursor != null and typed != "":
+		var l := typed.replace(",", ".").to_float()
+		var last := points[points.size() - 1]
+		var d := (cursor as Vector3) - last
+		d.y = 0.0
+		var dz := draw_z - last.y
+		if d.length() > 1e-6 and grade_on:
+			var run := l / sqrt(1.0 + pow(grade_pct / 100.0, 2.0))
+			cursor = last + d.normalized() * run
+			cursor.y = maxf(last.y + grade_pct / 100.0 * run, 0.0)
+		elif d.length() > 1e-6 and l > absf(dz):
+			cursor = last + d.normalized() * sqrt(l * l - dz * dz)
+			cursor.y = draw_z
+	if cursor != null:
 		pts.append(cursor)
 		rs.append(0.0)
 		if new_radius > 0.0 and rs.size() >= 3:
@@ -781,6 +1042,8 @@ func _draw_drawing(e: EditorUtsim) -> void:
 			_num(float(draft["length"])), _num((cursor as Vector3).y)]
 		if steep:
 			text += "\nAcima do máximo de %s°" % _num(float(pv["limit"]), 1)
+		if typed != "":
+			text = "Digitado: %s m\n" % typed + text
 		_readout_at(cursor, text, steep)
 	else:
 		_readout.visible = false
