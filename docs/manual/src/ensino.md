@@ -24,7 +24,7 @@ A campanha tem atos, e cada ato tem missões em ordem. Cada missão resolvida li
 | 2 | Filas e atendimento | 2.1 Balcão da ferramentaria · 2.2 Quem desiste vai embora · 2.3 Urgente na frente · 2.4 Mesma média, outra fila · 2.5 A central de atendimento |
 | 3 | Capacidade, turnos e estoque intermediário | 3.1 A demanda dobrou · 3.2 Pulmão certo · 3.3 Corretiva ou preventiva · 3.4 Lote e setup · 3.5 A expansão da linha de eixos |
 | 4 | Balanceamento de linha | 4.1 Montagem do ventilador · 4.2 O balanceamento no papel e no chão · 4.3 A demanda subiu |
-| 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Giro perto da doca · 5.3 Frota de transporte |
+| 5 | Arranjo físico e movimentação | 5.1 Oficina de usinagem · 5.2 Funcional ou celular · 5.3 Giro perto da doca · 5.4 Frota de transporte |
 | 6 | Tempos e métodos | 6.1 Quantas máquinas por operador · 6.2 Trabalho externo · 6.3 Célula com operadores · 6.4 Cronometragem |
 | 7 | Problemas integrados | 7.1 Linha com inspeção e retrabalho · 7.2 Pronto atendimento por turnos · 7.3 Reembolso no escritório · 7.4 Centro de distribuição: pickers e embalagem · 7.5 Do enunciado ao modelo |
 | 8 | O caso Lean Seis Sigma | 8.1 Definir · 8.2 Medir · 8.3 Analisar · 8.4 Melhorar · 8.5 Controlar |
