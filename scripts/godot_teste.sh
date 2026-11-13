@@ -16,6 +16,10 @@
 
 set -u
 
+# As preferências do usuário (Configurações do UTSim 3D) não entram no teste: um arquivo novo.
+UTSIM_PREFERENCIAS="$(mktemp -d)/utsim3d.json"
+export UTSIM_PREFERENCIAS
+
 cd "$(dirname "$0")/.." || exit 1
 
 falha() {
