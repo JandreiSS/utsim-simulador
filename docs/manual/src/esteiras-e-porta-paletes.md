@@ -57,6 +57,8 @@ A esteira pode seguir um trajeto desenhado por nós, como se desenham ruas: reta
 | `max_slope` | do tipo | inclinação máxima em graus |
 | `width` | `0.6` | largura da esteira em metros |
 
+Na animação, a correia anda só quando a esteira anda de verdade: para com uma quebra ou fora do turno e, sem acúmulo, enquanto a peça da frente espera na saída. Os tambores das pontas giram com ela, e os roletes da esteira por gravidade giram enquanto há peças rolando sobre eles.
+
 O que a geometria muda no resultado:
 
 - **Comprimento:** é o do trajeto em 3D, com as curvas e as subidas. Subir 1 m em 4 m de planta dá √(4² + 1²) ≈ 4,12 m.
@@ -65,6 +67,16 @@ O que a geometria muda no resultado:
 - **Curva:** o arco é tangente aos dois trechos e fica no plano do piso. Se o raio não cabe, ele diminui até o ponto de tangência chegar à metade do trecho mais curto. O arco de raio `r` que vira θ encurta o caminho em `2r·tan(θ/2) − r·θ`.
 - **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
 - **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora. Onde a parte de baixo da estrutura (0,14 m abaixo da superfície) fica a 2,2 m do piso ou mais, dá para passar por baixo: ali só as pernas, sob os nós, são obstáculo.
+
+#### Passagem de uma esteira para outra
+
+Quando uma esteira desenhada entrega a outra esteira desenhada mais baixa, a peça cai da ponta de saída na ponta de entrada da outra. A queda de altura `h` leva o tempo de queda livre, `√(2h/g)` com g = 9,81 m/s² (0,40 m: 0,29 s), que entra no resultado como atraso da ligação (abaixo de 5 cm, a passagem é imediata). Há avisos quando:
+
+- a queda passa de 0,5 m (a peça bate; use calha ou desça a esteira);
+- as duas pontas ficam a mais de 0,3 m uma da outra na planta (a peça cai fora);
+- a ponta de entrada da outra está acima da saída (a peça não sobe sozinha).
+
+Um `transfer` próprio na esteira de origem vale no lugar dessa regra.
 
 #### Inclinação máxima
 
@@ -97,7 +109,9 @@ No Editar, o grupo Mover da Biblioteca tem três ferramentas: "Esteira desenhada
 - **Terminar:** Enter ou duplo clique. Backspace volta um nó, e Esc cancela. A esteira se liga ao objeto ou à esteira onde começa e onde acaba.
 - **Continuar:** um clique no primeiro ou no último nó de uma esteira começa outra ali, como uma rua que segue.
 - **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó.
+- **Perfil:** com um trajeto selecionado, um painel embaixo da vista mostra o corte dele: altura × distância em planta, a altura de cada nó e a inclinação de cada trecho, em vermelho acima do limite. Arraste um nó no perfil para cima ou para baixo para mudar só a altura dele (de 5 em 5 cm; com Shift, de 1 em 1 cm).
 - **Curvar um trecho:** com o trajeto selecionado, cada trecho mostra um losango laranja no meio. Arraste-o: nasce ali um nó com o maior raio que cabe, e o trecho vira uma curva suave.
+- **Mover e girar o trajeto inteiro:** o quadrado verde no meio do trajeto selecionado arrasta o trajeto todo (na grade). Sem nó selecionado, as setas movem o trajeto um passo da grade (Shift: 1 cm), e R gira 15° no sentido anti-horário em volta do meio dele (Shift+R, horário); também há os botões "Girar 15°" no painel. As alturas e as curvas ficam.
 - **Paralelo:** no painel, "Paralelo a (m)" e "Desenhar paralelo" criam outro trajeto ao lado, à esquerda do sentido (negativo: à direita), com as mesmas alturas e as curvas concêntricas (o raio de dentro diminui, o de fora aumenta). A esteira paralela é do mesmo tipo e não se liga a nada.
 
 Tudo se desfaz com Ctrl+Z.

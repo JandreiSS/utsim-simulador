@@ -21,6 +21,7 @@
   - [Movimentação e obstáculos](movimentacao.md)
   - [Corredores e faixas de segurança](corredores.md)
   - [Pessoas: fadiga, aprendizado e habilidades](pessoas.md)
+  - [Ponte rolante](ponte-rolante.md)
 - [Esteiras e porta-paletes](esteiras-e-porta-paletes.md)
 - [Defeitos, inspeção e retrabalho](defeitos-e-inspecao.md)
 - [Quebras e turnos](quebras-e-turnos.md)

@@ -42,6 +42,8 @@ ELEMENTOS = {
     "esteira_canaleta": trajeto.esteira_canaleta,
     "porta_paletes": armazenagem.porta_paletes,
     "estante": armazenagem.estante,
+    "estante_espera": armazenagem.estante_espera,
+    "espera_chao": armazenagem.espera_chao,
     "peca": armazenagem.peca,
     "palete": armazenagem.palete,
     "caixa": armazenagem.caixa,
