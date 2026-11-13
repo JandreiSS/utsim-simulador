@@ -373,3 +373,28 @@ espessura, por fora da largura.
 suporte não ficam no piso: o `minimo` deles é negativo em z.
 
 O teste `as_pecas_da_esteira_por_trajeto_tem_a_origem_no_apoio` confere as origens e as medidas.
+
+## Esperas: mesa, palete, estante e chão
+
+Uma espera (fila ou buffer) pode ser desenhada de quatro jeitos. Em todos, o catálogo diz
+onde as peças ficam: a altura do apoio e a área livre `[x, y]`, centrada na origem.
+
+| Tipo | Arquivo | O que o catálogo dá |
+|---|---|---|
+| Mesa | `espera` | `dados.tampo` = 0,76 e `dados.area` = [1,10; 0,66] |
+| Palete | `palete` | `dados.tampo` = 0,144 e `dados.area` = [1,16; 0,96] |
+| Estante | `estante_espera` (1,20 × 0,60 × 1,65 m, três prateleiras ao alcance da mão) ou `estante` (1,0 × 0,5 × 2,0 m, quatro) | `dados.prateleiras`: uma lista, de baixo para cima, com `altura` (o tampo da prateleira), `area` e `vao` (a altura livre até a prateleira de cima). O acesso é por `-y` |
+| Chão | `espera_chao` | `dados.area` = [1,20; 1,00] (por dentro do quadro) e `dados.faixa` = 0,05 |
+
+- `estante_espera`: prateleiras a 0,30, 0,75 e 1,20 m, área de 1,10 × 0,52 m e vão de 0,395 m
+  (cabe a `caixa`, de 0,30 m). Tem batente no fundo e nas laterais, aba com etiqueta na frente
+  e uma tampa em cima, que não é nível de espera.
+- `estante`: a prateleira de cima (a 1,975 m) é a tampa e não entra em `prateleiras`.
+- `espera_chao`: o quadro amarelo tem um nó por lado, para crescer sem engrossar a faixa.
+  `faixa_frente` e `faixa_fundo` (em `y = ∓(area_y/2 + faixa/2)`) esticam em x; `faixa_e` e
+  `faixa_d` (em `x = ±(area_x/2 + faixa/2)`) esticam em y. `dados.estica` repete isso. Para
+  uma área de `a × b`, a escala em x das duas primeiras é `(a + 2·faixa) / (area_x + 2·faixa)`,
+  a escala em y das outras é `b / area_y`, e cada nó vai para a borda nova.
+
+O teste `as_esperas_dizem_onde_as_pecas_ficam` confere que as áreas e as alturas cabem em
+cada elemento.
