@@ -119,6 +119,20 @@ Nesta versão a linha é em série. Uma variante que não passa por um recurso t
 nele, e uma variante que passa duas vezes pelo mesmo recurso conta só a primeira operação (o
 app avisa).
 
+## Com os outros apps
+
+- **Do simulador para o produto.** O modelo gerado ou atualizado pelo app guarda de que projeto
+  e revisão veio. Aberto a partir de um nó (`utsim-produto --utsim-abrir=<modelo.ron>
+  --utsim-no=<nó>`, ou um pedido `--utsim-pedido` com o modelo e o nó), o app abre esse
+  projeto na tela Roteiros, no item cujo roteiro passa pelo recurso do nó. Um pedido que pede
+  resposta é respondido quando o app fecha: concluído, ou o que impediu.
+- **Das características para a Qualidade.** Na tela Características, o botão "Qualidade" de
+  uma característica medida numa operação abre o UTSim Qualidade no processador dessa
+  operação, no último modelo gerado ou atualizado. Sem modelo ainda, o botão fica apagado e
+  diz o que fazer.
+- **Datas.** Os campos de data aceitam `AAAA-MM-DD` ou `DD/MM/AAAA` e ficam com a borda
+  vermelha quando a data não existe ou, no fim de uma fase, vem antes do início.
+
 ## Atalhos e exemplo
 
 - **Ctrl+S** grava agora; **Ctrl+Shift+S** grava uma revisão.
