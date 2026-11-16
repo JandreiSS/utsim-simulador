@@ -2761,7 +2761,7 @@
    8.5,
    7.75
   ],
-  "triangulos": 1204
+  "triangulos": 1252
  },
  "ponte_rolante_medio": {
   "arquivo": "ponte_rolante_medio.glb",
@@ -2869,7 +2869,7 @@
    8.5,
    7.75
   ],
-  "triangulos": 2516
+  "triangulos": 2380
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",
