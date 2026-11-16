@@ -9,11 +9,13 @@ use crate::egui_widgets::Registry;
 use crate::texto::tx;
 use crate::ui_props::named;
 
-/// Shows the window; `codigo` is the default mode of the distribution fields. Returns
-/// whether it changed, and pushes `configuracoes:fechar` when it is closed.
+/// Shows the window; `codigo` is the default mode of the distribution fields and `lingua`
+/// the language of the interface. Returns whether one changed, and pushes
+/// `configuracoes:fechar` when it is closed.
 pub fn show(
     ctx: &egui::Context,
     codigo: &mut bool,
+    lingua: &mut utsim_idiomas::Idioma,
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) -> bool {
@@ -35,6 +37,19 @@ pub fn show(
                     .strong()
                     .color(colors::HEADING),
             );
+            ui.label(RichText::new(tx("configuracoes-idioma")).color(colors::TEXT));
+            let r = ui.scope(|ui| utsim_idiomas::seletor(ui, "utsim_config_idioma", lingua));
+            named(ui, reg, "Config_Idioma", &r.response, lingua.nome());
+            changed |= r.inner;
+            ui.add(
+                Label::new(
+                    RichText::new(tx("configuracoes-idioma-ajuda"))
+                        .small()
+                        .color(colors::TEXT_WEAK),
+                )
+                .wrap(),
+            );
+            ui.separator();
             ui.label(RichText::new(tx("configuracoes-distribuicoes")).color(colors::TEXT));
             ui.horizontal(|ui| {
                 for (name, value, label) in [

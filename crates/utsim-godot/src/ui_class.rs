@@ -177,6 +177,32 @@ impl INode2D for UtsimUi {
 
 #[godot_api]
 impl UtsimUi {
+    /// The live panel of `nome` shown in a window of its own (`UtsimPainelVivo`), as it is
+    /// now; `None` when it is closed or back over the view.
+    pub(crate) fn painel_solto(&self, nome: &str) -> Option<crate::ui_ao_vivo::Painel> {
+        self.host
+            .vivo
+            .iter()
+            .find(|p| p.nome == nome && p.solta)
+            .cloned()
+    }
+
+    /// Closes the live panel of `nome`.
+    pub(crate) fn vivo_fechar(&mut self, nome: &str) {
+        let n = self.host.vivo.len();
+        self.host.vivo.retain(|p| p.nome != nome);
+        if self.host.vivo.len() != n {
+            self.host.invalidate();
+        }
+    }
+
+    /// Puts the live panel of `nome` back over the 3D view.
+    pub(crate) fn vivo_prender(&mut self, nome: &str) {
+        if crate::ui_ao_vivo::soltar(&mut self.host.vivo, nome, false) {
+            self.host.invalidate();
+        }
+    }
+
     /// An action of the interface (`novo`, `abrir`, `modo:simular`, `ferramenta:ligar`,
     /// `organizar:alinhar:esquerda`, `grade:ligar`, `passo:0.5`, `analisar:resultados`...).
     #[signal]
@@ -604,6 +630,32 @@ impl UtsimUi {
             self.host.vivo.clear();
             self.host.invalidate();
         }
+    }
+
+    /// Closes the live panel of `name` (its own window was closed).
+    #[func]
+    fn live_close(&mut self, name: GString) {
+        self.vivo_fechar(&name.to_string());
+    }
+
+    /// The objects of the live panels in windows of their own.
+    #[func]
+    fn live_detached(&self) -> PackedStringArray {
+        let names: Vec<&str> = self
+            .host
+            .vivo
+            .iter()
+            .filter(|p| p.solta)
+            .map(|p| p.nome.as_str())
+            .collect();
+        strings(&names)
+    }
+
+    /// The title of the window of the live panel of `name`.
+    #[func]
+    fn live_window_title(&self, name: GString) -> GString {
+        let n = name.to_string();
+        GString::from(crate::texto::fx("vivo-janela-titulo", &[("objeto", n.into())]).as_str())
     }
 
     /// The objects of the live panels on screen, the most recent first.

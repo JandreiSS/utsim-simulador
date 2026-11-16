@@ -475,6 +475,10 @@ func _step(s: Dictionary, k: int) -> void:
 		if not _main.open_live_panel(String(s["painel_ao_vivo"])):
 			_fail("passo %d: o painel ao vivo de %s não abriu" % [k, s["painel_ao_vivo"]])
 		await _frames(4)
+	elif s.has("fechar_janela_vivo"):
+		# The user closes the window of a live panel (its title bar's ×): the panel goes.
+		_main._close_live_window(String(s["fechar_janela_vivo"]), true)
+		await _frames(3)
 	elif s.has("outro_app"):
 		var o: Dictionary = s["outro_app"]
 		var path := _resolve(_base, String(o["arquivo"]))
@@ -1266,6 +1270,24 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("longe_do_centro"):
 						var away := absf(float(info["ponte_x"])) > 1.0 or absf(float(info["carro_y"])) > 1.0
 						report.call("ponte %s fora do centro" % want["objeto"], away == bool(want["longe_do_centro"]), str(info))
+			"janela_vivo_texto":
+				# {"objeto", "controle", "contem"}: a widget of the panel in the window of its
+				# own (`PainelVivo_Titulo`, `PainelVivo_Nota`...).
+				var w: Window = _main.live_windows.get(String(want["objeto"]))
+				var shown := ""
+				if w != null and w.get_child_count() > 0:
+					shown = String(w.get_child(0).widget_text(String(want["controle"])))
+				report.call("janela de %s: %s contém %s" % [want["objeto"], want["controle"], want["contem"]], shown.contains(String(want["contem"])), shown)
+			"janelas_vivo":
+				# ["objeto", ...]: the live panels open in windows of their own (sorted),
+				# and the main interface agrees.
+				var abertas: Array = _main.live_windows.keys()
+				abertas.sort()
+				var soltas: Array = Array(_main.ui.live_detached())
+				soltas.sort()
+				var quer: Array = Array(want)
+				quer.sort()
+				report.call("janelas ao vivo %s" % [quer], abertas == quer and soltas == quer, "janelas %s, painéis soltos %s" % [abertas, soltas])
 			"clipes_corrigidos":
 				# ["Walk_Carry_Loop", ...]: the clips swapped for the corrected ones of
 				# pessoa_clipes.glb in the library of the Blender bodies.

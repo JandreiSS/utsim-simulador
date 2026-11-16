@@ -27,6 +27,7 @@ use utsim_ui_tema::{colors, sizes};
 
 use crate::ao_vivo::Leitura;
 use crate::egui_widgets::{Registry, WidgetInfo};
+use crate::texto::tx;
 use crate::ui_props::{named, named_toggle};
 use crate::ui_results::{Chart, Curve, draw_chart, num};
 
@@ -48,6 +49,9 @@ const CORES: [Color32; 2] = [
 pub struct Painel {
     pub nome: String,
     pub fixo: bool,
+    /// Shown in a window of its own (`UtsimPainelVivo`), not over the 3D view: it stays
+    /// open (as if pinned) and keeps being updated.
+    pub solta: bool,
     pub leitura: Option<Leitura>,
 }
 
@@ -64,34 +68,60 @@ pub fn prefixo(k: usize) -> String {
 /// is replaced. True when the list changed.
 pub fn abrir(lista: &mut Vec<Painel>, nome: &str) -> bool {
     if let Some(i) = lista.iter().position(|p| p.nome == nome) {
-        if i == 0 {
+        // In a window of its own: it is already shown.
+        if i == 0 || lista[i].solta {
             return false;
         }
         let p = lista.remove(i);
         lista.insert(0, p);
         return true;
     }
-    lista.retain(|p| p.fixo);
+    lista.retain(|p| p.fixo || p.solta);
     lista.insert(
         0,
         Painel {
             nome: nome.into(),
             fixo: false,
+            solta: false,
             leitura: None,
         },
     );
-    lista.truncate(MAX_PANELS);
+    // At most MAX_PANELS over the view; the ones in windows of their own do not count.
+    let mut n = 0;
+    lista.retain(|p| {
+        if p.solta {
+            return true;
+        }
+        n += 1;
+        n <= MAX_PANELS
+    });
     true
 }
 
 /// Esc: closes the panel not pinned, or else the most recent one. False when none is open.
 pub fn fechar_topo(lista: &mut Vec<Painel>) -> bool {
-    if lista.is_empty() {
+    // The panels in windows of their own are closed by their windows.
+    let Some(i) = lista
+        .iter()
+        .position(|p| !p.fixo && !p.solta)
+        .or_else(|| lista.iter().position(|p| !p.solta))
+    else {
         return false;
-    }
-    let i = lista.iter().position(|p| !p.fixo).unwrap_or(0);
+    };
     lista.remove(i);
     true
+}
+
+/// The panel of `nome` goes to a window of its own (`solta`) or back over the view. True
+/// when it changed.
+pub fn soltar(lista: &mut [Painel], nome: &str, solta: bool) -> bool {
+    match lista.iter_mut().find(|p| p.nome == nome) {
+        Some(p) if p.solta != solta => {
+            p.solta = solta;
+            true
+        }
+        _ => false,
+    }
 }
 
 /// Runs a click of a panel (`vivo:fechar:<k>`, `vivo:fixar:<k>`); false for other actions.
@@ -109,6 +139,7 @@ pub fn acao(lista: &mut Vec<Painel>, a: &str) -> bool {
                 lista.remove(k);
             }
             "fixar" => lista[k].fixo = !lista[k].fixo,
+            "soltar" => lista[k].solta = !lista[k].solta,
             _ => {}
         }
     }
@@ -181,6 +212,17 @@ pub fn show(
             named(ui, reg, &format!("{pre}_Fechar"), &r, "Fechar");
             if r.clicked() {
                 out.push(format!("vivo:fechar:{k}"));
+            }
+            // A window of its own (that can go to another monitor), or back over the view.
+            let (label, tip) = if p.solta {
+                (tx("vivo-prender"), tx("vivo-prender-dica"))
+            } else {
+                (tx("vivo-soltar"), tx("vivo-soltar-dica"))
+            };
+            let r = ui.button(label).on_hover_text(tip);
+            named(ui, reg, &format!("{pre}_Janela"), &r, label);
+            if r.clicked() {
+                out.push(format!("vivo:soltar:{k}"));
             }
             let r = ui
                 .selectable_label(p.fixo, if p.fixo { "Fixado" } else { "Fixar" })
@@ -350,6 +392,36 @@ fn estados(ui: &mut Ui, reg: &mut Registry, name: &str, l: &Leitura) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_panel_in_its_own_window_stays_open_and_out_of_the_view() {
+        let mut l = Vec::new();
+        abrir(&mut l, "a");
+        assert!(soltar(&mut l, "a", true));
+        assert!(!soltar(&mut l, "a", true));
+        // Another object: "a" stays (as if pinned) and does not come back over the view.
+        abrir(&mut l, "b");
+        assert_eq!(
+            l.iter().map(|p| p.nome.as_str()).collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        assert!(!abrir(&mut l, "a"));
+        // Esc closes the one over the view, never the one in a window.
+        assert!(fechar_topo(&mut l));
+        assert!(!fechar_topo(&mut l));
+        assert_eq!(l.len(), 1);
+        // The panels in windows do not count in the limit over the view.
+        for n in ["c", "d", "e", "f", "g"] {
+            abrir(&mut l, n);
+            acao(&mut l, "vivo:fixar:0");
+        }
+        assert_eq!(l.iter().filter(|p| !p.solta).count(), MAX_PANELS);
+        assert!(l.iter().any(|p| p.nome == "a" && p.solta));
+        // The button: to a window and back.
+        let k = l.iter().position(|p| p.nome == "a").unwrap();
+        assert!(acao(&mut l, &format!("vivo:soltar:{k}")));
+        assert!(!l[k].solta);
+    }
 
     fn nomes(l: &[Painel]) -> Vec<(&str, bool)> {
         l.iter().map(|p| (p.nome.as_str(), p.fixo)).collect()

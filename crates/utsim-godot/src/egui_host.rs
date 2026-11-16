@@ -114,6 +114,11 @@ impl Host {
         };
         let mut props_state = PropsState::default();
         props_state.code_default = preferencias.distribuicao_codigo;
+        // The language of the whole program: the saved one, else the system's (the tests
+        // keep theirs).
+        if !cfg!(test) {
+            utsim_idiomas::definir(preferencias.lingua());
+        }
         Host {
             preferencias,
             config_open: false,
@@ -349,7 +354,7 @@ impl Host {
     /// Whether the live panels are on screen: some open, in Simular, with no window over
     /// the view.
     pub fn vivo_visivel(&self) -> bool {
-        !self.vivo.is_empty()
+        self.vivo.iter().any(|p| !p.solta)
             && !self.bar.editing
             && !self.pert_open
             && !(self.results_open && self.results.is_some())
@@ -397,6 +402,7 @@ impl Host {
         let mut panels = Vec::new();
         let (reg, bar, mem) = (&mut self.reg, &self.bar, &mut self.bar_mem);
         let mut codigo = self.props_state.code_default;
+        let mut lingua = self.preferencias.lingua();
         let (props, pst) = (&self.props, &mut self.props_state);
         let (left, edit, sim, lmem) = (self.left, &self.edit, &self.sim, &mut self.left_mem);
         let (status, play) = (&self.status, &self.play);
@@ -507,9 +513,11 @@ impl Host {
             // The live results panels: Simular only, in the bottom-right corner of the
             // view, not over the Resultados or PERT/CPM window that covers it.
             if !bar.editing && !pert_open && results.is_none() {
-                let rects = ui_ao_vivo::rects(live_area, vivo.len());
-                for (k, (rect, p)) in rects.into_iter().zip(vivo).enumerate() {
-                    ui_ao_vivo::show(ui, rect, k, p, reg, &mut actions);
+                // The ones in windows of their own are drawn there (`UtsimPainelVivo`).
+                let here: Vec<usize> = (0..vivo.len()).filter(|&k| !vivo[k].solta).collect();
+                let rects = ui_ao_vivo::rects(live_area, here.len());
+                for (rect, &k) in rects.into_iter().zip(&here) {
+                    ui_ao_vivo::show(ui, rect, k, &vivo[k], reg, &mut actions);
                     panels.push(rect);
                 }
             }
@@ -519,7 +527,8 @@ impl Host {
                 panels.push(screen);
             }
             if config_open {
-                config_changed |= crate::ui_config::show(ui.ctx(), &mut codigo, reg, &mut actions);
+                config_changed |=
+                    crate::ui_config::show(ui.ctx(), &mut codigo, &mut lingua, reg, &mut actions);
                 panels.push(screen);
             }
             if let Some(d) = dialog {
@@ -533,6 +542,12 @@ impl Host {
         if config_changed {
             self.props_state.code_default = codigo;
             self.preferencias.distribuicao_codigo = codigo;
+            if lingua != self.preferencias.lingua() {
+                self.preferencias.idioma = Some(lingua.codigo().to_string());
+                if !cfg!(test) {
+                    utsim_idiomas::definir(lingua);
+                }
+            }
             if !cfg!(test)
                 && let Err(e) = self.preferencias.gravar()
             {
@@ -584,10 +599,17 @@ impl Host {
             self.flows_open = false;
             self.dirty = true;
         }
-        // The clicks of the live panels are the host's (close, pin).
+        // The clicks of the live panels are the host's (close, pin, window); a panel that
+        // goes to a window of its own asks the main scene to open it (`vivo_janela:<name>`).
         let before = actions.len();
         let vivo = &mut self.vivo;
+        let soltas: Vec<String> = actions
+            .iter()
+            .filter_map(|a| a.strip_prefix("vivo:soltar:")?.parse::<usize>().ok())
+            .filter_map(|k| vivo.get(k).filter(|p| !p.solta).map(|p| p.nome.clone()))
+            .collect();
         actions.retain(|a| !crate::ui_ao_vivo::acao(vivo, a));
+        actions.extend(soltas.into_iter().map(|n| format!("vivo_janela:{n}")));
         if actions.len() != before {
             self.dirty = true;
         }

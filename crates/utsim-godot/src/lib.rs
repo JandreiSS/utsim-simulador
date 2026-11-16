@@ -57,6 +57,7 @@ pub mod modelos3d;
 pub mod network_edit;
 pub mod outro_app;
 pub mod overlay_mesh;
+mod painel_janela;
 pub mod path_edit;
 mod path_godot;
 pub mod pert_view;
