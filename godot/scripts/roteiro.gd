@@ -1246,6 +1246,26 @@ func _check(c: Dictionary, k: int) -> void:
 						var node_name := String(want["aberto"] if want_open else want["fechado"])
 						var moved = cena.element_node_moved(i, node_name)
 						report.call("%s de %s %s" % [node_name, want["objeto"], "aberto" if want_open else "fechado"], moved != null and bool(moved) == want_open, str(moved))
+			"ponte3d":
+				# {"objeto", "t", "gancho_entre": [a, b], "trilho_entre": [a, b],
+				# "longe_do_centro": true}: an overhead crane drawn node by node: the hook's
+				# height above the floor, the length of a runway beam (its size) and the
+				# bridge or the trolley away from the centre.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var info: Dictionary = cena.ponte_info(cena.block_index(String(want["objeto"])))
+				report.call("ponte %s" % want["objeto"], not info.is_empty(), "")
+				if not info.is_empty():
+					if want.has("gancho_entre"):
+						var g := float(info["gancho_y"])
+						report.call("altura do gancho de %s" % want["objeto"], g >= float(want["gancho_entre"][0]) and g <= float(want["gancho_entre"][1]), "%.2f m" % g)
+					if want.has("trilho_entre"):
+						var l := float(info.get("trilho", -1.0))
+						report.call("comprimento do trilho de %s" % want["objeto"], l >= float(want["trilho_entre"][0]) and l <= float(want["trilho_entre"][1]), "%.2f m" % l)
+					if want.has("longe_do_centro"):
+						var away := absf(float(info["ponte_x"])) > 1.0 or absf(float(info["carro_y"])) > 1.0
+						report.call("ponte %s fora do centro" % want["objeto"], away == bool(want["longe_do_centro"]), str(info))
 			"clipes_corrigidos":
 				# ["Walk_Carry_Loop", ...]: the clips swapped for the corrected ones of
 				# pessoa_clipes.glb in the library of the Blender bodies.

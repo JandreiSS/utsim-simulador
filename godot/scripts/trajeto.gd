@@ -70,6 +70,10 @@ var parallel_dist := 1.0
 ## Fixed slope while drawing: the next node's height follows from its distance in plan.
 var grade_on := false
 var grade_pct := 5.0
+## Angle (degrees) the panel turns the selected route by.
+var turn_deg := 15.0
+## Distance (m) of the turn handle from the middle of the route.
+const TURN_ARM := 1.4
 ## `UtsimTrajetos.esteiras()` and `caminhos()`.
 var belts: Array = []
 var paths: Array = []
@@ -253,6 +257,10 @@ func _handle_at(p: Vector2) -> Dictionary:
 			# The curve handles: the middle of each segment of the selected route.
 			if r["name"] != sel_name or path != sel_path:
 				continue
+			var turn_sp = _screen(_middle(r) + Vector3(TURN_ARM, 0.05, 0))
+			if turn_sp != null and (turn_sp as Vector2).distance_to(p) <= best_d:
+				best_d = (turn_sp as Vector2).distance_to(p)
+				best = {"name": r["name"], "path": path, "index": -1, "handle": "girar"}
 			var mid_sp = _screen(_middle(r))
 			if mid_sp != null and (mid_sp as Vector2).distance_to(p) <= best_d:
 				best_d = (mid_sp as Vector2).distance_to(p)
@@ -274,6 +282,14 @@ func press(p: Vector2, shift: bool) -> void:
 		_add_point(p)
 		return
 	var h := _handle_at(p)
+	if not h.is_empty() and h["handle"] == "girar":
+		_press = h.duplicate()
+		_press["pos"] = p
+		_press["from"] = _middle(_route(h["name"], h["path"]))
+		_press["angle"] = 0.0
+		_dragging = false
+		main.set_status("Arraste em volta do meio para girar %s (de 15 em 15°; Shift: de 1 em 1°)." % sel_name)
+		return
 	if not h.is_empty() and h["handle"] == "mover":
 		_press = h.duplicate()
 		_press["pos"] = p
@@ -416,6 +432,16 @@ func drag(p: Vector2) -> void:
 	var from: Vector3 = _press["from"]
 	if _press["handle"] == "z":
 		_drag_at = Vector3(from.x, _height_under(p, from), from.z)
+	elif _press["handle"] == "girar":
+		var at = editor.floor_at(p)
+		if at == null:
+			return
+		var v: Vector3 = (at as Vector3) - from
+		# Counter-clockwise seen from above is positive (model +y is Godot -z).
+		var deg := rad_to_deg(atan2(-v.z, v.x))
+		var step := 1.0 if Input.is_key_pressed(KEY_SHIFT) else 15.0
+		_press["angle"] = snappedf(deg, step)
+		_drag_at = from + Vector3(cos(deg_to_rad(_press["angle"])), 0, -sin(deg_to_rad(_press["angle"]))) * TURN_ARM
 	elif _press["handle"] == "mover":
 		var at = editor.floor_at(p)
 		if at == null:
@@ -452,6 +478,8 @@ func drag(p: Vector2) -> void:
 				_drag_at.y = from.y
 		_press["lock"] = lock
 	var text := "X %s  Y %s  altura %s m" % [_num(_drag_at.x), _num(-_drag_at.z), _num(_drag_at.y)]
+	if _press["handle"] == "girar":
+		text = "Girar %s°" % _num(float(_press.get("angle", 0.0)), 0)
 	match String(_press.get("lock", "")):
 		"x":
 			text += "\neixo X travado (Ctrl)"
@@ -513,6 +541,11 @@ func release(_p: Vector2) -> void:
 	var name: String = pr["name"]
 	var path: bool = pr["path"]
 	var ok: bool
+	if pr["handle"] == "girar":
+		var a := float(pr.get("angle", 0.0))
+		if absf(a) > 1e-6:
+			turn_route(a)
+		return
 	if pr["handle"] == "mover":
 		var d: Vector3 = _drag_at - from
 		if tr.mover_trajeto(name, path, Vector3(d.x, 0.0, d.z)):
@@ -708,7 +741,17 @@ func _middle(r: Dictionary) -> Vector3:
 	var line: PackedVector3Array = r["line"]
 	if line.is_empty():
 		return Vector3.ZERO
-	return line[line.size() / 2]
+	# Half the length along the line (the belt stands there and turns about it).
+	var total := 0.0
+	for k in range(1, line.size()):
+		total += line[k].distance_to(line[k - 1])
+	var left := total * 0.5
+	for k in range(1, line.size()):
+		var d := line[k].distance_to(line[k - 1])
+		if d >= left and d > 0.0:
+			return line[k - 1].lerp(line[k], left / d)
+		left -= d
+	return line[line.size() - 1]
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -851,6 +894,8 @@ func panel() -> Array:
 	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
 	if r["too_steep"]:
 		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
+	rows.append({"kind": "number", "name": "Trajeto_GiroGraus", "label": "Girar (graus; + anti-horário)", "value": turn_deg, "min": -360.0, "max": 360.0, "step": 1.0, "action": "trajeto_giro_graus"})
+	rows.append({"kind": "button", "name": "Trajeto_Girar", "text": "Girar o trajeto", "action": "trajeto_girar"})
 	rows.append({"kind": "button", "name": "Trajeto_GirarEsq", "text": "Girar 15° (anti-horário, R)", "action": "trajeto_girar_esq"})
 	rows.append({"kind": "button", "name": "Trajeto_GirarDir", "text": "Girar 15° (horário, Shift+R)", "action": "trajeto_girar_dir"})
 	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
@@ -881,7 +926,7 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro; sem nó selecionado, as setas movem e R gira o trajeto."})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
 	return rows
 
 
@@ -979,6 +1024,12 @@ func form(what: String, value: String) -> void:
 					main.set_status("Esteira dividida: %s → %s." % [sel_name, other])
 		"trajeto_excluir_no":
 			delete_selected()
+			return
+		"trajeto_giro_graus":
+			turn_deg = v
+			return
+		"trajeto_girar":
+			turn_route(turn_deg)
 			return
 		"trajeto_girar_esq":
 			turn_route(15.0)
@@ -1080,6 +1131,18 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 				e._ribbon(line[i] + d + lift, line[i + 1] + d + lift, 0.08, DRAWING)
 			c = _drag_at
 		_square(e, c + Vector3(0, 0.05, 0), 0.28, DRAWING)
+		var mc := _middle(r)
+		var ring := mc + Vector3(TURN_ARM, 0.05, 0)
+		if _dragging and _press.get("handle", "") == "girar":
+			ring = _drag_at + Vector3(0, 0.05, 0)
+			var a := deg_to_rad(float(_press.get("angle", 0.0)))
+			var rot := Basis(Vector3.UP, a)
+			for i in line.size() - 1:
+				var p0: Vector3 = mc + rot * (line[i] - mc)
+				var p1: Vector3 = mc + rot * (line[i + 1] - mc)
+				e._ribbon(p0 + lift, p1 + lift, 0.08, CURVE)
+		e._ribbon(mc + Vector3(0, 0.05, 0), ring, 0.04, CURVE)
+		_ring(e, ring, 0.22, CURVE)
 	for i in nodes.size():
 		var n := nodes[i]
 		if _dragging and sel and not bending and i == int(_press.get("index", -1)):
@@ -1096,6 +1159,15 @@ func _handle(e: EditorUtsim, n: Vector3, r: float, color: Color) -> void:
 	if n.y > 0.05:
 		_post(e, floor, n, 0.03, STICK)
 		_diamond(e, n + Vector3(0, 0.02, 0), r * 0.8, color)
+
+
+## A small ring on the floor (the turn handle).
+func _ring(e: EditorUtsim, c: Vector3, r: float, color: Color) -> void:
+	var n := 16
+	for k in n:
+		var a0 := TAU * k / n
+		var a1 := TAU * (k + 1) / n
+		e._ribbon(c + Vector3(cos(a0), 0, sin(a0)) * r, c + Vector3(cos(a1), 0, sin(a1)) * r, 0.06, color)
 
 
 func _square(e: EditorUtsim, c: Vector3, r: float, color: Color) -> void:
