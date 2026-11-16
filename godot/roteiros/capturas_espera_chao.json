@@ -1,0 +1,12 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Faixas do espera_chao: o quadro cresce sem engrossar a faixa, e as peças ficam por dentro."},
+		{"abrir": "espera_chao_visual.ron"},
+		{"modo": "simular"},
+		{"tempo": 30.0},
+		{"camera": {"alvo": [0, 2], "distancia": 9.0, "giro": 0.0, "inclinacao": 1.2}},
+		{"esperar": 5},
+		{"capturar": "espera_chao_faixas"}
+	]
+}
