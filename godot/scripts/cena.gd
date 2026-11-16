@@ -59,6 +59,8 @@ var _clips2_body: AnimationLibrary
 var clips_fixed := PackedStringArray()
 ## Blocks whose Blender element plays clips (rig `anim`).
 var _animated := PackedInt32Array()
+## Overhead cranes: their bridge, trolley and hook follow the frame (`ponte`).
+var _pontes := PackedInt32Array()
 ## Items of the last frame put on a point of a Blender element: [block, point, node].
 var _anchored: Array = []
 var labels_visible := true
@@ -120,6 +122,7 @@ func clear(keep_templates := false) -> void:
 	_item_spare.clear()
 	mobiles.clear()
 	_animated.clear()
+	_pontes.clear()
 	_anchored.clear()
 	_last_color.clear()
 	_last_label.clear()
@@ -206,6 +209,8 @@ func build(pb: Object, keep_templates := false) -> void:
 				_animated.append(i)
 			if not fell_back:
 				_bind_points(rig, asset, b.get("pontos", PackedStringArray()))
+			if b.has("ponte_json") and not fell_back and _bind_ponte(rig, asset, String(b["ponte_json"])):
+				_pontes.append(i)
 			if b.get("skeletal", false):
 				var p := Pessoa.new()
 				# A Blender body has no clips of its own: the UAL1 ones drive its skeleton.
@@ -334,6 +339,102 @@ static func _clip_key_in_player(player: AnimationPlayer, clip: String) -> String
 		if player.has_animation(StringName(k)):
 			return k
 	return ""
+
+
+## Stretches the overhead crane element to the crane's size node by node, as the contract
+## in `docs/elementos_3d_blender.md` ("Ponte rolante") says: the runway beams along x, the
+## girders across, the columns in height (the rail goes up with them); the other parts
+## only move. The root is never stretched (the wheels and beams would deform). Keeps the
+## nodes the frame moves (`_drive_ponte`). False when the element is not the expected one.
+func _bind_ponte(rig: Dictionary, asset: Node3D, text: String) -> bool:
+	var j = JSON.parse_string(text)
+	if typeof(j) != TYPE_DICTIONARY:
+		return false
+	var d: Dictionary = j.get("dados", {})
+	var size: Array = j.get("tamanho", [12.0, 8.0, 7.75])
+	var rail := float(j.get("trilho", 6.0))
+	var rail0 := float(d.get("altura_trilho", 6.0))
+	var kx := float(size[0]) / float(d.get("comprimento", 12.0))
+	var ky := float(size[1]) / float(d.get("vao", 8.0))
+	var up := rail - rail0
+	var estica: Dictionary = d.get("estica", {})
+	var nodes := {}
+	var stack: Array[Node] = [asset]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is Node3D:
+			nodes[String(n.name)] = n
+	for name in ["ponte", "carro", "gancho", "cabo"]:
+		if not nodes.has(name):
+			push_warning("ponte rolante sem o nó %s" % name)
+			return false
+	for name in nodes:
+		var n: Node3D = nodes[name]
+		var on_root: bool = name.begins_with("trilho") or name.begins_with("coluna") or name == "ponte"
+		var on_bridge: bool = (n.get_parent() as Node) == nodes["ponte"] and name != "carro"
+		if on_root:
+			# Along the runway and across the span; the rail and the bridge at the new height.
+			n.position.x *= kx
+			n.position.z *= ky
+			if name.begins_with("trilho") or name == "ponte":
+				n.position.y += up
+		elif on_bridge:
+			n.position.z *= ky
+			if name == "botoeira":
+				# The pendant stays at the same height above the floor.
+				n.position.y -= up
+		match String(estica.get(name, "")):
+			"x":
+				n.scale.x *= kx
+			"y":
+				n.scale.z *= ky
+			"z":
+				if name == "cabo_botoeira":
+					var base := float(d.get("cabo_botoeira_base", 1.0))
+					n.scale.y *= (base + up) / maxf(base, 1e-3)
+				elif name.begins_with("coluna"):
+					n.scale.y *= rail / maxf(rail0, 1e-3)
+	rig["ponte_no"] = nodes["ponte"]
+	rig["ponte_carro"] = nodes["carro"]
+	rig["ponte_gancho"] = nodes["gancho"]
+	rig["ponte_cabo"] = nodes["cabo"]
+	rig["ponte_gancho_y"] = (nodes["gancho"] as Node3D).position.y
+	rig["ponte_cabo_escala"] = (nodes["cabo"] as Node3D).scale.y
+	# Height of the hook point above the floor with the hook up, and the cable then.
+	rig["ponte_gancho_repouso"] = float(d.get("gancho_repouso", 4.58)) + up
+	rig["ponte_cabo_base"] = float(d.get("cabo_base", 2.0))
+	return true
+
+
+## Puts the bridge, the trolley and the hook where the frame says: `h` is the hook in the
+## crane's own frame (along the runway, across, height above the floor).
+func _drive_ponte(rig: Dictionary, h: Vector3) -> void:
+	(rig["ponte_no"] as Node3D).position.x = h.x
+	(rig["ponte_carro"] as Node3D).position.z = -h.y
+	var drop := float(rig["ponte_gancho_repouso"]) - h.z
+	var gancho: Node3D = rig["ponte_gancho"]
+	gancho.position.y = float(rig["ponte_gancho_y"]) - drop
+	var base := maxf(float(rig["ponte_cabo_base"]), 1e-3)
+	var cabo: Node3D = rig["ponte_cabo"]
+	cabo.scale.y = float(rig["ponte_cabo_escala"]) * (base + drop) / base
+
+
+## What a roteiro checks of crane `i`: the hook point's height above the floor, the length
+## of a runway beam and the bridge's place along it (empty when `i` is not a crane).
+func ponte_info(i: int) -> Dictionary:
+	if i < 0 or i >= rigs.size() or not rigs[i].has("ponte_no"):
+		return {}
+	var rig: Dictionary = rigs[i]
+	var root: Node3D = rig["root"]
+	var info := {
+		"ponte_x": (rig["ponte_no"] as Node3D).position.x,
+		"carro_y": -(rig["ponte_carro"] as Node3D).position.z,
+		"gancho_y": float(rig["ponte_gancho_repouso"]) - (float(rig["ponte_gancho_y"]) - (rig["ponte_gancho"] as Node3D).position.y),
+	}
+	for n in (rig["asset"] as Node3D).find_children("trilho_e", "Node3D", true, false):
+		info["trilho"] = _box_in(root, n as Node3D).size.x
+	return info
 
 
 ## The AnimationLibrary of an imported scene with clips (the UAL files), or null.
@@ -942,6 +1043,10 @@ func apply(t: float, dt: float, snap := false) -> void:
 	var anim_clip: PackedInt32Array = f.get("anim_clip", PackedInt32Array())
 	var anim_fase: PackedFloat32Array = f.get("anim_fase", PackedFloat32Array())
 	var anim_extra: PackedFloat32Array = f.get("anim_extra", PackedFloat32Array())
+	var ponte: PackedVector3Array = f.get("ponte", PackedVector3Array())
+	for i in _pontes:
+		if i < ponte.size() and not is_nan(ponte[i].x):
+			_drive_ponte(rigs[i], ponte[i])
 	for i in _animated:
 		if i < anim_clip.size():
 			_drive_clip(rigs[i], anim_clip[i], anim_fase[i])
