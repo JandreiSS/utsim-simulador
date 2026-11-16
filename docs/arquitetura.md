@@ -635,6 +635,13 @@ metade do lado `load_zone`, girado com o caminho. `Model::drive` grava o rastro 
 resultado no relatório quando o modelo tem pontes e pessoas
 (`has_people_under_cranes`).
 
+A ponte com botoeira ou rádio (`utsim_objects::CraneOperator`) pede a pessoa com
+`TaskKind::Operate` e `tag` `CRANE_TAG`. Como a manutenção, esse trabalho não é intercalado
+nem tirado por preempção (`task::is_case_tag`). O ponto onde a pessoa encontra a ponte vem
+de `Ctx::set_meeting_point`, que o despachante e a pessoa leem com `Ctx::meeting_point`.
+Com botoeira, a ponte manda `MSG_FOLLOW_X/Y/Z` e `MSG_FOLLOW` para a pessoa andar junto com
+a carga. A ponte limita o próprio trecho carregado ao passo da pessoa mais lenta da equipe.
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)
