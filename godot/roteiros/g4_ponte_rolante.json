@@ -1,0 +1,17 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Ponte rolante (ponte_rolante.glb): esticada nó por nó até o size do modelo (40 m de caminho, 18 m de vão), sem deformar vigas e rodas. A ponte, o carro e o gancho seguem as viagens do rastro; o gancho desce para engatar e para soltar, e a chapa fica pendurada nele."},
+		{"abrir": "../../examples/ponte_rolante.ron"},
+		{"modo": "simular"},
+		{"conferir": {"ponte3d": {"objeto": "ponte", "t": 0.0, "gancho_entre": [5.9, 6.1], "trilho_entre": [39.0, 41.0], "longe_do_centro": false}}},
+		{"tempo": 0.0},
+		{"focar": {"objeto": "ponte", "distancia": 45.0, "giro": 0.6, "inclinacao": 0.5}},
+		{"capturar": "g4_ponte_rolante_01_repouso"},
+		{"nota": "Em 1590 s a ponte está no recebimento (17 m e 6 m do centro) engatando a primeira chapa: o gancho desceu a 1,2 m."},
+		{"conferir": {"ponte3d": {"objeto": "ponte", "t": 1590.0, "gancho_entre": [1.1, 1.3], "longe_do_centro": true}}},
+		{"tempo": 1590.0},
+		{"focar": {"objeto": "recebimento", "distancia": 14.0, "giro": 0.6, "inclinacao": 0.35}},
+		{"capturar": "g4_ponte_rolante_02_engate"}
+	]
+}
