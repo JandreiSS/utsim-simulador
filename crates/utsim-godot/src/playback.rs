@@ -251,6 +251,9 @@ pub struct FrameData {
     /// Rise of the forks past the fork clip's travel (a rack cell above it), asset units,
     /// for the engine to add to the `carro` node; 0 for the others.
     pub anim_extra: Vec<f32>,
+    /// The hook of each crane, in its own frame (`u`, `v`, height; [`Playback::ponte_pose`]);
+    /// NaN for the other blocks.
+    pub ponte: Vec<[f32; 3]>,
     /// Per drawn item: the block whose element holds it at one of its points (the part a
     /// station works on, the load on the forks or the deck), -1 for none, and the point
     /// (index into that block's static `pontos`). The engine puts the item there after
@@ -274,6 +277,76 @@ pub struct Espera3d {
     pub beside_x: f32,
     pub root: [f32; 3],
     pub turn: f32,
+}
+
+/// An overhead crane (`Crane`) in the 3D view, drawn with the `ponte_rolante` element: its
+/// rectangle (centre, turn and `size`), the height the hook travels at and what the scene
+/// needs to stretch the element to the size (`json`: the catalogue's `dados`, the size and
+/// the rail height, read by `cena.gd`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Ponte3d {
+    /// Model coordinates of the centre of the rectangle.
+    pub centre: [f64; 3],
+    pub yaw: f64,
+    pub hook_height: f64,
+    pub json: String,
+}
+
+/// Height of the hook above the floor while hooking or unhooking a load, m.
+pub const HOOK_WORK: f64 = 1.2;
+
+impl Ponte3d {
+    /// The crane `o` drawn with element `e`; `None` without a `size` (the model requires it).
+    pub fn new(o: &utsim_model::ObjectDef, e: &modelos3d::Elemento) -> Option<Ponte3d> {
+        let utsim_model::ObjectKind::Crane { hook_height, .. } = &o.kind else {
+            return None;
+        };
+        let size = o.size?;
+        let rail_base = e.dados["altura_trilho"].as_f64().unwrap_or(6.0);
+        let tall_base = f64::from(e.tamanho[2]).max(rail_base);
+        let rail = size[2] * rail_base / tall_base;
+        let json = serde_json::json!({
+            "dados": e.dados,
+            "tamanho": size,
+            "trilho": rail,
+        })
+        .to_string();
+        Some(Ponte3d {
+            centre: o.position,
+            yaw: o
+                .visual
+                .as_ref()
+                .and_then(|v| v.yaw)
+                .map_or(0.0, f64::to_radians),
+            hook_height: *hook_height,
+            json,
+        })
+    }
+
+    /// The hook in the crane's own frame: along the runway (`u`), across (`v`), and its
+    /// height above the floor, for a hook over `at` (model coordinates) and the crane's
+    /// state.
+    pub fn hook(&self, at: [f64; 3], state: Option<utsim_core::State>) -> [f64; 3] {
+        let (s, c) = self.yaw.sin_cos();
+        let (dx, dy) = (at[0] - self.centre[0], at[1] - self.centre[1]);
+        let z = match state {
+            Some(utsim_core::State::Loading | utsim_core::State::Unloading) => {
+                HOOK_WORK.min(self.hook_height)
+            }
+            _ => self.hook_height,
+        };
+        [c * dx + s * dy, -s * dx + c * dy, z]
+    }
+
+    /// The model point of the hook `h` ([`Ponte3d::hook`]).
+    pub fn global(&self, h: [f64; 3]) -> [f64; 3] {
+        let (s, c) = self.yaw.sin_cos();
+        [
+            self.centre[0] + c * h[0] - s * h[1],
+            self.centre[1] + s * h[0] + c * h[1],
+            self.centre[2] + h[2],
+        ]
+    }
 }
 
 /// Items drawn in the row beside a full waiting area; the others are only counted.
@@ -463,6 +536,8 @@ pub struct Playback {
     /// Per drawn block, the real waiting area of a queue (`waiting_area`): its places and
     /// where it stands; `None` for the others.
     pub esperas: Vec<Option<Espera3d>>,
+    /// Per drawn block, the overhead crane it is; `None` for the others.
+    pub pontes: Vec<Option<Ponte3d>>,
     /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
     /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
     vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
@@ -520,6 +595,16 @@ impl Playback {
                     asset: Some(w.element().to_string()),
                     ..scene.visual(b).cloned().unwrap_or_default()
                 });
+            let espera_visual = espera_visual.or_else(|| {
+                (kind == "Crane"
+                    && catalogo
+                        .as_ref()
+                        .is_some_and(|c| c.get("ponte_rolante").is_some()))
+                .then(|| utsim_model::VisualDef {
+                    asset: Some("ponte_rolante".to_string()),
+                    ..scene.visual(b).cloned().unwrap_or_default()
+                })
+            });
             let visual = espera_visual.as_ref().or(scene.visual(b));
             let mut look = looks::look_of(&kind, role, visual, &scene.geoms[b], ctx, model_dir);
             let (modelo3d, pessoa) = match &catalogo {
@@ -545,7 +630,7 @@ impl Playback {
                 .map_or(0.0, |m| modelos3d::inclinar_motorista(m, lean));
             let stack = kind == "Queue" && is_stack(model, &name);
             let sized = role.is_none()
-                && !matches!(kind.as_str(), "Conveyor" | "Rack")
+                && !matches!(kind.as_str(), "Conveyor" | "Rack" | "Crane")
                 && model
                     .and_then(|m| m.objects.iter().find(|o| o.name == name))
                     .is_some_and(|o| o.size.is_some());
@@ -660,6 +745,7 @@ impl Playback {
             animados: Vec::new(),
             tampos: Vec::new(),
             esperas: Vec::new(),
+            pontes: Vec::new(),
             vivo: std::sync::OnceLock::new(),
             rastro: std::sync::Mutex::new(None),
         }
@@ -699,6 +785,22 @@ impl Playback {
             }
         }
         self.animados = animados;
+        self.pontes = (0..self.blocks.len())
+            .map(|i| {
+                let v = &self.blocks[i];
+                if v.kind != "Crane" {
+                    return None;
+                }
+                let o = self
+                    .model
+                    .as_ref()?
+                    .objects
+                    .iter()
+                    .find(|o| o.name == v.name)?;
+                let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
+                Ponte3d::new(o, e)
+            })
+            .collect();
         self.esperas = (0..self.blocks.len())
             .map(|i| {
                 let v = &self.blocks[i];
@@ -796,6 +898,16 @@ impl Playback {
     pub fn operator_post(&self, i: usize, t: f64) -> Option<([f32; 3], f32)> {
         let (a, run) = self.animado(i, t)?;
         a.operator(run, t)
+    }
+
+    /// The hook of crane `i` (drawn index) at `t`, in its own frame (`u`, `v`, height):
+    /// over the last point of its travels (its centre before the first one), down while
+    /// hooking or unhooking.
+    pub fn ponte_pose(&self, i: usize, t: f64) -> Option<[f64; 3]> {
+        let p = self.pontes.get(i)?.as_ref()?;
+        let b = self.blocks[i].b;
+        let at = self.scene.timeline.carrier_pos(b, t).unwrap_or(p.centre);
+        Some(p.hook(at, self.scene.timeline.block_state(b, t)))
     }
 
     /// Whether block `i` is a `Processor` nobody operates (no `operators`, no `also`): its
@@ -1136,6 +1248,10 @@ impl Playback {
             f.clip_time.push(clip_time);
             let (anim_clip, anim_fase, anim_extra) = self.anim_at(f.anim_clip.len(), t, lift);
             f.anim_extra.push(anim_extra);
+            f.ponte.push(
+                self.ponte_pose(f.anim_clip.len(), t)
+                    .map_or([f32::NAN; 3], |h| h.map(|v| v as f32)),
+            );
             anchors.push(self.anchor_at(f.anim_clip.len(), t));
             f.anim_clip.push(anim_clip);
             f.anim_fase.push(anim_fase);
@@ -1279,7 +1395,13 @@ impl Playback {
                 && let Some(look) = &self.blocks[i].look
             {
                 let v = &self.blocks[i];
-                if let Some(belt) = looks::queue_belt(&v.kind, look) {
+                if let (Some(Some(pp)), Some(h)) = (self.pontes.get(i), self.ponte_pose(i, t)) {
+                    // Hanging under the hook (the stack, one under the other).
+                    let k = stacked.entry(i).or_default();
+                    let low = h[2] - f64::from(ITEM_SIZE) * (0.5 + *k as f64) - 0.05;
+                    *k += 1;
+                    center = to_godot(pp.global([h[0], h[1], low]).map(|v| v as f32));
+                } else if let Some(belt) = looks::queue_belt(&v.kind, look) {
                     // On top of the belt, in a line (the scene's slots are the simple
                     // queue's: their base is the block's).
                     let k = resting.entry(i).or_default();
@@ -2061,6 +2183,54 @@ mod tests {
             "{}",
             f.label[q]
         );
+    }
+
+    #[test]
+    fn the_overhead_crane_moves_its_bridge_trolley_and_hook_by_the_trace() {
+        let pb = playback("ponte_rolante.ron", false);
+        let k = pb.blocks.iter().position(|v| v.name == "ponte").unwrap();
+        assert_eq!(pb.blocks[k].modelo3d.as_deref(), Some("ponte_rolante"));
+        assert!(
+            !pb.blocks[k].sized,
+            "stretched node by node, not as a whole"
+        );
+        let p = pb.pontes[k].as_ref().expect("ponte");
+        let json: serde_json::Value = serde_json::from_str(&p.json).unwrap();
+        assert_eq!(json["tamanho"][0].as_f64(), Some(40.0));
+        assert!(json["dados"]["estica"].is_object());
+        // Before any travel the hook is over the centre, up at the travel height.
+        let rest = pb.ponte_pose(k, 0.0).unwrap();
+        assert!(rest[0].abs() < 1e-9 && rest[1].abs() < 1e-9 && (rest[2] - 6.0).abs() < 1e-9);
+        // Somewhere along the run: away from the centre, and down while hooking a load,
+        // with the load hanging under the hook.
+        let b = pb.blocks[k].b;
+        let mut moved = false;
+        let mut hooked = false;
+        for s in 1..2000 {
+            let t = s as f64 * 10.0;
+            let h = pb.ponte_pose(k, t).unwrap();
+            moved |= h[0].abs() > 1.0 || h[1].abs() > 1.0;
+            let state = pb.scene.timeline.block_state(b, t);
+            if matches!(
+                state,
+                Some(utsim_core::State::Loading | utsim_core::State::Unloading)
+            ) {
+                assert!((h[2] - HOOK_WORK).abs() < 1e-9, "{h:?}");
+                hooked = true;
+            }
+            let f = pb.frame(t);
+            assert!(f.ponte[k].iter().all(|v| v.is_finite()));
+            assert!(
+                f.ponte
+                    .iter()
+                    .enumerate()
+                    .all(|(j, v)| j == k || v[0].is_nan())
+            );
+            if moved && hooked {
+                break;
+            }
+        }
+        assert!(moved && hooked);
     }
 
     #[test]
