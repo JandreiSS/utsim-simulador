@@ -1264,6 +1264,10 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("gancho_entre"):
 						var g := float(info["gancho_y"])
 						report.call("altura do gancho de %s" % want["objeto"], g >= float(want["gancho_entre"][0]) and g <= float(want["gancho_entre"][1]), "%.2f m" % g)
+					if want.has("zona"):
+						# The square under the load: shown (with its side) or not.
+						var z: bool = info.get("zona", false)
+						report.call("zona sob a carga de %s" % want["objeto"], z == bool(want["zona"]) and float(info.get("zona_lado", 0.0)) > 0.0, "visível %s, lado %.2f m" % [z, float(info.get("zona_lado", 0.0))])
 					if want.has("trilho_entre"):
 						var l := float(info.get("trilho", -1.0))
 						report.call("comprimento do trilho de %s" % want["objeto"], l >= float(want["trilho_entre"][0]) and l <= float(want["trilho_entre"][1]), "%.2f m" % l)

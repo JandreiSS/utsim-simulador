@@ -404,12 +404,35 @@ func _bind_ponte(rig: Dictionary, asset: Node3D, text: String) -> bool:
 	# Height of the hook point above the floor with the hook up, and the cable then.
 	rig["ponte_gancho_repouso"] = float(d.get("gancho_repouso", 4.58)) + up
 	rig["ponte_cabo_base"] = float(d.get("cabo_base", 2.0))
+	# The square under the load (`load_zone`, half side): on the floor under the hook while
+	# an item hangs from it, in the colour of the safety zones.
+	var half := float(j.get("zona", 0.0))
+	if half > 0.0:
+		var zona := MeshInstance3D.new()
+		zona.name = "zona_carga"
+		var m := BoxMesh.new()
+		m.size = Vector3(2.0 * half, 0.02, 2.0 * half)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(1.0, 0.72, 0.1, 0.4)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.material = mat
+		zona.mesh = m
+		zona.visible = false
+		asset.add_child(zona)
+		rig["ponte_zona"] = zona
+		rig["ponte_zona_lado"] = 2.0 * half
 	return true
 
 
 ## Puts the bridge, the trolley and the hook where the frame says: `h` is the hook in the
-## crane's own frame (along the runway, across, height above the floor).
-func _drive_ponte(rig: Dictionary, h: Vector3) -> void:
+## crane's own frame (along the runway, across, height above the floor); `carga`: an item
+## hangs from it (the square under the load shows).
+func _drive_ponte(rig: Dictionary, h: Vector3, carga: bool) -> void:
+	if rig.has("ponte_zona"):
+		var zona: Node3D = rig["ponte_zona"]
+		zona.visible = carga
+		zona.position = Vector3(h.x, 0.02, -h.y)
 	(rig["ponte_no"] as Node3D).position.x = h.x
 	(rig["ponte_carro"] as Node3D).position.z = -h.y
 	var drop := float(rig["ponte_gancho_repouso"]) - h.z
@@ -431,6 +454,8 @@ func ponte_info(i: int) -> Dictionary:
 		"ponte_x": (rig["ponte_no"] as Node3D).position.x,
 		"carro_y": -(rig["ponte_carro"] as Node3D).position.z,
 		"gancho_y": float(rig["ponte_gancho_repouso"]) - (float(rig["ponte_gancho_y"]) - (rig["ponte_gancho"] as Node3D).position.y),
+		"zona": rig.has("ponte_zona") and (rig["ponte_zona"] as Node3D).visible,
+		"zona_lado": float(rig.get("ponte_zona_lado", 0.0)),
 	}
 	for n in (rig["asset"] as Node3D).find_children("trilho_e", "Node3D", true, false):
 		info["trilho"] = _box_in(root, n as Node3D).size.x
@@ -1044,9 +1069,10 @@ func apply(t: float, dt: float, snap := false) -> void:
 	var anim_fase: PackedFloat32Array = f.get("anim_fase", PackedFloat32Array())
 	var anim_extra: PackedFloat32Array = f.get("anim_extra", PackedFloat32Array())
 	var ponte: PackedVector3Array = f.get("ponte", PackedVector3Array())
+	var ponte_carga: PackedFloat32Array = f.get("ponte_carga", PackedFloat32Array())
 	for i in _pontes:
 		if i < ponte.size() and not is_nan(ponte[i].x):
-			_drive_ponte(rigs[i], ponte[i])
+			_drive_ponte(rigs[i], ponte[i], i < ponte_carga.size() and ponte_carga[i] > 0.5)
 	for i in _animated:
 		if i < anim_clip.size():
 			_drive_clip(rigs[i], anim_clip[i], anim_fase[i])
