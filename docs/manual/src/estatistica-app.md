@@ -50,7 +50,7 @@ Arquivo › Exportar planilha em xlsx grava `estatistica/exportados/<nome>.xlsx`
 
 | Grupo | Análises |
 |---|---|
-| Estatística básica | descritiva, normalidade (Anderson-Darling), t de uma amostra, t de duas amostras (Welch ou variância combinada), t pareado, uma proporção, duas proporções, igualdade de variâncias (Levene e Bartlett), equivalência (TOST) |
+| Estatística básica | descritiva, normalidade (Anderson-Darling), t de uma amostra, t de duas amostras (Welch ou variância combinada), t pareado, uma proporção, duas proporções, igualdade de variâncias (Levene e Bartlett), equivalência (TOST), intervalo de tolerância |
 | ANOVA | um fator com as comparações de Tukey, dois fatores |
 | Não paramétricos | Mann-Whitney, Wilcoxon pareado, Kruskal-Wallis, mediana de Mood, Friedman |
 | Tabelas | qui-quadrado de independência, com as contagens observadas e esperadas |
@@ -64,6 +64,13 @@ O resultado mostra a conclusão, os números, as tabelas e os gráficos. "Refaze
 ### Equivalência (TOST)
 
 O TOST responde se duas médias são iguais na prática, isto é, se a diferença fica entre um limite inferior e um superior que você escolhe pelo processo (a menor diferença que importa). Ele faz dois testes t unilaterais. A conclusão é "equivalentes" quando os dois rejeitam, o que é o mesmo que o intervalo de confiança de 1 − 2α (90 % com α = 0,05) caber inteiro nos limites. As comparações são duas amostras (Welch), pareada ou uma amostra contra μ₀. Um teste t sem significância não prova igualdade; o TOST prova.
+
+### Intervalo de tolerância
+
+O intervalo de confiança fala da média; o de tolerância fala das peças. Ele dá os limites que guardam ao menos uma proporção da população (a cobertura, por exemplo 95 %) com a confiança escolhida (por exemplo 95 %). Pode ter os dois lados ou só um ("só o inferior" para uma resistência mínima, "só o superior" para um tempo máximo).
+
+- **Normal:** `x̄ ± k·s`, com o fator `k` exato para o tamanho da amostra. Serve quando os dados são normais; se o Anderson-Darling rejeita a normalidade (p < 0,05), o resultado avisa.
+- **Não paramétrico:** usa os próprios valores ordenados e vale para qualquer distribuição contínua. Pede mais dados: os extremos da amostra só chegam a 90 % de cobertura com 95 % de confiança a partir de 46 valores (dois lados) ou 29 (um lado). Com menos, o resultado mostra a confiança atingida e quantos valores faltam.
 
 ## Dados da simulação (menu Simulação)
 
@@ -149,4 +156,4 @@ O UTSim e o Seis Sigma podem pedir um experimento ao Estatística (pedido `plane
 
 ## O que vem depois
 
-O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, GLM, regressão logística, confiabilidade com censura, assistente guiado e séries temporais.
+O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, a transformação de Johnson, GLM, stepwise, regressão logística, confiabilidade com censura, assistente guiado e séries temporais.
