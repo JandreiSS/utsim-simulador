@@ -254,6 +254,9 @@ pub struct FrameData {
     /// The hook of each crane, in its own frame (`u`, `v`, height; [`Playback::ponte_pose`]);
     /// NaN for the other blocks.
     pub ponte: Vec<[f32; 3]>,
+    /// Per crane: 1 while an item hangs from its hook (the square under the load is
+    /// shown), else 0; NaN for the other blocks.
+    pub ponte_carga: Vec<f32>,
     /// Per drawn item: the block whose element holds it at one of its points (the part a
     /// station works on, the load on the forks or the deck), -1 for none, and the point
     /// (index into that block's static `pontos`). The engine puts the item there after
@@ -290,9 +293,15 @@ pub struct Ponte3d {
     pub yaw: f64,
     pub hook_height: f64,
     pub json: String,
+    /// The hoisting of the hook from the trace ([`utsim_core::TraceEvent::Hoist`]), in time
+    /// order: start, duration, world height from and to. Empty in older traces.
+    pub hoists: Vec<(f64, f64, f64, f64)>,
+    /// When an item hangs from the hook ([`utsim_model::exposure::LoadTrack::hanging`]).
+    pub hanging: Vec<(f64, f64)>,
 }
 
-/// Height of the hook above the floor while hooking or unhooking a load, m.
+/// Height of the hook above the floor while hooking or unhooking a load in traces without
+/// hoisting (older ones), m.
 pub const HOOK_WORK: f64 = 1.2;
 
 impl Ponte3d {
@@ -303,12 +312,18 @@ impl Ponte3d {
         };
         let size = o.size?;
         let rail_base = e.dados["altura_trilho"].as_f64().unwrap_or(6.0);
+        // The square under the load (`load_zone`, half side), the same the safety reads.
+        let zona = match &o.kind {
+            utsim_model::ObjectKind::Crane { load_zone, .. } => *load_zone,
+            _ => 0.0,
+        };
         let tall_base = f64::from(e.tamanho[2]).max(rail_base);
         let rail = size[2] * rail_base / tall_base;
         let json = serde_json::json!({
             "dados": e.dados,
             "tamanho": size,
             "trilho": rail,
+            "zona": zona,
         })
         .to_string();
         Some(Ponte3d {
@@ -320,7 +335,26 @@ impl Ponte3d {
                 .map_or(0.0, f64::to_radians),
             hook_height: *hook_height,
             json,
+            hoists: Vec::new(),
+            hanging: Vec::new(),
         })
+    }
+
+    /// The world height of the hook at `t` by the hoisting of the trace; `None` before the
+    /// first hoist or without them.
+    pub fn hoist_at(&self, t: f64) -> Option<f64> {
+        let k = self.hoists.partition_point(|h| h.0 <= t);
+        let &(t0, dur, from, to) = self.hoists.get(k.checked_sub(1)?)?;
+        Some(if dur > 0.0 && t < t0 + dur {
+            from + (to - from) * (t - t0) / dur
+        } else {
+            to
+        })
+    }
+
+    /// Whether an item hangs from the hook at `t` (the square under the load is shown).
+    pub fn loaded(&self, t: f64) -> bool {
+        self.hanging.iter().any(|&(a, b)| a <= t && t < b)
     }
 
     /// The hook in the crane's own frame: along the runway (`u`), across (`v`), and its
@@ -785,6 +819,11 @@ impl Playback {
             }
         }
         self.animados = animados;
+        let tracks = self
+            .model
+            .as_ref()
+            .map(|m| utsim_model::exposure::load_tracks(m, &replay.records, replay.stop_time))
+            .unwrap_or_default();
         self.pontes = (0..self.blocks.len())
             .map(|i| {
                 let v = &self.blocks[i];
@@ -798,7 +837,24 @@ impl Playback {
                     .iter()
                     .find(|o| o.name == v.name)?;
                 let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
-                Ponte3d::new(o, e)
+                let mut p = Ponte3d::new(o, e)?;
+                p.hoists = replay
+                    .records
+                    .iter()
+                    .filter_map(|r| match r.event {
+                        utsim_core::TraceEvent::Hoist {
+                            carrier,
+                            from,
+                            to,
+                            duration,
+                        } if carrier == v.b => Some((r.t, duration, from, to)),
+                        _ => None,
+                    })
+                    .collect();
+                if let Some(tr) = tracks.iter().find(|tr| tr.name == v.name) {
+                    p.hanging = tr.hanging.clone();
+                }
+                Some(p)
             })
             .collect();
         self.esperas = (0..self.blocks.len())
@@ -901,13 +957,23 @@ impl Playback {
     }
 
     /// The hook of crane `i` (drawn index) at `t`, in its own frame (`u`, `v`, height):
-    /// over the last point of its travels (its centre before the first one), down while
-    /// hooking or unhooking.
+    /// over the last point of its travels (its centre before the first one), at the height
+    /// of the trace's hoisting (older traces: down while hooking or unhooking).
     pub fn ponte_pose(&self, i: usize, t: f64) -> Option<[f64; 3]> {
         let p = self.pontes.get(i)?.as_ref()?;
         let b = self.blocks[i].b;
         let at = self.scene.timeline.carrier_pos(b, t).unwrap_or(p.centre);
-        Some(p.hook(at, self.scene.timeline.block_state(b, t)))
+        let mut h = p.hook(at, self.scene.timeline.block_state(b, t));
+        if let Some(z) = p.hoist_at(t) {
+            h[2] = z - p.centre[2];
+        }
+        Some(h)
+    }
+
+    /// Whether crane `i` (drawn index) carries a hanging item at `t`; `None` for the other
+    /// blocks.
+    pub fn ponte_carga(&self, i: usize, t: f64) -> Option<bool> {
+        Some(self.pontes.get(i)?.as_ref()?.loaded(t))
     }
 
     /// Whether block `i` is a `Processor` nobody operates (no `operators`, no `also`): its
@@ -1251,6 +1317,10 @@ impl Playback {
             f.ponte.push(
                 self.ponte_pose(f.anim_clip.len(), t)
                     .map_or([f32::NAN; 3], |h| h.map(|v| v as f32)),
+            );
+            f.ponte_carga.push(
+                self.ponte_carga(f.anim_clip.len(), t)
+                    .map_or(f32::NAN, |c| if c { 1.0 } else { 0.0 }),
             );
             anchors.push(self.anchor_at(f.anim_clip.len(), t));
             f.anim_clip.push(anim_clip);
@@ -2201,23 +2271,21 @@ mod tests {
         // Before any travel the hook is over the centre, up at the travel height.
         let rest = pb.ponte_pose(k, 0.0).unwrap();
         assert!(rest[0].abs() < 1e-9 && rest[1].abs() < 1e-9 && (rest[2] - 6.0).abs() < 1e-9);
-        // Somewhere along the run: away from the centre, and down while hooking a load,
-        // with the load hanging under the hook.
-        let b = pb.blocks[k].b;
+        assert!(!p.hoists.is_empty(), "the trace's hoisting");
+        assert!(!p.hanging.is_empty(), "the loads hanging");
+        assert_eq!(json["zona"].as_f64(), Some(2.0));
+        // Somewhere along the run: away from the centre, the hook down by the trace's
+        // hoisting (between the floor and the travel height), and a load hanging with the
+        // square under it.
         let mut moved = false;
-        let mut hooked = false;
-        for s in 1..2000 {
-            let t = s as f64 * 10.0;
+        let mut lowered = false;
+        let mut loaded = false;
+        for s in 1..20000 {
+            let t = s as f64;
             let h = pb.ponte_pose(k, t).unwrap();
             moved |= h[0].abs() > 1.0 || h[1].abs() > 1.0;
-            let state = pb.scene.timeline.block_state(b, t);
-            if matches!(
-                state,
-                Some(utsim_core::State::Loading | utsim_core::State::Unloading)
-            ) {
-                assert!((h[2] - HOOK_WORK).abs() < 1e-9, "{h:?}");
-                hooked = true;
-            }
+            assert!(h[2] > -1e-9 && h[2] < 6.0 + 1e-9, "{t}: {h:?}");
+            lowered |= h[2] < 3.0;
             let f = pb.frame(t);
             assert!(f.ponte[k].iter().all(|v| v.is_finite()));
             assert!(
@@ -2226,11 +2294,13 @@ mod tests {
                     .enumerate()
                     .all(|(j, v)| j == k || v[0].is_nan())
             );
-            if moved && hooked {
+            assert_eq!(f.ponte_carga[k] == 1.0, p.loaded(t));
+            loaded |= f.ponte_carga[k] == 1.0;
+            if moved && lowered && loaded {
                 break;
             }
         }
-        assert!(moved && hooked);
+        assert!(moved && lowered && loaded);
     }
 
     #[test]

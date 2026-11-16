@@ -888,6 +888,11 @@ impl UtsimPlayback {
         put(&mut d, "ponte", vectors(&f.ponte));
         put(
             &mut d,
+            "ponte_carga",
+            PackedFloat32Array::from(f.ponte_carga.as_slice()),
+        );
+        put(
+            &mut d,
             "item_ancora_bloco",
             PackedInt32Array::from(f.item_ancora_bloco.as_slice()),
         );
