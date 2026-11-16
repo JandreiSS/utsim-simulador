@@ -151,6 +151,29 @@ pub fn snap_along(
             );
         }
     }
+    // The faces of the fixed objects: the middle of each side of the area it takes on the
+    // floor, so a belt ends at the face of the machine and not inside it.
+    let bodies = model.nav_bodies();
+    for b in bodies
+        .iter()
+        .filter(|b| !matches!(b.shape, utsim_nav::Shape::Conveyor { .. }))
+    {
+        let poly = b.polygon();
+        for k in 0..poly.len() {
+            let (a, c) = (poly[k], poly[(k + 1) % poly.len()]);
+            let mid = [(a[0] + c[0]) / 2.0, (a[1] + c[1]) / 2.0, p[2]];
+            offer(
+                d2(p, mid),
+                Snap {
+                    at: mid,
+                    what: "porta",
+                    object: Some(b.name.clone()),
+                    output: None,
+                },
+                &mut best,
+            );
+        }
+    }
     for o in model.objects.iter().filter(|o| {
         !matches!(
             o.kind,
@@ -752,11 +775,11 @@ impl Editor {
         };
         if path {
             return self.edit_path(name, |a| {
-                let n = a.points.len() as f64;
-                let o = [
-                    a.points.iter().map(|p| p[0]).sum::<f64>() / n,
-                    a.points.iter().map(|p| p[1]).sum::<f64>() / n,
-                ];
+                // About the point at half its length, as the editor draws the handles.
+                let line = a.centerline();
+                let half = utsim_nav::path3d::length3(&line) / 2.0;
+                let o = utsim_nav::path3d::point_at(&line, half)
+                    .map_or(a.points[0], |(q, _)| [q[0], q[1]]);
                 for p in a.points.iter_mut() {
                     *p = turn(*p, o);
                 }
@@ -1576,6 +1599,24 @@ mod tests {
         assert_eq!(e.model().aisles[0].points, vec![[1.0, -1.0], [1.0, 1.0]]);
         e.move_route(&p, true, [0.0, 1.0, 0.0]).unwrap();
         assert_eq!(e.model().aisles[0].points[0], [1.0, 0.0]);
+    }
+
+    #[test]
+    fn a_belt_snaps_to_the_face_of_a_machine() {
+        let mut e = Editor::new("t");
+        // A processor at (5, 0): its area is 1,8 × 1,8 m, so its west face is at x = 4,1.
+        let m = e.add("Processor", [5.0, 0.0, 0.0]).unwrap();
+        let s = snap(e.model(), [4.0, 0.1, 0.8], 0.5, 0.45, None, None);
+        assert_eq!((s.what, s.object.as_deref()), ("porta", Some(m.as_str())));
+        assert!(
+            (s.at[0] - 4.1).abs() < 1e-9 && s.at[1].abs() < 1e-9,
+            "{:?}",
+            s.at
+        );
+        assert_eq!(s.at[2], 0.8);
+        // Near its centre, the centre still counts.
+        let s = snap(e.model(), [5.1, 0.1, 0.8], 0.5, 0.45, None, None);
+        assert_eq!(s.at[0], 5.0);
     }
 
     #[test]
