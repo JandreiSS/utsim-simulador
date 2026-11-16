@@ -876,9 +876,14 @@ fn print_summary(model: &Model, reports: &[RunReport]) {
     for b in &first.blocks {
         let n = &b.name;
         let prefix = format!("{n}.state.");
+        // Keys with the prefix are contiguous in the ordered map: start there and stop at
+        // the first key past them.
         let states: Vec<String> = summary
-            .iter()
-            .filter_map(|(k, s)| k.strip_prefix(&prefix).map(|state| (state, s)))
+            .range::<str, _>((
+                std::ops::Bound::Included(prefix.as_str()),
+                std::ops::Bound::Unbounded,
+            ))
+            .map_while(|(k, s)| k.strip_prefix(&prefix).map(|state| (state, s)))
             .filter(|(_, s)| s.mean > 0.0)
             .map(|(state, s)| format!("{state} {}", fmt_pct(s)))
             .collect();
