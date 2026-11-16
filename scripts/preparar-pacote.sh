@@ -32,8 +32,12 @@ if [ -e "$DESTINO" ] && [ -n "$(ls -A "$DESTINO" 2>/dev/null)" ]; then
 fi
 mkdir -p "$DESTINO/bin"
 
+# Com a interface 3D (Godot), o editor antigo utsim-view não vai no pacote: o launcher abre
+# o 3D, e nada mais chama o utsim-view (96 MB a menos). Sem o 3D, ele continua sendo o editor.
+PROGRAMAS="utsim utsim-view"
+[ -n "$GODOT_EXPORT" ] && PROGRAMAS="utsim"
 achou=0
-for nome in utsim utsim-view; do
+for nome in $PROGRAMAS; do
     if [ -f "$BINS/$nome.exe" ]; then
         cp "$BINS/$nome.exe" "$DESTINO/bin/"
     elif [ -f "$BINS/$nome" ]; then

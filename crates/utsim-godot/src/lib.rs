@@ -57,6 +57,7 @@ pub mod modelos3d;
 pub mod network_edit;
 pub mod outro_app;
 pub mod overlay_mesh;
+mod painel_janela;
 pub mod path_edit;
 mod path_godot;
 pub mod pert_view;
@@ -603,6 +604,10 @@ impl UtsimPlayback {
             put(&mut e, "shape", simple_shape(&v.kind));
             put(&mut e, "stack", v.stack);
             put(&mut e, "sized", v.sized);
+            if let Some(Some(p)) = c.pontes.get(i) {
+                // The overhead crane: stretched node by node to its size (`cena.gd`).
+                put(&mut e, "ponte_json", GString::from(p.json.as_str()));
+            }
             if v.kind == "Source" {
                 // C7: the item a source creates, in the colour its items get.
                 let c = utsim_scene::style::origin_color(v.b);
@@ -880,6 +885,7 @@ impl UtsimPlayback {
             "anim_extra",
             PackedFloat32Array::from(f.anim_extra.as_slice()),
         );
+        put(&mut d, "ponte", vectors(&f.ponte));
         put(
             &mut d,
             "item_ancora_bloco",

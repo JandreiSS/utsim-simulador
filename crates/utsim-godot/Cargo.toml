@@ -37,7 +37,7 @@ serde.workspace = true
 ron.workspace = true
 utsim-ui-tema.workspace = true
 # The texts of UTSim 3D in five languages (idiomas/*/godot.ftl).
-utsim-idiomas = { path = "../utsim-idiomas", default-features = false }
+utsim-idiomas = { path = "../utsim-idiomas", default-features = false, features = ["egui"] }
 # The mission mode of UTSim Ensino (`ensino_class`): the same screens as its window.
 utsim-ensino-ui = { path = "../utsim-ensino-ui" }
 utsim-ensino-store = { path = "../utsim-ensino-store" }

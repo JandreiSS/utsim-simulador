@@ -783,6 +783,7 @@ Escolha o conjunto, a análise e as colunas:
 | MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
 | Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
 | Superfície de resposta | as colunas dos fatores (codificadas, 2 a 6) e a resposta |
+| Desejabilidade de várias respostas | as colunas dos fatores e, para cada resposta, a coluna, o objetivo (maximizar, minimizar ou chegar no alvo), os limites e a importância |
 | Igualdade de variâncias (Levene com a mediana e Bartlett) | coluna dos valores e coluna dos grupos |
 | Kruskal-Wallis e teste da mediana de Mood | coluna dos valores e coluna dos grupos |
 | Friedman | coluna dos valores, do tratamento e do bloco (um valor de cada tratamento em cada bloco) |
@@ -915,7 +916,20 @@ máximo; todos positivos, um mínimo; sinais trocados, uma sela (a resposta sobe
 desce noutra); um perto de zero, uma crista. Se o ponto cai fora da região do experimento, o
 veredito avisa que é extrapolação, e o ponto deve ser confirmado com novas corridas. Os
 gráficos são o |t| de cada termo e a resposta prevista ao longo de cada fator, com os outros
-no centro. O erro vem das réplicas, dos pontos centrais e dos termos
+no centro.
+
+Quando o mesmo experimento mede várias respostas (rendimento e custo, por exemplo), o melhor
+ponto de uma pode ser ruim para outra. "Desejabilidade de várias respostas" acha o meio-termo.
+Preencha cada resposta na sua coluna da planilha. Para cada uma, escolha o objetivo e os
+limites. **Maximizar** vai de inaceitável no limite inferior a ideal no superior;
+**minimizar** é o contrário; **chegar no alvo** é ideal no alvo e inaceitável fora dos
+limites. A **importância** (1 por padrão) pesa a resposta no total. O app ajusta um modelo de
+segunda ordem por resposta e procura, dentro da região do experimento, o ponto com a maior
+desejabilidade geral (a média geométrica das desejabilidades, de 0 a 1, de Derringer e
+Suich). O resultado traz o melhor ponto (codificado e nas unidades reais), a resposta prevista
+e a desejabilidade de cada uma, e o R² de cada modelo. Geral 0 quer dizer que nenhum ponto
+atende a todos os limites: o ponto mostrado é o que fica menos fora, e vale rever os limites
+ou o experimento. O erro vem das réplicas, dos pontos centrais e dos termos
 deixados fora do modelo; sem nenhum grau de liberdade para o erro, os valores-p vêm do pseudo
 erro padrão de Lenth. Os gráficos são o Pareto dos efeitos, os efeitos principais e um gráfico
 de interação para cada interação de dois fatores do modelo (linhas que se cruzam ou se abrem

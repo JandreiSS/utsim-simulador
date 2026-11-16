@@ -13,3 +13,16 @@ configuracoes-distribuicoes-ajuda = Vale per tutti i campi di distribuzione (tem
 configuracoes-fechar = Chiudi
 props-editar_como_texto = Modifica come codice (testo RON)
 props-editar_como_formulario = Torna al modulo
+
+## Painéis ao vivo em janela própria
+
+vivo-soltar = Finestra
+vivo-soltar-dica = Apre questo pannello in una finestra propria, che può andare su un altro monitor; resta in diretta
+vivo-prender = Indietro
+vivo-prender-dica = Chiude la finestra e rimette il pannello sopra la vista 3D
+vivo-janela-titulo = UTSim 3D: { $objeto }
+
+## Idioma
+
+configuracoes-idioma = Lingua
+configuracoes-idioma-ajuda = Per ora cambiano lingua solo la finestra Impostazioni e i pannelli dal vivo; le altre schermate restano in portoghese.

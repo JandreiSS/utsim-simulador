@@ -37,6 +37,8 @@ pub enum Passo {
     Atalhos,
     Desempenho,
     Ensino,
+    /// A live panel goes to a window of its own (its object).
+    JanelaVivo(String),
     Analisar(String),
     /// "Abrir no UTSim Qualidade / Segurança" of the node tabs: the app (`qualidade`,
     /// `seguranca`) and the node.
@@ -180,6 +182,10 @@ impl Passo {
                 "dialogo"
             }
             Atalhos => "atalhos",
+            JanelaVivo(s) => {
+                a.s = s.clone();
+                "vivo_janela"
+            }
             Desempenho => "desempenho",
             Ensino => "ensino",
             Analisar(s) => {
@@ -468,6 +474,7 @@ pub fn rotear(what: &str, st: &Estado) -> Vec<Passo> {
             }
         }
         "ensino" => Ensino,
+        "vivo_janela" => JanelaVivo(arg.into()),
         "resultados" => Resultados(arg.into()),
         "pert" => Pert(arg.into()),
         "form" => return formulario(arg),

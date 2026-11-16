@@ -624,6 +624,17 @@ peça sair da origem no fim do engate e entrar no destino no fim do desengate. U
 mais pesada que a capacidade sai da fila em `begin_trip`, é contada e não é transportada.
 A ponte não entra no piso como obstáculo nem nos roteadores.
 
+A altura do gancho vai para o rastro em `TraceEvent::Hoist { carrier, from, to, duration }`
+(altura do mundo). Um evento sem duração em `reset` marca o gancho em cima, e
+`crane_hoist`, `crane_raise` e, em `Parallel`, `crane_travel` gravam cada movimento.
+`utsim_model::exposure::load_tracks` remonta, do rastro, a posição do gancho e os
+intervalos com peça pendurada. Cada intervalo vai do `Moved` para dentro da ponte até o fim
+do último movimento do gancho começado antes do `Moved` para fora, ou seja, até a peça
+tocar o destino. `under_loads` amostra cada pessoa dentro do `LoadZone`, um quadrado de
+metade do lado `load_zone`, girado com o caminho. `Model::drive` grava o rastro e põe o
+resultado no relatório quando o modelo tem pontes e pessoas
+(`has_people_under_cranes`).
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)

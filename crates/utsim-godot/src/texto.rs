@@ -2,7 +2,7 @@
 //! of `idiomas/<código>/godot.ftl` (`docs/traducao.md`, round 8). The screens read them by
 //! [`tx`]; the GDScript side through the bridge.
 
-use utsim_idiomas::Catalogo;
+use utsim_idiomas::{Catalogo, Valor};
 
 /// The texts of UTSim 3D in the five languages, embedded from `idiomas/`.
 pub static TEXTOS: Catalogo = utsim_idiomas::catalogo!("godot");
@@ -10,6 +10,11 @@ pub static TEXTOS: Catalogo = utsim_idiomas::catalogo!("godot");
 /// The text of a key in the language of now.
 pub fn tx(chave: &'static str) -> &'static str {
     TEXTOS.t(chave)
+}
+
+/// The text of a key with named values.
+pub fn fx(chave: &str, args: &[(&str, Valor)]) -> String {
+    TEXTOS.f(chave, args)
 }
 
 #[cfg(test)]

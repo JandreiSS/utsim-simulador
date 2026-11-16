@@ -540,6 +540,8 @@ func _run_step(p: Dictionary) -> bool:
 				go.call()
 		"atalhos":
 			toggle_shortcuts()
+		"vivo_janela":
+			open_live_window(s)
 		"desempenho":
 			toggle_performance()
 		"ensino":
@@ -1650,6 +1652,56 @@ func document_model() -> Object:
 		return null
 	var m: Object = doc.as_model()
 	return m if m.is_loaded() else null
+
+
+# ---------------------------------------------------------------------------
+# Live panels in windows of their own
+# ---------------------------------------------------------------------------
+
+## The windows of the live panels taken out of the 3D view, by object.
+var live_windows := {}
+
+
+## Opens the live panel of `nome` in a window of its own (`UtsimPainelVivo`): a window of
+## the operating system, not embedded, so it can go to another monitor; it keeps being
+## updated with the clock. Without a display (the scripted tests) it is embedded.
+func open_live_window(nome: String) -> void:
+	if live_windows.has(nome):
+		(live_windows[nome] as Window).grab_focus()
+		return
+	var w := Window.new()
+	w.name = "JanelaVivo_%s" % nome.validate_node_name()
+	w.title = ui.live_window_title(nome)
+	w.size = Vector2i(440, 380)
+	w.min_size = Vector2i(320, 240)
+	var painel = ClassDB.instantiate("UtsimPainelVivo")
+	painel.setup(ui, nome)
+	w.add_child(painel)
+	w.close_requested.connect(func(): _close_live_window(nome, true))
+	painel.connect("fechada", func(): _close_live_window(nome, false))
+	live_windows[nome] = w
+	var root := get_tree().root
+	var native := DisplayServer.get_name() != "headless"
+	var embed := root.gui_embed_subwindows
+	if native:
+		# A real window only for this one: the dialogs stay as they are.
+		root.gui_embed_subwindows = false
+	root.add_child(w)
+	w.popup_centered()
+	if native:
+		root.gui_embed_subwindows = embed
+
+
+## Closes the window of the live panel of `nome`; `drop`: the user closed the window, so
+## the panel goes too.
+func _close_live_window(nome: String, drop: bool) -> void:
+	if not live_windows.has(nome):
+		return
+	var w: Window = live_windows[nome]
+	live_windows.erase(nome)
+	if drop and ui != null:
+		ui.live_close(nome)
+	w.queue_free()
 
 
 ## The actions of the "Analisar" menu and buttons.

@@ -232,6 +232,8 @@ As contas usam a mesma janela do relatório: do fim do aquecimento até o instan
 
 **Fixar** mantém o painel aberto, e o próximo clique abre outro ao lado (até três). O **×** fecha um painel, e **Esc** fecha o mais recente, o não fixado primeiro. Voltar ao Editar ou abrir outro modelo fecha todos; simular de novo o mesmo modelo mantém os painéis.
 
+**Janela** leva o painel para uma janela própria do sistema, que pode ir para outro monitor. Ele continua ao vivo, acompanhando o relógio, e dá para ter vários abertos assim ao mesmo tempo; eles não contam no limite de três sobre a vista e o **Esc** não os fecha. **Voltar** fecha a janela e devolve o painel para cima da vista 3D, e fechar a janela (ou o **×** do painel) fecha o painel. Voltar ao Editar ou abrir outro modelo fecha também essas janelas.
+
 ## Nomes das métricas
 
 Experimentos, otimização e testes referem-se às métricas por nome, no formato `objeto.métrica`:

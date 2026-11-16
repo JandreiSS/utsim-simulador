@@ -11,6 +11,19 @@ use serde::{Deserialize, Serialize};
 pub struct Preferencias {
     /// The distribution fields open as code (RON text) instead of the form.
     pub distribuicao_codigo: bool,
+    /// The language of the interface (`pt-BR`, `en`...); absent: the system's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idioma: Option<String>,
+}
+
+impl Preferencias {
+    /// The language to use: the saved one, else the system's ([`utsim_idiomas::Idioma::inicial`]).
+    pub fn lingua(&self) -> utsim_idiomas::Idioma {
+        self.idioma
+            .as_deref()
+            .and_then(utsim_idiomas::Idioma::de_codigo)
+            .unwrap_or_else(utsim_idiomas::Idioma::inicial)
+    }
 }
 
 impl Preferencias {
@@ -54,7 +67,9 @@ mod tests {
         assert!(!Preferencias::default().distribuicao_codigo);
         let p = Preferencias {
             distribuicao_codigo: true,
+            idioma: Some("en".into()),
         };
+        assert_eq!(p.lingua(), utsim_idiomas::Idioma::En);
         let t = serde_json::to_string(&p).unwrap();
         assert_eq!(serde_json::from_str::<Preferencias>(&t).unwrap(), p);
         // An older or partial file keeps the defaults for what it lacks.
