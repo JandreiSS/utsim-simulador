@@ -185,7 +185,7 @@ Numa planta com muitos objetos, o visualizador troca o que está longe por algo 
 - O corredor da empilhadeira num porta-paletes é sempre o lado `-y` dele.
 - Os tanques da rede de fluidos ainda usam o cilindro translúcido, não o modelo `tanque`.
 - No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá, e as pessoas aparecem como `operador_simples`.
-- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto. Quem trabalha junto no mesmo posto (operadores por peça) já fica lado a lado, a 0,7 m.
+- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto. Quem trabalha junto no mesmo posto (operadores por peça) já fica lado a lado, a 0,7 m, na frente da máquina. Os que não cabem na largura dela ficam nas laterais, um de cada lado, da frente para o fundo, virados para a máquina.
 - Não há animação de empurrar, dirigir ou sentar, e a pessoa com a caixa anda com o mesmo passo em qualquer velocidade (não há animação de correr carregando).
 
 ## Cena 3D para outros motores
