@@ -235,6 +235,7 @@ Sem campos. Escreva `kind: Sink`.
 | `motion` | `Safe` (ou `Sequential`, `Parallel`) |
 | `weight_label` | `"weight"` |
 | `home` | `false` |
+| `load_zone` | `2.0` (metade do lado da área sob a carga, m) |
 
 Precisa de `size` (curso da ponte, vão, altura útil). Veja [Ponte rolante](ponte-rolante.md).
 
