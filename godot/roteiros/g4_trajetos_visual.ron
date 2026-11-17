@@ -11,9 +11,12 @@ Model(
         (name: "lateral", kind: Conveyor(length: 4.0, speed: 0.6, item_length: 0.6,
             route: Some((nodes: [(at: (-2.0, -4.0, 0.8)), (at: (-2.0, 0.0, 0.8))], drive: Gravity))),
          position: (0.0, 0.0, 0.0)),
+        (name: "calha", kind: Conveyor(length: 4.0, speed: 3.0, item_length: 0.6,
+            route: Some((nodes: [(at: (-1.5, 0.0, 2.4)), (at: (1.5, 0.0, 0.6))], drive: Chute))),
+         position: (8.0, 4.0, 0.0)),
         (name: "saida", kind: Sink, position: (7.0, 9.0, 0.0)),
     ],
-    connections: [("chegada", "esteira"), ("esteira", "saida"), ("lateral", "saida")],
+    connections: [("chegada", "esteira"), ("esteira", "saida"), ("lateral", "saida"), ("calha", "saida")],
     aisles: [
         (name: "escada", kind: Pedestrian, points: [(-6.0, -6.0), (-1.0, -6.0), (2.0, -6.0), (6.0, -6.0)],
          width: 1.2, heights: [0.0, 2.4, 2.4, 0.0], stair: true),
