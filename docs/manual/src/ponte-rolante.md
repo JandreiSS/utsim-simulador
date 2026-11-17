@@ -91,9 +91,28 @@ passe pela outra (anticolisão). Use uma ponte por caminho de rolamento.
 
 ## Operador
 
-Por ora, a ponte é operada da cabine: o operador não é modelado como pessoa. A operação
-por botoeira, com uma pessoa da equipe que acompanha a carga a pé e limita a velocidade
-da ponte à dela, vem numa próxima etapa.
+O campo `operator` (`operador`) diz quem opera a ponte:
+
+- `Cabin` (`Cabine`, o padrão): da cabine. O operador não é modelado como pessoa.
+- `Pendant(team: "operadores")` (`Botoeira(equipe: ...)`): uma pessoa da equipe opera a
+  botoeira e acompanha a carga a pé.
+- `Radio(team: "operadores")` (`Controle(equipe: ...)`): uma pessoa da equipe opera por
+  controle remoto, do ponto onde encontrou a ponte.
+
+A equipe é uma pessoa (`Transporter`) ou um `Dispatcher` só de pessoas. A cada transporte,
+a ponte pede uma pessoa à equipe assim que sai para buscar a peça. A pessoa anda até o
+ponto de pegar e para ao lado da carga, 1 m fora da área sob a carga (`load_zone`),
+atravessada ao caminho de rolamento. A ponte vai até a peça ao mesmo tempo e só engata
+quando a pessoa chega. O tempo de espera vai para `crane.operator_wait`.
+
+Com botoeira, a pessoa anda junto com a carga até o destino, sempre à mesma distância do
+gancho. Por isso ela nunca fica sob a carga. A viagem carregada nunca é mais rápida que
+a pessoa: o tempo é o maior entre o dos eixos e a distância no piso dividida pela
+velocidade da pessoa mais lenta da equipe. Com rádio, a pessoa fica onde encontrou a ponte
+e a ponte anda na sua velocidade.
+
+A pessoa fica ocupada até a peça ser solta e o gancho voltar para cima. Esse trabalho não
+é intercalado com outros casos (multitarefa) nem interrompido por um pedido mais urgente.
 
 ## Campos
 
@@ -107,6 +126,7 @@ da ponte à dela, vem numa próxima etapa.
 | `weight_label` (`rotulo_peso`) | `"weight"` |
 | `home` (`volta`) | `false`: com `true`, volta à sua posição quando fica sem pedidos |
 | `load_zone` (`zona_carga`) | `2.0`: metade do lado, em metros, da área sob a carga; 0 ou mais |
+| `operator` (`operador`) | `Cabin`: ou `Pendant(team: ...)`, `Radio(team: ...)` (veja [Operador](#operador)) |
 
 A ponte precisa de `size`. Ela não opera postos (`operators.team` não pode ser uma ponte)
 e não tem perfil de pessoa.
@@ -119,6 +139,7 @@ e não tem perfil de pessoa.
 | `crane.refused` | peças recusadas por passarem da capacidade |
 | `crane.loaded_time` | tempo com uma peça pendurada no gancho |
 | `crane.bridge_time`, `crane.trolley_time`, `crane.hoist_time` | tempo em que cada eixo andou (com `Safe`, a ponte e o carro andam ao mesmo tempo) |
+| `crane.operator_wait` | com botoeira ou rádio: tempo parada no ponto de pegar, à espera da pessoa |
 | `tempo_sob_carga`, `entradas_sob_carga` | com pessoas no modelo: tempo e entradas de pessoas sob a carga desta ponte. As mesmas chaves aparecem em cada pessoa, somando todas as pontes |
 
 Os estados (`idle`, `travel_empty`, `travel_loaded`, `loading`, `unloading`) e a

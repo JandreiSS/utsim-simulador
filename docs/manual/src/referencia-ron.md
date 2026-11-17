@@ -236,6 +236,7 @@ Sem campos. Escreva `kind: Sink`.
 | `weight_label` | `"weight"` |
 | `home` | `false` |
 | `load_zone` | `2.0` (metade do lado da área sob a carga, m) |
+| `operator` | `Cabin` (ou `Pendant(team: ...)`, `Radio(team: ...)`) |
 
 Precisa de `size` (curso da ponte, vão, altura útil). Veja [Ponte rolante](ponte-rolante.md).
 
