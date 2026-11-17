@@ -25,6 +25,8 @@ utsim-assets.workspace = true
 utsim-look.workspace = true
 utsim-script.workspace = true
 utsim-opt.workspace = true
+# The texts in five languages (idiomas/*/editor.ftl) and the language picker of the top bar.
+utsim-idiomas = { workspace = true, features = ["egui"] }
 clap.workspace = true
 serde_json.workspace = true
 serde.workspace = true
