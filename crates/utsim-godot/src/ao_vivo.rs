@@ -55,7 +55,7 @@ impl Classe {
             "Sink" => Classe::Saida,
             "Source" => Classe::Chegada,
             "Transporter" if role == Some(MobileRole::Person) => Classe::Pessoa,
-            "Transporter" => Classe::Veiculo,
+            "Transporter" | "Crane" => Classe::Veiculo,
             _ => Classe::Outro,
         }
     }
@@ -716,6 +716,7 @@ impl AoVivo {
         let n = self.numeros_de(i, t);
         let tipo = match (b.classe, b.papel) {
             (Classe::Pessoa, _) => "pessoa".to_string(),
+            _ if b.kind == "Crane" => "ponte rolante".into(),
             (_, Some(MobileRole::Forklift)) => "empilhadeira".into(),
             (_, Some(MobileRole::Agv)) => "AGV".into(),
             (Classe::Veiculo, _) => "veículo".into(),
@@ -1036,7 +1037,7 @@ impl AoVivo {
                         "NoPosto",
                         "Trabalhando num posto",
                         pct(f(State::Utilize)),
-                        "Fração da janela operando um processo.",
+                        "Fração da janela operando um processo (ou uma ponte rolante pela botoeira ou pelo rádio).",
                     ));
                     linhas.push(linha(
                         "Descanso",
@@ -1064,6 +1065,14 @@ impl AoVivo {
                         ));
                     }
                 } else {
+                    if b.kind == "Crane" {
+                        linhas.push(linha(
+                            "EsperaOperador",
+                            "Esperando o operador",
+                            pct(f(State::WaitingOperator)),
+                            "Fração da janela parada na carga até a pessoa da botoeira ou do rádio chegar ao lado dela.",
+                        ));
+                    }
                     linhas.push(linha(
                         "Parado",
                         "Parado (quebra)",
@@ -1074,6 +1083,8 @@ impl AoVivo {
                 secoes.push(Secao {
                     titulo: if b.classe == Classe::Pessoa {
                         "Pessoa"
+                    } else if b.kind == "Crane" {
+                        "Ponte rolante"
                     } else {
                         "Veículo"
                     },
@@ -1419,6 +1430,40 @@ mod tests {
         );
         let erros = v.confere_todos();
         assert!(erros.is_empty(), "{erros:#?}");
+    }
+
+    #[test]
+    fn the_crane_panel_shows_the_wait_for_its_operator() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../godot/roteiros/g4_ponte_botoeira.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let v = AoVivo::new(&replay, Some(&model), |b| {
+            Some(utsim_scene::compose::role_of(
+                &replay.blocks[b].name,
+                Some(&model),
+            ))
+        });
+        assert!(v.confere_todos().is_empty(), "{:?}", v.confere_todos());
+        let l = v.leitura("ponte", replay.stop_time).expect("ponte");
+        assert_eq!(l.classe, Classe::Veiculo);
+        assert_eq!(l.tipo, "ponte rolante");
+        let secao = l
+            .secoes
+            .iter()
+            .find(|s| s.titulo == "Ponte rolante")
+            .unwrap();
+        let espera = secao
+            .linhas
+            .iter()
+            .find(|x| x.chave == "EsperaOperador")
+            .expect("the line of the wait");
+        assert_ne!(espera.valor, pct(0.0), "the crane waited for its operator");
+        assert!(l.numeros.fracao(State::WaitingOperator) > 0.0);
+        // The person at the pendant works (utilize) while running the crane.
+        let p = v.leitura("operador", replay.stop_time).expect("operador");
+        assert_eq!(p.classe, Classe::Pessoa);
+        assert!(p.numeros.fracao(State::Utilize) > 0.0);
     }
 
     #[test]

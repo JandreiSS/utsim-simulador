@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use utsim_assets::Spec;
-use utsim_model::Model;
 use utsim_model::replay::Replay;
+use utsim_model::{Model, ObjectDef, ObjectKind};
 use utsim_scene::compose::{ITEM_SIZE, turned};
 use utsim_scene::style::{self, Shape};
 use utsim_scene::{EntityId, EntityKind, LinkKind, MobileRole, Motion, Scene, SceneOptions};
@@ -438,6 +438,90 @@ pub const SIDE_GAP: f32 = 0.45;
 /// How far into the station (from the post's row) the first operator beside it stands.
 pub const SIDE_START: f32 = 0.6;
 
+/// Distance from the edge of the area under the load to the person at a crane's pendant
+/// or radio (`utsim_model`'s `OPERATOR_CLEARANCE`).
+const CRANE_CLEARANCE: f64 = 1.0;
+
+/// Per replay block, the spans (`utilize`) in which the person runs a crane from the
+/// floor (`operator: Pendant` or `Radio`). The trace does not say which task a person
+/// works on: a span of a member of the crane's team counts when, as the crane starts to
+/// hook a load, the person stands beside it, the clearance outside the area under the
+/// load (where the crane meets its operator).
+pub fn crane_operator_spans(model: &Model, replay: &Replay) -> Vec<Vec<(f64, f64)>> {
+    use utsim_core::{State, TraceEvent};
+    let n = replay.blocks.len();
+    let mut out = vec![Vec::new(); n];
+    let index = |name: &str| replay.blocks.iter().position(|b| b.name == name);
+    let mut states: Vec<Vec<(f64, State)>> = vec![Vec::new(); n];
+    // Per block: start, end and last point of each travel.
+    let mut travels: Vec<Vec<(f64, f64, [f64; 3])>> = vec![Vec::new(); n];
+    for r in &replay.records {
+        match &r.event {
+            TraceEvent::State { block, state } if *block < n => states[*block].push((r.t, *state)),
+            TraceEvent::Travel {
+                carrier,
+                path,
+                duration,
+            } if *carrier < n => {
+                if let Some(&end) = path.last() {
+                    travels[*carrier].push((r.t, r.t + duration, end));
+                }
+            }
+            _ => {}
+        }
+    }
+    // Where block `b` stands at `t` (`None` while it moves).
+    let at = |b: usize, t: f64| -> Option<[f64; 3]> {
+        let k = travels[b].partition_point(|tr| tr.0 <= t);
+        match k.checked_sub(1).map(|k| travels[b][k]) {
+            Some((_, end, p)) if t + 1e-9 >= end => Some(p),
+            Some(_) => None,
+            None => Some(replay.blocks[b].position),
+        }
+    };
+    for o in &model.objects {
+        let ObjectKind::Crane { operator, .. } = &o.kind else {
+            continue;
+        };
+        let (Some(team), Some(crane)) = (operator.team(), index(&o.name)) else {
+            continue;
+        };
+        let members: Vec<usize> = match model.objects.iter().find(|m| m.name == team) {
+            Some(ObjectDef {
+                kind: ObjectKind::Dispatcher { team, .. },
+                ..
+            }) => team.iter().filter_map(|m| index(m)).collect(),
+            Some(_) => index(team).into_iter().collect(),
+            None => Vec::new(),
+        };
+        let d = model.crane_load_zone(o).map_or(0.0, |z| z.half[1]) + CRANE_CLEARANCE;
+        let hooks: Vec<f64> = states[crane]
+            .iter()
+            .filter(|s| s.1 == State::Loading)
+            .map(|s| s.0)
+            .collect();
+        for m in members {
+            let list = &states[m];
+            for (k, &(start, s)) in list.iter().enumerate() {
+                if s != State::Utilize {
+                    continue;
+                }
+                let end = list.get(k + 1).map_or(f64::INFINITY, |x| x.0);
+                let beside = hooks.iter().filter(|&&a| start <= a && a < end).any(|&a| {
+                    match (at(m, a), at(crane, a)) {
+                        (Some(p), Some(c)) => ((p[0] - c[0]).hypot(p[1] - c[1]) - d).abs() < 0.3,
+                        _ => false,
+                    }
+                });
+                if beside {
+                    out[m].push((start, end));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// The floor box of a station (drawn index) for [`spread_at_posts`]: centre (Godot
 /// coordinates), half sizes along its own x and z, and its turn about `+Y`.
 pub type StationBox = ([f32; 3], [f32; 3], f32);
@@ -651,6 +735,9 @@ pub struct Playback {
     pub esperas: Vec<Option<Espera3d>>,
     /// Per drawn block, the overhead crane it is; `None` for the others.
     pub pontes: Vec<Option<Ponte3d>>,
+    /// Per replay block, when the person runs a crane from the floor (pendant or radio,
+    /// [`crane_operator_spans`]): then they stand beside the load, not at a post.
+    operando_ponte: Vec<Vec<(f64, f64)>>,
     /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
     /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
     vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
@@ -859,6 +946,7 @@ impl Playback {
             tampos: Vec::new(),
             esperas: Vec::new(),
             pontes: Vec::new(),
+            operando_ponte: model.map_or_else(Vec::new, |m| crane_operator_spans(m, replay)),
             vivo: std::sync::OnceLock::new(),
             rastro: std::sync::Mutex::new(None),
         }
@@ -1234,7 +1322,11 @@ impl Playback {
             );
         }
         let mut at_post = None;
-        if look.carry == Carry::Hands && p.motion == Motion::Working {
+        let at_crane = self
+            .operando_ponte
+            .get(b)
+            .is_some_and(|v| v.iter().any(|&(a, z)| a <= t && t < z));
+        if look.carry == Carry::Hands && p.motion == Motion::Working && !at_crane {
             let station = self.stations.iter().copied().find(|&st| {
                 [0, 2]
                     .iter()
@@ -1416,6 +1508,12 @@ impl Playback {
             } else {
                 v.name.clone()
             };
+            if v.kind == "Crane" && state == Some(utsim_core::State::WaitingOperator) {
+                shown.push_str(&format!(
+                    " · {}",
+                    style::state_label(Some(utsim_core::State::WaitingOperator))
+                ));
+            }
             if v.kind == "Source" {
                 // C7: the mode badge, and in a run the items created so far.
                 if !v.badge.is_empty() {
@@ -2339,6 +2437,78 @@ mod tests {
             "{}",
             f.label[q]
         );
+    }
+
+    #[test]
+    fn the_pendant_operator_stands_beside_the_load_and_the_crane_waits_for_them() {
+        use utsim_core::{State, TraceEvent};
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../godot/roteiros/g4_ponte_botoeira.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), true);
+        let k = pb.blocks.iter().position(|v| v.name == "ponte").unwrap();
+        let op = pb.blocks.iter().position(|v| v.name == "operador").unwrap();
+        let (crane, person) = (pb.blocks[k].b, pb.blocks[op].b);
+        let spans = &pb.operando_ponte[person];
+        assert!(spans.len() >= 2, "{spans:?}");
+        // The person far away: the crane waits at the first load, and says so.
+        let wait = replay
+            .records
+            .iter()
+            .find_map(|r| match r.event {
+                TraceEvent::State { block, state }
+                    if block == crane && state == State::WaitingOperator =>
+                {
+                    Some(r.t)
+                }
+                _ => None,
+            })
+            .expect("the crane waits for its operator");
+        let label = &pb.frame(wait + 0.5).label[k];
+        assert!(label.contains("aguardando operador"), "{label}");
+        assert!(!pb.frame(wait - 0.5).label[k].contains("aguardando"));
+        // Where the trace puts the person at `t` (moving or standing).
+        let trace_at = |t: f64| -> [f32; 3] {
+            let mut at = replay.blocks[person].position;
+            for r in &replay.records {
+                if r.t > t {
+                    break;
+                }
+                if let TraceEvent::Travel {
+                    carrier,
+                    path,
+                    duration,
+                } = &r.event
+                    && *carrier == person
+                {
+                    let u = if *duration > 0.0 {
+                        ((t - r.t) / duration).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    };
+                    let (a, b) = (path[0], *path.last().unwrap());
+                    at = std::array::from_fn(|i| a[i] + (b[i] - a[i]) * u);
+                }
+            }
+            to_godot(at.map(|v| v as f32))
+        };
+        // Running the crane, standing or walking with the load: where the trace says,
+        // never at the post of the station under the hook.
+        let mut walked = false;
+        for &(a, z) in spans.iter().take(3) {
+            let end = z.min(replay.stop_time);
+            for s in 1..40 {
+                let t = a + (end - a) * s as f64 / 40.0;
+                let f = pb.frame(t);
+                let want = trace_at(t);
+                let got = f.position[op];
+                let d = (got[0] - want[0]).hypot(got[2] - want[2]);
+                assert!(d < 0.05, "{t}: {got:?} vs {want:?}");
+                walked |= f.motion[op] == motion_code(Motion::Moving { speed: 0.0 }).0;
+            }
+        }
+        assert!(walked, "the pendant operator walks with the load");
     }
 
     #[test]

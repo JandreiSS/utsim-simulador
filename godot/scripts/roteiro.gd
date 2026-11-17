@@ -833,7 +833,7 @@ func _accept_dialog(path: String, k: int) -> void:
 ## asset the miniature shows), `foco` (name of the control with the keyboard focus) and
 ## `giro` ({objeto, graus, tolerancia}: how the block is turned as drawn, its root).
 ##
-## G4: `corredores` ({total, pedestre, empilhadeira, misto, cruzamentos}), `faixas` ({continuas_maior_que, zebras_maior_que, setas_maior_que}: polygons of the floor marking in the scene), `corredor` ({nome, tipo, largura, mao_dupla, pontos, perfil}: an aisle of the document), `corredor_selecionado` (name), `desenhando` (points of the aisle being drawn), `obstaculos_visiveis`, `acesso` ({objeto, proprio, x, y, tolerancia}: the access point of an object, model plan), `destaque` (names outlined), `campo_painel` ({objeto, caminho, valor}: a field of the properties schema; `objeto` "run" for the model) and `movel_em` ({objeto, t, x, y, tolerancia}: where a mobile is drawn at time `t`, a range `[min, max]` for `x` and `y`).
+## G4: `corredores` ({total, pedestre, empilhadeira, misto, cruzamentos}), `faixas` ({continuas_maior_que, zebras_maior_que, setas_maior_que}: polygons of the floor marking in the scene), `corredor` ({nome, tipo, largura, mao_dupla, pontos, perfil}: an aisle of the document), `corredor_selecionado` (name), `desenhando` (points of the aisle being drawn), `obstaculos_visiveis`, `acesso` ({objeto, proprio, x, y, tolerancia}: the access point of an object, model plan), `destaque` (names outlined), `campo_painel` ({objeto, caminho, valor}: a field of the properties schema; `objeto` "run" for the model) and `movel_em` ({objeto, t, x, y, tolerancia}: where a mobile is drawn at time `t`, a range `[min, max]` for `x` and `y`) and `rotulo` ({objeto, t, contem, nao_contem}: the 3D label of an object at time `t`).
 ##
 ## G3: `dados` ({campo, fonte, familia, familia_contem, n_maior_que, defasado, analisado}: the real data of a field, `objeto.campo`), `grafico_dados` ({controle, barras_maior_que, curva}: the mini histogram of a field), `rede` ({nos, trechos, controlados}), `no_posicao` ({no, x, y, tolerancia}), `texto` ({controle, contem}: the text of a
 ## label, rich text or field), `visivel` / `oculto` (control names), `replicacoes`
@@ -1086,6 +1086,16 @@ func _check(c: Dictionary, k: int) -> void:
 						report.call("x de %s em t=%s" % [want["objeto"], want["t"]], at.x >= float(want["x"][0]) and at.x <= float(want["x"][1]), "x = %.2f" % at.x)
 					if want.has("y"):
 						report.call("y de %s em t=%s" % [want["objeto"], want["t"]], -at.z >= float(want["y"][0]) and -at.z <= float(want["y"][1]), "y = %.2f" % -at.z)
+			"rotulo":
+				_main.seek(float(want["t"]), true)
+				var i: int = _main.cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0 and _main.cena.rigs[i].has("label"):
+					var text: String = (_main.cena.rigs[i]["label"] as Label3D).text
+					if want.has("contem"):
+						report.call("rótulo de %s em t=%s" % [want["objeto"], want["t"]], text.contains(String(want["contem"])), text)
+					if want.has("nao_contem"):
+						report.call("rótulo de %s em t=%s sem %s" % [want["objeto"], want["t"], want["nao_contem"]], not text.contains(String(want["nao_contem"])), text)
 			"no_posicao":
 				var found := false
 				for n in _main.editor.rede.net["nodes"]:
