@@ -940,6 +940,7 @@ mod tests {
                 base_dir: None,
                 abas: e.tab_fields(&name),
                 somente_leitura: None,
+                fadiga: Vec::new(),
                 simulado: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);
@@ -1000,6 +1001,7 @@ mod tests {
                 base_dir: None,
                 abas: e.tab_fields(&name),
                 somente_leitura: None,
+                fadiga: Vec::new(),
                 simulado: None,
             });
             let (meshes, _) = check_canvas(&mut h, size, 3);

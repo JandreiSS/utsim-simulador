@@ -1,0 +1,15 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Curva de fadiga da pessoa no painel de propriedades (fase P4): ana tem estudo de tempos do torno, método A, em cinco horários com uma pausa; o painel mostra as médias medidas, a curva ajustada (o mesmo ajuste de utsim pessoa ajustar) e a pausa sombreada, só leitura."},
+		{"abrir": "../../examples/pessoas_tempos_proprios.ron"},
+		{"clicar": {"objeto": "ana"}},
+		{"conferir": {"selecao": ["ana"], "visivel": ["Fadiga_Curva_0", "Fadiga_Grafico_0", "Fadiga_Resumo_0"]}},
+		{"conferir": {"texto": {"controle": "Fadiga_Curva_0", "contem": "torno"}}},
+		{"conferir": {"texto": {"controle": "Fadiga_Resumo_0", "contem": "λ"}}},
+		{"capturar": "g4_curva_fadiga_01_ana"},
+		{"nota": "bruno não tem estudo: o painel não mostra curva."},
+		{"clicar": {"objeto": "bruno"}},
+		{"conferir": {"selecao": ["bruno"], "oculto": ["Fadiga_Curva_0"]}}
+	]
+}

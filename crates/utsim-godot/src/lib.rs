@@ -79,6 +79,7 @@ pub mod ui_bar;
 pub mod ui_bottom;
 mod ui_class;
 pub mod ui_config;
+pub mod ui_fadiga;
 pub mod ui_fitwin;
 pub mod ui_flows;
 pub mod ui_form;

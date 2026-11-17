@@ -26,3 +26,18 @@ vivo-janela-titulo = UTSim 3D : { $objeto }
 
 configuracoes-idioma = Langue
 configuracoes-idioma-ajuda = Pour l’instant, seules la fenêtre Paramètres et les panneaux en direct changent de langue ; les autres écrans restent en portugais.
+
+## Curva de fadiga da pessoa
+
+fadiga-secao = Courbe de fatigue (étude des temps)
+fadiga-nota = Lecture seule. Les relevés et l’ajustement se modifient dans UTSim Estatística ou avec la commande utsim pessoa ajustar.
+fadiga-tarefa = Tâche { $tarefa } : { $leituras } relevés à { $horarios } horaires
+fadiga-tarefa-metodo = Tâche { $tarefa }, méthode { $metodo } : { $leituras } relevés à { $horarios } horaires
+fadiga-resumo = Reposée : { $t0 }. À la fatigue maximale, { $acrescimo } % de plus. Fatigue λ = { $lambda } par heure ; récupération μ = { $mu } par heure ({ $origem }).
+fadiga-estimada = estimée
+fadiga-padrao = par défaut
+fadiga-hora = heure du poste
+fadiga-pausa = Pause
+fadiga-curva = Courbe ajustée
+fadiga-media = Moyenne mesurée
+fadiga-erro = Non ajustée : { $erro }
