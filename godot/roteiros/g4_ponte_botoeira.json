@@ -1,0 +1,27 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Ponte rolante pela botoeira (G3): o operador começa longe; a ponte chega ao recebimento antes dele e espera (WaitingOperator), com o rótulo dizendo isso, enquanto ele anda até o ponto de encontro, 1 m fora da área sob a carga (3 m do gancho)."},
+		{"abrir": "g4_ponte_botoeira.ron"},
+		{"modo": "simular"},
+		{"conferir": {"rotulo": {"objeto": "ponte", "t": 1570.0, "nao_contem": "aguardando operador"}}},
+		{"conferir": {"rotulo": {"objeto": "ponte", "t": 1590.0, "contem": "aguardando operador"}}},
+		{"conferir": {"ponte3d": {"objeto": "ponte", "t": 1590.0, "gancho_entre": [5.9, 6.1], "longe_do_centro": true, "zona": false}}},
+		{"tempo": 1590.0},
+		{"focar": {"objeto": "recebimento", "distancia": 16.0, "giro": 0.6, "inclinacao": 0.4}},
+		{"capturar": "g4_ponte_botoeira_01_espera"},
+		{"nota": "Chegou: ele fica ao lado da carga, fora da área sob ela, enquanto o gancho desce e engata; a ponte já não espera."},
+		{"conferir": {"movel_em": {"objeto": "operador", "t": 1650.0, "x": [2.9, 3.1], "y": [-0.1, 0.1]}}},
+		{"conferir": {"rotulo": {"objeto": "ponte", "t": 1650.0, "nao_contem": "aguardando operador"}}},
+		{"nota": "Com a chapa suspensa, ele anda junto, ao lado dela, até o corte (o trecho carregado no passo dele)."},
+		{"conferir": {"movel_em": {"objeto": "operador", "t": 1790.0, "x": [7.7, 8.1], "y": [5.1, 5.5]}}},
+		{"conferir": {"ponte3d": {"objeto": "ponte", "t": 1790.0, "longe_do_centro": true, "zona": true}}},
+		{"tempo": 1790.0},
+		{"focar": {"objeto": "operador", "distancia": 14.0, "giro": 0.6, "inclinacao": 0.4}},
+		{"capturar": "g4_ponte_botoeira_02_junto"},
+		{"nota": "No corte, ele fica ao lado da carga enquanto ela desce, e não vai para o posto do operador do corte."},
+		{"conferir": {"movel_em": {"objeto": "operador", "t": 1850.0, "x": [13.9, 14.1], "y": [11.9, 12.1]}}},
+		{"tempo": 1850.0},
+		{"capturar": "g4_ponte_botoeira_03_corte"}
+	]
+}
