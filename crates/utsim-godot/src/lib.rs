@@ -79,6 +79,7 @@ pub mod ui_bar;
 pub mod ui_bottom;
 mod ui_class;
 pub mod ui_config;
+pub mod ui_fadiga;
 pub mod ui_fitwin;
 pub mod ui_flows;
 pub mod ui_form;
@@ -199,6 +200,20 @@ impl UtsimModel {
     #[func]
     fn is_replay(&self) -> bool {
         self.replay.is_some()
+    }
+
+    /// The floor's colour and the grid's on it (`[floor, grid]`, as
+    /// `UtsimDocument.floor_colors`) of the open replay: the colour of its model, the
+    /// default grey without one. Empty when no replay is open.
+    #[func]
+    fn replay_floor_colors(&self) -> PackedColorArray {
+        let Some(r) = self.replay.as_ref() else {
+            return PackedColorArray::new();
+        };
+        let floor = crate::grid::floor_color(r.floor_color.as_deref());
+        let grid = crate::grid::grid_color(floor);
+        let c = |v: [f32; 3]| Color::from_rgb(v[0], v[1], v[2]);
+        PackedColorArray::from(&[c(floor), c(grid)][..])
     }
 
     /// The statistics of the recorded replay, as a run of one replication.

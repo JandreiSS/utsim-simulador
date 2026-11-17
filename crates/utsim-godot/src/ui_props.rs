@@ -78,6 +78,8 @@ pub struct PropsView {
     pub somente_leitura: Option<String>,
     /// What the last run says about the object, by tab (`indicadores.rs`).
     pub simulado: Option<crate::ui_abas::Simulado>,
+    /// The fatigue curves of a person with a time study (`ui_fadiga`).
+    pub fadiga: Vec<crate::ui_fadiga::CurvaFadiga>,
 }
 
 /// What the user did in the panel.
@@ -326,6 +328,13 @@ fn contents(
         }
         if f.path == "output" {
             outputs(ui, reg, out, p);
+        }
+    }
+    if p.kind != "run" && !v.fadiga.is_empty() {
+        let title = crate::texto::tx("fadiga-secao");
+        section_header(ui, reg, st, title);
+        if !st.closed.contains(title) {
+            crate::ui_fadiga::show(ui, &v.fadiga, reg);
         }
     }
     if p.kind != "run" && !v.abas.is_empty() {
@@ -1930,6 +1939,7 @@ mod tests {
             base_dir: None,
             abas: e.tab_fields(object),
             somente_leitura: None,
+            fadiga: Vec::new(),
             simulado: None,
         }
     }

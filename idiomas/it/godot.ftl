@@ -26,3 +26,18 @@ vivo-janela-titulo = UTSim 3D: { $objeto }
 
 configuracoes-idioma = Lingua
 configuracoes-idioma-ajuda = Per ora cambiano lingua solo la finestra Impostazioni e i pannelli dal vivo; le altre schermate restano in portoghese.
+
+## Curva de fadiga da pessoa
+
+fadiga-secao = Curva di fatica (studio dei tempi)
+fadiga-nota = Sola lettura. Le letture e l’adattamento si modificano in UTSim Estatística o con il comando utsim pessoa ajustar.
+fadiga-tarefa = Compito { $tarefa }: { $leituras } letture in { $horarios } orari
+fadiga-tarefa-metodo = Compito { $tarefa }, metodo { $metodo }: { $leituras } letture in { $horarios } orari
+fadiga-resumo = Riposata: { $t0 }. Alla fatica massima, { $acrescimo } % in più. Fatica λ = { $lambda } all’ora; recupero μ = { $mu } all’ora ({ $origem }).
+fadiga-estimada = stimata
+fadiga-padrao = predefinita
+fadiga-hora = ora del turno
+fadiga-pausa = Pausa
+fadiga-curva = Curva adattata
+fadiga-media = Media misurata
+fadiga-erro = Non adattata: { $erro }

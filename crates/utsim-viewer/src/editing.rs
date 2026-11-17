@@ -515,6 +515,7 @@ pub fn empty_replay() -> Replay {
             blocks: Vec::new(),
         },
         fluids: None,
+        floor_color: None,
     }
 }
 

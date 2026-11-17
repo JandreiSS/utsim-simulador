@@ -58,6 +58,8 @@ pub struct UtsimUi {
     props_on: bool,
     /// The revision and object the cached view was built for.
     props_key: Option<(u64, String, Option<String>)>,
+    /// The fatigue curves last fitted, by object and its study (`ui_fadiga::chave`).
+    fadiga: Option<(String, Vec<crate::ui_fadiga::CurvaFadiga>)>,
     /// The texture of the miniature's `SubViewport` (owned by Godot, never freed here).
     miniature: Option<Rid>,
     /// The library icons: entry id to egui texture, and those textures to Godot's (owned
@@ -108,6 +110,7 @@ impl INode2D for UtsimUi {
             driver: -1,
             props_on: false,
             props_key: None,
+            fadiga: None,
             miniature: None,
             icons: HashMap::new(),
             user: HashMap::new(),
@@ -1728,6 +1731,18 @@ impl UtsimUi {
             },
             simulado: None,
             somente_leitura: notice,
+            fadiga: {
+                // Fitted again only when the study changes (the fit takes a moment).
+                let key = crate::ui_fadiga::chave(d.editor.model(), &self.object);
+                match &self.fadiga {
+                    Some((k, c)) if *k == key => c.clone(),
+                    _ => {
+                        let c = crate::ui_fadiga::curvas(d.editor.model(), &self.object);
+                        self.fadiga = Some((key, c.clone()));
+                        c
+                    }
+                }
+            },
         });
         if let Some(pv) = self.host.props.as_mut() {
             pv.simulado = simulated_view(self.indicadores.as_ref(), &self.object, &pv.abas);

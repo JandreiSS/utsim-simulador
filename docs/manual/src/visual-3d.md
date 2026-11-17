@@ -171,7 +171,7 @@ Em **Simular** (e a primeira pessoa também em Editar), o menu **Câmera** da ba
 - **Primeira pessoa:** `W`, `A`, `S`, `D` andam, `Shift` corre, a roda do mouse muda a velocidade (0,5 a 30 m/s; o controle "velocidade" do quadro no canto também). Segure o botão direito para olhar em volta, ou ligue **Travar o mouse** (tecla `L`) para olhar só movendo o mouse; `Esc` solta o mouse e, de novo, sai do modo. O chão é plano (a câmera fica sempre a 1,6 m) e os blocos são obstáculos: você desliza ao longo deles em vez de atravessá-los. Marcas no chão (áreas pintadas) podem ser pisadas. Em Editar, o mouse não edita enquanto você anda. No navegador não há trava do mouse; o botão direito olha em volta.
 - Cada modo guarda o que você ajustou (distância, velocidade, para onde olhava).
 - **Andar (UTSim 3D, no Simular):** a tecla `F` põe você dentro da fábrica, na altura dos olhos (1,7 m), de frente para o ponto que a órbita olhava. `W`, `A`, `S` e `D` andam e o mouse olha, com o cursor preso. `Shift` corre, `E` e `Q` (ou `Espaço` e `C`) sobem e passam a voar, e `V` alterna entre voar e voltar ao chão. A roda muda a velocidade, de 0,5 a 40 m/s. O clique na mira (o `+` no meio da vista) abre o painel ao vivo do que está à frente. `Esc` sai e devolve a câmera de antes, e `Home` sai e enquadra o modelo. Andando, você atravessa os objetos: não há colisão.
-- **Cor do chão (UTSim 3D):** no painel do modelo (nada selecionado), em Piso e corredores, ligue "Cor do chão" e escolha a cor. Ela fica gravada no modelo (`floor_marking.floor_color`), e a grade muda de tom para continuar visível.
+- **Cor do chão (UTSim 3D):** no painel do modelo (nada selecionado), em Piso e corredores, ligue "Cor do chão" e escolha a cor. Ela fica gravada no modelo (`floor_marking.floor_color`), e a grade muda de tom para continuar visível. O replay gravado leva essa cor junto (`floor_color`), e um replay aberto sozinho mostra o chão do seu modelo; um replay antigo, sem ela, mostra o cinza de sempre.
 - Seguir e Do recurso só existem em Simular, e só para recursos móveis (empilhadeiras, AGVs e pessoas).
 
 ## Modelos grandes (níveis de detalhe)
@@ -185,7 +185,7 @@ Numa planta com muitos objetos, o visualizador troca o que está longe por algo 
 - O corredor da empilhadeira num porta-paletes é sempre o lado `-y` dele.
 - Os tanques da rede de fluidos ainda usam o cilindro translúcido, não o modelo `tanque`.
 - No navegador, `visual.asset` com caminho de arquivo cai no modelo padrão. Só os nomes da biblioteca funcionam por lá, e as pessoas aparecem como `operador_simples`.
-- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto. Quem trabalha junto no mesmo posto (operadores por peça) já fica lado a lado, a 0,7 m.
+- Pessoas e veículos que esperam no mesmo objeto podem aparecer um dentro do outro, porque a simulação os põe no mesmo ponto. Quem trabalha junto no mesmo posto (operadores por peça) já fica lado a lado, a 0,7 m, na frente da máquina. Os que não cabem na largura dela ficam nas laterais, um de cada lado, da frente para o fundo, virados para a máquina.
 - Não há animação de empurrar, dirigir ou sentar, e a pessoa com a caixa anda com o mesmo passo em qualquer velocidade (não há animação de correr carregando).
 
 ## Cena 3D para outros motores

@@ -195,6 +195,13 @@ distribuições candidatas. Gravar regrava o modelo inteiro pelo editor, que man
 comentário do começo do arquivo, mas não os comentários do meio. Por isso, use
 `--saida` se o modelo tiver comentários que você quer manter.
 
+No UTSim 3D, ao selecionar uma pessoa com estudo, o painel de propriedades ganha a seção
+**Curva de fadiga (estudo de tempos)**. Para cada tarefa e método, ela traz um gráfico
+com a média medida em cada horário (pontos), a curva ajustada (linha, pelo mesmo ajuste do
+comando) e as pausas sombreadas. Embaixo do gráfico vêm `t0`, o acréscimo da fadiga, `λ` e
+`μ` (estimada ou padrão) e os avisos. A seção é só de leitura: as leituras e a gravação do
+ajuste ficam no UTSim Estatística ou no comando.
+
 ### Tempos próprios
 
 Com `times`, a pessoa tem o seu próprio tempo numa tarefa:

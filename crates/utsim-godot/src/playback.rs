@@ -433,25 +433,104 @@ impl Espera3d {
 /// piece), side by side across its post, metres.
 pub const POST_SPACING: f32 = 0.7;
 
+/// Gap between the side of a station and the operators who stand beside it, metres.
+pub const SIDE_GAP: f32 = 0.45;
+/// How far into the station (from the post's row) the first operator beside it stands.
+pub const SIDE_START: f32 = 0.6;
+
+/// The floor box of a station (drawn index) for [`spread_at_posts`]: centre (Godot
+/// coordinates), half sizes along its own x and z, and its turn about `+Y`.
+pub type StationBox = ([f32; 3], [f32; 3], f32);
+
 /// Operators at the same station (the drawn index each pose was put at) stand side by
 /// side across its post, in the order of the blocks, the middle of the row on the post:
-/// two operators per piece do not stand inside each other.
-fn spread_at_posts(poses: &mut [Option<(utsim_scene::MobilePose, Option<usize>)>]) {
+/// several operators per piece do not stand inside each other. The row holds as many as
+/// fit across the station (at least two); the others stand along its sides, one side and
+/// then the other, from the front to the back, facing it. `station` gives the floor box
+/// of a station; without it the row only grows.
+fn spread_at_posts(
+    poses: &mut [Option<(utsim_scene::MobilePose, Option<usize>)>],
+    station: impl Fn(usize) -> Option<StationBox>,
+) {
     let mut by: HashMap<usize, Vec<usize>> = HashMap::new();
     for (k, p) in poses.iter().enumerate() {
         if let Some((_, Some(st))) = p {
             by.entry(*st).or_default().push(k);
         }
     }
-    for list in by.values().filter(|l| l.len() > 1) {
-        let n = list.len() as f32;
-        for (r, &k) in list.iter().enumerate() {
+    for (&st, list) in by.iter().filter(|(_, l)| l.len() > 1) {
+        let Some((post, yaw)) = poses[list[0]].as_ref().map(|p| (p.0.position, p.0.yaw)) else {
+            continue;
+        };
+        let side = turned([0.0, 0.0, 1.0], yaw);
+        let geom = station(st);
+        // How far the station reaches across the post (from its middle).
+        let reach = geom.map(|(_, h, turn)| {
+            let (ax, az) = (turned([1.0, 0.0, 0.0], turn), turned([0.0, 0.0, 1.0], turn));
+            (side[0] * ax[0] + side[2] * ax[2]).abs() * h[0]
+                + (side[0] * az[0] + side[2] * az[2]).abs() * h[2]
+        });
+        let fit = reach.map_or(usize::MAX, |r| {
+            ((2.0 * r / POST_SPACING).floor() as usize + 1).max(2)
+        });
+        let front = list.len().min(fit);
+        // Where the station's middle is across the post (the post may be off it), and the
+        // way into the station, square to the row.
+        let (mid, into) = match geom {
+            Some((c, _, _)) => {
+                let (dx, dz) = (c[0] - post[0], c[2] - post[2]);
+                let mid = dx * side[0] + dz * side[2];
+                let (ix, iz) = (dx - mid * side[0], dz - mid * side[2]);
+                let len = (ix * ix + iz * iz).sqrt();
+                let into = if len > 1e-3 {
+                    [ix / len, 0.0, iz / len]
+                } else {
+                    turned([1.0, 0.0, 0.0], yaw)
+                };
+                (mid, into)
+            }
+            None => (0.0, [0.0; 3]),
+        };
+        // The row on the post, moved across only as needed to stay within the station.
+        let half_row = (front as f32 - 1.0) / 2.0 * POST_SPACING;
+        let centre = match reach {
+            Some(r) if half_row <= r => 0.0f32.clamp(mid - r + half_row, mid + r - half_row),
+            Some(_) => mid,
+            None => 0.0,
+        };
+        for (r, &k) in list.iter().take(front).enumerate() {
             if let Some((p, _)) = poses[k].as_mut() {
-                let off = (r as f32 - (n - 1.0) / 2.0) * POST_SPACING;
-                let side = turned([0.0, 0.0, 1.0], p.yaw);
+                let off = centre + (r as f32 - (front as f32 - 1.0) / 2.0) * POST_SPACING;
                 p.position[0] += side[0] * off;
                 p.position[2] += side[2] * off;
             }
+        }
+        let Some(reach) = reach else {
+            continue;
+        };
+        // The operator's own facing (its frame), to turn it towards the station's side.
+        let facing = turned(into, -yaw);
+        for (j, &k) in list.iter().skip(front).enumerate() {
+            let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+            let along = SIDE_START + POST_SPACING * (j / 2) as f32;
+            let Some((p, _)) = poses[k].as_mut() else {
+                continue;
+            };
+            let out = mid + sign * (reach + SIDE_GAP.max(half_row - reach));
+            p.position[0] = post[0] + side[0] * out + into[0] * along;
+            p.position[2] = post[2] + side[2] * out + into[2] * along;
+            // Facing the station: across, towards its middle.
+            let want = [-side[0] * sign, 0.0, -side[2] * sign];
+            let half_turn = std::f32::consts::FRAC_PI_2;
+            p.yaw = [yaw + half_turn, yaw - half_turn]
+                .into_iter()
+                .max_by(|a, b| {
+                    let fa = turned(facing, *a);
+                    let fb = turned(facing, *b);
+                    (fa[0] * want[0] + fa[2] * want[2])
+                        .total_cmp(&(fb[0] * want[0] + fb[2] * want[2]))
+                })
+                .unwrap_or(yaw);
         }
     }
 }
@@ -1203,6 +1282,13 @@ impl Playback {
             .map(|(_, i)| i)
     }
 
+    /// The floor box of station `i` (drawn index), for spreading its operators.
+    fn station_box(&self, i: usize) -> Option<StationBox> {
+        let b = self.blocks.get(i)?.b;
+        let s = &self.scene;
+        Some((*s.positions.get(b)?, s.geoms.get(b)?.half, s.turn(b)))
+    }
+
     /// Everything that changes at `t`.
     pub fn frame(&self, t: f64) -> FrameData {
         let s = &self.scene;
@@ -1224,7 +1310,7 @@ impl Playback {
                 _ => None,
             })
             .collect();
-        spread_at_posts(&mut drawn);
+        spread_at_posts(&mut drawn, |i| self.station_box(i));
         for (v, pose) in self.blocks.iter().zip(drawn) {
             let b = v.b;
             let state = s.timeline.block_state(b, t);
@@ -2371,19 +2457,86 @@ mod tests {
             assert!((f.yaw[m] - yaw).abs() < 1e-5);
         }
         let (c, d) = (f.position[carla], f.position[davi]);
-        // Across the post, the post in the middle.
+        // In a row across the post (on its line), both in front of the machine: the post
+        // is near its edge, so the pair slides towards its middle.
         let gap = ((c[0] - d[0]).powi(2) + (c[2] - d[2]).powi(2)).sqrt();
         assert!((gap - POST_SPACING).abs() < 1e-3, "{c:?} {d:?}");
-        let mid = [(c[0] + d[0]) / 2.0, (c[2] + d[2]) / 2.0];
-        assert!((mid[0] - post[0]).abs() < 1e-3 && (mid[1] - post[2]).abs() < 1e-3);
+        let side = turned([0.0, 0.0, 1.0], yaw);
+        let (sc, sh, sturn) = pb.station_box(cnc).unwrap();
+        let reach = {
+            let (ax, az) = (
+                turned([1.0, 0.0, 0.0], sturn),
+                turned([0.0, 0.0, 1.0], sturn),
+            );
+            (side[0] * ax[0] + side[2] * ax[2]).abs() * sh[0]
+                + (side[0] * az[0] + side[2] * az[2]).abs() * sh[2]
+        };
+        let across_mid = (sc[0] - post[0]) * side[0] + (sc[2] - post[2]) * side[2];
+        for q in [c, d] {
+            let (dx, dz) = (q[0] - post[0], q[2] - post[2]);
+            let across = dx * side[0] + dz * side[2];
+            let off_line =
+                ((dx - across * side[0]).powi(2) + (dz - across * side[2]).powi(2)).sqrt();
+            assert!(off_line < 1e-3, "on the post's row: {q:?}");
+            assert!(
+                (across - across_mid).abs() <= reach + 1e-3,
+                "in front of the machine"
+            );
+        }
         // One operator alone stays on the post.
         let mut one = vec![Some((
             pb.scene.mobile_at(pb.blocks[carla].b, 15.0).unwrap(),
             Some(cnc),
         ))];
         let before = one[0].unwrap().0.position;
-        spread_at_posts(&mut one);
+        spread_at_posts(&mut one, |i| pb.station_box(i));
         assert_eq!(one[0].unwrap().0.position, before);
+    }
+
+    #[test]
+    fn many_operators_per_piece_go_around_the_station() {
+        let pb = espera_dupla();
+        let cnc = index(&pb, "cnc_1");
+        let carla = index(&pb, "carla");
+        let pose = pb.scene.mobile_at(pb.blocks[carla].b, 15.0).unwrap();
+        let (post, yaw) = (pose.position, pose.yaw);
+        let (c, h, turn) = pb.station_box(cnc).unwrap();
+        let mut many = vec![Some((pose, Some(cnc))); 7];
+        spread_at_posts(&mut many, |i| pb.station_box(i));
+        let at: Vec<[f32; 3]> = many.iter().map(|p| p.unwrap().0.position).collect();
+        // Nobody inside another one, nobody inside the station.
+        for a in 0..at.len() {
+            for b in a + 1..at.len() {
+                let d = ((at[a][0] - at[b][0]).powi(2) + (at[a][2] - at[b][2]).powi(2)).sqrt();
+                assert!(d > POST_SPACING - 1e-3, "{a} {b}: {at:?}");
+            }
+            let l = turned([at[a][0] - c[0], 0.0, at[a][2] - c[2]], -turn);
+            assert!(
+                l[0].abs() > h[0] + 0.1 || l[2].abs() > h[2] + 0.1,
+                "{a} inside the station: {l:?} {h:?}"
+            );
+        }
+        // The row in front keeps the post's facing; the others are turned a quarter, to
+        // the station, and stand closer to its middle than the post across.
+        let front = many
+            .iter()
+            .filter(|p| (p.unwrap().0.yaw - yaw).abs() < 1e-5)
+            .count();
+        assert!((2..7).contains(&front), "{front}");
+        let side = turned([0.0, 0.0, 1.0], yaw);
+        for p in many.iter().map(|p| p.unwrap().0) {
+            if (p.yaw - yaw).abs() < 1e-5 {
+                continue;
+            }
+            assert!(((p.yaw - yaw).abs() - std::f32::consts::FRAC_PI_2).abs() < 1e-4);
+            // Beside the station, past its side, and towards the back.
+            let across = (p.position[0] - c[0]) * side[0] + (p.position[2] - c[2]) * side[2];
+            assert!(across.abs() > 0.4, "{across}");
+            let to_c = [c[0] - p.position[0], c[2] - p.position[2]];
+            let from_post = [c[0] - post[0], c[2] - post[2]];
+            let along = |v: [f32; 2]| v[0] * from_post[0] + v[1] * from_post[1];
+            assert!(along(to_c) < along(from_post), "towards the back");
+        }
     }
 
     #[test]

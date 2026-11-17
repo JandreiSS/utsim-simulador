@@ -1411,11 +1411,16 @@ func _update_shadows(lo: Vector3, hi: Vector3) -> void:
 	sun.directional_shadow_max_distance = camera.dist + (hi - lo).length() * 0.5 + 10.0
 
 
-## The floor in the model's colour, and the grid in a tone that stays visible on it.
+## The floor in the model's colour, and the grid in a tone that stays visible on it; a
+## replay opened alone has its model's colour, not the document's.
 func _apply_floor() -> void:
-	if doc == null or _ground == null:
+	if _ground == null:
 		return
-	var c: PackedColorArray = doc.floor_colors()
+	var c := PackedColorArray()
+	if playing_replay and model != null and model.is_replay():
+		c = model.replay_floor_colors()
+	elif doc != null:
+		c = doc.floor_colors()
 	if c.size() < 2:
 		return
 	(_ground.material_override as StandardMaterial3D).albedo_color = c[0]
