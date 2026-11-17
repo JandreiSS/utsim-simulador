@@ -9,9 +9,9 @@
 		{"tempo": 40.0},
 		{"focar": {"objeto": "fila", "distancia": 3.0, "giro": 0.6, "inclinacao": 0.45}},
 		{"capturar": "g4_espera_dupla_01_mesa"},
-		{"nota": "A Carla e o Davi trabalham juntos na peça: os dois no posto do CNC (y = -1,4), um de cada lado do ponto_operador (x = 2,85)."},
-		{"conferir": {"movel_em": {"objeto": "carla", "t": 15.0, "x": [2.45, 2.55], "y": [-1.45, -1.35]}}},
-		{"conferir": {"movel_em": {"objeto": "davi", "t": 15.0, "x": [3.15, 3.25], "y": [-1.45, -1.35]}}},
+		{"nota": "A Carla e o Davi trabalham juntos na peça: os dois no posto do CNC (y = -1,4), lado a lado na frente da máquina, a fileira puxada para dentro da largura dela (o ponto_operador fica a 0,85 m do meio)."},
+		{"conferir": {"movel_em": {"objeto": "carla", "t": 15.0, "x": [2.15, 2.25], "y": [-1.45, -1.35]}}},
+		{"conferir": {"movel_em": {"objeto": "davi", "t": 15.0, "x": [2.85, 2.95], "y": [-1.45, -1.35]}}},
 		{"tempo": 15.0},
 		{"focar": {"objeto": "cnc_1", "distancia": 4.5, "giro": 0.5, "inclinacao": 0.3}},
 		{"capturar": "g4_espera_dupla_02_dupla"}
