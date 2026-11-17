@@ -2761,7 +2761,7 @@
    8.5,
    7.75
   ],
-  "triangulos": 1204
+  "triangulos": 1252
  },
  "ponte_rolante_medio": {
   "arquivo": "ponte_rolante_medio.glb",
@@ -2869,7 +2869,7 @@
    8.5,
    7.75
   ],
-  "triangulos": 2516
+  "triangulos": 2380
  },
  "porta_paletes": {
   "arquivo": "porta_paletes.glb",
@@ -4360,5 +4360,261 @@
    1.6
   ],
   "triangulos": 1388
+ },
+ "ventilador_coluna": {
+  "arquivo": "ventilador_coluna.glb",
+  "clipes": {
+   "girar": {
+    "laco": true,
+    "nos": [
+     "helice"
+    ]
+   }
+  },
+  "dados": {
+   "altura": 1.2,
+   "diametro": 0.4,
+   "eixo": 1.0
+  },
+  "estados": {},
+  "minimo": [
+   -0.25,
+   -0.21,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "helice",
+   "ventilador_coluna"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.399,
+   0.42,
+   1.194
+  ],
+  "triangulos": 856
+ },
+ "ventilador_coluna_caixa": {
+  "arquivo": "ventilador_coluna_caixa.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho_caixa": [
+    0.48,
+    0.22,
+    0.5
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.242,
+   -0.114,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "ventilador_coluna_caixa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.484,
+   0.228,
+   0.502
+  ],
+  "triangulos": 164
+ },
+ "ventilador_coluna_caixa_medio": {
+  "arquivo": "ventilador_coluna_caixa_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho_caixa": [
+    0.48,
+    0.22,
+    0.5
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.242,
+   -0.114,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "ventilador_coluna_caixa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.484,
+   0.228,
+   0.502
+  ],
+  "triangulos": 276
+ },
+ "ventilador_coluna_medio": {
+  "arquivo": "ventilador_coluna_medio.glb",
+  "clipes": {
+   "girar": {
+    "laco": true,
+    "nos": [
+     "helice"
+    ]
+   }
+  },
+  "dados": {
+   "altura": 1.2,
+   "diametro": 0.4,
+   "eixo": 1.0
+  },
+  "estados": {},
+  "minimo": [
+   -0.26,
+   -0.21,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "helice",
+   "ventilador_coluna"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.42,
+   0.42,
+   1.2
+  ],
+  "triangulos": 1328
+ },
+ "ventilador_mesa": {
+  "arquivo": "ventilador_mesa.glb",
+  "clipes": {
+   "girar": {
+    "laco": true,
+    "nos": [
+     "helice"
+    ]
+   }
+  },
+  "dados": {
+   "altura": 0.44,
+   "diametro": 0.32,
+   "eixo": 0.28
+  },
+  "estados": {},
+  "minimo": [
+   -0.149,
+   -0.16,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "helice",
+   "ventilador_mesa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.243,
+   0.32,
+   0.434
+  ],
+  "triangulos": 816
+ },
+ "ventilador_mesa_caixa": {
+  "arquivo": "ventilador_mesa_caixa.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho_caixa": [
+    0.4,
+    0.24,
+    0.46
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.202,
+   -0.124,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "ventilador_mesa_caixa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.404,
+   0.248,
+   0.462
+  ],
+  "triangulos": 164
+ },
+ "ventilador_mesa_caixa_medio": {
+  "arquivo": "ventilador_mesa_caixa_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho_caixa": [
+    0.4,
+    0.24,
+    0.46
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.202,
+   -0.124,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "ventilador_mesa_caixa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.404,
+   0.248,
+   0.462
+  ],
+  "triangulos": 276
+ },
+ "ventilador_mesa_medio": {
+  "arquivo": "ventilador_mesa_medio.glb",
+  "clipes": {
+   "girar": {
+    "laco": true,
+    "nos": [
+     "helice"
+    ]
+   }
+  },
+  "dados": {
+   "altura": 0.44,
+   "diametro": 0.32,
+   "eixo": 0.28
+  },
+  "estados": {},
+  "minimo": [
+   -0.155,
+   -0.16,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "helice",
+   "ventilador_mesa"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.249,
+   0.32,
+   0.44
+  ],
+  "triangulos": 1288
  }
 }

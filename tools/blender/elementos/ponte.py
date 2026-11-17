@@ -5,6 +5,8 @@ Eixos: `+x` é o caminho de rolamento (a ponte anda em x), `y` é o vão (o carr
 um nó próprio, com a origem onde a escala não a tira do lugar (ver `docs/elementos_3d_blender.md`).
 """
 
+import math
+
 from comum import Elemento
 
 COMPRIMENTO = 12.0  # caminho de rolamento (x)
@@ -104,8 +106,8 @@ def ponte_rolante(detalhe=0):
     if d:  # passadiço com guarda-corpo ao longo da viga de trás
         xp = x0 - VIGA_X - 0.20
         e.caixa("ponte", "estrutura", (xp - 0.55, -V2 + 0.4, TRILHO + 0.60), (xp, V2 - 0.4, TRILHO + 0.63), chanfro=0)
-        for k in range(9):
-            y = (-V2 + 0.4) + k * (VAO - 0.8) / 8
+        for k in range(7):
+            y = (-V2 + 0.4) + k * (VAO - 0.8) / 6
             e.caixa("ponte", "amarelo", (xp - 0.55, y - 0.015, TRILHO + 0.63), (xp - 0.52, y + 0.015, TRILHO + 1.65), chanfro=0)
         for z in (TRILHO + 1.15, TRILHO + 1.65):
             e.caixa("ponte", "amarelo", (xp - 0.55, -V2 + 0.4, z - 0.02), (xp - 0.52, V2 - 0.4, z + 0.02), chanfro=0)
@@ -119,6 +121,11 @@ def ponte_rolante(detalhe=0):
     e.caixa("cabine", "amarelo", (x0 - 0.75, yc - 0.65, TRILHO - 1.95), (x0 + 0.75, yc + 0.65, TRILHO - 1.05), chanfro=None if d else 0)
     e.caixa("cabine", "vidro", (x0 - 0.73, yc - 0.63, TRILHO - 1.05), (x0 + 0.73, yc + 0.63, TRILHO - 0.25), chanfro=0)
     e.caixa("cabine", "amarelo", (x0 - 0.78, yc - 0.68, TRILHO - 0.25), (x0 + 0.78, yc + 0.68, TRILHO - 0.17), chanfro=0)
+    e.caixa("cabine", "preto", (x0 - 0.76, yc - 0.66, TRILHO - 1.10), (x0 + 0.76, yc + 0.66, TRILHO - 1.04), chanfro=0)  # peitoril
+    if d:  # painel de comando e banco, vistos pelo vidro
+        e.caixa("cabine", "painel", (x0 + 0.35, yc - 0.40, TRILHO - 1.05), (x0 + 0.65, yc + 0.40, TRILHO - 0.80), chanfro=0)
+        e.caixa("cabine", "borracha", (x0 - 0.45, yc - 0.22, TRILHO - 1.05), (x0 - 0.05, yc + 0.22, TRILHO - 0.95), chanfro=0)
+        e.caixa("cabine", "borracha", (x0 - 0.52, yc - 0.22, TRILHO - 1.05), (x0 - 0.44, yc + 0.22, TRILHO - 0.50), chanfro=0)
     for sx in (-1, 1):
         for sy in (-1, 1):
             x, y = x0 + sx * 0.72, yc + sy * 0.62
@@ -164,16 +171,29 @@ def ponte_rolante(detalhe=0):
                  x - 0.02, x + 0.02, eixo=0)
         e.caixa("gancho", "preto", (x + s * 0.02, y0 - 0.19, GANCHO_Z - 0.06), (x + s * 0.025, y0 + 0.19, GANCHO_Z + 0.02), chanfro=0)
     e.caixa("gancho", "aco_escuro", (x0 - 0.17, y0 - 0.06, GANCHO_Z - 0.32), (x0 + 0.17, y0 + 0.06, GANCHO_Z - 0.24), chanfro=0)
-    e.caixa("gancho", "aco_escuro", (x0 - 0.03, y0 - 0.03, GANCHO_Z - 0.44), (x0 + 0.03, y0 + 0.03, GANCHO_Z - 0.32), chanfro=0)
-    # O gancho em si: um C no plano yz, aberto para +y.
+    # O gancho em si: um C forjado no plano yz, aberto para a frente (+y) em cima. O fundo da
+    # sela (por dentro) é `ponto_gancho`; a haste desce do moitão até o topo do C.
     zg = GANCHO_Z - PONTO_GANCHO  # o fundo da sela, onde a carga apoia
-    if d:
-        perfil = [(0.00, 0.18), (0.00, 0.10), (-0.11, 0.06), (-0.13, -0.02), (-0.09, -0.09), (0.0, -0.12),
-                  (0.09, -0.09), (0.13, -0.01), (0.12, 0.05)]
-    else:
-        perfil = [(0.00, 0.18), (0.00, 0.10), (-0.12, 0.04), (-0.10, -0.08), (0.0, -0.12), (0.11, -0.06), (0.12, 0.05)]
-    for (ya, za), (yb2, zb) in zip(perfil, perfil[1:]):
-        e.barra("gancho", "amarelo", (x0, y0 + ya, zg + 0.08 + za), (x0, y0 + yb2, zg + 0.08 + zb), 0.045)
+    ri, ro = 0.10, 0.16
+    zc = zg + ri
+    n = 14 if d else 8
+    fora, dentro = [], []
+    for k in range(n + 1):
+        ang = math.radians(70.0 + 305.0 * k / n)
+        # A ponta afina no último trecho.
+        fino = 0.022 * max(0.0, k - (n - 2)) / 2
+        fora.append((y0 + (ro - fino) * math.cos(ang), zc + (ro - fino) * math.sin(ang)))
+        dentro.append((y0 + (ri + fino) * math.cos(ang), zc + (ri + fino) * math.sin(ang)))
+    meia = 0.035 if d else 0.03
+    # Um trecho por segmento: a tampa de um perfil em C inteiro não sai certa na exportação.
+    for k in range(n):
+        e.prisma("gancho", "aco_escuro", [fora[k], fora[k + 1], dentro[k + 1], dentro[k]], x0 - meia, x0 + meia, eixo=0)
+    e.caixa("gancho", "aco_escuro", (x0 - meia, y0 - 0.04, zc + ri), (x0 + meia, y0 + 0.04, GANCHO_Z - 0.32), chanfro=0)
+    e.caixa("gancho", "aco", (x0 - 0.05, y0 - 0.055, GANCHO_Z - 0.36), (x0 + 0.05, y0 + 0.055, GANCHO_Z - 0.32), chanfro=0)  # porca
+    if d:  # trava de segurança, da haste até a ponta
+        pa, pb = (y0 + 0.04, zc + ri + 0.03), (y0 + 0.118, zc + 0.045)
+        e.prisma("gancho", "amarelo", [pa, pb, (pb[0] + 0.008, pb[1] + 0.010), (pa[0] + 0.008, pa[1] + 0.010)],
+                 x0 - 0.012, x0 + 0.012, eixo=0)
     e.ponto("ponto_gancho", (x0, y0, zg), 0, pai="gancho")
 
     e.dados = {
