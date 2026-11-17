@@ -50,7 +50,7 @@ Arquivo › Exportar planilha em xlsx grava `estatistica/exportados/<nome>.xlsx`
 
 | Grupo | Análises |
 |---|---|
-| Estatística básica | descritiva, normalidade (Anderson-Darling), t de uma amostra, t de duas amostras (Welch ou variância combinada), t pareado, uma proporção, duas proporções, igualdade de variâncias (Levene e Bartlett), equivalência (TOST), intervalo de tolerância |
+| Estatística básica | descritiva, normalidade (Anderson-Darling), t de uma amostra, t de duas amostras (Welch ou variância combinada), t pareado, uma proporção, duas proporções, igualdade de variâncias (Levene e Bartlett), equivalência (TOST), intervalo de tolerância, transformação de Johnson |
 | ANOVA | um fator com as comparações de Tukey, dois fatores |
 | Não paramétricos | Mann-Whitney, Wilcoxon pareado, Kruskal-Wallis, mediana de Mood, Friedman |
 | Tabelas | qui-quadrado de independência, com as contagens observadas e esperadas |
@@ -71,6 +71,10 @@ O intervalo de confiança fala da média; o de tolerância fala das peças. Ele 
 
 - **Normal:** `x̄ ± k·s`, com o fator `k` exato para o tamanho da amostra. Serve quando os dados são normais; se o Anderson-Darling rejeita a normalidade (p < 0,05), o resultado avisa.
 - **Não paramétrico:** usa os próprios valores ordenados e vale para qualquer distribuição contínua. Pede mais dados: os extremos da amostra só chegam a 90 % de cobertura com 95 % de confiança a partir de 46 valores (dois lados) ou 29 (um lado). Com menos, o resultado mostra a confiança atingida e quantos valores faltam.
+
+### Transformação de Johnson
+
+Quando os dados não são normais e a conta pede a normal (capacidade, intervalo de tolerância normal, cartas), a transformação de Johnson leva os valores à normal. São três famílias: SU, sem limites; SB, limitada dos dois lados; e SL, a lognormal. O app escolhe a família e os parâmetros pelos quantis da amostra, testa cada candidata pelo Anderson-Darling e fica com a de maior p. O resultado mostra a fórmula com γ, η, ε e λ, o p antes e depois, os valores transformados e os gráficos de probabilidade normal antes e depois. Com p abaixo de 0,10 mesmo depois de transformar, use um método que não suponha a normal, como o intervalo de tolerância não paramétrico. São precisos ao menos 8 valores.
 
 ## Dados da simulação (menu Simulação)
 
@@ -156,4 +160,4 @@ O UTSim e o Seis Sigma podem pedir um experimento ao Estatística (pedido `plane
 
 ## O que vem depois
 
-O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, a transformação de Johnson, GLM, stepwise, regressão logística, confiabilidade com censura, assistente guiado e séries temporais.
+O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, GLM, stepwise, regressão logística, confiabilidade com censura, assistente guiado e séries temporais.
