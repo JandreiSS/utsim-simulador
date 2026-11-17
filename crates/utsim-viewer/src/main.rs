@@ -327,6 +327,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // A script finds buttons by their Portuguese labels, so it always runs in Portuguese;
+    // otherwise the language chosen in the top bar, or the system's.
+    if steps.is_some() {
+        utsim_idiomas::definir(utsim_idiomas::Idioma::PtBr);
+    } else if let Some(i) = utsim_viewer::texto::idioma_salvo() {
+        utsim_idiomas::definir(i);
+    }
     let transit = cli
         .transit
         .map_or(TransitSetting::Auto, TransitSetting::Fixed);

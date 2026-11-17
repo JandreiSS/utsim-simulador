@@ -160,68 +160,41 @@ pub fn paste_offset(n: u32) -> [f64; 3] {
     [k, -k, 0.0]
 }
 
-/// The keyboard and mouse shortcuts of `Editar`, as shown in the "Atalhos" window
-/// (shortcut, what it does).
+/// The keyboard and mouse shortcuts of `Editar`, as shown in the "Atalhos" window: the
+/// keys (in `editor.ftl`) of the shortcut and of what it does.
 pub const SHORTCUTS: [(&str, &str); 32] = [
-    ("Clique", "seleciona o bloco (ou remove a ligação clicada)"),
-    (
-        "Clique repetido no mesmo ponto",
-        "alterna entre os objetos sobrepostos (uma dica mostra qual está selecionado)",
-    ),
-    ("Shift + clique", "põe ou tira o bloco da seleção"),
-    (
-        "Shift + arrastar no chão",
-        "seleção por caixa (soma à seleção)",
-    ),
-    ("Arrastar um bloco", "move o bloco ou a seleção inteira"),
-    ("Arrastar no chão", "desloca a vista"),
-    ("Botão direito + arrastar", "gira a vista"),
-    ("Roda do mouse", "aproxima e afasta, em direção ao cursor"),
-    (
-        "Aba Objetos: clique, Shift + clique",
-        "seleciona, soma à seleção; o duplo clique enquadra o objeto",
-    ),
-    (
-        "Biblioteca: clique e clique no chão",
-        "coloca um objeto (Shift mantém a ferramenta)",
-    ),
-    (
-        "Biblioteca: arrastar até o chão",
-        "coloca um objeto onde soltar",
-    ),
-    ("Setas", "move a seleção um passo da grade"),
-    ("Del", "exclui a seleção"),
-    ("C", "liga o bloco selecionado ao próximo clicado"),
-    (
-        "Esc",
-        "cancela a ferramenta, fecha os diálogos e sai das câmeras seguir e primeira pessoa",
-    ),
-    ("F", "enquadra o modelo (volta à câmera em órbita)"),
-    (
-        "1, 2, 3, 4",
-        "câmera: órbita, seguir um recurso, primeira pessoa, do recurso",
-    ),
-    (
-        "W A S D",
-        "anda na primeira pessoa (Shift corre, a roda muda a velocidade)",
-    ),
-    ("L", "trava o mouse na primeira pessoa"),
-    ("F1", "mostra ou esconde esta janela"),
-    ("F3", "mostra ou esconde os tempos de quadro"),
-    ("F4", "liga ou desliga os níveis de detalhe"),
-    ("Ctrl + A", "seleciona todos os objetos"),
-    ("Ctrl + C", "copia a seleção"),
-    ("Ctrl + X", "recorta a seleção"),
-    (
-        "Ctrl + V",
-        "cola (nomes únicos, ligações internas preservadas)",
-    ),
-    ("Ctrl + D", "duplica a seleção"),
-    ("Ctrl + Z", "desfaz"),
-    ("Ctrl + Y ou Ctrl + Shift + Z", "refaz"),
-    ("Ctrl + S", "salva"),
-    ("Ctrl + Shift + S", "salva com outro nome (Salvar como)"),
-    ("Ctrl + N", "novo modelo"),
+    ("atalho-01-teclas", "atalho-01"),
+    ("atalho-02-teclas", "atalho-02"),
+    ("atalho-03-teclas", "atalho-03"),
+    ("atalho-04-teclas", "atalho-04"),
+    ("atalho-05-teclas", "atalho-05"),
+    ("atalho-06-teclas", "atalho-06"),
+    ("atalho-07-teclas", "atalho-07"),
+    ("atalho-08-teclas", "atalho-08"),
+    ("atalho-09-teclas", "atalho-09"),
+    ("atalho-10-teclas", "atalho-10"),
+    ("atalho-11-teclas", "atalho-11"),
+    ("atalho-12-teclas", "atalho-12"),
+    ("atalho-13-teclas", "atalho-13"),
+    ("atalho-14-teclas", "atalho-14"),
+    ("atalho-15-teclas", "atalho-15"),
+    ("atalho-16-teclas", "atalho-16"),
+    ("atalho-17-teclas", "atalho-17"),
+    ("atalho-18-teclas", "atalho-18"),
+    ("atalho-19-teclas", "atalho-19"),
+    ("atalho-20-teclas", "atalho-20"),
+    ("atalho-21-teclas", "atalho-21"),
+    ("atalho-22-teclas", "atalho-22"),
+    ("atalho-23-teclas", "atalho-23"),
+    ("atalho-24-teclas", "atalho-24"),
+    ("atalho-25-teclas", "atalho-25"),
+    ("atalho-26-teclas", "atalho-26"),
+    ("atalho-27-teclas", "atalho-27"),
+    ("atalho-28-teclas", "atalho-28"),
+    ("atalho-29-teclas", "atalho-29"),
+    ("atalho-30-teclas", "atalho-30"),
+    ("atalho-31-teclas", "atalho-31"),
+    ("atalho-32-teclas", "atalho-32"),
 ];
 
 /// Mobile resources are not wired by ports: the message shown when the user tries to
@@ -636,13 +609,15 @@ mod tests {
         assert_eq!(paste_offset(1), [2.0, -2.0, 0.0]);
         assert_eq!(paste_offset(3), [6.0, -6.0, 0.0]);
         assert_eq!(paste_offset(0), paste_offset(1));
-        let mut keys: Vec<&str> = SHORTCUTS.iter().map(|s| s.0).collect();
+        utsim_idiomas::definir_nesta_thread(Some(utsim_idiomas::Idioma::PtBr));
+        let mut keys: Vec<&str> = SHORTCUTS.iter().map(|s| crate::texto::tx(s.0)).collect();
         keys.sort();
         keys.dedup();
         assert_eq!(keys.len(), SHORTCUTS.len());
         for key in ["Ctrl + C", "Ctrl + V", "Ctrl + D", "Shift + clique", "F1"] {
-            assert!(SHORTCUTS.iter().any(|s| s.0 == key), "{key}");
+            assert!(keys.contains(&key), "{key}");
         }
+        utsim_idiomas::definir_nesta_thread(None);
     }
 
     #[test]

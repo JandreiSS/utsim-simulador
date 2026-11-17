@@ -1,6 +1,7 @@
 //! Every non-ASCII character that the panels put on screen must exist in egui's default
 //! fonts; a missing glyph is drawn as an empty box (the ✓ and ✗ of the optimisation tab
-//! were). The scan reads the source files, so a new symbol in a label is caught here.
+//! were). The scan reads the source files and the `editor.ftl` of every language, so a new
+//! symbol in a label is caught here.
 
 use std::path::Path;
 
@@ -51,6 +52,18 @@ fn every_symbol_drawn_by_the_panels_has_a_glyph() {
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
         &mut found,
     );
+    // The texts of the panels in every language (`idiomas/<código>/editor.ftl`).
+    let idiomas = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../idiomas");
+    for entry in std::fs::read_dir(&idiomas).unwrap() {
+        let path = entry.unwrap().path().join("editor.ftl");
+        let text = std::fs::read_to_string(&path).unwrap();
+        let name = path.display().to_string();
+        for line in text.lines().filter(|l| !l.trim_start().starts_with('#')) {
+            for c in line.chars() {
+                found.push((name.clone(), c));
+            }
+        }
+    }
     assert!(!found.is_empty());
     let mut missing: Vec<(String, char)> = Vec::new();
     ctx.fonts_mut(|fonts| {
