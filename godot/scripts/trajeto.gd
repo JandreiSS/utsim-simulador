@@ -906,7 +906,7 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": "Rampas de acesso nas pontas (1:12)", "action": "trajeto_rampas"})
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
-		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"]], "value": r["drive"], "action": "trajeto_acionamento"})
+		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"], ["Calha (escorrega)", "calha"]], "value": r["drive"], "action": "trajeto_acionamento"})
 		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
 	if sel_nodes.size() == 1:
 		var i := sel_nodes[0]
