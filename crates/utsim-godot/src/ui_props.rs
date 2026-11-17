@@ -333,8 +333,10 @@ fn contents(
     if p.kind != "run" && !v.fadiga.is_empty() {
         let title = crate::texto::tx("fadiga-secao");
         section_header(ui, reg, st, title);
-        if !st.closed.contains(title) {
-            crate::ui_fadiga::show(ui, &v.fadiga, reg);
+        if !st.closed.contains(title) && crate::ui_fadiga::show(ui, &v.fadiga, reg) {
+            out.push(PropAction::Aba(crate::ui_abas::AbaAcao::AbrirApp(
+                "estatistica".into(),
+            )));
         }
     }
     if p.kind != "run" && !v.abas.is_empty() {

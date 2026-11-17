@@ -10,6 +10,10 @@
 //! Each argument goes whole to the process (no shell), so spaces and accents need no
 //! quoting. The other app opens on its Modelo screen with the node selected and answers
 //! nothing; it takes the model's lock after the UTSim 3D lets it go.
+//!
+//! The UTSim Estatística opens a spreadsheet instead (`--utsim-abrir=<arquivo.csv>`): the
+//! readings of a person's time study, written by [`crate::ui_fadiga::csv`], with no node
+//! and no lock (it does not edit the model).
 
 use std::path::{Path, PathBuf};
 
@@ -18,6 +22,7 @@ use std::path::{Path, PathBuf};
 pub enum App {
     Qualidade,
     Seguranca,
+    Estatistica,
 }
 
 impl App {
@@ -25,6 +30,7 @@ impl App {
         match nome {
             "qualidade" => Some(App::Qualidade),
             "seguranca" => Some(App::Seguranca),
+            "estatistica" => Some(App::Estatistica),
             _ => None,
         }
     }
@@ -34,6 +40,7 @@ impl App {
         match self {
             App::Qualidade => "qualidade",
             App::Seguranca => "seguranca",
+            App::Estatistica => "estatistica",
         }
     }
 
@@ -42,6 +49,7 @@ impl App {
         match self {
             App::Qualidade => "utsim-qualidade",
             App::Seguranca => "utsim-seguranca",
+            App::Estatistica => "utsim-estatistica",
         }
     }
 
@@ -49,6 +57,7 @@ impl App {
         match self {
             App::Qualidade => "UTSim Qualidade",
             App::Seguranca => "UTSim Segurança do Trabalho",
+            App::Estatistica => "UTSim Estatística",
         }
     }
 }
@@ -106,6 +115,19 @@ pub fn argumentos(padrao: &[String], modelo: &Path, no: &str) -> Vec<String> {
     a
 }
 
+/// Opens `app` on a data file (`--utsim-abrir=<arquivo>`, no node): the UTSim
+/// Estatística with a spreadsheet. Does not wait.
+pub fn abrir_arquivo(app: App, arquivo: &Path) -> Result<(), String> {
+    let (exe, mut args, dir) = localizar(app).ok_or_else(|| falta(app))?;
+    args.push(format!("--utsim-abrir={}", arquivo.display()));
+    std::process::Command::new(&exe)
+        .args(args)
+        .current_dir(dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Não consegui abrir {}: {e}", exe.display()))
+}
+
 /// What is missing, said to the user.
 pub fn falta(app: App) -> String {
     format!(
@@ -141,6 +163,8 @@ mod tests {
             ]
         );
         assert_eq!(App::de("seguranca"), Some(App::Seguranca));
+        assert_eq!(App::de("estatistica"), Some(App::Estatistica));
+        assert_eq!(App::Estatistica.programa(), "utsim-estatistica");
         assert_eq!(App::de("x"), None);
         assert!(falta(App::Qualidade).contains("UTSim Qualidade"));
     }

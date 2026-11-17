@@ -13,6 +13,9 @@
 		{"capturar": "trajetos_visual_escada"},
 		{"camera": {"alvo": [0, 6], "distancia": 7.0, "giro": 0.3, "inclinacao": 0.35}},
 		{"esperar": 5},
-		{"capturar": "trajetos_visual_subida"}
+		{"capturar": "trajetos_visual_subida"},
+		{"camera": {"alvo": [8, 4], "distancia": 6.0, "giro": 0.5, "inclinacao": 0.4}},
+		{"esperar": 5},
+		{"capturar": "trajetos_visual_calha"}
 	]
 }
