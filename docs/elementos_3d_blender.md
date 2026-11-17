@@ -398,3 +398,23 @@ onde as peças ficam: a altura do apoio e a área livre `[x, y]`, centrada na or
 
 O teste `as_esperas_dizem_onde_as_pecas_ficam` confere que as áreas e as alturas cabem em
 cada elemento.
+
+## Produtos de exemplo: ventiladores
+
+Dois produtos para os enunciados do Ensino (e, se for o caso, como peça no simulador), em
+escala real (`tools/blender/elementos/produtos.py`). Frente em `+x`, origem no chão, no centro
+da base.
+
+| Arquivo | Tamanho | Nós | Clipe |
+|---|---|---|---|
+| `ventilador_mesa` | 0,44 m de altura, grade de 0,32 m | `corpo` (base, haste, motor e grade) e `helice` | `girar` (laço): a hélice dá uma volta em torno de x |
+| `ventilador_coluna` | 1,20 m de altura, grade de 0,40 m | `corpo` e `helice` | `girar` |
+| `ventilador_mesa_caixa` | caixa de 0,40 × 0,24 × 0,46 m | `corpo` | — |
+| `ventilador_coluna_caixa` | caixa de 0,48 × 0,22 × 0,50 m (o ventilador vai desmontado) | `corpo` | — |
+
+`dados` do ventilador: `altura`, `diametro` (da grade) e `eixo` (a altura do eixo da hélice).
+`dados.tamanho_caixa` da caixa embalada: `[x, y, z]`. A caixa é de papelão com fita, uma faixa
+azul e o desenho do ventilador nas duas faces largas. Cada arquivo tem também o `_medio`.
+
+O teste `os_ventiladores_tem_escala_real_e_cabem_na_caixa` confere as alturas, o eixo da
+hélice e o tamanho das caixas.

@@ -408,6 +408,10 @@ const CONTRATO: &[Contrato] = &[
         &["ponto_gancho", "ponto_operador"],
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
+    ("ventilador_mesa", &["corpo", "helice"], &[], &["girar"]),
+    ("ventilador_coluna", &["corpo", "helice"], &[], &["girar"]),
+    ("ventilador_mesa_caixa", &["corpo"], &[], &[]),
+    ("ventilador_coluna_caixa", &["corpo"], &[], &[]),
     ("estante_espera", &["estrutura"], &[], &[]),
     (
         "espera_chao",
@@ -1084,6 +1088,45 @@ fn as_esperas_dizem_onde_as_pecas_ficam() {
         for k in 0..2 {
             let a = area[k].as_f64().unwrap() as f32;
             assert!((a + 2.0 * faixa - tam[k]).abs() < 1e-3, "chão, eixo {k}");
+        }
+    }
+}
+
+#[test]
+fn os_ventiladores_tem_escala_real_e_cabem_na_caixa() {
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        for (nome, altura) in [("ventilador_mesa", 0.45), ("ventilador_coluna", 1.2)] {
+            let item = &cat[&format!("{nome}{sufixo}")];
+            let tam = v3(&item["tamanho"]);
+            assert!((tam[2] - altura).abs() < 0.02, "{nome}: altura {}", tam[2]);
+            // A hélice fica no eixo dito, dentro da grade, e o diâmetro é o da grade.
+            let d = &item["dados"];
+            let eixo = d["eixo"].as_f64().unwrap() as f32;
+            let diametro = d["diametro"].as_f64().unwrap() as f32;
+            assert!(
+                (tam[2] - (eixo + diametro / 2.0)).abs() < 0.01,
+                "{nome}: topo da grade"
+            );
+            let g = Glb::ler(&format!("{nome}{sufixo}.glb"));
+            let h = g.pose(None, false)["helice"];
+            assert!(
+                h[1].abs() < 1e-4 && (h[2] - eixo).abs() < 1e-4,
+                "{nome}: hélice em {h:?}"
+            );
+            // Embalado, é uma caixa de papelão que cabe nos braços (o de coluna vai desmontado).
+            let caixa = &cat[&format!("{nome}_caixa{sufixo}")];
+            let c = v3(&caixa["tamanho"]);
+            assert!(
+                c.iter().all(|v| *v > 0.2 && *v < 0.6),
+                "{nome}: caixa {c:?}"
+            );
+            if nome == "ventilador_mesa" {
+                assert!(
+                    c[2] >= tam[2] && c[0] >= diametro,
+                    "{nome}: não cabe na caixa"
+                );
+            }
         }
     }
 }
