@@ -60,6 +60,7 @@ pub fn drive_name(d: BeltDrive) -> &'static str {
     match d {
         BeltDrive::Powered => "motorizada",
         BeltDrive::Gravity => "gravidade",
+        BeltDrive::Chute => "calha",
     }
 }
 
@@ -1184,6 +1185,7 @@ impl Editor {
         let d = match drive {
             "motorizada" => BeltDrive::Powered,
             "gravidade" => BeltDrive::Gravity,
+            "calha" => BeltDrive::Chute,
             _ => return Err(format!("acionamento desconhecido: {drive}")),
         };
         self.edit_route(name, |r, _| r.drive = d)
