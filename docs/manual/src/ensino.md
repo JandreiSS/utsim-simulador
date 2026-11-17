@@ -37,7 +37,7 @@ Nos atos 1 a 3 o aluno só decide com alavancas. Nos atos 4 e 5 ele monta peças
 
 A tela da missão tem, de cima para baixo:
 
-1. **Enunciado**, com os conceitos da missão (o glossário explica cada um).
+1. **Enunciado**, com os conceitos da missão (o glossário explica cada um). Nas missões que já têm o enunciado desenhado, ele começa com a cena do processo em 3D, feita com os mesmos elementos do simulador: estações, operadores, esperas e peças. Os números do problema ficam presos ao objeto de que falam: a carga de cada estação (uma por modelo, numa linha de modelos mistos, em vermelho quando passa do takt), a alavanca escolhida, a meta na saída e a pergunta de previsão. Os números acompanham as decisões: ao arrastar uma tarefa, a carga da estação muda no desenho. Depois de simular, a saída mostra o valor simulado, com borda verde quando bate a meta e vermelha quando não bate. Acima da cena ficam o takt e a parcela de cada modelo.
 2. **Medições do estado atual**, em algumas missões. O botão roda a fábrica como está e mostra as medidas pedidas, com intervalo.
 3. **Previsão**. Antes de simular, o aluno responde (qual é o gargalo, quanto vai dar a fila). A previsão vale pontos e fica travada depois da primeira rodada.
 4. **Decisões**, as alavancas da missão, com o custo de cada uma e o orçamento.
