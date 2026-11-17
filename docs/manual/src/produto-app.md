@@ -64,7 +64,9 @@ A casa é desenhada inteira e se edita clicando nela:
   barras, a ordem (a primeira em destaque) e a dificuldade técnica (clique nos pontinhos).
 
 Clicar numa necessidade ou numa característica abre embaixo o quadro para editar o texto, a
-unidade, o alvo e a dificuldade. Uma necessidade sem relação média ou forte ganha um "!"
+unidade, o alvo e a dificuldade. **Arraste** o nome de uma necessidade para cima ou para baixo,
+ou o de uma característica técnica para os lados, para mudar a ordem: a linha colorida mostra onde
+ela entra, e a relação, o telhado e as notas vão junto. Uma necessidade sem relação média ou forte ganha um "!"
 amarelo; uma característica sem nenhuma relação fica em amarelo. "Trazer requisitos do
 cliente" cria uma linha por requisito do cliente, e "Ver um exemplo" monta uma casa pronta.
 
@@ -100,6 +102,9 @@ próprio em uma variante.
 
 Nas **Características**, cada medida tem nominal, LIE, LSE, unidade, classe e a operação onde
 nasce. O desvio é o do processo esperado; zero quer dizer um oitavo da tolerância (Cp 1,33).
+A coluna **Cpk** mostra o último estudo de capacidade que voltou do UTSim Qualidade: verde de
+1,33 para cima, amarelo de 1,00 a 1,33 e vermelho abaixo de 1,00. Passe o ponteiro para ver o
+histórico com o Cp, o Cpk, o Pp e o Ppk.
 
 ## Para a simulação
 
@@ -126,12 +131,49 @@ app avisa).
   --utsim-no=<nó>`, ou um pedido `--utsim-pedido` com o modelo e o nó), o app abre esse
   projeto na tela Roteiros, no item cujo roteiro passa pelo recurso do nó. Um pedido que pede
   resposta é respondido quando o app fecha: concluído, ou o que impediu.
-- **Das características para a Qualidade.** Na tela Características, o botão "Qualidade" de
-  uma característica medida numa operação abre o UTSim Qualidade no processador dessa
-  operação, no último modelo gerado ou atualizado. Sem modelo ainda, o botão fica apagado e
+- **Das características para a Qualidade, e de volta.** Na tela Características, o botão
+  "Qualidade" de uma característica medida numa operação abre o UTSim Qualidade no
+  processador dessa operação, no último modelo gerado ou atualizado, pedindo o estudo de
+  capacidade dela. Enquanto a Qualidade está aberta, a coluna Cpk diz "aguardando…". Ao
+  fechar a Qualidade, o Cp e o Cpk voltam para a característica (mesmo que o Desenvolvimento
+  de Produto tenha sido fechado e aberto no meio). Sem modelo ainda, o botão fica apagado e
   diz o que fazer.
+- **Modelo ligado.** A tela Para a simulação mostra o modelo ligado (o último gerado ou
+  atualizado). Quando a estrutura, os roteiros ou as características mudam depois, ela avisa
+  que o modelo ficou para trás e oferece "Atualizar o modelo ligado".
 - **Datas.** Os campos de data aceitam `AAAA-MM-DD` ou `DD/MM/AAAA` e ficam com a borda
   vermelha quando a data não existe ou, no fim de uma fase, vem antes do início.
+
+## Trabalho em equipe
+
+Várias pessoas podem editar o mesmo projeto ao mesmo tempo, cada uma no seu computador, com
+a pasta do projeto no Google Drive (ou outra pasta sincronizada):
+
+- Cada gravação vira um arquivo novo na pasta `diario`, com as mudanças daquela pessoa,
+  assinado com a chave do computador dela. Ninguém escreve por cima do arquivo de outra
+  pessoa, então a sincronização nunca cria cópias em conflito.
+- A cada poucos segundos o app junta as gravações de todos. Duas pessoas mexendo em coisas
+  diferentes, ou em campos diferentes da mesma coisa, ficam as duas; no mesmo campo, vale a
+  gravação mais recente. Dois requisitos criados ao mesmo tempo com o mesmo código ganham
+  códigos diferentes sozinhos.
+- A tela **Equipe › Diário** mostra quem grava neste projeto (com a chave de cada um), se
+  tudo confere e a linha das gravações, com o que cada uma mudou. Uma gravação mexida fora do
+  app, ou com assinatura que não confere, fica de fora e aparece em vermelho.
+- A chave fica no perfil de cada pessoa (`produto_chave_assinatura.txt`, ao lado da
+  configuração), nunca na pasta do projeto.
+
+Um projeto feito numa versão anterior ganha o diário na primeira vez que é aberto. Depois
+disso, a versão anterior do app não o abre mais: atualize pelo launcher.
+
+### Assinaturas dos portões
+
+Na tela Fases e portões, um aprovador que marcou "aprovou" e tem o mesmo nome escrito na
+abertura vê o botão **Assinar**: a aprovação fica selada com a chave dele. Quem decide um
+portão sela a decisão do mesmo jeito, e a linha do tempo mostra "assinada". Se a fase mudar
+depois (entregas, checklist, objetivo), a assinatura continua lá, em amarelo: "mudou depois".
+
+A assinatura revela uma alteração feita fora do app, mas não a impede, e não é assinatura
+digital com valor legal.
 
 ## Atalhos e exemplo
 
