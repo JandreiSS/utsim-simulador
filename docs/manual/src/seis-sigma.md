@@ -887,6 +887,17 @@ fatores mexem no Y e se eles agem juntos.
   todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
 - **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma
   ordem; rode na ordem sorteada para não confundir um fator com o que muda ao longo do dia.
+- **Blocos**: quando as corridas não cabem num dia, num lote de matéria-prima ou num turno,
+  divida o plano em blocos. O fatorial e a fração aceitam 2 ou 4 blocos; o app confunde os
+  blocos com as interações de ordem mais alta possível e diz quais são (num 2³ em dois
+  blocos, ABC). O composto central aceita 2 blocos: o fatorial com metade dos centros no
+  bloco 1, os axiais com a outra metade no bloco 2, e o rotacionável passa a usar o α que
+  deixa os blocos ortogonais ao modelo. O Box-Behnken e a triagem têm um bloco só. A
+  planilha ganha a coluna `bloco`, e a ordem sorteada fica dentro de cada bloco: rode um
+  bloco inteiro antes do seguinte. Na análise, a superfície e a desejabilidade põem um termo
+  por bloco (Bl1, Bl2…) e dão o ponto ótimo para a média dos blocos; o fatorial avisa com que
+  termos os blocos estão confundidos, porque um efeito grande ali pode ser só a diferença
+  entre os blocos.
 
 "Gravar a planilha de coleta" grava em `dados/` um CSV na ordem de execução, com a ordem
 padrão, as colunas codificadas `A`, `B`, `C`..., os níveis reais e a coluna da resposta vazia;
