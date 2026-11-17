@@ -8,8 +8,8 @@
 		{"conferir": {"texto": {"controle": "Fadiga_Curva_0", "contem": "torno"}}},
 		{"conferir": {"texto": {"controle": "Fadiga_Resumo_0", "contem": "λ"}}},
 		{"capturar": "g4_curva_fadiga_01_ana"},
-		{"nota": "bruno não tem estudo: o painel não mostra curva."},
-		{"clicar": {"objeto": "bruno"}},
-		{"conferir": {"selecao": ["bruno"], "oculto": ["Fadiga_Curva_0"]}}
+		{"nota": "o torno não é pessoa: o painel não mostra curva (bruno, sem estudo, fica no teste de unidade)."},
+		{"clicar": {"objeto": "torno"}},
+		{"conferir": {"selecao": ["torno"], "oculto": ["Fadiga_Curva_0"]}}
 	]
 }
