@@ -86,6 +86,12 @@ decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fa
 volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
 quem e a justificativa.
 
+O botão **Relatório do portão**, embaixo de cada fase, grava o relatório daquela fase na
+pasta `relatorios` do projeto, em HTML (abre no navegador) e em PDF: objetivo e datas, o que
+ainda falta no portão, as entregas, o checklist, os aprovadores com a situação da assinatura,
+as decisões tomadas naquele portão e uma linha por aprovador para assinar no papel. Cada
+clique grava um arquivo novo, com a data e a hora no nome.
+
 ## Estrutura, variantes e roteiros
 
 Na **Estrutura**, crie o produto e os itens (montagem, peça, matéria-prima, comprado) e
