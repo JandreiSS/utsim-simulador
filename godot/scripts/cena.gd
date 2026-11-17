@@ -200,7 +200,10 @@ func build(pb: Object, keep_templates := false) -> void:
 			root.add_child(asset)
 			rig["asset"] = asset
 			if b.get("sized", false) and not fell_back:
-				_fit_to_size(root, asset, b["size"])
+				# The floor frame (`espera_chao`) grows side by side, its stripes as thin as
+				# they are; every other element is stretched whole.
+				if not _fit_floor_frame(asset, b["size"]):
+					_fit_to_size(root, asset, b["size"])
 			if b.has("color") and not b.get("skeletal", false):
 				_tint_named(asset, "pintura", b["color"])
 			_bind(rig, asset)
@@ -815,6 +818,43 @@ func _box_in(frame: Node3D, node: Node) -> AABB:
 ## block (x length, y height, z width) to that box, standing on the floor at its centre.
 ## The asset turns under the root by quarter turns only, so the axes swap when it is
 ## turned sideways.
+## The marked floor area (`espera_chao`) at `size`, as the contract in
+## `docs/elementos_3d_blender.md` says: the outer edge of the frame is the edge of `size`
+## and each stripe keeps its width (`FLOOR_STRIPE`). `faixa_frente` and `faixa_fundo` grow
+## along x and go to the new front and back; `faixa_e` and `faixa_d` grow across and go to
+## the new sides. The items lie inside (`utsim_model::espera::places`). False when the
+## element is not the frame (it has not the four stripes).
+const FLOOR_STRIPE := 0.05
+const FLOOR_AREA := Vector2(1.2, 1.0)
+
+
+func _fit_floor_frame(asset: Node3D, size: Vector3) -> bool:
+	var nodes := {}
+	for name in ["faixa_frente", "faixa_fundo", "faixa_e", "faixa_d"]:
+		var n := asset.find_child(name, true, false) as Node3D
+		if n == null:
+			return false
+		nodes[name] = n
+	var sideways := absf(sin(asset.rotation.y)) > 0.7
+	# The size in the element's own frame (x along it, z across).
+	var sx := size.z if sideways else size.x
+	var sz := size.x if sideways else size.z
+	var f := FLOOR_STRIPE
+	var a := maxf(sx - 2.0 * f, 0.1)
+	var b := maxf(sz - 2.0 * f, 0.1)
+	for name in ["faixa_frente", "faixa_fundo"]:
+		var n: Node3D = nodes[name]
+		n.scale.x *= (a + 2.0 * f) / (FLOOR_AREA.x + 2.0 * f)
+		n.position.z = signf(n.position.z) * (b / 2.0 + f / 2.0)
+		n.position.x = 0.0
+	for name in ["faixa_e", "faixa_d"]:
+		var n: Node3D = nodes[name]
+		n.scale.z *= b / FLOOR_AREA.y
+		n.position.x = signf(n.position.x) * (a / 2.0 + f / 2.0)
+		n.position.z = 0.0
+	return true
+
+
 func _fit_to_size(root: Node3D, asset: Node3D, size: Vector3) -> void:
 	var box := _box_in(root, asset)
 	if box.size.x <= 1e-4 or box.size.y <= 1e-4 or box.size.z <= 1e-4:
