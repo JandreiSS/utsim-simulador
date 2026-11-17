@@ -22,6 +22,7 @@ import armazenagem  # noqa: E402
 import postos  # noqa: E402
 import ponte  # noqa: E402
 import trajeto  # noqa: E402
+import produtos  # noqa: E402
 import pessoas  # noqa: E402
 import clipes  # noqa: E402
 
@@ -47,6 +48,10 @@ ELEMENTOS = {
     "peca": armazenagem.peca,
     "palete": armazenagem.palete,
     "caixa": armazenagem.caixa,
+    "ventilador_mesa": produtos.ventilador_mesa,
+    "ventilador_coluna": produtos.ventilador_coluna,
+    "ventilador_mesa_caixa": produtos.ventilador_mesa_caixa,
+    "ventilador_coluna_caixa": produtos.ventilador_coluna_caixa,
 }
 
 DETALHES = {0: "", 1: "_medio"}
