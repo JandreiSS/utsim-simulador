@@ -943,6 +943,7 @@ pub fn edit_replay(model: &Model) -> Replay {
             blocks: Vec::new(),
         },
         fluids: model.fluids.clone(),
+        floor_color: model.marking().floor_color.clone(),
     }
 }
 
