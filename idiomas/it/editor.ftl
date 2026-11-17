@@ -1,3 +1,5 @@
+# Traduzione automatica, in attesa di revisione umana.
+# Tradução automática, aguardando revisão humana.
 # UTSim: l'editor del simulatore (base: barra, livelli, pannelli e dialoghi generali).
 
 ui-sem_observacoes = nessuna osservazione
