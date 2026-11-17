@@ -868,6 +868,14 @@ func _reload_from_disk() -> void:
 ## model is saved first (a new one asks where); then it opens on the node and edits the
 ## model, which the UTSim 3D reads again when it saves (`_check_disk`).
 func _open_in_app(app: String, node: String) -> void:
+	if app == "estatistica":
+		# Only the readings of the person's time study go, as a spreadsheet: no save and
+		# no lock handed over (the UTSim Estatística does not edit the model).
+		var err: String = doc.open_in_app(app, node)
+		set_status(err if err != "" else "Abrindo as leituras de %s no UTSim Estatística." % node)
+		if ui != null:
+			ui.repaint()
+		return
 	var nome := "UTSim Qualidade" if app == "qualidade" else "UTSim Segurança do Trabalho"
 	if doc.path() == "":
 		set_status("Salve o modelo antes de abrir no %s." % nome)

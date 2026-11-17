@@ -38,3 +38,5 @@ fadiga-pausa = Break
 fadiga-curva = Fitted curve
 fadiga-media = Measured mean
 fadiga-erro = Not fitted: { $erro }
+fadiga-abrir = Open in UTSim Estatística
+fadiga-abrir-ajuda = Opens the readings of this time study in a UTSim Estatística spreadsheet (one row per measured time: task, method, hour of the shift and time) for analysis. The model does not change.
