@@ -62,7 +62,7 @@ def arquivo(elemento):
     raise SystemExit(f"enunciado: elemento '{elemento}' não existe em {a.pasta}")
 
 
-def importar(elemento, x, y, giro, fases, escala=1.0):
+def importar(elemento, x, y, giro, fases, escala=1.0, cor=None):
     antes = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=arquivo(elemento))
     novos = [o for o in bpy.data.objects if o not in antes]
@@ -82,6 +82,13 @@ def importar(elemento, x, y, giro, fases, escala=1.0):
     raiz.rotation_mode = "XYZ"
     raiz.rotation_euler = (0, 0, math.radians(giro))
     raiz.scale = (escala, escala, escala)
+    if cor:
+        rgb = tuple(int(cor[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        m = mat("cor_" + cor, rgb, 0.6)
+        for o in novos:
+            if o.type == "MESH":
+                o.data.materials.clear()
+                o.data.materials.append(m)
     return {o.name.split(".")[0]: o for o in novos}, novos
 
 
@@ -132,7 +139,8 @@ for ob in P["objetos"]:
         caixa_min[k] = min(caixa_min[k], v)
         caixa_max[k] = max(caixa_max[k], v)
 for pc in P.get("pecas", []):
-    importar(pc["elemento"], pc["x"], pc["y"], pc.get("giro", 0.0), {}, pc.get("escala", 1.0))
+    importar(pc["elemento"], pc["x"], pc["y"], pc.get("giro", 0.0), {}, pc.get("escala", 1.0),
+             pc.get("cor"))
 
 cena.frame_set(QUADRO)
 for i, ob in enumerate(P["objetos"]):
@@ -164,8 +172,7 @@ mundo.node_tree.nodes["Background"].inputs["Color"].default_value = (0.93, 0.95,
 mundo.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.45
 cena.world = mundo
 
-# Câmera ortográfica, de cima em três quartos, enquadrando a planta com folga em cima para
-# os cartões.
+# Câmera ortográfica, de cima em três quartos, enquadrando a planta.
 L, H = P.get("largura", 2200), P.get("altura", 860)
 cena.render.resolution_x = L
 cena.render.resolution_y = H
@@ -188,9 +195,29 @@ bpy.context.view_layer.update()
 proj = [world_to_camera_view(cena, oc, v) for v in pontos]
 lx = max(v.x for v in proj) - min(v.x for v in proj)
 ly = max(v.y for v in proj) - min(v.y for v in proj)
-# Ocupa 94 % da largura, ou 55 % da altura (o resto fica para os cartões, em cima).
-cam.ortho_scale = 10.0 * max(lx / 0.94, ly / 0.55)
+# Ocupa 94 % da largura, ou 80 % da altura: os cartões que não cabem sobre a imagem ficam
+# acima dela, no app.
+cam.ortho_scale = 10.0 * max(lx / 0.94, ly / 0.80)
 bpy.context.view_layer.update()
+proj = [world_to_camera_view(cena, oc, v) for v in pontos]
+# A imagem fica só tão alta quanto o conteúdo pede (de 320 px até a altura da planta): uma
+# linha comprida e baixa não vira uma faixa de piso vazio. A escala ortográfica vale na
+# largura, então reduzir a altura não muda o tamanho das coisas.
+ocupado = max(v.y for v in proj) - min(v.y for v in proj)
+H = max(320, min(H, int(H * ocupado / 0.80)))
+cena.render.resolution_y = H
+bpy.context.view_layer.update()
+# Do mesmo jeito na largura (de 900 px até a da planta), para uma cena estreita, como os três
+# postos de uma central. A escala vale na maior dimensão: guarda-se a dos objetos.
+proj = [world_to_camera_view(cena, oc, v) for v in pontos]
+largo = max(v.x for v in proj) - min(v.x for v in proj)
+novo_l = max(900, min(L, int(L * largo / 0.94)))
+if novo_l < L:
+    escala_px = cam.ortho_scale / L
+    L = novo_l
+    cena.render.resolution_x = L
+    cam.ortho_scale = escala_px * max(L, H)
+    bpy.context.view_layer.update()
 proj = [world_to_camera_view(cena, oc, v) for v in pontos]
 cx = (max(v.x for v in proj) + min(v.x for v in proj)) / 2
 cy_baixo = min(v.y for v in proj)
