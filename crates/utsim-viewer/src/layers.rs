@@ -19,6 +19,7 @@ use utsim_viewer::layout;
 use utsim_viewer::properties::network::{
     converter_objects, edge_panel, edge_text, fluid_node_panel, node_panel,
 };
+use utsim_viewer::texto::{fx, tx, vx};
 use utsim_viewer::view;
 
 use crate::camera::CameraLock;
@@ -110,7 +111,7 @@ pub fn delete(ed: &mut Editor) {
             Some(NetSel::Node(name)) => {
                 ed.exec(Command::RemoveNode { name: name.clone() });
                 if ed.status.is_empty() {
-                    ed.status = format!("Nó {name} e suas arestas excluídos (Ctrl+Z desfaz)");
+                    ed.status = fx("camadas-no_excluido", &[("nome", vx(&name))]);
                 }
             }
             Some(NetSel::Edge(from, to)) => {
@@ -119,7 +120,10 @@ pub fn delete(ed: &mut Editor) {
                     to: to.clone(),
                 });
                 if ed.status.is_empty() {
-                    ed.status = format!("Aresta {from} - {to} excluída (Ctrl+Z desfaz)");
+                    ed.status = fx(
+                        "camadas-aresta_excluida",
+                        &[("de", vx(&from)), ("para", vx(&to))],
+                    );
                 }
             }
             None => {}
@@ -128,7 +132,7 @@ pub fn delete(ed: &mut Editor) {
             if let Some(name) = ed.fluid_sel.take() {
                 ed.exec(Command::RemoveFluidNode { name: name.clone() });
                 if ed.status.is_empty() {
-                    ed.status = format!("Nó {name} e suas ligações excluídos (Ctrl+Z desfaz)");
+                    ed.status = fx("camadas-no_fluido_excluido", &[("nome", vx(&name))]);
                 }
             }
         }
@@ -177,17 +181,27 @@ pub fn follow_renames(ed: &mut Editor, commands: &[Command]) {
     }
 }
 
+/// The name of a layer on screen; [`Layer::label`] stays the Portuguese name that scripts
+/// and the recorded state use.
+pub fn layer_name(layer: Layer) -> &'static str {
+    match layer {
+        Layer::Objects => tx("camada-objetos"),
+        Layer::Network => tx("camada-rede"),
+        Layer::Fluids => tx("camada-fluidos"),
+    }
+}
+
 /// The three layers as buttons at the top of the left panel.
 pub fn layer_switch(ui: &mut egui::Ui, ed: &mut Editor) {
     ui.horizontal(|ui| {
         for layer in Layer::ALL {
             let hint = match layer {
-                Layer::Objects => "Objetos do modelo: biblioteca, ligações e propriedades",
-                Layer::Network => "Rede de caminhos dos recursos móveis: nós e arestas",
-                Layer::Fluids => "Rede de fluidos: fontes, tanques, tubos e conversores",
+                Layer::Objects => tx("camadas-objetos_dica"),
+                Layer::Network => tx("camadas-rede_dica"),
+                Layer::Fluids => tx("camadas-fluidos_dica"),
             };
             if ui
-                .selectable_label(ed.layer == layer, layer.label())
+                .selectable_label(ed.layer == layer, layer_name(layer))
                 .on_hover_text(hint)
                 .clicked()
                 && ed.layer != layer
@@ -214,9 +228,9 @@ fn tool_button(ui: &mut egui::Ui, ed: &mut Editor, label: &str, tool: Tool, hint
 }
 
 fn grid_ui(ui: &mut egui::Ui, ed: &mut Editor) {
-    ui.checkbox(&mut ed.snap, "Encaixar na grade");
+    ui.checkbox(&mut ed.snap, tx("editor-encaixar"));
     ui.horizontal(|ui| {
-        ui.label("Passo (m)");
+        ui.label(tx("editor-passo"));
         ui.add_enabled(
             ed.snap,
             egui::DragValue::new(&mut ed.grid_step)
@@ -231,62 +245,62 @@ fn grid_ui(ui: &mut egui::Ui, ed: &mut Editor) {
 pub fn tools_ui(ui: &mut egui::Ui, ed: &mut Editor) {
     match ed.layer {
         Layer::Network => {
-            ui.heading("Rede de caminhos");
+            ui.heading(tx("camadas-rede_de_caminhos"));
             tool_button(
                 ui,
                 ed,
-                "Selecionar",
+                tx("camadas-selecionar"),
                 Tool::Select,
-                "Clique seleciona um nó ou uma aresta; arrastar move o nó",
+                tx("camadas-selecionar_rede_dica"),
             );
-            tool_button(ui, ed, "Nó", Tool::Node, "Clique no chão coloca um nó");
+            tool_button(ui, ed, tx("camadas-no"), Tool::Node, tx("camadas-no_dica"));
             tool_button(
                 ui,
                 ed,
-                "Aresta",
+                tx("camadas-aresta"),
                 Tool::Edge(None),
-                "Clique num nó e depois em outro; clicar no chão cria um nó já ligado",
+                tx("camadas-aresta_dica"),
             );
-            ui.checkbox(&mut ed.new_two_way, "Arestas novas de mão dupla");
+            ui.checkbox(&mut ed.new_two_way, tx("camadas-mao_dupla"));
             ui.separator();
             grid_ui(ui, ed);
             ui.separator();
-            ui.weak("Aresta: clique de nó em nó para desenhar o caminho; Esc termina.");
-            ui.weak("Del exclui o nó (com as arestas) ou a aresta selecionada.");
-            ui.weak("Cada objeto atendido entra na rede pelo nó mais próximo (linha tracejada).");
+            ui.weak(tx("camadas-ajuda_aresta"));
+            ui.weak(tx("camadas-ajuda_del_rede"));
+            ui.weak(tx("camadas-ajuda_atendido"));
         }
         Layer::Fluids => {
-            ui.heading("Rede de fluidos");
+            ui.heading(tx("camadas-rede_de_fluidos"));
             tool_button(
                 ui,
                 ed,
-                "Selecionar",
+                tx("camadas-selecionar"),
                 Tool::Select,
-                "Clique seleciona um nó; arrastar move o nó",
+                tx("camadas-selecionar_fluidos_dica"),
             );
             tool_button(
                 ui,
                 ed,
-                "Ligar",
+                tx("camadas-ligar"),
                 Tool::FluidLink(None),
-                "Clique no nó de origem e depois no de destino (a vazão segue a seta)",
+                tx("camadas-ligar_dica"),
             );
             ui.separator();
-            ui.strong("Colocar");
+            ui.strong(tx("camadas-colocar"));
             for e in FLUID_PALETTE {
                 tool_button(
                     ui,
                     ed,
                     e.label,
                     Tool::FluidPlace(e.id),
-                    "Clique no chão coloca o nó (Shift mantém a ferramenta)",
+                    tx("camadas-colocar_dica"),
                 );
             }
             ui.separator();
             grid_ui(ui, ed);
             ui.separator();
-            ui.weak("A rede precisa ser acíclica. Os conversores ligam a rede a um objeto.");
-            ui.weak("Del exclui o nó selecionado e suas ligações.");
+            ui.weak(tx("camadas-ajuda_aciclica"));
+            ui.weak(tx("camadas-ajuda_del_fluidos"));
         }
         Layer::Objects => {}
     }
@@ -301,10 +315,10 @@ pub fn properties_ui(ui: &mut egui::Ui, ed: &mut Editor) -> Vec<Command> {
             Some(NetSel::Node(name)) => {
                 ui.horizontal(|ui| {
                     ui.strong(&name);
-                    if ui.button("Aresta daqui").clicked() {
+                    if ui.button(tx("camadas-aresta_daqui")).clicked() {
                         ed.tool = Tool::Edge(Some(name.clone()));
                     }
-                    if ui.button("Excluir (Del)").clicked() {
+                    if ui.button(tx("editor-excluir")).clicked() {
                         out.push(Command::RemoveNode { name: name.clone() });
                     }
                 });
@@ -312,7 +326,7 @@ pub fn properties_ui(ui: &mut egui::Ui, ed: &mut Editor) -> Vec<Command> {
                 out.extend(node_panel(ui, &ed.doc, &name));
             }
             Some(NetSel::Edge(from, to)) => {
-                if ui.button("Excluir (Del)").clicked() {
+                if ui.button(tx("editor-excluir")).clicked() {
                     out.push(Command::RemoveEdge {
                         from: from.clone(),
                         to: to.clone(),
@@ -327,10 +341,10 @@ pub fn properties_ui(ui: &mut egui::Ui, ed: &mut Editor) -> Vec<Command> {
             Some(name) => {
                 ui.horizontal(|ui| {
                     ui.strong(&name);
-                    if ui.button("Ligar daqui").clicked() {
+                    if ui.button(tx("camadas-ligar_daqui")).clicked() {
                         ed.tool = Tool::FluidLink(Some(name.clone()));
                     }
-                    if ui.button("Excluir (Del)").clicked() {
+                    if ui.button(tx("editor-excluir")).clicked() {
                         out.push(Command::RemoveFluidNode { name: name.clone() });
                     }
                 });
@@ -346,19 +360,18 @@ pub fn properties_ui(ui: &mut egui::Ui, ed: &mut Editor) -> Vec<Command> {
 
 fn network_summary(ui: &mut egui::Ui, ed: &mut Editor) {
     let Some(net) = ed.doc.model().network.clone() else {
-        ui.label("O modelo não tem rede de caminhos.");
-        ui.weak(
-            "Sem rede, os recursos móveis andam em linha reta. Use \"Nó\" para colocar os \
-             nós e \"Aresta\" para ligá-los.",
-        );
+        ui.label(tx("camadas-sem_rede"));
+        ui.weak(tx("camadas-sem_rede_ajuda"));
         return;
     };
-    ui.label(format!(
-        "{} nós e {} arestas. Selecione um para editar.",
-        net.nodes.len(),
-        net.edges.len()
+    ui.label(fx(
+        "camadas-resumo_rede",
+        &[
+            ("nos", vx(&net.nodes.len())),
+            ("arestas", vx(&net.edges.len())),
+        ],
     ));
-    egui::CollapsingHeader::new(format!("Nós ({})", net.nodes.len()))
+    egui::CollapsingHeader::new(fx("camadas-nos", &[("n", vx(&net.nodes.len()))]))
         .default_open(true)
         .show(ui, |ui| {
             for n in &net.nodes {
@@ -367,7 +380,7 @@ fn network_summary(ui: &mut egui::Ui, ed: &mut Editor) {
                 }
             }
         });
-    egui::CollapsingHeader::new(format!("Arestas ({})", net.edges.len()))
+    egui::CollapsingHeader::new(fx("camadas-arestas", &[("n", vx(&net.edges.len()))]))
         .default_open(true)
         .show(ui, |ui| {
             for e in &net.edges {
@@ -380,15 +393,17 @@ fn network_summary(ui: &mut egui::Ui, ed: &mut Editor) {
 
 fn fluid_summary(ui: &mut egui::Ui, ed: &mut Editor) {
     let Some(def) = ed.doc.model().fluids.clone() else {
-        ui.label("O modelo não tem rede de fluidos.");
-        ui.weak("Escolha um tipo em \"Colocar\" e clique no chão; depois use \"Ligar\".");
+        ui.label(tx("camadas-sem_fluidos"));
+        ui.weak(tx("camadas-sem_fluidos_ajuda"));
         return;
     };
-    ui.label(format!(
-        "Rede \"{}\": {} nós e {} ligações. Selecione um nó para editar.",
-        def.name,
-        def.nodes.len(),
-        def.links.len()
+    ui.label(fx(
+        "camadas-resumo_fluidos",
+        &[
+            ("rede", vx(&def.name)),
+            ("nos", vx(&def.nodes.len())),
+            ("ligacoes", vx(&def.links.len())),
+        ],
     ));
     for n in &def.nodes {
         let kind = fluid_entry(utsim_edit::fluids::fluid_kind_id(&n.kind)).map_or("", |e| e.label);

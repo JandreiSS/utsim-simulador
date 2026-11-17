@@ -26,6 +26,7 @@ use utsim_viewer::layout;
 use utsim_viewer::picking::{self, Cycle};
 use utsim_viewer::properties::{properties_panel, properties_panel_shared, run_panel};
 use utsim_viewer::style;
+use utsim_viewer::texto::{fx, tx, vx};
 use utsim_viewer::timeline::TransitSetting;
 
 use crate::camera::CameraLock;
@@ -219,11 +220,9 @@ impl Editor {
         ed.stop_text = stop.to_string();
         if let Some(layout) = auto_layout_command(ed.doc.model()) {
             let _ = ed.doc.apply(layout);
-            ed.status = "Layout automático aplicado: salve para manter as posições".into();
+            ed.status = tx("editor-layout_aplicado").into();
         } else if needs_layout(ed.doc.model()) && ed.doc.model().network.is_some() {
-            ed.status = "Modelo com rede de caminhos: posicione os objetos nos nós da rede \
-                         (o layout automático não foi aplicado)"
-                .into();
+            ed.status = tx("editor-layout_com_rede").into();
         }
         ed.refresh();
         ed
@@ -328,7 +327,7 @@ impl Editor {
             .map(PathBuf::from)
             .or_else(|| self.pending_path.clone())
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
-            .unwrap_or_else(|| "sem título.ron".to_string())
+            .unwrap_or_else(|| tx("editor-sem_titulo").to_string())
     }
 
     pub fn exec(&mut self, command: Command) {
@@ -385,7 +384,7 @@ impl Editor {
             self.select_only(None);
             self.exec(c);
             if names.len() > 1 && self.status.is_empty() {
-                self.status = format!("{} objetos excluídos (Ctrl+Z desfaz)", names.len());
+                self.status = fx("editor-excluidos", &[("n", vx(&names.len()))]);
             }
             self.tool = Tool::Select;
         }
@@ -394,15 +393,17 @@ impl Editor {
     fn copy(&mut self) -> bool {
         let names = self.selection();
         if names.is_empty() {
-            self.status = "Nada selecionado para copiar".into();
+            self.status = tx("editor-nada_para_copiar").into();
             return false;
         }
         self.clipboard = Clipboard::copy(self.doc.model(), &names);
         self.pastes = 0;
-        self.status = format!(
-            "{} objeto(s) e {} ligação(ões) copiados",
-            self.clipboard.objects.len(),
-            self.clipboard.connections.len()
+        self.status = fx(
+            "editor-copiados",
+            &[
+                ("objetos", vx(&self.clipboard.objects.len())),
+                ("ligacoes", vx(&self.clipboard.connections.len())),
+            ],
         );
         true
     }
@@ -411,19 +412,22 @@ impl Editor {
         if self.copy() {
             let n = self.clipboard.objects.len();
             self.delete_selected();
-            self.status = format!("{n} objeto(s) recortados (Ctrl+V cola)");
+            self.status = fx("editor-recortados", &[("n", vx(&n))]);
         }
     }
 
     /// Pastes `clip` moved by `offset` and selects the copies.
     fn paste_clip(&mut self, clip: &Clipboard, offset: [f64; 3]) {
         let Some((command, names)) = clip.paste(self.doc.model(), offset) else {
-            self.status = "A área de transferência está vazia (Ctrl+C copia)".into();
+            self.status = tx("editor-area_vazia").into();
             return;
         };
         self.exec(command);
         if self.status.is_empty() {
-            self.status = format!("{} objeto(s) colados: {}", names.len(), names.join(", "));
+            self.status = fx(
+                "editor-colados",
+                &[("n", vx(&names.len())), ("nomes", vx(&names.join(", ")))],
+            );
             let (mut p, mut o) = (None, Vec::new());
             select_names(&mut p, &mut o, names, false);
             self.selected = p;
@@ -451,7 +455,7 @@ impl Editor {
     fn duplicate(&mut self) {
         let names = self.selection();
         if names.is_empty() {
-            self.status = "Nada selecionado para duplicar".into();
+            self.status = tx("editor-nada_para_duplicar").into();
             return;
         }
         let clip = Clipboard::copy(self.doc.model(), &names);
@@ -496,8 +500,8 @@ impl Editor {
             Some(p) => self.doc.save_as(p),
         };
         self.status = match result {
-            Ok(()) => format!("Salvo em {}", self.file_name()),
-            Err(e) => format!("Erro ao salvar: {e}"),
+            Ok(()) => fx("editor-salvo_em", &[("arquivo", vx(&self.file_name()))]),
+            Err(e) => fx("editor-erro_ao_salvar", &[("erro", vx(&e))]),
         };
     }
 
@@ -523,8 +527,8 @@ impl Editor {
             path.set_extension("ron");
         }
         self.status = match self.doc.save_as(&path) {
-            Ok(()) => format!("Salvo em {}", path.display()),
-            Err(e) => format!("Erro ao salvar: {e}"),
+            Ok(()) => fx("editor-salvo_em", &[("arquivo", vx(&path.display()))]),
+            Err(e) => fx("editor-erro_ao_salvar", &[("erro", vx(&e))]),
         };
         self.save_prompt = None;
     }
@@ -564,26 +568,26 @@ impl Editor {
         let stop = match self.stop_text.trim().replace(',', ".").parse::<f64>() {
             Ok(v) if v.is_finite() && v > 0.0 => v,
             _ => {
-                self.status = "Tempo máximo inválido: use um número maior que zero".into();
+                self.status = tx("editor-tempo_invalido").into();
                 return;
             }
         };
         let model = run_model(self.doc.model(), stop);
-        let (tx, rx) = mpsc::channel();
+        let (sender, rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         std::thread::spawn(move || {
             let result = model.replay(0).map_err(|e| e.to_string());
-            let _ = tx.send(result);
+            let _ = sender.send(result);
         });
         // The browser has no threads here: run it in place (the result is already in the
         // channel when the next frame polls it).
         #[cfg(target_arch = "wasm32")]
         {
             let result = model.replay(0).map_err(|e| e.to_string());
-            let _ = tx.send(result);
+            let _ = sender.send(result);
         }
         self.job = Some(Mutex::new(rx));
-        self.status = "Simulando...".into();
+        self.status = tx("editor-simulando").into();
     }
 
     fn run(&mut self, act: Act) {
@@ -657,7 +661,7 @@ pub fn poll_job(
     let result = match received {
         Ok(result) => result,
         Err(TryRecvError::Empty) => return,
-        Err(TryRecvError::Disconnected) => Err("a simulação terminou sem resultado".to_string()),
+        Err(TryRecvError::Disconnected) => Err(tx("editor-sem_resultado").to_string()),
     };
     editor.job = None;
     match result {
@@ -671,7 +675,7 @@ pub fn poll_job(
             editor.status.clear();
             editor.frame_request = true;
         }
-        Err(e) => editor.status = format!("Erro na simulação: {e}"),
+        Err(e) => editor.status = fx("editor-erro_na_simulacao", &[("erro", vx(&e))]),
     }
 }
 
@@ -1017,9 +1021,9 @@ pub fn mouse(
                     .collect();
                 let n = names.len();
                 select_names(&mut editor.selected, &mut editor.multi, names, true);
-                editor.status = format!(
-                    "{n} objeto(s) na caixa, {} selecionado(s)",
-                    editor.selection().len()
+                editor.status = fx(
+                    "editor-na_caixa",
+                    &[("n", vx(&n)), ("sel", vx(&editor.selection().len()))],
                 );
             }
             return;
@@ -1057,7 +1061,7 @@ fn click(
             if let Some(i) = block {
                 let to = editor.view.names[i].clone();
                 if to == from {
-                    editor.status = "Escolha outro bloco como destino".into();
+                    editor.status = tx("editor-outro_destino").into();
                     return;
                 }
                 if let Some(msg) = connect_blocked(editor.view.kinds[i]) {
@@ -1126,7 +1130,10 @@ fn click(
                         from: from.clone(),
                         to: to.clone(),
                     });
-                    editor.status = format!("Ligação {from} -> {to} removida (Ctrl+Z desfaz)");
+                    editor.status = fx(
+                        "editor-ligacao_removida",
+                        &[("de", vx(&from)), ("para", vx(&to))],
+                    );
                 }
                 None => editor.select_only(None),
             }
@@ -1239,18 +1246,21 @@ pub fn toolbar(
     egui::Panel::top("barra").show(&mut top, |ui| {
         ui.horizontal(|ui| {
             let editing = ed.mode == Mode::Edit;
-            if ui.selectable_label(editing, "Editar").clicked() && !editing {
+            if ui.selectable_label(editing, tx("editor-editar")).clicked() && !editing {
                 acts.push(Act::Edit);
             }
             let running = ed.job.is_some();
             if ui
-                .add_enabled(!running, egui::Button::new("▶ Simular").selected(!editing))
+                .add_enabled(
+                    !running,
+                    egui::Button::new(tx("editor-simular")).selected(!editing),
+                )
                 .clicked()
                 && editing
             {
                 acts.push(Act::Simulate);
             }
-            ui.label("até t =");
+            ui.label(tx("editor-ate_t"));
             ui.add_enabled(
                 editing,
                 egui::TextEdit::singleline(&mut ed.stop_text).desired_width(56.0),
@@ -1258,28 +1268,36 @@ pub fn toolbar(
             ui.separator();
             // File and history buttons stay visible in `Simular`, only disabled.
             ui.add_enabled_ui(editing, |ui| {
-                if ui.button("Novo").on_hover_text("Ctrl+N").clicked() {
+                if ui
+                    .button(tx("editor-novo"))
+                    .on_hover_text("Ctrl+N")
+                    .clicked()
+                {
                     acts.push(Act::New);
                 }
-                if ui.button("Salvar").on_hover_text("Ctrl+S").clicked() {
+                if ui
+                    .button(tx("editor-salvar"))
+                    .on_hover_text("Ctrl+S")
+                    .clicked()
+                {
                     acts.push(Act::Save);
                 }
                 if ui
-                    .button("Salvar como...")
+                    .button(tx("editor-salvar_como_botao"))
                     .on_hover_text("Ctrl+Shift+S")
                     .clicked()
                 {
                     acts.push(Act::SaveAs);
                 }
                 if ui
-                    .add_enabled(ed.doc.can_undo(), egui::Button::new("Desfazer"))
+                    .add_enabled(ed.doc.can_undo(), egui::Button::new(tx("editor-desfazer")))
                     .on_hover_text("Ctrl+Z")
                     .clicked()
                 {
                     acts.push(Act::Undo);
                 }
                 if ui
-                    .add_enabled(ed.doc.can_redo(), egui::Button::new("Refazer"))
+                    .add_enabled(ed.doc.can_redo(), egui::Button::new(tx("editor-refazer")))
                     .on_hover_text("Ctrl+Y")
                     .clicked()
                 {
@@ -1287,27 +1305,31 @@ pub fn toolbar(
                 }
             });
             ui.separator();
-            if ui.button("Enquadrar (F)").clicked() {
+            if ui.button(tx("editor-enquadrar")).clicked() {
                 acts.push(Act::Frame);
             }
             if ui
-                .selectable_label(ed.flows.open, "Fluxos")
-                .on_hover_text("Lógica do usuário: fluxos de tokens")
+                .selectable_label(ed.flows.open, tx("editor-fluxos"))
+                .on_hover_text(tx("editor-fluxos_dica"))
                 .clicked()
             {
                 ed.flows.open = !ed.flows.open;
             }
             if ui
-                .selectable_label(ed.results.open, "Resultados")
-                .on_hover_text("Replicações, resumo com intervalos de confiança, gráficos, cenários e otimização")
+                .selectable_label(ed.results.open, tx("editor-resultados"))
+                .on_hover_text(tx("editor-resultados_dica"))
                 .clicked()
             {
-                let path = ed.doc.path().map(PathBuf::from).or_else(|| ed.pending_path.clone());
+                let path = ed
+                    .doc
+                    .path()
+                    .map(PathBuf::from)
+                    .or_else(|| ed.pending_path.clone());
                 ed.results.toggle(ed.doc.model(), path.as_deref());
             }
             if ui
-                .selectable_label(ed.shortcuts_open, "Atalhos")
-                .on_hover_text("Atalhos de teclado e mouse (F1)")
+                .selectable_label(ed.shortcuts_open, tx("editor-atalhos"))
+                .on_hover_text(tx("editor-atalhos_dica"))
                 .clicked()
             {
                 ed.shortcuts_open = !ed.shortcuts_open;
@@ -1316,6 +1338,11 @@ pub fn toolbar(
             crate::models::toggle(ui, &mut visual, &mut lighting);
             ui.separator();
             crate::camera_modes::selector(ui, &mut cameras);
+            ui.separator();
+            let mut lingua = utsim_idiomas::atual();
+            if utsim_idiomas::seletor(ui, "idioma_editor", &mut lingua) {
+                utsim_viewer::texto::escolher_idioma(lingua);
+            }
             if running {
                 ui.spinner();
             }
@@ -1330,15 +1357,13 @@ pub fn toolbar(
     if ed.save_prompt.is_some() {
         let mut save = false;
         let mut cancel = false;
-        egui::Window::new("Salvar como")
+        egui::Window::new(tx("editor-salvar_como"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 if let Some(text) = ed.save_prompt.as_mut() {
-                    ui.label(
-                        "Caminho do arquivo (.ron), relativo à pasta do programa ou completo:",
-                    );
+                    ui.label(tx("editor-caminho_do_arquivo"));
                     let field = ui.add(egui::TextEdit::singleline(text).desired_width(420.0));
                     if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         save = true;
@@ -1352,13 +1377,13 @@ pub fn toolbar(
                     if !text.trim().is_empty() && target.exists() && !same {
                         ui.colored_label(
                             egui::Color32::from_rgb(240, 200, 80),
-                            "Esse arquivo já existe e será sobrescrito.",
+                            tx("editor-sobrescrito"),
                         );
                     }
                 }
                 ui.horizontal(|ui| {
-                    save |= ui.button("Salvar").clicked();
-                    cancel = ui.button("Cancelar").clicked();
+                    save |= ui.button(tx("editor-salvar")).clicked();
+                    cancel = ui.button(tx("editor-cancelar")).clicked();
                 });
             });
         if save && let Some(text) = ed.save_prompt.clone() {
@@ -1369,17 +1394,17 @@ pub fn toolbar(
     }
 
     if ed.confirm_new {
-        egui::Window::new("Novo modelo")
+        egui::Window::new(tx("editor-novo_modelo"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("Há alterações não salvas. Descartá-las e começar um modelo novo?");
+                ui.label(tx("editor-descartar_pergunta"));
                 ui.horizontal(|ui| {
-                    if ui.button("Descartar").clicked() {
+                    if ui.button(tx("editor-descartar")).clicked() {
                         ed.new_document();
                     }
-                    if ui.button("Cancelar").clicked() {
+                    if ui.button(tx("editor-cancelar")).clicked() {
                         ed.confirm_new = false;
                     }
                 });
@@ -1388,7 +1413,7 @@ pub fn toolbar(
 
     if ed.shortcuts_open {
         let mut open = true;
-        egui::Window::new("Atalhos do editor")
+        egui::Window::new(tx("editor-atalhos_do_editor"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -1400,13 +1425,13 @@ pub fn toolbar(
                     .spacing([18.0, 4.0])
                     .show(ui, |ui| {
                         for (keys, what) in SHORTCUTS {
-                            ui.strong(keys);
-                            ui.label(what);
+                            ui.strong(tx(keys));
+                            ui.label(tx(what));
                             ui.end_row();
                         }
                     });
                 ui.separator();
-                ui.weak("F1 ou Esc fecha esta janela.");
+                ui.weak(tx("editor-f1_fecha"));
             });
         if !open {
             ed.shortcuts_open = false;
@@ -1414,14 +1439,14 @@ pub fn toolbar(
     }
 
     if ed.show_blocked {
-        egui::Window::new("Não é possível simular")
+        egui::Window::new(tx("editor-nao_simula"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("Corrija os problemas do modelo antes de simular:");
+                ui.label(tx("editor-corrija"));
                 issues_ui(ui, &ed.issues, &mut ed.selected);
-                if ui.button("Fechar").clicked() {
+                if ui.button(tx("editor-fechar")).clicked() {
                     ed.show_blocked = false;
                 }
             });
@@ -1458,7 +1483,7 @@ pub fn results_window(mut contexts: EguiContexts, mut editor: ResMut<Editor>) ->
             crate::results_panel::Request::Exec(command) => {
                 editor.exec(command);
                 if editor.status.is_empty() {
-                    editor.status = "Valores gravados no modelo (Ctrl+Z desfaz)".into();
+                    editor.status = tx("editor-valores_gravados").into();
                 }
             }
         }
@@ -1507,14 +1532,14 @@ pub fn flows_panel(
 /// Issues grouped by object; clicking an object name selects it.
 fn issues_ui(ui: &mut egui::Ui, issues: &[Issue], selected: &mut Option<String>) {
     if issues.is_empty() {
-        ui.label("Nenhum problema: o modelo pode ser simulado.");
+        ui.label(tx("editor-nenhum_problema"));
         return;
     }
     let red = egui::Color32::from_rgb(255, 120, 110);
     for (object, messages) in group_issues(issues) {
         match object {
             None => {
-                ui.strong("Modelo");
+                ui.strong(tx("editor-modelo"));
             }
             Some(name) => {
                 if ui.link(name.clone()).clicked() {
@@ -1534,7 +1559,7 @@ fn warnings_ui(ui: &mut egui::Ui, warnings: &[Issue], selected: &mut Option<Stri
     for (object, messages) in group_issues(warnings) {
         match object {
             None => {
-                ui.strong("Modelo");
+                ui.strong(tx("editor-modelo"));
             }
             Some(name) => {
                 if ui.link(name.clone()).clicked() {
@@ -1571,8 +1596,8 @@ pub fn edit_panels(
             if ed.layer == Layer::Objects {
                 ui.horizontal(|ui| {
                     for (tab, label) in [
-                        (LeftTab::Library, "Biblioteca"),
-                        (LeftTab::Objects, "Objetos"),
+                        (LeftTab::Library, tx("editor-biblioteca")),
+                        (LeftTab::Objects, tx("camada-objetos")),
                     ] {
                         if ui.selectable_label(ed.left_tab == tab, label).clicked() {
                             ed.left_tab = tab;
@@ -1631,7 +1656,7 @@ pub fn edit_panels(
         .default_size(330.0)
         .size_range(260.0..=600.0)
         .show(&mut right, |ui| {
-            ui.heading("Propriedades");
+            ui.heading(tx("editor-propriedades"));
             // Another object (or none) selected: start again at the top, where the name is.
             let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
             if ed.props_for != ed.selected {
@@ -1646,7 +1671,7 @@ pub fn edit_panels(
                         }
                     }
                     None => {
-                        ui.label("Selecione um bloco para editar suas propriedades.");
+                        ui.label(tx("editor-selecione_um_bloco"));
                         ui.separator();
                         for command in run_panel(ui, &ed.doc) {
                             acts.push(Act::Exec(Box::new(command)));
@@ -1658,17 +1683,17 @@ pub fn edit_panels(
                     Some(name) => {
                         ui.horizontal(|ui| {
                             ui.strong(&name);
-                            if ui.button("Ligar (C)").clicked() {
+                            if ui.button(tx("editor-ligar")).clicked() {
                                 ed.start_connect(name.clone());
                             }
-                            if ui.button("Excluir (Del)").clicked() {
+                            if ui.button(tx("editor-excluir")).clicked() {
                                 acts.push(Act::Delete);
                             }
                         });
                         if matches!(ed.tool, Tool::Connect(_)) {
                             ui.colored_label(
                                 egui::Color32::from_rgb(255, 215, 80),
-                                "Clique no bloco de destino (Esc cancela).",
+                                tx("editor-clique_no_destino"),
                             );
                         }
                         ui.separator();
@@ -1680,12 +1705,12 @@ pub fn edit_panels(
                     }
                 }
                 ui.separator();
-                ui.strong(format!("Problemas ({})", ed.issues.len()));
+                ui.strong(fx("editor-problemas", &[("n", vx(&ed.issues.len()))]));
                 let before = ed.selected.clone();
                 issues_ui(ui, &ed.issues, &mut ed.selected);
                 if !ed.warnings.is_empty() {
                     ui.separator();
-                    ui.strong(format!("Avisos ({})", ed.warnings.len()));
+                    ui.strong(fx("editor-avisos", &[("n", vx(&ed.warnings.len()))]));
                     warnings_ui(ui, &ed.warnings, &mut ed.selected);
                 }
                 if ed.selected != before {
@@ -1768,10 +1793,7 @@ fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
                         .add(
                             egui::Button::selectable(on, text).sense(egui::Sense::click_and_drag()),
                         )
-                        .on_hover_text(format!(
-                            "{}: clique e depois clique no chão, ou arraste até o chão",
-                            entry.kind
-                        ));
+                        .on_hover_text(fx("editor-colocar_dica", &[("tipo", vx(&entry.kind))]));
                     if response.drag_started() {
                         ed.palette_drag = Some(entry.id);
                     }
@@ -1786,9 +1808,9 @@ fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
             });
     }
     ui.separator();
-    ui.checkbox(&mut ed.snap, "Encaixar na grade");
+    ui.checkbox(&mut ed.snap, tx("editor-encaixar"));
     ui.horizontal(|ui| {
-        ui.label("Passo (m)");
+        ui.label(tx("editor-passo"));
         ui.add_enabled(
             ed.snap,
             egui::DragValue::new(&mut ed.grid_step)
@@ -1798,8 +1820,8 @@ fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
         );
     });
     ui.separator();
-    ui.weak("Esc cancela. Shift + clique no chão coloca vários.");
-    ui.weak("Atalhos: F1.");
+    ui.weak(tx("editor-esc_cancela"));
+    ui.weak(tx("editor-atalhos_f1"));
 }
 
 /// Right panel for several selected objects: actions on all of them, align and
@@ -1807,26 +1829,38 @@ fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
 /// every selected object, as one undo step).
 fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Vec<Act>) {
     let names = ed.selection();
-    ui.strong(format!("{} objetos selecionados", names.len()));
+    ui.strong(fx("editor-selecionados", &[("n", vx(&names.len()))]));
     ui.label(names.join(", "));
     ui.horizontal_wrapped(|ui| {
-        if ui.button("Copiar").on_hover_text("Ctrl+C").clicked() {
+        if ui
+            .button(tx("editor-copiar"))
+            .on_hover_text("Ctrl+C")
+            .clicked()
+        {
             acts.push(Act::Copy);
         }
-        if ui.button("Duplicar").on_hover_text("Ctrl+D").clicked() {
+        if ui
+            .button(tx("editor-duplicar"))
+            .on_hover_text("Ctrl+D")
+            .clicked()
+        {
             acts.push(Act::Duplicate);
         }
-        if ui.button("Excluir todos").on_hover_text("Del").clicked() {
+        if ui
+            .button(tx("editor-excluir_todos"))
+            .on_hover_text("Del")
+            .clicked()
+        {
             acts.push(Act::Delete);
         }
     });
     ui.separator();
-    ui.strong("Alinhar");
+    ui.strong(tx("editor-alinhar"));
     ui.horizontal(|ui| {
         for (label, how) in [
-            ("Esquerda", Align::Left),
-            ("Centro X", Align::CenterX),
-            ("Direita", Align::Right),
+            (tx("editor-esquerda"), Align::Left),
+            (tx("editor-centro_x"), Align::CenterX),
+            (tx("editor-direita"), Align::Right),
         ] {
             if ui.button(label).clicked() {
                 acts.push(Act::Align(how));
@@ -1835,9 +1869,9 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
     });
     ui.horizontal(|ui| {
         for (label, how) in [
-            ("Topo", Align::Top),
-            ("Centro Y", Align::CenterY),
-            ("Base", Align::Bottom),
+            (tx("editor-topo"), Align::Top),
+            (tx("editor-centro_y"), Align::CenterY),
+            (tx("editor-base"), Align::Bottom),
         ] {
             if ui.button(label).clicked() {
                 acts.push(Act::Align(how));
@@ -1846,10 +1880,13 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
     });
     ui.horizontal(|ui| {
         let three = names.len() >= 3;
-        for (label, axis) in [("Distribuir em x", Axis::X), ("Distribuir em y", Axis::Y)] {
+        for (label, axis) in [
+            (tx("editor-distribuir_x"), Axis::X),
+            (tx("editor-distribuir_y"), Axis::Y),
+        ] {
             if ui
                 .add_enabled(three, egui::Button::new(label))
-                .on_hover_text("Espaça igualmente entre os dois extremos (3 objetos ou mais)")
+                .on_hover_text(tx("editor-distribuir_dica"))
                 .clicked()
             {
                 acts.push(Act::Distribute(axis));
@@ -1858,10 +1895,10 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
     });
     ui.separator();
     if arrange::same_kind(ed.doc.model(), &names) {
-        ui.strong("Propriedades de todos");
-        ui.weak(format!(
-            "Os campos mostram os valores de {primary}; cada alteração vale para os {} objetos.",
-            names.len()
+        ui.strong(tx("editor-propriedades_de_todos"));
+        ui.weak(fx(
+            "editor-campos_de_todos",
+            &[("primeiro", vx(&primary)), ("n", vx(&names.len()))],
         ));
         ui.separator();
         let edits: Vec<Command> = properties_panel_shared(ui, &ed.doc, primary)
@@ -1884,7 +1921,7 @@ fn selection_ui(ui: &mut egui::Ui, ed: &mut Editor, primary: &str, acts: &mut Ve
 fn objects_ui(ui: &mut egui::Ui, ed: &mut Editor) {
     ui.add(
         egui::TextEdit::singleline(&mut ed.list_filter)
-            .hint_text("Buscar por nome")
+            .hint_text(tx("editor-buscar_por_nome"))
             .desired_width(f32::INFINITY),
     );
     let mut kinds: Vec<&'static str> = ed
@@ -1901,16 +1938,19 @@ fn objects_ui(ui: &mut egui::Ui, ed: &mut Editor) {
     }
     egui::ComboBox::from_id_salt("lista_tipo")
         .width(ui.available_width() - 8.0)
-        .selected_text(ed.list_kind.unwrap_or("Todos os tipos"))
+        .selected_text(ed.list_kind.unwrap_or(tx("editor-todos_os_tipos")))
         .show_ui(ui, |ui| {
-            ui.selectable_value(&mut ed.list_kind, None, "Todos os tipos");
+            ui.selectable_value(&mut ed.list_kind, None, tx("editor-todos_os_tipos"));
             for kind in kinds {
                 ui.selectable_value(&mut ed.list_kind, Some(kind), kind);
             }
         });
     let shown = picking::filter_objects(ed.doc.model(), &ed.list_filter, ed.list_kind);
     let total = ed.doc.model().objects.len();
-    ui.weak(format!("{} de {} objetos", shown.len(), total));
+    ui.weak(fx(
+        "editor-de_objetos",
+        &[("n", vx(&shown.len())), ("total", vx(&total))],
+    ));
     let multi_key = ui.input(|i| i.modifiers.shift || i.modifiers.command);
     let chosen = ed.selection();
     let red = egui::Color32::from_rgb(255, 120, 110);
@@ -1937,9 +1977,7 @@ fn objects_ui(ui: &mut egui::Ui, ed: &mut Editor) {
                         egui::Button::selectable(on, name)
                             .min_size(egui::vec2(ui.available_width(), 0.0)),
                     )
-                    .on_hover_text(format!(
-                        "{kind}. Clique seleciona, Shift soma à seleção, duplo clique enquadra"
-                    ));
+                    .on_hover_text(fx("editor-objeto_dica", &[("tipo", vx(&kind))]));
                 if response.double_clicked() {
                     clicked = Some((object.name.clone(), false, true));
                 } else if response.clicked() {
@@ -1960,9 +1998,9 @@ fn objects_ui(ui: &mut egui::Ui, ed: &mut Editor) {
     }
 }
 
-/// Labels of the buttons that move a connection in its order.
-const MOVE_UP: &str = "Subir";
-const MOVE_DOWN: &str = "Descer";
+/// Keys of the labels of the buttons that move a connection in its order.
+const MOVE_UP: &str = "editor-subir";
+const MOVE_DOWN: &str = "editor-descer";
 
 /// One connection of the order lists: its label and the buttons to move it up or down
 /// (swapping with the neighbour in the same list) and to remove it.
@@ -1977,8 +2015,8 @@ fn order_row(
     ui.horizontal_wrapped(|ui| {
         ui.label(label);
         if ui
-            .add_enabled(k > 0, egui::Button::new(MOVE_UP).small())
-            .on_hover_text("Troca de lugar com a anterior (Ctrl+Z desfaz)")
+            .add_enabled(k > 0, egui::Button::new(tx(MOVE_UP)).small())
+            .on_hover_text(tx("editor-subir_dica"))
             .clicked()
         {
             acts.push(Act::Exec(Box::new(Command::SwapConnections {
@@ -1987,8 +2025,8 @@ fn order_row(
             })));
         }
         if ui
-            .add_enabled(k + 1 < list.len(), egui::Button::new(MOVE_DOWN).small())
-            .on_hover_text("Troca de lugar com a seguinte (Ctrl+Z desfaz)")
+            .add_enabled(k + 1 < list.len(), egui::Button::new(tx(MOVE_DOWN)).small())
+            .on_hover_text(tx("editor-descer_dica"))
             .clicked()
         {
             acts.push(Act::Exec(Box::new(Command::SwapConnections {
@@ -1998,7 +2036,7 @@ fn order_row(
         }
         if ui
             .small_button("x")
-            .on_hover_text("Remover ligação")
+            .on_hover_text(tx("editor-remover_ligacao"))
             .clicked()
         {
             acts.push(Act::Exec(Box::new(Command::Disconnect {
@@ -2023,27 +2061,38 @@ fn connections_ui(ui: &mut egui::Ui, doc: &Document, name: &str, acts: &mut Vec<
         .iter()
         .filter(|(_, b)| b == name)
         .collect();
-    ui.strong("Ligações");
+    ui.strong(tx("editor-ligacoes"));
     if outputs.is_empty() && inputs.is_empty() {
-        ui.weak("Nenhuma. Use \"Ligar\" e clique no destino.");
+        ui.weak(tx("editor-nenhuma_ligacao"));
         return;
     }
-    ui.weak(
-        "A ordem importa. Saídas: a ordem é o número da porta (1, 2, ...) que as regras de \
-         saída usam. Entradas: a primeira tem prioridade quando o objeto puxa um item.",
-    );
+    ui.weak(tx("editor-ordem_importa"));
     if !outputs.is_empty() {
-        ui.label("Saídas, por porta:");
+        ui.label(tx("editor-saidas_por_porta"));
     }
     for k in 0..outputs.len() {
-        let label = format!("porta {}: {name} -> {}", k + 1, outputs[k].1);
+        let label = fx(
+            "editor-porta",
+            &[
+                ("n", vx(&(k + 1))),
+                ("de", vx(&name)),
+                ("para", vx(&outputs[k].1)),
+            ],
+        );
         order_row(ui, &outputs, k, label, acts);
     }
     if !inputs.is_empty() {
-        ui.label("Entradas, por prioridade:");
+        ui.label(tx("editor-entradas_por_prioridade"));
     }
     for k in 0..inputs.len() {
-        let label = format!("{}a: {} -> {name}", k + 1, inputs[k].0);
+        let label = fx(
+            "editor-entrada",
+            &[
+                ("n", vx(&(k + 1))),
+                ("de", vx(&inputs[k].0)),
+                ("para", vx(&name)),
+            ],
+        );
         order_row(ui, &inputs, k, label, acts);
     }
 }
