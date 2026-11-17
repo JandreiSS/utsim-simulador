@@ -843,6 +843,62 @@
   ],
   "triangulos": 1608
  },
+ "controle_remoto": {
+  "arquivo": "controle_remoto.glb",
+  "clipes": {},
+  "dados": {
+   "alca_altura": 0.5,
+   "largura": 0.26,
+   "pega": 0.32
+  },
+  "estados": {},
+  "minimo": [
+   -0.303,
+   -0.166,
+   -0.04
+  ],
+  "nos": [
+   "alca",
+   "controle_remoto",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.383,
+   0.332,
+   0.543
+  ],
+  "triangulos": 392
+ },
+ "controle_remoto_medio": {
+  "arquivo": "controle_remoto_medio.glb",
+  "clipes": {},
+  "dados": {
+   "alca_altura": 0.5,
+   "largura": 0.26,
+   "pega": 0.32
+  },
+  "estados": {},
+  "minimo": [
+   -0.303,
+   -0.166,
+   -0.04
+  ],
+  "nos": [
+   "alca",
+   "controle_remoto",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.383,
+   0.332,
+   0.543
+  ],
+  "triangulos": 580
+ },
  "empilhadeira": {
   "arquivo": "empilhadeira.glb",
   "clipes": {

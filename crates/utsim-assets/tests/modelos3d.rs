@@ -260,8 +260,9 @@ fn o_catalogo_e_os_arquivos_batem() {
         }
         // No piso e com o tamanho do catálogo. A ponteira e o suporte da canaleta da esteira
         // por trajeto têm a origem no ponto de apoio (a linha da esteira, o topo da longarina).
-        let no_apoio =
-            chave.starts_with("esteira_ponteira") || chave.starts_with("esteira_canaleta");
+        let no_apoio = chave.starts_with("esteira_ponteira")
+            || chave.starts_with("esteira_canaleta")
+            || chave.starts_with("controle_remoto");
         assert!(
             no_apoio || item["minimo"][2].as_f64().unwrap().abs() < 2e-3,
             "{chave}: fora do piso"
@@ -408,6 +409,7 @@ const CONTRATO: &[Contrato] = &[
         &["ponto_gancho", "ponto_operador"],
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
+    ("controle_remoto", &["corpo", "alca"], &[], &[]),
     ("ventilador_mesa", &["corpo", "helice"], &[], &["girar"]),
     ("ventilador_coluna", &["corpo", "helice"], &[], &["girar"]),
     ("ventilador_mesa_caixa", &["corpo"], &[], &[]),
@@ -1128,6 +1130,35 @@ fn os_ventiladores_tem_escala_real_e_cabem_na_caixa() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn o_controle_remoto_cabe_nas_maos() {
+    // O rádio da ponte rolante: a origem fica entre as mãos, no centro da caixa, e a correia
+    // sobe até a altura dita.
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        let item = &cat[&format!("controle_remoto{sufixo}")];
+        let (min, tam) = (v3(&item["minimo"]), v3(&item["tamanho"]));
+        let d = &item["dados"];
+        let pega = d["pega"].as_f64().unwrap() as f32;
+        let alca = d["alca_altura"].as_f64().unwrap() as f32;
+        // Simétrico em y, com as alças laterais na distância da pega.
+        assert!((min[1] + tam[1] / 2.0).abs() < 1e-3, "centro em y");
+        assert!(
+            (tam[1] - pega).abs() < 0.03,
+            "pega de {pega}, largura {}",
+            tam[1]
+        );
+        assert!((0.25..0.45).contains(&pega), "pega de {pega}");
+        // A caixa fica em volta da origem; a correia sobe.
+        assert!(min[2] < 0.0 && min[2] > -0.06, "fundo em {}", min[2]);
+        assert!(
+            (min[2] + tam[2] - alca).abs() < 0.02,
+            "correia até {}",
+            min[2] + tam[2]
+        );
     }
 }
 

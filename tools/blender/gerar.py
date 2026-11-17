@@ -38,6 +38,7 @@ ELEMENTOS = {
     "empilhadeira": movimentacao.empilhadeira,
     "agv": movimentacao.agv,
     "ponte_rolante": ponte.ponte_rolante,
+    "controle_remoto": ponte.controle_remoto,
     "esteira_pe": trajeto.esteira_pe,
     "esteira_ponteira": trajeto.esteira_ponteira,
     "esteira_canaleta": trajeto.esteira_canaleta,

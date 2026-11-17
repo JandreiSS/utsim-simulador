@@ -354,6 +354,23 @@ ponte em `x`, o carro em `y` e o gancho na altura `h`, `ponte` vai para `x`, `ca
 
 O teste `a_ponte_rolante_anda_nos_tres_eixos` confere os três movimentos e os cursos.
 
+### Controle remoto (`controle_remoto.glb`)
+
+O rádio de quem opera a ponte rolante a pé, do tipo caixa de barriga
+(`controle_remoto` em `tools/blender/elementos/ponte.py`): caixa amarela de 0,26 × 0,15 × 0,08 m,
+dois manetes, botão de emergência, chave, antena e as alças laterais onde as mãos seguram.
+
+- Origem entre as duas mãos, no centro da caixa. `+x` é a frente do operador e `z` é para cima.
+  Não fica no piso: o `minimo` é negativo em z.
+- Nós: `corpo` e `alca`. A `alca` é a correia, que sobe pelo peito e fecha atrás do pescoço,
+  0,50 m acima e 0,30 m atrás da origem; serve para o corpo padrão e pode ser escondida.
+- `dados.pega` = 0,32 (a distância entre as alças laterais, perto dos 0,45 m entre os pulsos no
+  clipe de segurar carga), `dados.largura` = 0,26 e `dados.alca_altura` = 0,50.
+- Como usar: no ponto médio das mãos da pessoa, girado com ela, com os braços do clipe
+  `Walk_Carry_Loop` (o mesmo de quem está parado com carga).
+
+O teste `o_controle_remoto_cabe_nas_maos` confere a origem, a pega e a altura da correia.
+
 ## Peças da esteira por trajeto
 
 A esteira desenhada por trajeto é feita na cena, ao longo da linha
