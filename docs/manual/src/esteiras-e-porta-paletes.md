@@ -68,6 +68,10 @@ O que a geometria muda no resultado:
 - **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
 - **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora. Onde a parte de baixo da estrutura (0,14 m abaixo da superfície) fica a 2,2 m do piso ou mais, dá para passar por baixo: ali só as pernas, sob os nós, são obstáculo.
 
+#### Calha (escorregador)
+
+Com `drive: Chute`, o trajeto é uma calha de chapa lisa entre guias altas: a peça escorrega pela gravidade, com atrito. Em cada trecho, a aceleração ao longo da chapa é `g·(sen θ − μ·cos θ)`, com μ = 0,3 (caixa de papelão em aço). A peça parte do repouso na entrada e acelera na descida, limitada à `speed` da calha (a velocidade-limite na saída). O tempo de passagem sai dessa conta: 4 m a 30° levam √(2L/a) ≈ 1,84 s. Abaixo de atan(0,3) ≈ 16,7°, a peça não escorrega sozinha: anda empurrada pelas de trás, a 5 cm/s, e há aviso. A calha não tem limite de inclinação, porque é feita para ser íngreme. No painel, ela é o acionamento "Calha (escorrega)".
+
 #### Passagem de uma esteira para outra
 
 Quando uma esteira desenhada entrega a outra esteira desenhada mais baixa, a peça cai da ponta de saída na ponta de entrada da outra. A queda de altura `h` leva o tempo de queda livre, `√(2h/g)` com g = 9,81 m/s² (0,40 m: 0,29 s), que entra no resultado como atraso da ligação (abaixo de 5 cm, a passagem é imediata). Há avisos quando:

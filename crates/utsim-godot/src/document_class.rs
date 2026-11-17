@@ -372,6 +372,9 @@ impl UtsimDocument {
         let Some(a) = crate::outro_app::App::de(&app.to_string()) else {
             return GString::from("App desconhecido.");
         };
+        if a == crate::outro_app::App::Estatistica {
+            return GString::from(self.open_study_in_stats(&node.to_string()).as_str());
+        }
         let Some(file) = self.editor.doc.path().map(|p| p.to_path_buf()) else {
             return GString::from("Salve o modelo antes de abrir no outro app.");
         };
@@ -396,6 +399,30 @@ impl UtsimDocument {
                 }
                 GString::from(e.as_str())
             }
+        }
+    }
+
+    /// The readings of the time study of person `node` as a spreadsheet in the UTSim
+    /// Estatística (`ui_fadiga::csv`, written to the temporary folder): `""`, or why not.
+    /// The model is not handed over: the other app only reads the data.
+    fn open_study_in_stats(&self, node: &str) -> String {
+        let Some(text) = crate::ui_fadiga::csv(self.editor.model(), node) else {
+            return format!("{node} não tem estudo de tempos.");
+        };
+        let model = self
+            .editor
+            .doc
+            .path()
+            .and_then(|p| p.file_stem())
+            .map_or("modelo".to_string(), |s| s.to_string_lossy().into_owned());
+        let dir = std::env::temp_dir().join("utsim").join("estudos");
+        let file = dir.join(crate::ui_fadiga::csv_name(&model, node));
+        if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, text)) {
+            return format!("Não consegui gravar {}: {e}", file.display());
+        }
+        match crate::outro_app::abrir_arquivo(crate::outro_app::App::Estatistica, &file) {
+            Ok(()) => String::new(),
+            Err(e) => e,
         }
     }
 

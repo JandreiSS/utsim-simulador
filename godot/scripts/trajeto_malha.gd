@@ -30,6 +30,7 @@ const FRAME_COLOR := Color(0.33, 0.45, 0.60)
 const GUIDE_COLOR := Color(0.92, 0.66, 0.18)
 const LEG_COLOR := Color(0.55, 0.58, 0.62)
 const ROLLER_COLOR := Color(0.78, 0.80, 0.83)
+const CHUTE_COLOR := Color(0.72, 0.75, 0.78)
 const DECK_COLOR := Color(0.46, 0.47, 0.48)
 const EDGE_COLOR := Color(0.95, 0.80, 0.18)
 
@@ -129,7 +130,9 @@ static func belt(r: Dictionary) -> Node3D:
 	var half := w * 0.5
 	var sides := _sides(line)
 	var gravity := String(r.get("drive", "")) == "gravidade"
-	var channels := String(r.get("style", "")) == "canaletas"
+	# A chute: a smooth steel sheet between high sides, no belt and no rollers.
+	var chute := String(r.get("drive", "")) == "calha"
+	var channels := String(r.get("style", "")) == "canaletas" or chute
 	var parts := _parts_available()
 	# Frames, guides and legs: one mesh, coloured by vertex.
 	var st := SurfaceTool.new()
@@ -161,7 +164,7 @@ static func belt(r: Dictionary) -> Node3D:
 		_bar(st, Vector3(feet[0].x, bottom - 0.03, feet[0].z), Vector3(feet[1].x, bottom - 0.03, feet[1].z), 0.035, LEG_COLOR)
 		if bottom > 1.2:
 			_bar(st, Vector3(feet[0].x, 0.25, feet[0].z), Vector3(feet[1].x, 0.25, feet[1].z), 0.035, LEG_COLOR)
-	if parts:
+	if parts and not chute:
 		_end_drums(root, line, w)
 		if channels:
 			_guide_brackets(root, line, sides, half)
@@ -171,7 +174,18 @@ static func belt(r: Dictionary) -> Node3D:
 	frame.mesh = st.commit()
 	frame.material_override = _material(Color.WHITE, 0.45, 0.55)
 	root.add_child(frame)
-	if gravity:
+	if chute:
+		var sheet := SurfaceTool.new()
+		sheet.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_sweep(sheet, line, sides, -half, half, -0.02, 0.0, CHUTE_COLOR)
+		sheet.generate_normals()
+		var mi := MeshInstance3D.new()
+		mi.name = "Calha"
+		mi.mesh = sheet.commit()
+		mi.material_override = _material(Color.WHITE, 0.25, 0.85)
+		root.add_child(mi)
+		root.set_meta("belt_material", null)
+	elif gravity:
 		var rollers := _rollers(line, sides, w)
 		root.add_child(rollers)
 		root.set_meta("belt_material", null)
