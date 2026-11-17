@@ -200,7 +200,9 @@ No UTSim 3D, ao selecionar uma pessoa com estudo, o painel de propriedades ganha
 com a média medida em cada horário (pontos), a curva ajustada (linha, pelo mesmo ajuste do
 comando) e as pausas sombreadas. Embaixo do gráfico vêm `t0`, o acréscimo da fadiga, `λ` e
 `μ` (estimada ou padrão) e os avisos. A seção é só de leitura: as leituras e a gravação do
-ajuste ficam no UTSim Estatística ou no comando.
+ajuste ficam no UTSim Estatística ou no comando. O botão **Abrir no UTSim Estatística**
+abre as leituras numa planilha do Estatística, uma linha por tempo medido (`tarefa`,
+`metodo`, `hora` e `tempo`), para analisar. O modelo não muda nem fica com o outro app.
 
 ### Tempos próprios
 
