@@ -78,6 +78,10 @@ Quando uma esteira desenhada entrega a outra esteira desenhada mais baixa, a pe�
 
 Um `transfer` próprio na esteira de origem vale no lugar dessa regra.
 
+#### Altura das pontas para quem pega a peça
+
+Uma pessoa que deixa a peça na ponta de entrada (o `transport` de quem alimenta a esteira) ou a pega na ponta de saída (o `transport` da própria esteira) precisa alcançá-la em pé. Há aviso quando a ponta fica acima de 1,75 m do piso (ponha uma plataforma ou desça a ponta) ou abaixo de 0,3 m (ela trabalha agachada). Empilhadeiras e AGVs não entram nessa conta.
+
 #### Inclinação máxima
 
 Acima do limite aparece um aviso, porque a peça escorrega ou tomba.

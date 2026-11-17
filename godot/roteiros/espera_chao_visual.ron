@@ -1,0 +1,19 @@
+// Captura das faixas do espera_chao: a padrão e uma de 3,0 × 1,8 m, com as peças dentro.
+Model(
+    format: 2,
+    name: "espera de chao",
+    run: (stop_time: 60.0, seed: 1, replications: 1),
+    objects: [
+        (name: "fonte_a", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(14)), position: (-4.0, 0.0, 0.0)),
+        (name: "chao_padrao", kind: Queue(), position: (0.0, 0.0, 0.0), waiting_area: Some((kind: Floor))),
+        (name: "posto_a", kind: Processor(process: Const(40.0)), position: (4.0, 0.0, 0.0)),
+        (name: "fonte_b", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(30)), position: (-4.0, 4.0, 0.0)),
+        (name: "chao_grande", kind: Queue(), position: (0.0, 4.0, 0.0), size: Some((3.0, 1.8, 0.004)), waiting_area: Some((kind: Floor))),
+        (name: "posto_b", kind: Processor(process: Const(40.0)), position: (4.0, 4.0, 0.0)),
+        (name: "saida", kind: Sink, position: (8.0, 2.0, 0.0)),
+    ],
+    connections: [
+        ("fonte_a", "chao_padrao"), ("chao_padrao", "posto_a"), ("posto_a", "saida"),
+        ("fonte_b", "chao_grande"), ("chao_grande", "posto_b"), ("posto_b", "saida"),
+    ],
+)
