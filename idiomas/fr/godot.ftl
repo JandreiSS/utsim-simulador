@@ -41,3 +41,5 @@ fadiga-pausa = Pause
 fadiga-curva = Courbe ajustée
 fadiga-media = Moyenne mesurée
 fadiga-erro = Non ajustée : { $erro }
+fadiga-abrir = Ouvrir dans UTSim Estatística
+fadiga-abrir-ajuda = Ouvre les relevés de cette étude des temps dans une feuille de UTSim Estatística (une ligne par temps mesuré : tâche, méthode, heure du poste et temps) pour les analyser. Le modèle ne change pas.
