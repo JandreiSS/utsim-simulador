@@ -1,10 +1,11 @@
-//! egui control panel, block statistics and in-scene labels (Portuguese UI).
+//! egui control panel, block statistics and in-scene labels (texts in `editor.ftl`).
 
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use utsim_core::TallySummary;
 use utsim_fluid::FluidKind;
 use utsim_viewer::editing::NetworkView;
+use utsim_viewer::texto::{fx, tx, vx};
 use utsim_viewer::{fluids, style, view};
 
 use crate::dock::Dock;
@@ -13,11 +14,17 @@ use crate::playback::{Data, FluidSelection, Playback, SPEEDS, Selection};
 
 fn fmt_tally(t: &TallySummary) -> String {
     if t.count == 0 {
-        "sem observações".to_string()
+        tx("ui-sem_observacoes").to_string()
     } else {
-        format!(
-            "n={}  média={:.4}  dp={:.4}  mín={:.4}  máx={:.4}",
-            t.count, t.mean, t.std_dev, t.min, t.max
+        fx(
+            "ui-resumo",
+            &[
+                ("n", vx(&t.count)),
+                ("media", vx(&format!("{:.4}", t.mean))),
+                ("dp", vx(&format!("{:.4}", t.std_dev))),
+                ("min", vx(&format!("{:.4}", t.min))),
+                ("max", vx(&format!("{:.4}", t.max))),
+            ],
         )
     }
 }
@@ -94,7 +101,7 @@ pub fn draw_labels(
 /// change state) how many items they received so far.
 fn state_text(kind: &str, state: Option<utsim_core::State>, received: usize) -> String {
     if kind == "Sink" {
-        format!("recebidos: {received}")
+        fx("ui-recebidos", &[("n", vx(&received))])
     } else {
         style::state_label(state).to_string()
     }
@@ -197,41 +204,50 @@ fn sim_controls(
     cameras: &mut crate::camera_modes::CameraModes,
 ) {
     let tl = &data.timeline;
-    ui.heading("Simulação");
-    ui.label(format!(
-        "{} - replicação {}",
-        data.replay.model, data.replay.replication
+    ui.heading(tx("ui-simulacao"));
+    ui.label(fx(
+        "ui-modelo_replicacao",
+        &[
+            ("modelo", vx(&data.replay.model)),
+            ("n", vx(&data.replay.replication)),
+        ],
     ));
-    ui.label(format!(
-        "{} blocos, {} itens, {} eventos de rastro",
-        tl.block_count(),
-        tl.item_count(),
-        tl.record_count()
+    ui.label(fx(
+        "ui-contagem",
+        &[
+            ("blocos", vx(&tl.block_count())),
+            ("itens", vx(&tl.item_count())),
+            ("eventos", vx(&tl.record_count())),
+        ],
     ));
     ui.separator();
 
     ui.horizontal_wrapped(|ui| {
-        let label = if pb.playing { "Pausar" } else { "Reproduzir" };
+        let label = if pb.playing {
+            tx("ui-pausar")
+        } else {
+            tx("ui-reproduzir")
+        };
         if ui.button(label).clicked() {
             if pb.t >= data.end {
                 pb.t = 0.0;
             }
             pb.playing = !pb.playing;
         }
-        if ui.button("< Evento").clicked() {
+        if ui.button(tx("ui-evento_anterior")).clicked() {
             pb.playing = false;
             let t = pb.t;
             pb.t = tl.prev_event_time(t).unwrap_or(0.0);
         }
-        if ui.button("Evento >").clicked() {
+        if ui.button(tx("ui-evento_seguinte")).clicked() {
             pb.playing = false;
             let t = pb.t;
             pb.t = tl.next_event_time(t).unwrap_or(data.end).min(data.end);
         }
-        if ui.button("Início").clicked() {
+        if ui.button(tx("ui-inicio")).clicked() {
             pb.t = 0.0;
         }
-        if ui.button("Enquadrar (F)").clicked() {
+        if ui.button(tx("editor-enquadrar")).clicked() {
             editor.frame_request = true;
         }
     });
@@ -239,27 +255,33 @@ fn sim_controls(
         if ui.button("-").clicked() {
             pb.slower();
         }
-        ui.label(format!("velocidade x{}", SPEEDS[pb.speed_idx]));
+        ui.label(fx("ui-velocidade", &[("v", vx(&SPEEDS[pb.speed_idx]))]));
         if ui.button("+").clicked() {
             pb.faster();
         }
     });
-    ui.weak("unidades de tempo simulado por segundo");
+    ui.weak(tx("ui-unidades_por_segundo"));
     let mut t = pb.t;
     let slider = egui::Slider::new(&mut t, 0.0..=data.end.max(f64::MIN_POSITIVE))
-        .text("tempo")
+        .text(tx("ui-tempo"))
         .smart_aim(false);
     if ui.add(slider).changed() {
         pb.t = t;
         pb.playing = false;
     }
-    ui.label(format!("tempo simulado: {:.4} de {:.4}", pb.t, data.end));
-    ui.weak("Espaço: reproduzir/pausar | +/-: velocidade | setas: evento anterior/próximo | F: enquadrar");
-    ui.weak("Mouse: esquerdo arrasta (move) e clica (seleciona), direito gira, roda aproxima");
-    ui.weak("Câmera: 1 órbita, 2 seguir, 3 primeira pessoa, 4 do recurso | F3: tempos de quadro");
+    ui.label(fx(
+        "ui-tempo_simulado",
+        &[
+            ("t", vx(&format!("{:.4}", pb.t))),
+            ("fim", vx(&format!("{:.4}", data.end))),
+        ],
+    ));
+    ui.weak(tx("ui-ajuda_teclas"));
+    ui.weak(tx("ui-ajuda_mouse"));
+    ui.weak(tx("ui-ajuda_camera"));
     ui.separator();
 
-    ui.strong("Blocos");
+    ui.strong(tx("ui-blocos"));
     egui::ScrollArea::vertical()
         .id_salt("lista_blocos")
         .max_height(170.0)
@@ -286,7 +308,7 @@ fn sim_controls(
     ui.separator();
 
     if !data.fluid.is_empty() {
-        ui.strong("Fluidos");
+        ui.strong(tx("camada-fluidos"));
         egui::ScrollArea::vertical()
             .id_salt("lista_fluidos")
             .max_height(130.0)
@@ -321,7 +343,7 @@ fn sim_controls(
     }
     match selection.0.filter(|s| *s < data.replay.blocks.len()) {
         None => {
-            ui.label("Clique em um bloco para ver suas estatísticas.");
+            ui.label(tx("ui-clique_em_um_bloco"));
         }
         Some(sel) => block_stats(ui, data, sel, pb.t, cameras),
     }
@@ -374,7 +396,7 @@ pub fn capacity_labels(network: &NetworkView) -> Vec<Label> {
                 (seg.a[2] + seg.b[2]) / 2.0,
             ];
             Some(Label {
-                text: format!("capacidade {capacity}"),
+                text: fx("ui-capacidade_rotulo", &[("n", vx(&capacity))]),
                 position: mid,
                 height: -0.2,
                 selected: false,
@@ -408,65 +430,67 @@ fn fluid_stats(ui: &mut egui::Ui, data: &Data, node: usize, t: f64) {
                     max_in,
                     max_out,
                 }) => {
-                    row(ui, "nível agora", fmt_num(sample.level));
-                    row(ui, "capacidade", fmt_num(*capacity));
+                    row(ui, tx("ui-nivel_agora"), fmt_num(sample.level));
+                    row(ui, tx("ui-capacidade"), fmt_num(*capacity));
                     row(
                         ui,
-                        "ocupação",
+                        tx("ui-ocupacao"),
                         fluids::percent_text(sample.level, *capacity),
                     );
                     row(
                         ui,
-                        "taxa agora",
-                        format!(
-                            "{} por unidade de tempo ({})",
-                            fmt_num(sample.rate),
-                            fluids::rate_label(sample.rate)
+                        tx("ui-taxa_agora"),
+                        fx(
+                            "ui-por_unidade_de_tempo",
+                            &[
+                                ("taxa", vx(&fmt_num(sample.rate))),
+                                ("sentido", vx(&fluids::rate_label(sample.rate))),
+                            ],
                         ),
                     );
-                    row(ui, "nível inicial", fmt_num(*initial));
+                    row(ui, tx("ui-nivel_inicial"), fmt_num(*initial));
                     if let Some(r) = max_in {
-                        row(ui, "entrada máxima", fmt_num(*r));
+                        row(ui, tx("ui-entrada_maxima"), fmt_num(*r));
                     }
                     if let Some(r) = max_out {
-                        row(ui, "saída máxima", fmt_num(*r));
+                        row(ui, tx("ui-saida_maxima"), fmt_num(*r));
                     }
                 }
                 Some(FluidKind::Source { rate }) => {
-                    row(ui, "vazão agora", fmt_num(sample.rate));
-                    row(ui, "vazão da fonte", fmt_num(*rate));
+                    row(ui, tx("ui-vazao_agora"), fmt_num(sample.rate));
+                    row(ui, tx("ui-vazao_da_fonte"), fmt_num(*rate));
                 }
                 Some(FluidKind::Pipe { max_rate }) => {
-                    row(ui, "vazão agora", fmt_num(sample.rate));
-                    row(ui, "vazão máxima", fmt_num(*max_rate));
+                    row(ui, tx("ui-vazao_agora"), fmt_num(sample.rate));
+                    row(ui, tx("ui-vazao_maxima"), fmt_num(*max_rate));
                 }
                 Some(FluidKind::Sink { max_rate }) => {
-                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    row(ui, tx("ui-vazao_agora"), fmt_num(sample.rate));
                     if let Some(r) = max_rate {
-                        row(ui, "vazão máxima", fmt_num(*r));
+                        row(ui, tx("ui-vazao_maxima"), fmt_num(*r));
                     }
                 }
                 Some(FluidKind::FromItems { object, volume }) => {
-                    row(ui, "objeto", object.clone());
-                    row(ui, "volume por item", fmt_num(*volume));
+                    row(ui, tx("ui-objeto"), object.clone());
+                    row(ui, tx("ui-volume_por_item"), fmt_num(*volume));
                 }
                 Some(FluidKind::ToItems {
                     object,
                     volume,
                     max_rate,
                 }) => {
-                    row(ui, "objeto", object.clone());
-                    row(ui, "volume por item", fmt_num(*volume));
-                    row(ui, "acumulado para o próximo item", fmt_num(sample.level));
-                    row(ui, "vazão agora", fmt_num(sample.rate));
+                    row(ui, tx("ui-objeto"), object.clone());
+                    row(ui, tx("ui-volume_por_item"), fmt_num(*volume));
+                    row(ui, tx("ui-acumulado"), fmt_num(sample.level));
+                    row(ui, tx("ui-vazao_agora"), fmt_num(sample.rate));
                     if let Some(r) = max_rate {
-                        row(ui, "vazão máxima", fmt_num(*r));
+                        row(ui, tx("ui-vazao_maxima"), fmt_num(*r));
                     }
                 }
                 None => {}
             }
         });
-    ui.weak("Nível e taxa interpolados a partir do rastro da rede de fluidos.");
+    ui.weak(tx("ui-nivel_interpolado"));
 }
 
 fn block_stats(
@@ -482,15 +506,15 @@ fn block_stats(
     if tl.is_mobile(sel) {
         ui.horizontal(|ui| {
             if ui
-                .button("Seguir este recurso")
-                .on_hover_text("A câmera acompanha o recurso por trás e por cima (2)")
+                .button(tx("ui-seguir_recurso"))
+                .on_hover_text(tx("ui-seguir_recurso_dica"))
                 .clicked()
             {
                 cameras.follow_block(sel);
             }
             if ui
-                .button("Ver do recurso")
-                .on_hover_text("A câmera vai na posição do motorista (4)")
+                .button(tx("ui-ver_do_recurso"))
+                .on_hover_text(tx("ui-ver_do_recurso_dica"))
                 .clicked()
             {
                 cameras.ride_block(sel);
@@ -509,36 +533,36 @@ fn block_stats(
         .show(ui, |ui| {
             let state = tl.block_state(sel, t);
             if block.kind == "Sink" {
-                ui.label("recebidos até agora");
+                ui.label(tx("ui-recebidos_ate_agora"));
                 ui.label(tl.block_received(sel, t).to_string());
             } else {
-                ui.label("estado agora");
+                ui.label(tx("ui-estado_agora"));
                 ui.label(style::state_label(state));
             }
             ui.end_row();
-            ui.label("conteúdo agora");
+            ui.label(tx("ui-conteudo_agora"));
             ui.label(tl.block_content(sel, t).to_string());
             ui.end_row();
             let Some(r) = report else {
                 return;
             };
-            ui.label("entradas");
+            ui.label(tx("ui-entradas"));
             ui.label(r.input.to_string());
             ui.end_row();
-            ui.label("saídas");
+            ui.label(tx("ui-saidas"));
             ui.label(r.output.to_string());
             ui.end_row();
-            ui.label("conteúdo médio");
+            ui.label(tx("ui-conteudo_medio"));
             ui.label(format!("{:.4}", r.content_mean));
             ui.end_row();
-            ui.label("conteúdo máximo");
+            ui.label(tx("ui-conteudo_maximo"));
             ui.label(format!("{}", r.content_max));
             ui.end_row();
-            ui.label("tempo de permanência");
+            ui.label(tx("ui-tempo_de_permanencia"));
             ui.label(fmt_tally(&r.staytime));
             ui.end_row();
             for (name, frac) in &r.states {
-                ui.label(format!("fração em {name}"));
+                ui.label(fx("ui-fracao_em", &[("estado", vx(name))]));
                 ui.label(format!("{:.2}%", frac * 100.0));
                 ui.end_row();
             }
@@ -548,5 +572,5 @@ fn block_stats(
                 ui.end_row();
             }
         });
-    ui.weak("Estatísticas finais da replicação (janela após o aquecimento).");
+    ui.weak(tx("ui-estatisticas_finais"));
 }
