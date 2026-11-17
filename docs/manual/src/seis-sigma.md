@@ -783,6 +783,7 @@ Escolha o conjunto, a análise e as colunas:
 | MSA: concordância de atributos | item, avaliador e resposta, e a coluna do padrão quando há |
 | Experimento fatorial 2^k | as colunas dos fatores, a resposta e a ordem máxima das interações |
 | Superfície de resposta | as colunas dos fatores (codificadas, 2 a 6) e a resposta |
+| Fatorial geral (ANOVA) | as colunas dos fatores (cada valor diferente é um nível) e a resposta |
 | Desejabilidade de várias respostas | as colunas dos fatores e, para cada resposta, a coluna, o objetivo (maximizar, minimizar ou chegar no alvo), os limites e a importância |
 | Igualdade de variâncias (Levene com a mediana e Bartlett) | coluna dos valores e coluna dos grupos |
 | Kruskal-Wallis e teste da mediana de Mood | coluna dos valores e coluna dos grupos |
@@ -883,6 +884,14 @@ fatores mexem no Y e se eles agem juntos.
   arriscada; ele precisa de ao menos um ponto central. Na planilha, a coluna `centro` diz
   `axial` nos pontos axiais. As réplicas não se aplicam: o erro vem dos pontos centrais
   (use de 3 a 5).
+- **Fatorial geral**: quando um fator tem mais de dois níveis (três fornecedores, quatro
+  máquinas), escreva os níveis de cada fator separados por `;` (de 2 a 10). O plano cruza
+  todos os níveis de todos os fatores e repete cada combinação pelas réplicas (até 1000
+  corridas, sem pontos centrais). Nas colunas A, B… a planilha põe a posição do nível na
+  lista, e nas colunas com o nome do fator, o nível escrito. A análise "Fatorial geral
+  (ANOVA)" lê cada coluna como categorias e testa os efeitos principais e as interações de
+  dois fatores. Sem réplicas e com dois fatores não sobra erro para os testes, então use
+  réplicas.
 - **Réplicas** repetem cada corrida (dão o erro puro); **pontos centrais** são corridas com
   todos os fatores no centro (dão erro sem dobrar o experimento e mostram curvatura).
 - **Semente**: a ordem das corridas é sorteada a partir dela. A mesma semente dá a mesma

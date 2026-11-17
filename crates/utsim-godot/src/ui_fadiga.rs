@@ -2,9 +2,10 @@
 //! study): for each task and method of the `study` of the person, the means measured at
 //! each hour of the shift and the curve fitted by `utsim_fit::fatigue` (the same fit as
 //! `utsim pessoa ajustar`), with the pauses shaded. Read only: the readings and the fit are
-//! edited in UTSim Estatística (or with the command).
+//! edited in UTSim Estatística (or with the command). "Abrir no UTSim Estatística" hands it
+//! the readings as a spreadsheet ([`csv`]).
 
-use egui::{Color32, Label, RichText, Ui};
+use egui::{Button, Color32, Label, RichText, Ui};
 use egui_plot::{Line, Plot, PlotPoints, Points, Polygon};
 use utsim_model::{Model, ObjectDef};
 use utsim_ui_tema::colors;
@@ -155,8 +156,60 @@ pub fn curvas(model: &Model, name: &str) -> Vec<CurvaFadiga> {
         .collect()
 }
 
-/// Draws the curves (under the section title, already drawn by the panel).
-pub fn show(ui: &mut Ui, curvas: &[CurvaFadiga], reg: &mut Registry) {
+/// The readings of the time study of `name` as a spreadsheet for the UTSim Estatística:
+/// one row per measured time, `tarefa;metodo;hora;tempo`, with `;` and the decimal comma
+/// (what its importer reads); `None` without a study.
+pub fn csv(model: &Model, name: &str) -> Option<String> {
+    let study = model
+        .objects
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| o.person.as_deref())
+        .and_then(|p| p.study.as_ref())?;
+    let num = |x: f64| format!("{x}").replace('.', ",");
+    // A `;` or a quote inside a task or method name goes quoted.
+    let cell = |s: &str| {
+        if s.contains([';', '"', '\n']) {
+            format!("\"{}\"", s.replace('"', "\"\""))
+        } else {
+            s.to_string()
+        }
+    };
+    let mut out = String::from("tarefa;metodo;hora;tempo\n");
+    for r in &study.readings {
+        for &t in &r.times {
+            out.push_str(&format!(
+                "{};{};{};{}\n",
+                cell(&r.task),
+                cell(&r.method),
+                num(r.hour),
+                num(t)
+            ));
+        }
+    }
+    Some(out)
+}
+
+/// The file name of the spreadsheet of `person` of `model` (the file's stem): letters,
+/// digits, `-` and `_` only.
+pub fn csv_name(model: &str, person: &str) -> String {
+    let clean = |s: &str| -> String {
+        s.chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect()
+    };
+    format!("{}-{}-estudo.csv", clean(model), clean(person))
+}
+
+/// Draws the curves (under the section title, already drawn by the panel). True when
+/// "Abrir no UTSim Estatística" was clicked.
+pub fn show(ui: &mut Ui, curvas: &[CurvaFadiga], reg: &mut Registry) -> bool {
     ui.add(
         Label::new(
             RichText::new(tx("fadiga-nota"))
@@ -165,6 +218,12 @@ pub fn show(ui: &mut Ui, curvas: &[CurvaFadiga], reg: &mut Registry) {
         )
         .wrap(),
     );
+    let texto = tx("fadiga-abrir");
+    let r = ui
+        .add_sized([ui.available_width(), 26.0], Button::new(texto))
+        .on_hover_text(tx("fadiga-abrir-ajuda"));
+    named(ui, reg, "Fadiga_AbrirEstatistica", &r, texto);
+    let clicked = r.clicked();
     for (k, c) in curvas.iter().enumerate() {
         let r = ui.add(Label::new(RichText::new(&c.titulo).color(colors::TEXT).strong()).wrap());
         named(ui, reg, &format!("Fadiga_Curva_{k}"), &r, &c.titulo);
@@ -243,6 +302,7 @@ pub fn show(ui: &mut Ui, curvas: &[CurvaFadiga], reg: &mut Registry) {
             );
         }
     }
+    clicked
 }
 
 #[cfg(test)]
@@ -277,6 +337,28 @@ mod tests {
         }
         // Rested after the pause: the curve falls across it.
         assert!(at(4.6) < at(3.9));
+        // The spreadsheet for the UTSim Estatística: one row per measured time.
+        let text = csv(&model, "ana").unwrap();
+        let mut lines = text.lines();
+        assert_eq!(lines.next(), Some("tarefa;metodo;hora;tempo"));
+        let rows: Vec<&str> = lines.collect();
+        let times: usize = model
+            .objects
+            .iter()
+            .find(|o| o.name == "ana")
+            .and_then(|o| o.person.as_deref())
+            .and_then(|p| p.study.as_ref())
+            .map(|s| s.readings.iter().map(|r| r.times.len()).sum())
+            .unwrap();
+        assert_eq!(rows.len(), times);
+        assert!(
+            rows.iter()
+                .all(|r| r.starts_with("torno;") && r.split(';').count() == 4),
+            "{rows:?}"
+        );
+        assert!(rows.iter().any(|r| r.contains(',')), "decimal comma");
+        assert!(csv(&model, "bruno").is_none());
+        assert_eq!(csv_name("Linha 1", "ana/b"), "Linha_1-ana_b-estudo.csv");
         // No study, no curve.
         assert!(curvas(&model, "bruno").is_empty());
         assert!(curvas(&model, "expedicao").is_empty());
