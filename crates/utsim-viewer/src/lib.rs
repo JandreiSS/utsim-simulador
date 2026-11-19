@@ -18,6 +18,7 @@ pub mod properties;
 pub mod results;
 pub mod roteiro;
 pub mod source;
+pub mod texto;
 pub mod view;
 
 // Pure scene modules, moved to the engine-independent `utsim-scene` crate and
