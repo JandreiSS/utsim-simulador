@@ -31,7 +31,7 @@ Com `UTSIM_BLENDER=1`, o `scripts/verificar.sh` gera tudo de novo e falha se alg
   clipes (em laço ou não, e os nós que movem) e as medidas que a ponte usa (`dados`).
 
 Sem compressão Draco ou meshopt: o `GLTFDocument` do Godot não as lê. A leveza vem do
-nível de detalhe baixo e de malhas sem textura (cerca de 1,4 MB para os 28 arquivos).
+nível de detalhe baixo e de malhas sem textura (menos de 3 MB para todos os elementos, sem contar as pessoas).
 
 ## Convenções
 
@@ -305,6 +305,25 @@ os clipes corrigidos, com os mesmos nomes de nó e de clipe.
   `Interact` (0,17 m à esquerda e 0,58 m à frente do ponto, a 1,3 m do chão) cai na tela.
   `ponto_porta` continua 0,6 m além. Na prensa o operador fica no centro, de frente para a
   mesa, porque o painel fica junto da saída da peça.
+
+## Forno de padaria (`forno.glb`)
+
+Forno rotativo de padaria, de 1,5 × 1,3 × 2,1 m, mais a coifa e a chaminé
+(`forno` em `tools/blender/elementos/maquinas.py`). É uma máquina como o `cnc`: tem os mesmos
+pontos, clipes e estados, e pode entrar no lugar dele sem ajuste na cena.
+
+- Nós: `chassi`, `porta` (de vidro, com dobradiça vertical na aresta esquerda), `carrinho` (o
+  carrinho de assadeiras com os pães), `tampa` (manutenção do queimador, no lado `+x`) e `luz`.
+- Pontos: os cinco das máquinas e `ponto_puxador`, filho da `porta`, no meio do puxador.
+  `ponto_peca` é filho do `carrinho` e fica na assadeira vazia do meio, no eixo dele: a peça gira
+  no lugar enquanto assa. `ponto_entrada` e `ponto_saida` ficam na frente, um de cada lado da porta.
+- Clipes: `ciclo` (o carrinho dá duas voltas em z), `porta_abrir` (a porta gira `dados.porta_giro`
+  graus em z, para fora), `setup` (o carrinho vai a um quarto de volta e retorna), `quebra` (a
+  tampa do queimador abre) e `ciclo_auto`.
+- O operador fica no painel, à direita da porta, fora do arco em que ela abre.
+- `dados`: `porta_giro` (−95), `camara` e `carrinho` (`[x, y, z]`, em metros).
+
+O teste `o_forno_abre_a_porta_para_fora_e_gira_o_carrinho` confere a porta, o operador e a peça.
 
 ## Ponte rolante (`ponte_rolante.glb`)
 

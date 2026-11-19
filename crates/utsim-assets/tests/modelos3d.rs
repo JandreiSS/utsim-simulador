@@ -273,7 +273,7 @@ fn o_catalogo_e_os_arquivos_batem() {
 #[test]
 fn os_arquivos_sao_leves() {
     let cat = catalogo();
-    // Os elementos somam no máximo 2,5 MB; as pessoas (MakeHuman, com rosto, mãos e roupa de
+    // Os elementos somam no máximo 3 MB; as pessoas (MakeHuman, com rosto, mãos e roupa de
     // verdade, mais os oito EPIs) têm orçamento próprio, por arquivo.
     let mut total = 0u64;
     for (chave, item) in &cat {
@@ -295,7 +295,7 @@ fn os_arquivos_sao_leves() {
         assert!(tri <= lim_tri, "{chave}: {tri} triângulos");
     }
     assert!(
-        total <= 5 * 512 * 1024,
+        total <= 3 * 1024 * 1024,
         "assets/modelos3d tem {total} bytes"
     );
 }
@@ -334,6 +334,19 @@ const CONTRATO: &[Contrato] = &[
             "ponto_peca",
             "ponto_entrada",
             "ponto_saida",
+        ],
+        &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
+    ),
+    (
+        "forno",
+        &["chassi", "porta", "luz", "carrinho", "tampa"],
+        &[
+            "ponto_operador",
+            "ponto_porta",
+            "ponto_peca",
+            "ponto_entrada",
+            "ponto_saida",
+            "ponto_puxador",
         ],
         &["ciclo", "porta_abrir", "setup", "quebra", "ciclo_auto"],
     ),
@@ -512,7 +525,7 @@ fn cada_elemento_tem_os_nos_pontos_e_clipes_do_contrato() {
 #[test]
 fn o_operador_fica_fora_da_maquina_e_olha_para_ela() {
     let cat = catalogo();
-    for nome in ["cnc", "prensa", "injetora", "posto"] {
+    for nome in ["cnc", "prensa", "injetora", "forno", "posto"] {
         let item = &cat[nome];
         let min = v3(&item["minimo"]);
         let op = &item["pontos"]["ponto_operador"];
@@ -633,11 +646,13 @@ fn os_clipes_movem_o_que_devem() {
             ("cnc", "ciclo"),
             ("prensa", "ciclo"),
             ("injetora", "ciclo"),
+            ("forno", "ciclo"),
             ("robo", "ciclo"),
             ("esteira", "rolar"),
             ("cnc", "setup"),
             ("prensa", "setup"),
             ("injetora", "setup"),
+            ("forno", "setup"),
             ("posto", "setup"),
             ("robo", "setup"),
         ] {
@@ -763,7 +778,7 @@ fn os_estados_apontam_para_clipes_e_pontos_do_elemento() {
     // As máquinas fazem tudo; a célula só abre o portão; a empilhadeira só tira o palete do
     // chão (0,10 m do curso do garfo).
     let cat = catalogo();
-    for m in ["cnc", "prensa", "injetora"] {
+    for m in ["cnc", "prensa", "injetora", "forno"] {
         assert_eq!(cat[m]["estados"].as_object().unwrap().len(), 8, "{m}");
     }
     let celula: BTreeSet<&str> = cat["celula"]["estados"]
@@ -818,7 +833,7 @@ fn a_peca_segue_pontos_do_elemento_em_cada_estado() {
         }
     }
     // Máquina: entra pela entrada, fica no lugar da peça, sai pela saída.
-    for m in ["cnc", "prensa", "injetora", "posto"] {
+    for m in ["cnc", "prensa", "injetora", "forno", "posto"] {
         let p = &cat[m]["peca"];
         assert_eq!(p["entering"][0][2], "ponto_entrada", "{m}");
         assert_eq!(p["processing"][0][2], "ponto_peca", "{m}");
@@ -1130,6 +1145,61 @@ fn os_ventiladores_tem_escala_real_e_cabem_na_caixa() {
                 );
             }
         }
+    }
+}
+
+/// O forno de padaria: a porta gira para fora sem passar pelo operador, e a peça fica na
+/// assadeira vazia do meio, no eixo do carrinho, na mesma altura nos dois níveis de detalhe.
+#[test]
+fn o_forno_abre_a_porta_para_fora_e_gira_o_carrinho() {
+    let cat = catalogo();
+    let giro = cat["forno"]["dados"]["porta_giro"].as_f64().unwrap() as f32;
+    assert!((-100.0..=-90.0).contains(&giro), "porta gira {giro}");
+    assert_eq!(
+        cat["forno"]["pontos"]["ponto_peca"]["pos"],
+        cat["forno_medio"]["pontos"]["ponto_peca"]["pos"]
+    );
+    assert_eq!(cat["forno"]["pontos"]["ponto_peca"]["pai"], "carrinho");
+    assert_eq!(cat["forno"]["pontos"]["ponto_puxador"]["pai"], "porta");
+    let op = v3(&cat["forno"]["pontos"]["ponto_operador"]["pos"]);
+    for sufixo in ["", "_medio"] {
+        let g = Glb::ler(&format!("forno{sufixo}.glb"));
+        let rep = g.pose(None, false);
+        let fechada = g.pose(Some("porta_abrir"), false)["ponto_puxador"];
+        let aberta = g.pose(Some("porta_abrir"), true)["ponto_puxador"];
+        assert!(
+            perto(fechada, rep["ponto_puxador"], 1e-4),
+            "fechada em repouso"
+        );
+        assert!(
+            aberta[1] < fechada[1] - 0.7,
+            "{sufixo}: puxador em {aberta:?}"
+        );
+        assert!(aberta[0] < -0.6, "{sufixo}: puxador em {aberta:?}");
+        assert!((aberta[2] - fechada[2]).abs() < 1e-4, "a porta não sobe");
+        // O operador fica fora do arco da porta: mais longe da dobradiça do que o puxador.
+        let dob = rep["porta"];
+        let raio = ((fechada[0] - dob[0]).powi(2) + (fechada[1] - dob[1]).powi(2)).sqrt();
+        let longe = ((op[0] - dob[0]).powi(2) + (op[1] - dob[1]).powi(2)).sqrt();
+        assert!(
+            longe > raio + 0.4,
+            "{sufixo}: porta de {raio} m, operador a {longe} m"
+        );
+        // Sem operador: porta aberta quando a peça entra e sai, fechada enquanto assa.
+        for f in [0.0, 2.0 / 24.0, 22.0 / 24.0, 1.0] {
+            let p = g.no_em("ciclo_auto", f, "ponto_puxador");
+            assert!(perto(p, aberta, 1e-3), "{sufixo}: porta em {f}: {p:?}");
+        }
+        for f in [4.0 / 24.0, 20.0 / 24.0] {
+            let p = g.no_em("ciclo_auto", f, "ponto_puxador");
+            assert!(perto(p, fechada, 1e-3), "{sufixo}: porta em {f}: {p:?}");
+        }
+        // A peça fica no eixo do carrinho: gira no lugar, sem sair da assadeira.
+        let peca = g.pose_em("setup", 0.5)["ponto_peca"];
+        assert!(
+            perto(peca, rep["ponto_peca"], 1e-3),
+            "{sufixo}: peça em {peca:?}"
+        );
     }
 }
 

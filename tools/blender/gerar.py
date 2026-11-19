@@ -30,6 +30,7 @@ ELEMENTOS = {
     "cnc": maquinas.cnc,
     "prensa": maquinas.prensa,
     "injetora": maquinas.injetora,
+    "forno": maquinas.forno,
     "posto": postos.posto,
     "robo": postos.robo,
     "celula": postos.celula,
