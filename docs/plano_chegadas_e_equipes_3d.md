@@ -249,6 +249,14 @@ Duas extensões, separadas por risco:
 
 **Estimativa** 8–12 h. **Modelo** Opus.
 
+**Feito em 2026-11-19.** Os dois: `text_labels` (`rotulos_texto`) na fonte, nas linhas da
+tabela e nos tipos de item, e `label_exprs` (`rotulos_expr`) na fonte, calculados na criação
+com o avaliador Rhai dos fluxos (`utsim_script::compile_label_exprs`, gancho
+`utsim_core::script::LabelScript`), com `now`, `count` e `item`. Linha no `utsim check` e
+testes em `crates/utsim-model/tests/chegadas_e_equipes.rs`. **Para a Interface:** os dois
+campos ainda não aparecem no inspetor da fonte nem na grade da tabela de chegadas (coluna de
+textos por linha), e a etiqueta do item no 3D pode mostrar os rótulos de texto.
+
 ### C5. Tabela de chegadas de planilha
 
 A lista `data` (hoje só para distribuições) passa a aceitar tabelas: `(table:
