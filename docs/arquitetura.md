@@ -652,6 +652,17 @@ espera pede `Ctx::lane_wait` e recebe `MSG_LANE_CHANGED` quando uma reserva muda
 uma ponte fica livre (`Ctx::lane_touch`), e então tenta de novo. Como cada reserva nova não
 encosta nas outras, duas pontes nunca chegam a menos de `gap` uma da outra.
 
+Com `keep_clear`, as pontes e os recursos móveis dividem um quadro (`utsim_objects::loads`,
+um por simulação). Antes do trecho carregado, a ponte reserva a faixa que a carga varre: o
+fecho convexo do quadrado de `load_zone` nas duas pontas, até o fim do trecho. Cada recurso
+móvel anda o caminho em pedaços, como o AGV, e anota no quadro o pedaço que está andando. No
+começo de cada pedaço, se ele entra numa faixa reservada antes de ela acabar, o pedaço é
+cortado na borda e, na borda, entra um pedaço parado até a faixa acabar. A ponte, antes de
+andar com a carga, procura no quadro quem atravessa a faixa durante o trecho. Se houver
+alguém, ela já reserva a faixa até a saída dessa pessoa mais o trecho, e tenta de novo
+quando a pessoa sai. Uma pessoa só espera uma reserva com fim conhecido, e a ponte só espera
+quem está andando: não há espera circular.
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)
