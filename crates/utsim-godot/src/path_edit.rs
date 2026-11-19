@@ -235,12 +235,13 @@ pub fn snap_along(
         return s;
     }
     // On the line of a drawn belt, away from its ends: a T joint (merge or divert).
-    for r in routes(model) {
-        if skip == Some(r.name.as_str()) {
+    for (name, origin, route) in drawn(model) {
+        if skip == Some(name) {
             continue;
         }
-        let (first, last) = (r.line[0], r.line[r.line.len() - 1]);
-        for w in r.line.windows(2) {
+        let line = route.line(origin);
+        let (first, last) = (line[0], line[line.len() - 1]);
+        for w in line.windows(2) {
             let (u, v) = (w[0], w[1]);
             let (dx, dy) = (v[0] - u[0], v[1] - u[1]);
             let len2 = dx * dx + dy * dy;
@@ -257,7 +258,7 @@ pub fn snap_along(
                 Snap {
                     at: q,
                     what: "linha",
-                    object: Some(r.name.clone()),
+                    object: Some(name.to_string()),
                     output: None,
                 },
                 &mut best,
@@ -431,6 +432,15 @@ pub struct RouteRow {
     pub capacity: usize,
 }
 
+/// As esteiras desenhadas sem o resto da linha do painel (nome, posição e trajeto): o
+/// encaixe e a busca de nós e trechos rodam a cada movimento do cursor e só precisam disso.
+fn drawn(model: &Model) -> impl Iterator<Item = (&str, [f64; 3], &BeltRoute)> {
+    model
+        .objects
+        .iter()
+        .filter_map(|o| Some((o.name.as_str(), o.position, tr::valid_route(&o.kind)?)))
+}
+
 pub fn routes(model: &Model) -> Vec<RouteRow> {
     model
         .objects
@@ -478,9 +488,9 @@ pub fn node_near(model: &Model, p: [f64; 3], radius: f64) -> Option<(String, usi
             best = Some((d, v));
         }
     };
-    for r in routes(model) {
-        for (i, n) in r.nodes.iter().enumerate() {
-            take(d2(p, *n), (r.name.clone(), i, false));
+    for (name, origin, r) in drawn(model) {
+        for (i, n) in abs_nodes(origin, r).into_iter().enumerate() {
+            take(d2(p, n), (name.to_string(), i, false));
         }
     }
     for a in &model.aisles {
@@ -503,9 +513,9 @@ pub fn segment_near(model: &Model, p: [f64; 3], radius: f64) -> Option<(String, 
     };
     let seg =
         |a: [f64; 3], b: [f64; 3]| utsim_nav::geom::point_segment(q, [a[0], a[1]], [b[0], b[1]]);
-    for r in routes(model) {
-        for (i, w) in r.nodes.windows(2).enumerate() {
-            take(seg(w[0], w[1]), (r.name.clone(), i, false));
+    for (name, origin, r) in drawn(model) {
+        for (i, w) in abs_nodes(origin, r).windows(2).enumerate() {
+            take(seg(w[0], w[1]), (name.to_string(), i, false));
         }
     }
     for a in &model.aisles {
@@ -987,12 +997,12 @@ impl Editor {
     /// Divide a esteira `name` no ponto da linha dela mais perto de `p` (em planta): um nó
     /// novo ali e as duas metades em série. Devolve o nome da segunda metade.
     pub fn split_at(&mut self, name: &str, p: [f64; 3]) -> Result<String, String> {
-        let row = routes(self.model())
-            .into_iter()
-            .find(|r| r.name == name)
+        let nodes = drawn(self.model())
+            .find(|(n, ..)| *n == name)
+            .map(|(_, origin, r)| abs_nodes(origin, r))
             .ok_or_else(|| format!("'{name}' não é uma esteira desenhada"))?;
-        let mut best = (f64::INFINITY, 0usize, row.nodes[0]);
-        for (i, w) in row.nodes.windows(2).enumerate() {
+        let mut best = (f64::INFINITY, 0usize, nodes[0]);
+        for (i, w) in nodes.windows(2).enumerate() {
             let (u, v) = (w[0], w[1]);
             let (dx, dy) = (v[0] - u[0], v[1] - u[1]);
             let len2 = (dx * dx + dy * dy).max(1e-12);
@@ -1284,6 +1294,152 @@ impl Editor {
         self.apply(Command::Batch(batch))?;
         Ok(name2)
     }
+
+    /// Apaga o trecho entre os nós `index` e `index + 1`. Numa ponta, o nó da ponta sai e
+    /// o trajeto encurta; no meio, o trajeto vira dois (a segunda metade fica com as
+    /// saídas e não se liga mais à da frente). Um passo de desfazer; devolve o nome do
+    /// trajeto novo (vazio se não houve).
+    pub fn cut_segment(&mut self, name: &str, path: bool, index: usize) -> Result<String, String> {
+        let n = if path {
+            self.model()
+                .aisles
+                .iter()
+                .find(|a| a.name == name)
+                .map(|a| a.points.len())
+                .ok_or_else(|| format!("não existe o caminho '{name}'"))?
+        } else {
+            self.route_of(name)?.1.nodes.len()
+        };
+        if index + 1 >= n {
+            return Err("não há trecho depois do último nó".into());
+        }
+        if n <= 2 {
+            return Err(if path {
+                "o caminho só tem esse trecho: apague o caminho inteiro".into()
+            } else {
+                "a esteira só tem esse trecho: apague a esteira inteira".into()
+            });
+        }
+        if index == 0 || index + 2 == n {
+            let end = if index == 0 { 0 } else { n - 1 };
+            return self.group(|e| {
+                e.remove_route_node(name, path, end)?;
+                if path {
+                    let k = if index == 0 { 0 } else { n - 2 };
+                    e.edit_path(name, |a| a.set_radius(k, 0.0))?;
+                } else {
+                    e.edit_route(name, |r, _| {
+                        if let Some(x) = if index == 0 {
+                            r.nodes.first_mut()
+                        } else {
+                            r.nodes.last_mut()
+                        } {
+                            x.radius = None;
+                        }
+                    })?;
+                }
+                Ok(String::new())
+            });
+        }
+        if path {
+            let a = self
+                .model()
+                .aisles
+                .iter()
+                .find(|a| a.name == name)
+                .cloned()
+                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+            let mut first = a.clone();
+            while first.points.len() > index + 1 {
+                first.remove_point(first.points.len() - 1);
+            }
+            first.set_radius(index, 0.0);
+            let mut second = a;
+            for _ in 0..=index {
+                second.remove_point(0);
+            }
+            second.set_radius(0, 0.0);
+            let name2 = self.doc.unique_aisle_name();
+            second.name = name2.clone();
+            self.apply(Command::Batch(vec![
+                Command::SetAisle {
+                    name: name.to_string(),
+                    aisle: Box::new(first),
+                },
+                Command::AddAisle(Box::new(second)),
+            ]))?;
+            return Ok(name2);
+        }
+        // A belt: split at the far node of the segment, then the first half drops that
+        // node and stops feeding the second.
+        self.group(|e| {
+            let name2 = e.split_route(name, index + 1)?;
+            e.apply(Command::Disconnect {
+                from: name.to_string(),
+                to: name2.clone(),
+            })?;
+            e.edit_route(name, |r, _| {
+                r.nodes.pop();
+                if let Some(x) = r.nodes.last_mut() {
+                    x.radius = None;
+                }
+            })?;
+            Ok(name2)
+        })
+    }
+
+    /// Inverte o sentido do trajeto: os nós na ordem contrária e, numa esteira, as
+    /// ligações também (quem a alimentava passa a recebê-la). Um passo de desfazer.
+    pub fn reverse_route(&mut self, name: &str, path: bool) -> Result<(), String> {
+        if path {
+            return self.edit_path(name, |a| a.reverse());
+        }
+        let ins: Vec<String> = self
+            .model()
+            .connections
+            .iter()
+            .filter(|(_, t)| t == name)
+            .map(|(f, _)| f.clone())
+            .collect();
+        let outs: Vec<String> = self
+            .model()
+            .connections
+            .iter()
+            .filter(|(f, _)| f == name)
+            .map(|(_, t)| t.clone())
+            .collect();
+        let (_, mut r) = self.route_of(name)?;
+        r.nodes.reverse();
+        let mut batch = vec![Command::SetRoute {
+            name: name.to_string(),
+            route: Some(Box::new(r)),
+        }];
+        for f in &ins {
+            batch.push(Command::Disconnect {
+                from: f.clone(),
+                to: name.to_string(),
+            });
+        }
+        for t in &outs {
+            batch.push(Command::Disconnect {
+                from: name.to_string(),
+                to: t.clone(),
+            });
+        }
+        for t in &outs {
+            batch.push(Command::Connect {
+                from: t.clone(),
+                to: name.to_string(),
+            });
+        }
+        for f in &ins {
+            batch.push(Command::Connect {
+                from: name.to_string(),
+                to: f.clone(),
+            });
+        }
+        self.apply(Command::Batch(batch))
+    }
 }
 
 #[cfg(test)]
@@ -1369,6 +1525,101 @@ mod tests {
         let total: f64 = rows.iter().map(|r| r.length).sum();
         assert!((total - 8.0).abs() < 1e-9);
         assert!(m.validate().is_ok());
+    }
+
+    #[test]
+    fn cutting_a_middle_segment_leaves_two_belts_apart() {
+        let mut e = Editor::new("t");
+        let name = belt(
+            &mut e,
+            &[
+                [0.0, 0.0, 0.8],
+                [4.0, 0.0, 0.8],
+                [8.0, 0.0, 0.8],
+                [12.0, 0.0, 0.8],
+            ],
+        );
+        let out = e.add("Sink", [16.0, 0.0, 0.0]).unwrap();
+        e.apply(Command::Connect {
+            from: name.clone(),
+            to: out.clone(),
+        })
+        .unwrap();
+        let before = e.model().clone();
+        let second = e.cut_segment(&name, false, 1).unwrap();
+        let m = e.model();
+        assert!(!m.connections.contains(&(name.clone(), second.clone())));
+        assert!(m.connections.contains(&(second.clone(), out)));
+        let rows = routes(m);
+        let total: f64 = rows.iter().map(|r| r.length).sum();
+        assert!((total - 8.0).abs() < 1e-9, "{total}");
+        assert_eq!(
+            rows.iter().find(|r| r.name == name).unwrap().nodes[1],
+            [4.0, 0.0, 0.8]
+        );
+        assert_eq!(
+            rows.iter().find(|r| r.name == second).unwrap().nodes[0],
+            [8.0, 0.0, 0.8]
+        );
+        // One undo step.
+        e.doc.undo();
+        assert_eq!(e.model(), &before);
+    }
+
+    #[test]
+    fn cutting_an_end_segment_shortens_the_route() {
+        let mut e = Editor::new("t");
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8], [8.0, 0.0, 0.8]]);
+        assert_eq!(e.cut_segment(&name, false, 1).unwrap(), "");
+        let r = &routes(e.model())[0];
+        assert_eq!(r.nodes, vec![[0.0, 0.0, 0.8], [4.0, 0.0, 0.8]]);
+        assert!(e.cut_segment(&name, false, 0).is_err());
+        let path = e
+            .add_floor_path(
+                &[
+                    [0.0, 5.0, 0.0],
+                    [4.0, 5.0, 0.0],
+                    [8.0, 5.0, 0.0],
+                    [12.0, 5.0, 0.0],
+                ],
+                &[],
+                1.2,
+            )
+            .unwrap();
+        let other = e.cut_segment(&path, true, 1).unwrap();
+        let a = |n: &str| {
+            e.model()
+                .aisles
+                .iter()
+                .find(|a| a.name == n)
+                .unwrap()
+                .points
+                .clone()
+        };
+        assert_eq!(a(&path), vec![[0.0, 5.0], [4.0, 5.0]]);
+        assert_eq!(a(&other), vec![[8.0, 5.0], [12.0, 5.0]]);
+        e.cut_segment(&path, true, 0).unwrap_err();
+        e.cut_segment(&other, true, 0).unwrap_err();
+    }
+
+    #[test]
+    fn reversing_a_belt_flips_its_nodes_and_links() {
+        let mut e = Editor::new("t");
+        let src = e.add("Source", [-2.0, 0.0, 0.0]).unwrap();
+        let name = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 1.0], [4.0, 4.0, 1.0]]);
+        let out = e.add("Sink", [8.0, 4.0, 0.0]).unwrap();
+        for (f, t) in [(src.clone(), name.clone()), (name.clone(), out.clone())] {
+            e.apply(Command::Connect { from: f, to: t }).unwrap();
+        }
+        e.reverse_route(&name, false).unwrap();
+        let m = e.model();
+        assert_eq!(routes(m)[0].nodes[0], [4.0, 4.0, 1.0]);
+        assert_eq!(routes(m)[0].nodes[2], [0.0, 0.0, 0.8]);
+        assert!(m.connections.contains(&(out.clone(), name.clone())));
+        assert!(m.connections.contains(&(name.clone(), src.clone())));
+        assert!(!m.connections.contains(&(src, name.clone())));
+        e.doc.undo();
+        assert_eq!(routes(e.model())[0].nodes[0], [0.0, 0.0, 0.8]);
     }
 
     #[test]

@@ -7,6 +7,7 @@ use utsim_core::Dist;
 use utsim_model::{ObjectDef, ObjectKind, RunSettings};
 
 use super::ron_text as ron;
+use crate::texto::tx;
 
 /// How a field is edited.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,6 +65,23 @@ pub fn kind_name(kind: &ObjectKind) -> &'static str {
         ObjectKind::Conveyor { .. } => "Esteira",
         ObjectKind::Rack { .. } => "Porta-paletes",
     }
+}
+
+/// The name of an object kind in the current language ([`kind_name`] stays Portuguese).
+pub fn kind_label(kind: &ObjectKind) -> &'static str {
+    tx(match kind {
+        ObjectKind::Source { .. } => "tipo-chegada",
+        ObjectKind::Queue { .. } => "tipo-fila",
+        ObjectKind::Processor { .. } => "tipo-processo",
+        ObjectKind::Combiner { .. } => "tipo-montagem",
+        ObjectKind::Separator { .. } => "tipo-desmontagem",
+        ObjectKind::Sink => "tipo-saida",
+        ObjectKind::Transporter { .. } => "tipo-transportador",
+        ObjectKind::Crane { .. } => "tipo-ponte-rolante",
+        ObjectKind::Dispatcher { .. } => "tipo-despachante",
+        ObjectKind::Conveyor { .. } => "tipo-esteira",
+        ObjectKind::Rack { .. } => "tipo-porta-paletes",
+    })
 }
 
 /// Fields specific to the kind of object.
@@ -173,15 +191,17 @@ pub fn transporter_names(objects: &[ObjectDef]) -> Vec<&str> {
         .collect()
 }
 
-/// Rack placement rules as `(ron text, Portuguese label)`.
-pub const RACK_PLACEMENTS: [(&str, &str); 2] =
-    [("FirstFree", "Primeira livre"), ("Random", "Aleatória")];
+/// Rack placement rules as `(ron text, label key)`.
+pub const RACK_PLACEMENTS: [(&str, &str); 2] = [
+    ("FirstFree", "prop-vaga-primeira-livre"),
+    ("Random", "prop-vaga-aleatoria"),
+];
 
-/// Dispatch rules as `(ron text, Portuguese label)`.
+/// Dispatch rules as `(ron text, label key)`.
 pub const DISPATCH_RULES: [(&str, &str); 3] = [
-    ("FirstAvailable", "Primeiro livre"),
-    ("RoundRobin", "Rodízio"),
-    ("Nearest", "Mais próximo"),
+    ("FirstAvailable", "prop-despacho-primeiro-livre"),
+    ("RoundRobin", "prop-despacho-rodizio"),
+    ("Nearest", "prop-despacho-mais-proximo"),
 ];
 
 /// Fields of the `run` section that scenario patches (and thus `Set`) understand.
@@ -283,36 +303,36 @@ pub fn read_field(obj: &ObjectDef, key: &str) -> Option<String> {
     })
 }
 
-/// Portuguese names of the distribution families, in menu order.
+/// Keys (`editor.ftl`) of the names of the distribution families, in menu order.
 pub const FAMILIES: [&str; 20] = [
-    "Constante",
-    "Uniforme",
-    "Exponencial",
-    "Triangular",
-    "Normal",
-    "Lognormal",
-    "Gama",
-    "Erlang",
-    "Weibull",
-    "Beta",
-    "Log-logística",
-    "Pearson V",
-    "Pearson VI",
-    "Discreta",
-    "Empírica",
-    "Poisson",
-    "Geométrica",
-    "Binomial",
-    "Binomial negativa",
-    "Deslocada",
+    "dist-constante",
+    "dist-uniforme",
+    "dist-exponencial",
+    "dist-triangular",
+    "dist-normal",
+    "dist-lognormal",
+    "dist-gama",
+    "dist-erlang",
+    "dist-weibull",
+    "dist-beta",
+    "dist-log-logistica",
+    "dist-pearson-v",
+    "dist-pearson-vi",
+    "dist-discreta",
+    "dist-empirica",
+    "dist-poisson",
+    "dist-geometrica",
+    "dist-binomial",
+    "dist-binomial-negativa",
+    "dist-deslocada",
 ];
 
 /// Heading shown before family `i` in the family list (`None`: same group as before).
 pub fn family_group(i: usize) -> Option<&'static str> {
     match i {
-        0 => Some("Contínuas"),
-        13 => Some("Discretas e empírica"),
-        19 => Some("Combinação"),
+        0 => Some(tx("prop-spec-continuas")),
+        13 => Some(tx("prop-spec-discretas_e_empirica")),
+        19 => Some(tx("prop-spec-combinacao")),
         _ => None,
     }
 }

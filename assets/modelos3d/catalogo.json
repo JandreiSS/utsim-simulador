@@ -843,6 +843,62 @@
   ],
   "triangulos": 1608
  },
+ "controle_remoto": {
+  "arquivo": "controle_remoto.glb",
+  "clipes": {},
+  "dados": {
+   "alca_altura": 0.5,
+   "largura": 0.26,
+   "pega": 0.32
+  },
+  "estados": {},
+  "minimo": [
+   -0.303,
+   -0.166,
+   -0.04
+  ],
+  "nos": [
+   "alca",
+   "controle_remoto",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.383,
+   0.332,
+   0.543
+  ],
+  "triangulos": 392
+ },
+ "controle_remoto_medio": {
+  "arquivo": "controle_remoto_medio.glb",
+  "clipes": {},
+  "dados": {
+   "alca_altura": 0.5,
+   "largura": 0.26,
+   "pega": 0.32
+  },
+  "estados": {},
+  "minimo": [
+   -0.303,
+   -0.166,
+   -0.04
+  ],
+  "nos": [
+   "alca",
+   "controle_remoto",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.383,
+   0.332,
+   0.543
+  ],
+  "triangulos": 580
+ },
  "empilhadeira": {
   "arquivo": "empilhadeira.glb",
   "clipes": {
@@ -1896,6 +1952,520 @@
    0.14
   ],
   "triangulos": 200
+ },
+ "forno": {
+  "arquivo": "forno.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "carrinho"
+    ]
+   },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "carrinho",
+     "porta"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "carrinho"
+    ]
+   }
+  },
+  "dados": {
+   "camara": [
+    1.0,
+    1.1,
+    1.91
+   ],
+   "carrinho": [
+    0.56,
+    0.62,
+    1.75
+   ],
+   "porta_giro": -95
+  },
+  "estados": {
+   "down": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 0.0,
+    "laco": false
+   },
+   "entering": {
+    "ate": 1.0,
+    "clipe": "porta_abrir",
+    "de": 0.0,
+    "laco": false,
+    "operador": [
+     "ponto_porta",
+     "ponto_operador"
+    ]
+   },
+   "leaving": {
+    "ate": 0.0,
+    "clipe": "porta_abrir",
+    "de": 1.0,
+    "laco": false,
+    "operador": [
+     "ponto_operador",
+     "ponto_porta"
+    ]
+   },
+   "maintenance": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 1.0,
+    "laco": false
+   },
+   "processing": {
+    "ate": 1.0,
+    "clipe": "ciclo",
+    "de": 0.0,
+    "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
+   },
+   "setup": {
+    "ate": 1.0,
+    "clipe": "setup",
+    "de": 0.0,
+    "laco": true
+   },
+   "waiting_repair": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 1.0,
+    "laco": false
+   }
+  },
+  "minimo": [
+   -0.76,
+   -0.95,
+   0.0
+  ],
+  "nos": [
+   "carrinho",
+   "chassi",
+   "forno",
+   "luz",
+   "porta",
+   "tampa"
+  ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "forno",
+    "pos": [
+     -1.05,
+     -1.0,
+     0.9
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "forno",
+    "pos": [
+     0.77,
+     -1.36,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "carrinho",
+    "pos": [
+     -0.05,
+     -0.05,
+     0.992
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "forno",
+    "pos": [
+     0.77,
+     -1.96,
+     0.0
+    ]
+   },
+   "ponto_puxador": {
+    "giro": 90,
+    "pai": "porta",
+    "pos": [
+     0.4,
+     -0.76,
+     1.1
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "forno",
+    "pos": [
+     1.05,
+     -1.0,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   1.55,
+   1.61,
+   2.5
+  ],
+  "triangulos": 796
+ },
+ "forno_medio": {
+  "arquivo": "forno_medio.glb",
+  "clipes": {
+   "ciclo": {
+    "laco": true,
+    "nos": [
+     "carrinho"
+    ]
+   },
+   "ciclo_auto": {
+    "laco": false,
+    "nos": [
+     "carrinho",
+     "porta"
+    ]
+   },
+   "porta_abrir": {
+    "laco": false,
+    "nos": [
+     "porta"
+    ]
+   },
+   "quebra": {
+    "laco": false,
+    "nos": [
+     "tampa"
+    ]
+   },
+   "setup": {
+    "laco": true,
+    "nos": [
+     "carrinho"
+    ]
+   }
+  },
+  "dados": {
+   "camara": [
+    1.0,
+    1.1,
+    1.91
+   ],
+   "carrinho": [
+    0.56,
+    0.62,
+    1.75
+   ],
+   "porta_giro": -95
+  },
+  "estados": {
+   "down": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 0.0,
+    "laco": false
+   },
+   "entering": {
+    "ate": 1.0,
+    "clipe": "porta_abrir",
+    "de": 0.0,
+    "laco": false,
+    "operador": [
+     "ponto_porta",
+     "ponto_operador"
+    ]
+   },
+   "leaving": {
+    "ate": 0.0,
+    "clipe": "porta_abrir",
+    "de": 1.0,
+    "laco": false,
+    "operador": [
+     "ponto_operador",
+     "ponto_porta"
+    ]
+   },
+   "maintenance": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 1.0,
+    "laco": false
+   },
+   "processing": {
+    "ate": 1.0,
+    "clipe": "ciclo",
+    "de": 0.0,
+    "laco": true
+   },
+   "processing_auto": {
+    "ate": 1.0,
+    "clipe": "ciclo_auto",
+    "de": 0.0,
+    "laco": false
+   },
+   "setup": {
+    "ate": 1.0,
+    "clipe": "setup",
+    "de": 0.0,
+    "laco": true
+   },
+   "waiting_repair": {
+    "ate": 1.0,
+    "clipe": "quebra",
+    "de": 1.0,
+    "laco": false
+   }
+  },
+  "minimo": [
+   -0.76,
+   -0.95,
+   0.0
+  ],
+  "nos": [
+   "carrinho",
+   "chassi",
+   "forno",
+   "luz",
+   "porta",
+   "tampa"
+  ],
+  "peca": {
+   "blocked": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "down": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "entering": [
+    [
+     0.0,
+     1.0,
+     "ponto_entrada"
+    ]
+   ],
+   "leaving": [
+    [
+     0.0,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "maintenance": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "processing_auto": [
+    [
+     0.0,
+     0.083333,
+     "ponto_entrada"
+    ],
+    [
+     0.083333,
+     0.916667,
+     "ponto_peca"
+    ],
+    [
+     0.916667,
+     1.0,
+     "ponto_saida"
+    ]
+   ],
+   "setup": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ],
+   "waiting_repair": [
+    [
+     0.0,
+     1.0,
+     "ponto_peca"
+    ]
+   ]
+  },
+  "pontos": {
+   "ponto_entrada": {
+    "giro": 0,
+    "pai": "forno",
+    "pos": [
+     -1.05,
+     -1.0,
+     0.9
+    ]
+   },
+   "ponto_operador": {
+    "giro": 90,
+    "pai": "forno",
+    "pos": [
+     0.77,
+     -1.36,
+     0.0
+    ]
+   },
+   "ponto_peca": {
+    "giro": 0,
+    "pai": "carrinho",
+    "pos": [
+     -0.05,
+     -0.05,
+     0.992
+    ]
+   },
+   "ponto_porta": {
+    "giro": 90,
+    "pai": "forno",
+    "pos": [
+     0.77,
+     -1.96,
+     0.0
+    ]
+   },
+   "ponto_puxador": {
+    "giro": 90,
+    "pai": "porta",
+    "pos": [
+     0.4,
+     -0.76,
+     1.1
+    ]
+   },
+   "ponto_saida": {
+    "giro": 0,
+    "pai": "forno",
+    "pos": [
+     1.05,
+     -1.0,
+     0.9
+    ]
+   }
+  },
+  "tamanho": [
+   1.55,
+   1.61,
+   2.5
+  ],
+  "triangulos": 2268
  },
  "injetora": {
   "arquivo": "injetora.glb",

@@ -258,3 +258,107 @@ def injetora(detalhe=0):
     })
     e.clipe("quebra", False, {"tampa": [(0, "rotation_euler", 0, 0.0), (1, "rotation_euler", 0, math.radians(-80))]})
     return e
+
+
+def forno(detalhe=0):
+    """Forno rotativo de padaria, 1,5 × 1,3 × 2,1 m (mais a chaminé). Nós: `chassi`, `porta`
+    (de vidro, dobradiça vertical à esquerda), `carrinho` (o carrinho de assadeiras, que gira
+    em z enquanto assa), `tampa` (manutenção do queimador, lado `+x`) e `luz`. Mesmos pontos,
+    clipes e estados das outras máquinas; `ponto_peca` fica na assadeira vazia do meio e gira
+    com o carrinho, e `ponto_puxador` anda com a porta."""
+    e = Elemento("forno", detalhe)
+    d = detalhe
+    e.no("chassi")
+    e.material("inox", 0xC4C8CD, 0.75, 0.35)
+    e.material("vidro", 0x6F8FA8, 0.1, 0.15, alfa=0.40)
+    e.material("interior", 0x1E2125, 0.3, 0.7)
+    e.material("brasa", 0xFFA940, 0.0, 0.5, emissao=True)
+    e.material("pao", 0xC98A3C, 0.0, 0.8)
+    # Câmara: x -0,55..0,45, y -0,60..0,50, z 0,04..1,95. O corpo fica em volta dela.
+    e.caixa("chassi", "base", (-0.75, -0.65, 0.0), (0.75, 0.65, 0.04), chanfro=0)
+    e.caixa("chassi", "inox", (-0.75, -0.65, 0.04), (-0.55, 0.65, 1.95))  # parede esquerda
+    e.caixa("chassi", "inox", (0.45, -0.65, 0.04), (0.75, 0.65, 1.95))  # coluna do painel
+    e.caixa("chassi", "inox", (-0.55, 0.50, 0.04), (0.45, 0.65, 1.95))  # fundo
+    e.caixa("chassi", "inox", (-0.75, -0.65, 1.95), (0.75, 0.65, 2.10))  # teto
+    e.caixa("chassi", "faixa", (-0.76, -0.66, 1.99), (0.76, 0.66, 2.05), chanfro=0)
+    # Forro escuro da câmara e a resistência acesa no teto.
+    e.caixa("chassi", "interior", (-0.555, -0.60, 0.04), (-0.55, 0.50, 1.95), chanfro=0)
+    e.caixa("chassi", "interior", (0.45, -0.60, 0.04), (0.455, 0.50, 1.95), chanfro=0)
+    e.caixa("chassi", "interior", (-0.55, 0.495, 0.04), (0.45, 0.50, 1.95), chanfro=0)
+    e.caixa("chassi", "interior", (-0.55, -0.60, 0.04), (0.45, 0.50, 0.045), chanfro=0)
+    e.caixa("chassi", "brasa", (-0.45, -0.45, 1.93), (0.35, 0.40, 1.95), chanfro=0)
+    # Coifa sobre a porta, com a chaminé, e a caixa do motor que gira o carrinho.
+    e.prisma("chassi", "inox", [(-0.95, 2.02), (-0.65, 2.02), (-0.65, 2.22), (-0.80, 2.22)], -0.60, 0.50, eixo=0)
+    e.cilindro("chassi", "inox", (-0.05, -0.20, 2.10), (-0.05, -0.20, 2.50), 0.10, 10 if d else 8)
+    e.caixa("chassi", "painel", (-0.30, 0.05, 2.10), (0.20, 0.50, 2.26))
+    if d:
+        e.cilindro("chassi", "aco", (0.45, 0.40, 2.10), (0.45, 0.40, 2.40), 0.05, 8)  # saída de vapor
+        for k in range(5):  # grelha do queimador no lado -x
+            z = 0.30 + k * 0.06
+            e.caixa("chassi", "interior", (-0.757, -0.30, z), (-0.75, 0.30, z + 0.03), chanfro=0)
+    _painel(e, 0.47, 0.73, 1.05, 1.50, -0.65)
+    # Carrinho de assadeiras: gira em torno de z no centro da câmara.
+    cx, cy = -0.05, -0.05
+    e.no("carrinho", pivo=(cx, cy, 0.05))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            x, y = cx + sx * 0.27, cy + sy * 0.30
+            e.caixa("carrinho", "aco", (x - 0.012, y - 0.012, 0.13), (x + 0.012, y + 0.012, 1.80), chanfro=0)
+            if d:
+                e.cilindro("carrinho", "borracha", (x - 0.02, y, 0.09), (x + 0.02, y, 0.09), 0.04, 8)
+    for z in (0.13, 1.78):
+        e.caixa("carrinho", "aco", (cx - 0.282, cy - 0.312, z), (cx + 0.282, cy + 0.312, z + 0.025), chanfro=0)
+    e.cilindro("carrinho", "aco_escuro", (cx, cy, 1.805), (cx, cy, 1.93), 0.03, 6)  # eixo do motor
+    niveis = 9 if d else 5  # a assadeira do meio fica na mesma altura nos dois níveis
+    passo = 1.44 / (niveis - 1)
+    meio = niveis // 2
+    for k in range(niveis):
+        z = 0.26 + k * passo
+        e.caixa("carrinho", "aco_escuro", (cx - 0.26, cy - 0.30, z), (cx + 0.26, cy + 0.30, z + 0.012), chanfro=0)
+        if k == meio:
+            continue  # a assadeira do meio fica vazia: é onde a peça aparece
+        if d:
+            for i in range(2):
+                for j in range(3):
+                    x, y = cx - 0.12 + i * 0.24, cy - 0.19 + j * 0.19
+                    e.cilindro("carrinho", "pao", (x - 0.09, y, z + 0.045), (x + 0.09, y, z + 0.045), 0.055, 6, raio2=0.045)
+        else:
+            for j in range(3):
+                y = cy - 0.19 + j * 0.19
+                e.caixa("carrinho", "pao", (cx - 0.21, y - 0.06, z + 0.012), (cx + 0.21, y + 0.06, z + 0.085), chanfro=0)
+    z_peca = round(0.26 + meio * passo + 0.012, 4)
+    # Porta de vidro: dobradiça vertical na aresta esquerda, abre para fora (-y).
+    e.no("porta", pivo=(-0.55, -0.65, 1.0))
+    x0, x1, z0, z1 = -0.57, 0.47, 0.06, 1.93
+    e.caixa("porta", "inox", (x0, -0.70, z0), (x1, -0.65, z0 + 0.10))
+    e.caixa("porta", "inox", (x0, -0.70, z1 - 0.10), (x1, -0.65, z1))
+    e.caixa("porta", "inox", (x0, -0.70, z0 + 0.10), (x0 + 0.09, -0.65, z1 - 0.10))
+    e.caixa("porta", "inox", (x1 - 0.09, -0.70, z0 + 0.10), (x1, -0.65, z1 - 0.10))
+    e.caixa("porta", "vidro", (x0 + 0.09, -0.68, z0 + 0.10), (x1 - 0.09, -0.67, z1 - 0.10), chanfro=0)
+    e.cilindro("porta", "aco", (0.40, -0.76, 0.85), (0.40, -0.76, 1.35), 0.018, 8)  # puxador
+    for z in (0.90, 1.30):
+        e.caixa("porta", "aco", (0.39, -0.76, z - 0.012), (0.41, -0.70, z + 0.012), chanfro=0)
+    # Tampa de manutenção do queimador no lado +x (dobradiça vertical na aresta da frente).
+    e.no("tampa", pivo=(0.75, -0.50, 0.30))
+    e.caixa("tampa", "inox", (0.75, -0.50, 0.30), (0.78, 0.45, 1.50))
+    e.caixa("tampa", "faixa", (0.78, -0.40, 1.30), (0.79, -0.25, 1.40), chanfro=0)
+    _torre_luz(e, 0.58, 0.45, 2.10)
+    # Pontos. O operador fica no painel, à direita da porta, fora do arco em que ela abre: a mão
+    # esquerda do clipe `Interact` (0,17 m à esquerda e 0,58 m à frente, a 1,3 m) cai na tela.
+    e.ponto("ponto_operador", (0.77, -1.36, 0.0), 90)
+    e.ponto("ponto_porta", (0.77, -1.96, 0.0), 90)
+    e.ponto("ponto_peca", (cx, cy, z_peca), 0, pai="carrinho")
+    e.ponto("ponto_entrada", (-1.05, -1.00, 0.90), 0)
+    e.ponto("ponto_saida", (1.05, -1.00, 0.90), 0)
+    e.ponto("ponto_puxador", (0.40, -0.76, 1.10), 90, pai="porta")
+    _ciclo_auto(e, {
+        "carrinho": [(0, "rotation_euler", 2, 0.0), (1, "rotation_euler", 2, 2 * TAU)],
+    }, ("rotation_euler", 2, math.radians(-95)))
+    e.clipe("setup", True, {
+        "carrinho": [(0, "rotation_euler", 2, 0.0), (0.2, "rotation_euler", 2, 0.0),
+                     (0.5, "rotation_euler", 2, math.pi / 2), (0.7, "rotation_euler", 2, math.pi / 2),
+                     (1, "rotation_euler", 2, 0.0)],
+    })
+    e.clipe("quebra", False, {"tampa": [(0, "rotation_euler", 2, 0.0), (1, "rotation_euler", 2, math.radians(-100))]})
+    e.dados = {"porta_giro": -95, "camara": [1.0, 1.1, 1.91], "carrinho": [0.56, 0.62, 1.75]}
+    return e

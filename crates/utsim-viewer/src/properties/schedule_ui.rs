@@ -2,6 +2,7 @@
 //! mode and value), the expected arrivals per period and per cycle, and the labels of
 //! each period. The whole table is committed as one `schedule` value.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::BTreeMap;
 
 use bevy_egui::egui::{self, Id, Ui};
@@ -17,8 +18,11 @@ use super::schedule::{
 
 /// Short text of a distribution for the table ("Exp, média 6").
 fn dist_summary(d: &Dist) -> String {
-    let family = super::spec::FAMILIES[super::spec::family_index(d)];
-    format!("{family}, média {}", mean_text(d.mean()))
+    let family = tx(super::spec::FAMILIES[super::spec::family_index(d)]);
+    fx(
+        "prop-schedule-ui-media",
+        &[("family", vx(&family)), ("mean", vx(&mean_text(d.mean())))],
+    )
 }
 
 fn count_text(v: f64) -> String {
@@ -70,14 +74,11 @@ impl Editor<'_> {
     ) {
         let field = "schedule";
         let id = self.id(field);
-        ui.strong("Chegadas por período");
+        ui.strong(tx("prop-schedule-ui-chegadas_por_periodo"));
         let mut on = current.is_some();
         if ui
-            .checkbox(&mut on, "a taxa de chegada muda com a hora")
-            .on_hover_text(
-                "Uma tabela de períodos que se repete a cada ciclo (um dia, uma semana). \
-                 Fora dos períodos não há chegadas.",
-            )
+            .checkbox(&mut on, tx("prop-schedule-ui-a_taxa_de_chegada_muda"))
+            .on_hover_text(tx("prop-schedule-ui-uma_tabela_de_periodos_que"))
             .changed()
         {
             let text = if on {
@@ -88,19 +89,25 @@ impl Editor<'_> {
             self.set(field, text);
         }
         let Some(s) = current else {
-            ui.weak("Desligado: o tempo entre chegadas acima vale o tempo todo.");
+            ui.weak(tx("prop-schedule-ui-desligado_o_tempo_entre_chegadas"));
             return;
         };
         let mut t = s.clone();
         let mut changed = false;
         let unit = unit_of_cycle(t.cycle);
         ui.horizontal(|ui| {
-            ui.label("ciclo");
+            ui.label(tx("prop-schedule-ui-ciclo"));
             changed |= num(ui, id.with("cycle"), &mut t.cycle, 1.0, 0.0);
-            for (label, v) in [("dia", 1440.0), ("semana", 10080.0)] {
+            for (label, v) in [
+                (tx("prop-schedule-ui-dia"), 1440.0),
+                (tx("prop-schedule-ui-semana"), 10080.0),
+            ] {
                 if ui
                     .small_button(label)
-                    .on_hover_text(format!("ciclo de {v} (tempo do modelo em minutos)"))
+                    .on_hover_text(fx(
+                        "prop-schedule-ui-ciclo_de_tempo_do_modelo",
+                        &[("v", vx(&v))],
+                    ))
                     .clicked()
                     && t.cycle != v
                 {
@@ -110,19 +117,15 @@ impl Editor<'_> {
             }
         });
         match unit {
-            Some(u) => ui.weak(format!(
-                "Ciclo de {}: tempo do modelo em {}. Horários em hh:mm, taxas por hora.",
-                ron::float(t.cycle),
-                u.name()
+            Some(u) => ui.weak(fx(
+                "prop-schedule-ui-ciclo_de_tempo_do_modelo-2",
+                &[("cycle", vx(&ron::float(t.cycle))), ("name", vx(&u.name()))],
             )),
-            None => ui.weak(
-                "Horários e taxas em unidades do modelo (com ciclo 1440, um dia em minutos, \
-                 a tabela mostra hh:mm).",
-            ),
+            None => ui.weak(tx("prop-schedule-ui-horarios_e_taxas_em_unidades")),
         };
         let rate_label = match unit {
-            Some(_) => "taxa por hora",
-            None => "taxa",
+            Some(_) => tx("prop-schedule-ui-taxa_por_hora"),
+            None => tx("prop-schedule-ui-taxa"),
         };
         let mut remove = None;
         egui::Grid::new(id.with("grid"))
@@ -130,7 +133,15 @@ impl Editor<'_> {
             .num_columns(7)
             .spacing([6.0, 4.0])
             .show(ui, |ui| {
-                for h in ["#", "início", "fim", "modo", "valor", "esperado", ""] {
+                for h in [
+                    "#",
+                    tx("prop-schedule-ui-inicio"),
+                    tx("prop-schedule-ui-fim"),
+                    tx("prop-schedule-ui-modo"),
+                    tx("prop-schedule-ui-valor"),
+                    tx("prop-schedule-ui-esperado"),
+                    "",
+                ] {
                     ui.weak(h);
                 }
                 ui.end_row();
@@ -141,7 +152,7 @@ impl Editor<'_> {
                     changed |= time_box(ui, row.with("e"), &mut p.end, s.cycle);
                     let index = mode_index(&p.arrivals);
                     let mut picked = index;
-                    let name = |k: usize| if k == 2 { rate_label } else { MODES[k] };
+                    let name = |k: usize| if k == 2 { rate_label } else { tx(MODES[k]) };
                     egui::ComboBox::from_id_salt(row.with("mode"))
                         .selected_text(name(index))
                         .width(110.0)
@@ -186,11 +197,8 @@ impl Editor<'_> {
                     ui.label(n.map_or("-".into(), count_text));
                     ui.horizontal(|ui| {
                         if ui
-                            .small_button("copiar do padrão")
-                            .on_hover_text(
-                                "Usa no período uma cópia do tempo entre chegadas padrão, \
-                                 para ajustar só aqui",
-                            )
+                            .small_button(tx("prop-schedule-ui-copiar_do_padrao"))
+                            .on_hover_text(tx("prop-schedule-ui-usa_no_periodo_uma_copia"))
                             .clicked()
                         {
                             p.arrivals = PeriodArrivals::Interarrival(default.clone());
@@ -198,7 +206,7 @@ impl Editor<'_> {
                         }
                         if ui
                             .small_button("x")
-                            .on_hover_text("remover o período")
+                            .on_hover_text(tx("prop-schedule-ui-remover_o_periodo"))
                             .clicked()
                         {
                             remove = Some(i);
@@ -213,7 +221,10 @@ impl Editor<'_> {
         }
         ui.horizontal(|ui| {
             let next = next_period(&t);
-            let r = ui.add_enabled(next.is_some(), egui::Button::new("adicionar período"));
+            let r = ui.add_enabled(
+                next.is_some(),
+                egui::Button::new(tx("prop-schedule-ui-adicionar_periodo")),
+            );
             if r.clicked()
                 && let Some(p) = next
             {
@@ -225,18 +236,18 @@ impl Editor<'_> {
         if errors.is_empty() {
             let per_cycle = s.expected_per_cycle(default);
             let hint = match unit {
-                Some(_) if s.cycle == 1440.0 => " (por dia)".to_string(),
-                Some(_) if s.cycle == 10080.0 => " (por semana)".to_string(),
+                Some(_) if s.cycle == 1440.0 => tx("prop-schedule-ui-por_dia").to_string(),
+                Some(_) if s.cycle == 10080.0 => tx("prop-schedule-ui-por_semana").to_string(),
                 _ => String::new(),
             };
-            ui.label(format!(
-                "Esperado por ciclo{hint}: {} chegadas",
-                count_text(per_cycle)
+            ui.label(fx(
+                "prop-schedule-ui-esperado_por_ciclo_chegadas",
+                &[
+                    ("hint", vx(&hint)),
+                    ("per_cycle", vx(&count_text(per_cycle))),
+                ],
             ));
-            ui.weak(
-                "Na troca de período a chegada pendente é sorteada de novo com o processo do \
-                 novo período (períodos seguidos com o mesmo processo mantêm a chegada).",
-            );
+            ui.weak(tx("prop-schedule-ui-na_troca_de_periodo_a"));
         } else {
             for e in errors {
                 ui.colored_label(RED, e);
@@ -247,12 +258,15 @@ impl Editor<'_> {
             .filter(|&i| matches!(t.periods[i].arrivals, PeriodArrivals::Interarrival(_)))
             .collect();
         if !with_dist.is_empty() {
-            egui::CollapsingHeader::new("Distribuições dos períodos")
+            egui::CollapsingHeader::new(tx("prop-schedule-ui-distribuicoes_dos_periodos"))
                 .id_salt(id.with("dists"))
                 .default_open(true)
                 .show(ui, |ui| {
                     for i in with_dist {
-                        let title = format!("Período {}: tempo entre chegadas", i + 1);
+                        let title = fx(
+                            "prop-schedule-ui-periodo_tempo_entre_chegadas",
+                            &[("i", vx(&(i + 1)))],
+                        );
                         if let PeriodArrivals::Interarrival(d) = &t.periods[i].arrivals
                             && let Some(new) = dist_block(ui, id.with(("d", i)), &title, d)
                         {
@@ -266,23 +280,31 @@ impl Editor<'_> {
             self.set(field, ron::schedule(&t));
             return;
         }
-        egui::CollapsingHeader::new("Rótulos por período")
+        egui::CollapsingHeader::new(tx("prop-schedule-ui-rotulos_por_periodo"))
             .id_salt(id.with("labels"))
             .default_open(false)
             .show(ui, |ui| {
-                ui.weak(
-                    "Os rótulos de um período substituem os rótulos padrão de mesmo nome \
-                     (por exemplo, mais urgentes à noite); os outros continuam valendo.",
-                );
+                ui.weak(tx("prop-schedule-ui-os_rotulos_de_um_periodo"));
                 if labels.is_empty() {
-                    ui.weak("A fonte não tem rótulos padrão.");
+                    ui.weak(tx("prop-schedule-ui-a_fonte_nao_tem_rotulos"));
                 }
                 for (i, p) in s.periods.iter().enumerate() {
                     let span = match (clock(p.start, s.cycle), clock(p.end, s.cycle)) {
-                        (Some(a), Some(b)) => format!("{a} a {b}"),
-                        _ => format!("{} a {}", ron::float(p.start), ron::float(p.end)),
+                        (Some(a), Some(b)) => {
+                            fx("prop-schedule-ui-a", &[("a", vx(&a)), ("b", vx(&b))])
+                        }
+                        _ => fx(
+                            "prop-schedule-ui-a-2",
+                            &[
+                                ("start", vx(&ron::float(p.start))),
+                                ("end", vx(&ron::float(p.end))),
+                            ],
+                        ),
                     };
-                    ui.label(format!("Período {} ({span})", i + 1));
+                    ui.label(fx(
+                        "prop-schedule-ui-periodo",
+                        &[("i", vx(&(i + 1))), ("span", vx(&span))],
+                    ));
                     ui.indent(id.with(("l", i)), |ui| {
                         self.labels_field(ui, &format!("schedule[{}].labels", i + 1), &p.labels);
                     });
