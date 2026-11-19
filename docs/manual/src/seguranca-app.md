@@ -38,7 +38,9 @@ A matriz padrão é uma grade própria de 5 por 5, com níveis baixo, médio, al
 
 Escolha um modelo e use "Rodar". A simulação roda em segundo plano e mostra, com média e intervalo de confiança, o tempo das pessoas em zonas de risco, as entradas sem o EPI pedido e os quase-conflitos entre pessoas e veículos. Tudo é simulado, serve para comparar layouts e não prevê acidentes.
 
-"Sugerir perigos" propõe um perigo para cada zona em que alguém de um posto esteve. Marque os que fizerem sentido e grave. Eles entram no inventário sem avaliação, e a probabilidade e a severidade ficam por sua conta. "Gravar HTML de exposição" escreve o relatório na pasta `relatorios/`.
+Num modelo com ponte rolante e pessoas, a tela mostra também o tempo e as entradas de cada pessoa sob a carga suspensa de cada ponte (a área quadrada embaixo do gancho enquanto há peça pendurada, campo `load_zone` da ponte). A meta é zero: qualquer tempo sob a carga aparece em vermelho, entra no relatório HTML e vira um perigo sugerido para o posto da ponte ou da pessoa.
+
+"Sugerir perigos" propõe um perigo para cada zona em que alguém de um posto esteve e para cada pessoa que ficou sob a carga suspensa de uma ponte. Marque os que fizerem sentido e grave. Eles entram no inventário sem avaliação, e a probabilidade e a severidade ficam por sua conta. "Gravar HTML de exposição" escreve o relatório na pasta `relatorios/`.
 
 ## Ergonomia
 
