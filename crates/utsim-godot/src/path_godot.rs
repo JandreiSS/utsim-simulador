@@ -579,4 +579,20 @@ impl UtsimTrajetos {
             .map(|s| GString::from(s.as_str()))
             .unwrap_or_default()
     }
+
+    /// Apaga o trecho entre os nós `index` e `index + 1` (numa ponta encurta; no meio o
+    /// trajeto vira dois).
+    #[func]
+    fn apagar_trecho(&mut self, name: GString, path: bool, index: i64) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.cut_segment(&n, path, index.max(0) as usize))
+            .is_some()
+    }
+
+    /// Inverte o sentido do trajeto (numa esteira, as ligações também).
+    #[func]
+    fn inverter(&mut self, name: GString, path: bool) -> bool {
+        let n = name.to_string();
+        self.edit(|e| e.reverse_route(&n, path)).is_some()
+    }
 }
