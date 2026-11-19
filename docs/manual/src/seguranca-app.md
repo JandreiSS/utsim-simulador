@@ -89,13 +89,15 @@ A tabela de dias debitados de norma técnica não é embutida: a empresa digita,
 
 ## Telas de checklist, EPI e incidentes
 
-A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item.
+A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item. Uma inspeção gravada por engano sai da lista com "Remover".
+
+Em todas as telas do app, remover pede confirmação: o primeiro clique troca o botão por "Confirmar remoção" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para inspeções, EPI, incidentes, perigos e ações do inventário.
 
 A tela EPI cadastra o tipo, o uso, o número do certificado digitado, a validade e o intervalo de troca. Abaixo do cadastro ficam as pendências: o equipamento exigido num posto que não está no cadastro e o certificado vencido.
 
 A tela Incidentes tem quatro abas:
 
-- **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo.
+- **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo. "Remover", ao lado de "Editar", tira um registro feito por engano. As pessoas da pasta restrita continuam lá.
 - **Horas-homem** guarda as horas de exposição de cada mês.
 - **Indicadores** calcula as taxas do período escolhido, o Pareto de causas e de postos, os eventos por zona e a carta `u` das lesões por mês. Esta aba nunca mostra nomes.
 - **Pessoas (restrita)** cria a pasta restrita, cadastra pessoas e anonimiza. Cadastrar e anonimizar só aparecem para quem pode gravar na pasta restrita, e a anonimização pede uma segunda confirmação porque apaga o nome para sempre.

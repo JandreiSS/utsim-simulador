@@ -34,7 +34,9 @@ Os botões "Gravar relatório HTML" e "Gravar CSV das medições" escrevem os ar
 
 Escolha o modelo e o número de replicações e use "Rodar". O cálculo roda em segundo plano. Os custos do modelo aparecem com o rótulo "Origem: Simulado". A tabela mostra, para as quatro categorias (prevenção, avaliação, falha interna e falha externa), a média, o intervalo de confiança de 95 %, os lançamentos digitados e o total. Abaixo ficam os custos por posto e por defeito.
 
-Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar.
+Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar. Um lançamento digitado errado sai com "Remover", na própria linha, e o total muda ao rodar de novo.
+
+Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar remoção" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
 
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 
