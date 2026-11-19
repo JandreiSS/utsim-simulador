@@ -642,6 +642,16 @@ de `Ctx::set_meeting_point`, que o despachante e a pessoa leem com `Ctx::meeting
 Com botoeira, a ponte manda `MSG_FOLLOW_X/Y/Z` e `MSG_FOLLOW` para a pessoa andar junto com
 a carga. A ponte limita o próprio trecho carregado ao passo da pessoa mais lenta da equipe.
 
+Pontes no mesmo caminho de rolamento (`Model::crane_lanes`: paralelas e com áreas que se
+sobrepõem) dividem uma faixa do núcleo (`utsim_objects::CraneLane`). A faixa é uma reta onde
+cada bloco reserva um trecho com `Ctx::lane_hold`, que só reserva se o trecho fica a `gap`
+dos trechos dos outros e, se não, diz quem está no caminho. Antes de andar, a ponte reserva
+o trecho que vai varrer. No fim do movimento, `Ctx::lane_set` encolhe a reserva ao ponto
+onde ela parou. Uma ponte no caminho recebe `MSG_GIVE_WAY` e sai, se estiver livre. A que
+espera pede `Ctx::lane_wait` e recebe `MSG_LANE_CHANGED` quando uma reserva muda ou quando
+uma ponte fica livre (`Ctx::lane_touch`), e então tenta de novo. Como cada reserva nova não
+encosta nas outras, duas pontes nunca chegam a menos de `gap` uma da outra.
+
 ## 4g. Manuseio de materiais (fase 5)
 
 ### Esteira (`Conveyor`)
