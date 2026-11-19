@@ -36,7 +36,7 @@ Escolha o modelo e o número de replicações e use "Rodar". O cálculo roda em 
 
 Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar. Um lançamento digitado errado sai com "Remover", na própria linha, e o total muda ao rodar de novo.
 
-Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar remoção" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
+Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
 
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 

@@ -91,7 +91,7 @@ A tabela de dias debitados de norma técnica não é embutida: a empresa digita,
 
 A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item. Uma inspeção gravada por engano sai da lista com "Remover".
 
-Em todas as telas do app, remover pede confirmação: o primeiro clique troca o botão por "Confirmar remoção" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para inspeções, EPI, incidentes, perigos e ações do inventário.
+Em todas as telas do app, remover pede confirmação: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para inspeções, EPI, incidentes, perigos e ações do inventário.
 
 A tela EPI cadastra o tipo, o uso, o número do certificado digitado, a validade e o intervalo de troca. Abaixo do cadastro ficam as pendências: o equipamento exigido num posto que não está no cadastro e o certificado vencido.
 
