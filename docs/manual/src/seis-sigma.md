@@ -1,10 +1,11 @@
-# UTSim Seis Sigma (gerenciador de projetos Lean Seis Sigma)
+# UTSim LSS (gerenciador de projetos Lean Seis Sigma)
 
-O UTSim Seis Sigma é o aplicativo da família UTSim para conduzir projetos de melhoria Lean
+O UTSim LSS é o aplicativo da família UTSim para conduzir projetos de melhoria Lean
 Seis Sigma: termo de abertura, fases e tollgates, quadro de ações, riscos, reuniões,
 cronograma, ganhos e as ferramentas de cada fase. É um programa de janela própria (não abre o
 navegador), funciona sem internet e não precisa de servidor: a equipe trabalha numa pasta
-compartilhada do Google Drive. O nome ainda é provisório.
+compartilhada do Google Drive. LSS vem de Lean Seis Sigma; até a versão 0.16.0 o app se
+chamava UTSim Seis Sigma, e os projetos, o programa e os atalhos daquela época continuam valendo.
 
 Já funcionam a **fundação** (etapa L0 do `docs/plano_lean_seis_sigma.md`: o formato do
 projeto, o trabalho em equipe pela pasta compartilhada, a visão geral e o quadro de ações), a
@@ -17,8 +18,8 @@ A estatística (etapa L3) aparece na navegação com o que vai trazer.
 
 ## Instalar e abrir
 
-O UTSim Seis Sigma é um produto próprio no launcher (veja [Launcher](launcher.md)), com o
-nome "UTSim Seis Sigma". Escolha-o na lista, instale e clique em "Abrir". Ele não precisa do
+O UTSim LSS é um produto próprio no launcher (veja [Launcher](launcher.md)), com o
+nome "UTSim LSS". Escolha-o na lista, instale e clique em "Abrir". Ele não precisa do
 editor de simulação instalado.
 
 Pela linha de comando, `utsim-seis-sigma` abre a janela e `utsim-seis-sigma "pasta.lss"` abre
@@ -441,6 +442,9 @@ vazia. O SIPOC gerado do modelo de simulação chega na etapa L4.
   do total, contando a que cruza os 80 %. No gráfico, as barras são o percentual de cada
   categoria (as vitais na cor de destaque), a linha é o acumulado e a linha horizontal marca
   os 80 %. O acumulado sempre termina em 100 %.
+- **Clicar numa barra** filtra as categorias e a tabela do resultado só com ela (a barra
+  "Outros" mostra as categorias que junta); clicar de novo mostra todas. O tracejado
+  vertical marca onde terminam as poucas vitais.
 
 ### Plano de coleta de dados
 
@@ -458,8 +462,15 @@ coluna "Falta" mostra o que ainda impede a coleta: nome, definição operacional
 - Cada causa tem o estado (aberta, provável, verificada ou descartada) e a evidência que o
   decidiu. "+ subcausa" desce um nível, sem limite de profundidade.
 - **Como ler o diagrama**: cada espinha é uma categoria (metade em cima, metade embaixo) com
-  as suas primeiras causas; as verificadas aparecem na cor de destaque, as prováveis em
-  laranja e as descartadas apagadas. As subcausas ficam na lista abaixo do desenho.
+  as suas primeiras causas em cartões; a borda das verificadas fica na cor de destaque, a das
+  prováveis em laranja e a das descartadas apagada. O selo "+n" diz quantas subcausas a causa
+  tem; elas ficam na lista abaixo do desenho.
+- **Editar no desenho**: clique num osso, fora dos cartões, para acrescentar uma causa
+  naquela categoria (Enter grava e abre a próxima). Duplo clique num cartão edita o texto, e
+  apagar o texto remove a causa. Arraste um cartão para outro osso para mudar a categoria (as
+  subcausas vão junto). O botão direito abre o menu, com "Começar um 5 porquês com esta
+  causa": a cadeia nasce no primeiro 5 porquês do projeto (criado se não houver), ligada à
+  causa, e a tela passa para ele.
 - Se duas pessoas moverem causas ao mesmo tempo e uma ficar embaixo da outra (um ciclo), o
   programa mostra a primeira como causa principal e avisa; nada some.
 
@@ -471,6 +482,10 @@ coluna "Falta" mostra o que ainda impede a coleta: nome, definição operacional
 - "+ por quê (novo ramo)" acrescenta um primeiro porquê; "+ por quê" ao lado de um porquê
   acrescenta o seguinte. Clicar duas vezes no mesmo porquê abre dois ramos.
 - Cada porquê tem a evidência. Marque "causa raiz" no porquê que a equipe concluiu.
+- **A árvore**: cada cadeia aparece também como árvore, da esquerda para a direita, com o
+  problema na raiz. O "+" à direita de um nó acrescenta um porquê abaixo dele (um ramo novo
+  quando ele já tem filhos), duplo clique edita e o botão direito marca a causa raiz (borda
+  grossa) ou remove o porquê e o que está abaixo.
 - **Como ler**: as causas raiz candidatas são os porquês marcados; sem marcação, o último
   porquê de cada ramo. Cinco níveis são a referência usual, não uma regra.
 
@@ -518,6 +533,11 @@ Cada linha é um modo de falha de uma etapa (ou função) do processo:
   "Característica crítica a partir de S") são marcadas com `◆`. Cada uma precisa de uma
   linha no plano de controle do projeto; o FMEA e o plano de controle avisam quantas
   faltam. Com S' preenchido, vale a severidade revista.
+- **Matriz severidade × ocorrência**: acima da grade, cada modo de falha com S e O é um ponto
+  na matriz, na cor da AP da linha (alta em vermelho, média em âmbar, baixa em verde); o
+  fundo das células mostra a faixa de S × O. A primeira coluna da grade traz a mesma cor.
+  Clique num ponto para ir à linha (ela fica marcada); clicar de novo na mesma célula passa
+  para a próxima linha dela.
 - **Como ler o RPN e a AP**: o RPN ordena, mas trata igual um 10 × 2 × 5 e um 2 × 10 × 5. A AP
   corrige isso dando peso maior à severidade: priorize as linhas de AP alta, depois as de
   AP média, e use o RPN só para desempatar.
@@ -730,7 +750,7 @@ para partir dali.
 ### Ferramentas da qualidade do DMADV
 
 A casa da qualidade (QFD), as tolerâncias por Monte Carlo e o poka-yoke ligado ao FMEA são
-ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o Seis Sigma guarda o
+ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o UTSim LSS guarda o
 resultado como entregável quando elas forem abertas de lá.
 
 ## Roteiro DMAIC
@@ -1484,7 +1504,7 @@ Melhoria da linha 2.lss/
   (`%LOCALAPPDATA%\UTSim\seis-sigma\cache\` no Windows, `~/.cache/utsim/seis-sigma/` no
   Linux) para abrir mais rápido. Pode ser apagado a qualquer momento.
 - Cada arquivo tem `"formato": N`. Um projeto num formato mais novo que o programa dá a
-  mensagem "projeto no formato N; esta versão do UTSim Seis Sigma lê até M": atualize pelo
+  mensagem "projeto no formato N; esta versão do UTSim LSS lê até M": atualize pelo
   launcher.
 
 ## Levar o projeto para quem não está na pasta
@@ -1498,7 +1518,7 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com P1). O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
-UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
+UTSim LSS; o mapa de competências já recebe dele as evidências de prática. A versão 2
 trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
 experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
 exportação dos painéis. A P6 trouxe a seleção de soluções (ponderada e Pugh), a auditoria 5S, o SMED, o

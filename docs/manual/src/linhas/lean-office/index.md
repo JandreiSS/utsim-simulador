@@ -66,7 +66,7 @@ Os capítulos da linha:
   gerados por código (veja [3D realista e aparência](../../visual-3d.md)).
 - **Planta (2D).** Em Simular, o menu **Câmera** tem a **Planta (2D)**: a mesma cena vista de
   cima, sem perspectiva, como uma planta baixa do processo. Serve para todas as linhas.
-- **UTSim Seis Sigma.** Os modelos de projeto "Kaizen administrativo" e "DMAIC transacional"
+- **UTSim LSS.** Os modelos de projeto "Kaizen administrativo" e "DMAIC transacional"
   trazem os entregáveis da linha nos checklists dos tollgates (veja [UTSim Seis
   Sigma](../../seis-sigma.md)).
 

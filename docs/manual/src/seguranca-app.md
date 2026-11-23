@@ -10,7 +10,7 @@ As normas aparecem aqui só pelo número e pelo tema, para situar o assunto. O p
 
 ## Pasta de unidade e postos
 
-A pasta de unidade e a tela Postos são as mesmas do [UTSim Qualidade](qualidade-app.md), e os dois aplicativos podem abrir a mesma pasta. Veja lá como criar a unidade, cadastrar os postos e importá-los de um modelo.
+A pasta de unidade e a tela Postos são as mesmas do [UTSim Qualidade](qualidade-app.md), e os dois aplicativos podem abrir a mesma pasta. Veja lá como a unidade começa sem pasta e é salva depois (Salvar, Salvar como e a chave "Salvamento automático", no canto de cima à esquerda), como cadastrar os postos e como importá-los de um modelo. A pasta restrita dos dados pessoais só pode ser criada depois que a unidade foi salva numa pasta, porque fica junto dela.
 
 ## Inventário de riscos por posto
 
@@ -110,7 +110,7 @@ A tela Incidentes tem quatro abas:
 
 ## Ferramentas e estudos
 
-A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA, A3 e poka-yoke (os dispositivos à prova de erro que também protegem as pessoas, com as verificações). Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo.
+A aba **Ferramentas** é a mesma do UTSim Qualidade (veja o capítulo do UTSim Qualidade), com as ferramentas de análise de causa e de dados: folha de verificação, estratificação, Pareto, histograma, dispersão, Ishikawa, 5 porquês, FMEA, A3 e poka-yoke (os dispositivos à prova de erro que também protegem as pessoas, com as verificações). Os dados são digitados ou importados de CSV e xlsx, e cada ferramenta tem relatório próprio em PDF e HTML, além do consolidado do estudo. O Ishikawa, os 5 porquês, o A3, a FMEA e o Pareto se editam em cima do desenho, como descreve a seção "Trabalhar em cima do desenho" do capítulo do UTSim Qualidade: as causas são cartões arrastáveis entre os ossos da espinha, os porquês formam uma árvore, a FMEA tem a matriz de severidade × ocorrência e clicar numa barra do Pareto filtra a tabela.
 
 ## Abrir pelo UTSim
 
