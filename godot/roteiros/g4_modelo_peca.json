@@ -1,0 +1,29 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Modelo da peça: a caixa é o padrão; no painel da chegada, \"Modelo da peça\" escolhe um elemento 3D do catálogo do Blender, que fica salvo no modelo (visual.item) e desenha as peças criadas ali."},
+		{"abrir": "g4_modelo_peca.ron"},
+		{"conferir": {"campo_painel": {"objeto": "chegada", "caminho": "visual.item", "valor": ""}}},
+		{"modo": "simular"},
+		{"conferir": {"modelo_peca": {"t": 30.0, "modelo": "caixa", "minimo": 3, "nenhum_outro": true}}},
+		{"modo": "editar"},
+		{"clicar": {"objeto": "chegada"}},
+		{"esperar": 5},
+		{"escolher": {"controle": "Prop_visual_item", "item": "palete"}},
+		{"esperar": 5},
+		{"conferir": {"campo_painel": {"objeto": "chegada", "caminho": "visual.item", "valor": "palete"}}},
+		{"conferir": {"modelo_contem": ["item:", "\"palete\""]}},
+		{"modo": "simular"},
+		{"nota": "Todas as peças são paletes agora, na espera, no posto e a caminho."},
+		{"conferir": {"modelo_peca": {"t": 30.0, "modelo": "palete", "minimo": 3, "nenhum_outro": true}}},
+		{"tempo": 30.0},
+		{"focar": {"objeto": "espera", "distancia": 6.0, "giro": 0.6, "inclinacao": 0.45}},
+		{"capturar": "g4_modelo_peca_01_paletes"},
+		{"nota": "Voltar à caixa: o padrão sai do modelo."},
+		{"modo": "editar"},
+		{"propriedade": {"objeto": "chegada", "caminho": "visual.item", "valor": ""}},
+		{"conferir": {"campo_painel": {"objeto": "chegada", "caminho": "visual.item", "valor": ""}}},
+		{"modo": "simular"},
+		{"conferir": {"modelo_peca": {"t": 30.0, "modelo": "caixa", "minimo": 3, "nenhum_outro": true}}}
+	]
+}

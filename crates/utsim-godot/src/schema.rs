@@ -2182,10 +2182,13 @@ pub fn asset_choices() -> Vec<Choice> {
         });
     }
     // The Blender elements of their own (`cnc`, `prensa`, `espera`...); not the person
-    // bodies (the person's sex picks them) nor the `_medio` files.
+    // bodies (the person's sex picks them), the `_medio` files, the clip files nor what a
+    // person carries (the crane's radio control).
     if let Some(cat) = crate::modelos3d::Catalogo::find(None) {
         for (stem, e) in &cat.elementos {
             if stem.ends_with("_medio")
+                || stem.starts_with("pessoa_clipes")
+                || stem == crate::modelos3d::RADIO
                 || crate::modelos3d::PESSOAS.contains(&stem.as_str())
                 || out.iter().any(|c| &c.value == stem)
             {
@@ -2196,6 +2199,36 @@ pub fn asset_choices() -> Vec<Choice> {
                 value: stem.clone(),
                 label: stem.clone(),
                 help: format!("{} ({:.2} x {:.2} x {:.2} m)", e.arquivo, t[0], t[1], t[2]),
+                group: "Elementos 3D (assets/modelos3d)".into(),
+            });
+        }
+    }
+    out
+}
+
+/// Text shown for the default item model: the box.
+pub const DEFAULT_ITEM: &str = "caixa (padrão)";
+
+/// The models an item can be drawn with (`visual.item` of a source): the box (`""`) and
+/// the Blender elements, but the person bodies, the `_medio` files and the clip files.
+pub fn item_choices() -> Vec<Choice> {
+    let mut out = vec![choice("", DEFAULT_ITEM)];
+    if let Some(cat) = crate::modelos3d::Catalogo::find(None) {
+        for (stem, e) in &cat.elementos {
+            if stem.ends_with("_medio")
+                || stem.starts_with("pessoa_clipes")
+                || crate::modelos3d::PESSOAS.contains(&stem.as_str())
+            {
+                continue;
+            }
+            let t = e.tamanho;
+            out.push(Choice {
+                value: stem.clone(),
+                label: stem.clone(),
+                help: format!(
+                    "{} ({:.2} x {:.2} x {:.2} m), desenhado no tamanho da peça",
+                    e.arquivo, t[0], t[1], t[2]
+                ),
                 group: "Elementos 3D (assets/modelos3d)".into(),
             });
         }
@@ -2229,6 +2262,20 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
         .optional(v.color.is_some()),
         float(s, "visual.scale", "Escala", v.scale.unwrap_or(1.0)).min(0.01),
     ];
+    // A source picks how its items are drawn (the box by default).
+    if matches!(obj.kind, ObjectKind::Source { .. }) {
+        let mut item = Field::new(
+            s,
+            "visual.item",
+            "Modelo da peça",
+            FieldType::Asset,
+            Value::Text(v.item.clone().unwrap_or_default()),
+        )
+        .choices(item_choices());
+        item.help =
+            "Elemento 3D com que as peças criadas aqui são desenhadas; a caixa é o padrão.".into();
+        out.push(item);
+    }
     // A fixed object turns in "Posição" (Rotação); a mobile resource faces where it goes,
     // and this only turns its drawing.
     if is_mobile(&obj.kind) {
@@ -2248,6 +2295,7 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
                 is_mobile(&obj.kind)
                     || VisualDef {
                         yaw: None,
+                        item: None,
                         ..v.clone()
                     } != VisualDef::default()
             })),
@@ -3442,6 +3490,10 @@ fn edit_visual(
             let t = value.as_text().unwrap_or("").trim();
             v.asset = (!t.is_empty()).then(|| t.to_string());
         }
+        "item" => {
+            let t = value.as_text().unwrap_or("").trim();
+            v.item = (!t.is_empty() && t != DEFAULT_ITEM).then(|| t.to_string());
+        }
         "color" | "color.on" => match value {
             Value::Null | Value::Bool(false) => v.color = None,
             Value::Bool(true) => v.color = Some(v.color.unwrap_or_else(|| "#d08030".into())),
@@ -3489,10 +3541,12 @@ fn edit_visual(
             v.yaw = (y != 0.0).then_some(y);
         }
         // The rotation of a fixed object is its place on the floor, not its look: kept.
+        // The model of the items is not the object's look: kept too.
         "reset" => {
             let keep = v.yaw.filter(|_| !is_mobile(&obj.kind));
             v = VisualDef {
                 yaw: keep,
+                item: v.item.clone(),
                 ..VisualDef::default()
             };
         }

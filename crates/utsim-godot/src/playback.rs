@@ -222,6 +222,9 @@ pub struct FrameData {
     pub color: Vec<[f32; 3]>,
     /// Distance driven divided by the asset scale (wheels: `-(rolled / radius)`).
     pub rolled: Vec<f32>,
+    /// Skeletal people holding the crane's radio control (`controle_remoto`) between the
+    /// hands: running a crane by radio.
+    pub radio: Vec<bool>,
     /// Skeletal people: clip index ([`Clip::index`], -1 for others) and time in it. The
     /// seated driver of a forklift: [`DriverClip::global_index`].
     pub clip: Vec<i32>,
@@ -233,6 +236,9 @@ pub struct FrameData {
     pub item_yaw: Vec<f32>,
     pub item_scale: Vec<f32>,
     pub item_color: Vec<[f32; 3]>,
+    /// Index into [`Playback::item_modelos`] of the Blender element the item is drawn
+    /// with (its source's `visual.item`); -1 for the box.
+    pub item_modelo: Vec<i32>,
     /// Block (index into [`Playback::blocks`]) of a skeletal person holding the item, so
     /// the engine can put it between the hands; -1 otherwise.
     pub item_carrier: Vec<i32>,
@@ -429,6 +435,10 @@ impl Espera3d {
     }
 }
 
+/// How far ahead of a person's root the hands hold an item, metres: a person picking an
+/// item from its place stands that far from it.
+pub const HAND_REACH: f32 = 0.35;
+
 /// Distance between operators who work at the same station together (operators per
 /// piece), side by side across its post, metres.
 pub const POST_SPACING: f32 = 0.7;
@@ -446,11 +456,19 @@ const CRANE_CLEARANCE: f64 = 1.0;
 /// floor (`operator: Pendant` or `Radio`). The trace does not say which task a person
 /// works on: a span of a member of the crane's team counts when, as the crane starts to
 /// hook a load, the person stands beside it, the clearance outside the area under the
-/// load (where the crane meets its operator).
-pub fn crane_operator_spans(model: &Model, replay: &Replay) -> Vec<Vec<(f64, f64)>> {
+/// load (where the crane meets its operator). The third value: the crane is run by radio
+/// (the person holds the radio control), not by the pendant.
+pub fn crane_operator_spans(model: &Model, replay: &Replay) -> Vec<Vec<(f64, f64, bool)>> {
     use utsim_core::{State, TraceEvent};
     let n = replay.blocks.len();
     let mut out = vec![Vec::new(); n];
+    // Most models have no crane run from the floor: no pass over the trace for them.
+    let floor_run = model.objects.iter().any(
+        |o| matches!(&o.kind, ObjectKind::Crane { operator, .. } if operator.team().is_some()),
+    );
+    if !floor_run {
+        return out;
+    }
     let index = |name: &str| replay.blocks.iter().position(|b| b.name == name);
     let mut states: Vec<Vec<(f64, State)>> = vec![Vec::new(); n];
     // Per block: start, end and last point of each travel.
@@ -486,6 +504,7 @@ pub fn crane_operator_spans(model: &Model, replay: &Replay) -> Vec<Vec<(f64, f64
         let (Some(team), Some(crane)) = (operator.team(), index(&o.name)) else {
             continue;
         };
+        let radio = matches!(operator, utsim_model::CraneControl::Radio { .. });
         let members: Vec<usize> = match model.objects.iter().find(|m| m.name == team) {
             Some(ObjectDef {
                 kind: ObjectKind::Dispatcher { team, .. },
@@ -514,7 +533,7 @@ pub fn crane_operator_spans(model: &Model, replay: &Replay) -> Vec<Vec<(f64, f64
                     }
                 });
                 if beside {
-                    out[m].push((start, end));
+                    out[m].push((start, end, radio));
                 }
             }
         }
@@ -723,6 +742,11 @@ pub struct Playback {
     dropped: Vec<Vec<f64>>,
     /// The catalogue of the Blender elements, when its folder was found.
     pub modelos3d: Option<Catalogo>,
+    /// The Blender elements the sources draw their items with (`visual.item`).
+    pub item_modelos: Vec<modelos3d::ModeloPeca>,
+    /// Per replay block, the index into [`Playback::item_modelos`] of its items' element;
+    /// -1 for the box.
+    item_modelo_de: Vec<i32>,
     /// Per drawn block, its Blender element resolved once (clips, state table, operator
     /// post and walks in the layout) and the runs of its states as the table sees them
     /// ([`Animado::runs`]); `None` for the others.
@@ -737,7 +761,7 @@ pub struct Playback {
     pub pontes: Vec<Option<Ponte3d>>,
     /// Per replay block, when the person runs a crane from the floor (pendant or radio,
     /// [`crane_operator_spans`]): then they stand beside the load, not at a post.
-    operando_ponte: Vec<Vec<(f64, f64)>>,
+    operando_ponte: Vec<Vec<(f64, f64, bool)>>,
     /// The live numbers of every block (the panel of Simular, `ui_ao_vivo`), built on
     /// the first use from the trace kept by [`Playback::com_rastro`], which then goes.
     vivo: std::sync::OnceLock<crate::ao_vivo::AoVivo>,
@@ -892,7 +916,8 @@ impl Playback {
         let mut created = vec![Vec::new(); n];
         let mut dropped = vec![Vec::new(); n];
         // Items still at the block that created them: destroyed there, they were lost.
-        let mut at_birth: HashMap<u64, usize> = HashMap::new();
+        // The fast hasher: one lookup for each of the (millions of) moves of the trace.
+        let mut at_birth: utsim_scene::timeline::FxMap<u64, usize> = Default::default();
         for r in &replay.records {
             match r.event {
                 utsim_core::TraceEvent::Created { item, block } => {
@@ -942,6 +967,8 @@ impl Playback {
             created,
             dropped,
             modelos3d: catalogo,
+            item_modelos: Vec::new(),
+            item_modelo_de: Vec::new(),
             animados: Vec::new(),
             tampos: Vec::new(),
             esperas: Vec::new(),
@@ -956,6 +983,40 @@ impl Playback {
     /// Resolves the Blender element of every block once (clips, state table, operator
     /// post and walks in the layout) and the runs of its states in the trace.
     fn with_blender(mut self, replay: &Replay) -> Playback {
+        // The item seated on the surface under each part point (a table top, clear of a
+        // clamp), before the points are placed.
+        if let Some(cat) = self.modelos3d.as_mut() {
+            for v in &self.blocks {
+                if let Some(stem) = v.modelo3d.as_deref() {
+                    cat.assentar(stem);
+                }
+            }
+        }
+        // The element each source draws its items with (`visual.item`), once per element.
+        self.item_modelo_de = vec![-1; replay.blocks.len()];
+        if let (Some(model), Some(cat)) = (self.model.as_ref(), self.modelos3d.as_ref()) {
+            for (b, block) in replay.blocks.iter().enumerate() {
+                let Some(stem) = model
+                    .objects
+                    .iter()
+                    .find(|o| o.name == block.name)
+                    .and_then(|o| o.visual.as_ref()?.item.clone())
+                else {
+                    continue;
+                };
+                let k = match self.item_modelos.iter().position(|m| m.stem == stem) {
+                    Some(k) => k,
+                    None => match modelos3d::ModeloPeca::of(cat, &stem) {
+                        Some(m) => {
+                            self.item_modelos.push(m);
+                            self.item_modelos.len() - 1
+                        }
+                        None => continue,
+                    },
+                };
+                self.item_modelo_de[b] = k as i32;
+            }
+        }
         let mut animados: Vec<Option<(Animado, modelos3d::Runs)>> = (0..self.blocks.len())
             .map(|i| {
                 let v = &self.blocks[i];
@@ -971,18 +1032,29 @@ impl Playback {
                 ))
             })
             .collect();
-        let mut states: HashMap<usize, Vec<(f64, utsim_core::State)>> = HashMap::new();
-        for r in &replay.records {
-            if let utsim_core::TraceEvent::State { block, state } = r.event
-                && let Some(i) = self.drawn_index(block)
-                && animados[i].is_some()
-            {
-                states.entry(i).or_default().push((r.t, state));
+        // The states as the timeline already holds them (no other pass over the trace).
+        for (i, slot) in animados.iter_mut().enumerate() {
+            if let Some((a, runs)) = slot.as_mut() {
+                let list = self.scene.timeline.block_states(self.blocks[i].b);
+                if !list.is_empty() {
+                    *runs = a.runs(list.iter().copied());
+                }
             }
         }
-        for (i, list) in states {
-            if let Some((a, runs)) = animados[i].as_mut() {
-                *runs = a.runs(list);
+        // A door (the `doca`) at a source or a sink opens for each item that comes in or
+        // goes out, not by the block's states: the times are those already gathered (the
+        // creations, the arrivals of the timeline), with no other pass over the trace.
+        for (i, slot) in animados.iter_mut().enumerate() {
+            let v = &self.blocks[i];
+            let times = match v.kind.as_str() {
+                "Source" => self.created.get(v.b).map_or(&[][..], Vec::as_slice),
+                "Sink" => self.scene.timeline.block_arrivals(v.b),
+                _ => continue,
+            };
+            if let Some((a, runs)) = slot.as_mut()
+                && let Some(door) = a.door_runs(times)
+            {
+                *runs = door;
             }
         }
         self.animados = animados;
@@ -1049,7 +1121,7 @@ impl Playback {
                     return None;
                 }
                 let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
-                Some((modelos3d::Tampo::of(e)?, self.placement(i)?))
+                Some(modelos3d::Tampo::of(e)?.placed(&self.placement(i)?))
             })
             .collect();
         self
@@ -1100,13 +1172,56 @@ impl Playback {
     pub fn placement(&self, i: usize) -> Option<modelos3d::Placement> {
         let look = self.blocks[i].look.as_ref()?;
         let (asset_yaw, offset) = self.asset_pose(i)?;
+        let fit = self.encaixe(i);
         Some(modelos3d::Placement {
             scale: look.scale,
+            stretch: fit.map_or([1.0; 3], |f| f.stretch),
             asset_yaw,
-            offset,
+            offset: fit.map_or(offset, |f| f.offset),
             root: self.static_pose(i).0,
             turn: self.turn(i),
         })
+    }
+
+    /// How the Blender element of block `i` is stretched to the size given in the model
+    /// (the engine applies it; its points, part tables and table tops follow). `None` when
+    /// the block has no size of its own or no Blender element.
+    pub fn encaixe(&self, i: usize) -> Option<modelos3d::Encaixe> {
+        let v = &self.blocks[i];
+        if !v.sized {
+            return None;
+        }
+        let e = self.modelos3d.as_ref()?.get(v.modelo3d.as_deref()?)?;
+        let look = v.look.as_ref()?;
+        let (yaw, offset) = self.asset_pose(i)?;
+        // A stack is drawn turned around (`cena.gd`).
+        let yaw = if v.stack {
+            yaw + std::f32::consts::PI
+        } else {
+            yaw
+        };
+        e.encaixe(look.scale, yaw, offset, self.local_size(i))
+    }
+
+    /// The belt of a queue drawn as a conveyor (`looks::queue_belt`), stretched to the
+    /// size given in the model as the engine stretches the asset: its length along the
+    /// belt, its width across and its top at the height of the box.
+    pub fn queue_belt(&self, i: usize) -> Option<looks::QueueBelt> {
+        let v = &self.blocks[i];
+        let mut belt = looks::queue_belt(&v.kind, v.look.as_ref()?)?;
+        if v.sized {
+            let size = self.local_size(i);
+            let sideways = self.asset_pose(i).is_some_and(|(y, _)| y.sin().abs() > 0.7);
+            let (along, across) = if sideways {
+                (size[2], size[0])
+            } else {
+                (size[0], size[2])
+            };
+            belt.length = along.max(0.2);
+            belt.width = across.max(0.2);
+            belt.top = size[1].max(0.05);
+        }
+        Some(belt)
     }
 
     /// The Blender element of block `i` and the run of its states at `t`.
@@ -1194,6 +1309,22 @@ impl Playback {
             .map_or_else(Vec::new, |(a, _)| {
                 a.pontos.iter().map(|(n, _)| n.clone()).collect()
             })
+    }
+
+    /// How far each point of [`Self::anchor_points`] was moved to seat the item on the
+    /// surface under it (Godot frame of the element; zero for the others).
+    pub fn anchor_adjust(&self, i: usize) -> Vec<[f32; 3]> {
+        let e = self.blocks[i]
+            .modelo3d
+            .as_deref()
+            .and_then(|s| self.modelos3d.as_ref()?.get(s));
+        self.anchor_points(i)
+            .iter()
+            .map(|n| {
+                e.and_then(|e| e.ajustes.get(n).copied())
+                    .unwrap_or([0.0; 3])
+            })
+            .collect()
     }
 
     /// Lengths of the person clips, seconds, in [`Clip::ALL`] order (read by the engine
@@ -1305,6 +1436,21 @@ impl Playback {
     ) -> Option<(utsim_scene::MobilePose, Option<usize>)> {
         let s = &self.scene;
         let mut p = s.mobile_at(b, t)?;
+        // A forklift or a person loading or unloading goes to the item's own place on the
+        // block (its slot), not to the access point the trace stops at: the forks or the
+        // hands under the item.
+        let hold = match look.carry {
+            Carry::Forks { forward, .. } => Some(forward),
+            Carry::Hands => Some(HAND_REACH),
+            _ => None,
+        };
+        if let Some(hold) = hold
+            && let Some((h, pickup, progress)) = s.carrier_window(b, t)
+            && let Some(target) = self.rest_center(h.other, h.item, if pickup { t } else { h.t })
+        {
+            (p.position, p.yaw) =
+                utsim_scene::compose::slot_approach(p.position, p.yaw, progress, target, hold);
+        }
         let original = p.position;
         let reach = match look.carry {
             Carry::Forks { forward, .. } => forward + 0.6,
@@ -1325,7 +1471,7 @@ impl Playback {
         let at_crane = self
             .operando_ponte
             .get(b)
-            .is_some_and(|v| v.iter().any(|&(a, z)| a <= t && t < z));
+            .is_some_and(|v| v.iter().any(|&(a, z, _)| a <= t && t < z));
         if look.carry == Carry::Hands && p.motion == Motion::Working && !at_crane {
             let station = self.stations.iter().copied().find(|&st| {
                 [0, 2]
@@ -1353,6 +1499,63 @@ impl Playback {
             }
         }
         Some((p, at_post))
+    }
+
+    /// The place of `item` among the `n` of drawn block `i` at `t` ([`style::pick_slots`]),
+    /// the places of the block worked out once per frame in `cache`; an item being dropped
+    /// there (not resting yet) gets the place it is going to.
+    fn place_of(
+        &self,
+        cache: &mut HashMap<usize, HashMap<usize, Option<usize>>>,
+        i: usize,
+        item: usize,
+        t: f64,
+        n: usize,
+    ) -> Option<usize> {
+        let b = self.blocks[i].b;
+        let map = cache.entry(i).or_insert_with(|| {
+            let list = self.scene.resting_at(b, t);
+            let seqs: Vec<Option<u32>> = list.iter().map(|&(_, s)| s).collect();
+            list.iter()
+                .map(|&(it, _)| it)
+                .zip(style::pick_slots(&seqs, n))
+                .collect()
+        });
+        match map.get(&item) {
+            Some(&k) => k,
+            None => self.scene.slot_of(b, item, t, n),
+        }
+    }
+
+    /// Centre (layout) of the place `item` rests on (or is dropped onto) at block `b`
+    /// (replay index) at `t`, as the frame draws it: a waiting area's own place, a table
+    /// top's or a conveyor's place, or the scene's slot. `None` for racks (the scene
+    /// turns the forklift to the cell itself) and blocks that are not drawn.
+    pub fn rest_center(&self, b: usize, item: usize, t: f64) -> Option<[f32; 3]> {
+        let s = &self.scene;
+        let i = self.index_of.get(b).copied().flatten()?;
+        let v = &self.blocks[i];
+        if matches!(v.kind.as_str(), "Rack" | "Conveyor") || v.role.is_some() {
+            return None;
+        }
+        if let Some(Some(e)) = self.esperas.get(i) {
+            let k = s.timeline.rack_slot(b, item, t)?;
+            return Some(e.to_layout(*e.places.get(k)?));
+        }
+        if let Some(Some((tampo, at))) = self.tampos.get(i) {
+            let size = ITEM_SIZE / at.scale.max(1e-6);
+            let n = tampo.per_layer(size) * style::MAX_LAYERS;
+            let cell = tampo.slot(s.slot_of(b, item, t, n)?, size)?;
+            let (on, _) = modelos3d::point_to_layout(&cell, at);
+            return Some([on[0], on[1] + ITEM_SIZE / 2.0, on[2]]);
+        }
+        if let Some(belt) = self.queue_belt(i) {
+            let n = belt.per_layer(ITEM_SIZE) * style::MAX_LAYERS;
+            let at = belt.slot(s.slot_of(b, item, t, n)?, ITEM_SIZE)?;
+            let base = s.base_at(b, t);
+            return Some([base[0] + at[0], base[1] + at[1], base[2] + at[2]]);
+        }
+        s.slot_center(b, item, t)
     }
 
     /// The nearest station (machine or bench, drawn index) whose footprint, grown by
@@ -1452,10 +1655,19 @@ impl Playback {
                 0.0
             };
             let content = s.timeline.block_content(b, t);
+            // A person running a crane by radio holds the radio control in both hands.
+            let radio = self
+                .operando_ponte
+                .get(b)
+                .is_some_and(|v| v.iter().any(|&(a, z, radio)| radio && a <= t && t < z));
             let (clip, clip_time) = match &v.look {
                 Some(l) if l.skeletal => {
                     let carrying = lift > 0.0 || content > 0;
-                    let c = looks::person_clip(motion, carrying);
+                    let c = match motion {
+                        Motion::Moving { .. } if radio => Clip::Carry,
+                        _ if radio => Clip::IdleCarry,
+                        _ => looks::person_clip(motion, carrying),
+                    };
                     let progress = match motion {
                         Motion::Loading { progress } | Motion::Unloading { progress } => progress,
                         _ => 0.0,
@@ -1490,6 +1702,8 @@ impl Playback {
             f.rolled.push(distance / scale);
             f.clip.push(clip);
             f.clip_time.push(clip_time);
+            f.radio
+                .push(radio && v.look.as_ref().is_some_and(|l| l.skeletal));
             let (anim_clip, anim_fase, anim_extra) = self.anim_at(f.anim_clip.len(), t, lift);
             f.anim_extra.push(anim_extra);
             f.ponte.push(
@@ -1532,10 +1746,9 @@ impl Playback {
                 (_, Some(Some((tampo, at)))) => {
                     tampo.hidden(content, ITEM_SIZE / at.scale.max(1e-6))
                 }
-                _ => v
-                    .look
-                    .as_ref()
-                    .and_then(|l| looks::queue_belt(&v.kind, l))
+                _ => (i < self.blocks.len())
+                    .then(|| self.queue_belt(i))
+                    .flatten()
                     .map_or(0, |belt| belt.hidden(content, ITEM_SIZE)),
             };
             f.label
@@ -1554,16 +1767,14 @@ impl Playback {
         // Items: where the scene puts them, moved onto forks, hands and decks.
         let mut stacked: HashMap<usize, usize> = HashMap::new();
 
-        let mut resting: HashMap<usize, usize> = HashMap::new();
+        // The places of the items resting on queues drawn as tables or conveyors, per
+        // block (`Playback::place_of`).
+        let mut places: HashMap<usize, HashMap<usize, Option<usize>>> = HashMap::new();
         // Items beside a full waiting area, per block.
         let mut beside: HashMap<usize, usize> = HashMap::new();
         // Queues drawn as conveyors: an item flying in or out does not sink into the belt.
         let belts: Vec<([f32; 3], looks::QueueBelt)> = (0..self.blocks.len())
-            .filter_map(|i| {
-                let v = &self.blocks[i];
-                let belt = looks::queue_belt(&v.kind, v.look.as_ref()?)?;
-                Some((self.static_pose(i).0, belt))
-            })
+            .filter_map(|i| Some((self.static_pose(i).0, self.queue_belt(i)?)))
             .collect();
         let items = s.items_at(t);
         // The part each station with a part point works on: the item that got there last
@@ -1634,6 +1845,8 @@ impl Playback {
                 f.item_yaw.push(self.turn(i));
                 f.item_scale.push(1.0);
                 f.item_color.push(style::origin_color(origin));
+                f.item_modelo
+                    .push(self.item_modelo_de.get(origin).copied().unwrap_or(-1));
                 f.item_carrier.push(-1);
                 f.item_stack.push(0);
                 f.item_ancora_bloco.push(-1);
@@ -1655,20 +1868,18 @@ impl Playback {
                     let low = h[2] - f64::from(ITEM_SIZE) * (0.5 + *k as f64) - 0.05;
                     *k += 1;
                     center = to_godot(pp.global([h[0], h[1], low]).map(|v| v as f32));
-                } else if let Some(belt) = looks::queue_belt(&v.kind, look) {
-                    // On top of the belt, in a line (the scene's slots are the simple
-                    // queue's: their base is the block's).
-                    let k = resting.entry(i).or_default();
-                    let simple = turned(style::slot_offset(Shape::LongBox, *k), self.turn(i));
-                    let Some(at) = belt.slot(*k, ITEM_SIZE) else {
+                } else if let Some(belt) = self.queue_belt(i) {
+                    // On top of the belt, in a line, each item on its own place while it
+                    // rests (the others do not move when one leaves).
+                    let n = belt.per_layer(ITEM_SIZE) * style::MAX_LAYERS;
+                    let Some(k) = self.place_of(&mut places, i, p.item, t, n) else {
                         continue;
                     };
-                    *k += 1;
-                    center = [
-                        center[0] - simple[0] + at[0],
-                        center[1] - simple[1] + at[1],
-                        center[2] - simple[2] + at[2],
-                    ];
+                    let Some(at) = belt.slot(k, ITEM_SIZE) else {
+                        continue;
+                    };
+                    let base = s.base_at(v.b, t);
+                    center = [base[0] + at[0], base[1] + at[1], base[2] + at[2]];
                 } else if let Some(Some(e)) = self.esperas.get(i) {
                     // On its own place (the one the simulation gave it), or beside the area
                     // while every place is taken.
@@ -1689,16 +1900,23 @@ impl Playback {
                     };
                     center = e.to_layout(local);
                 } else if let Some(Some((tampo, at))) = self.tampos.get(i) {
-                    // On the top of the waiting table, in its grid.
-                    let k = resting.entry(i).or_default();
-                    let Some(cell) = tampo.slot(*k, ITEM_SIZE / at.scale.max(1e-6)) else {
+                    // On the top of the waiting table, in its grid, each item on its own
+                    // place while it rests.
+                    let size = ITEM_SIZE / at.scale.max(1e-6);
+                    let n = tampo.per_layer(size) * style::MAX_LAYERS;
+                    let Some(k) = self.place_of(&mut places, i, p.item, t, n) else {
                         continue;
                     };
-                    *k += 1;
+                    let Some(cell) = tampo.slot(k, size) else {
+                        continue;
+                    };
                     let (on, _) = modelos3d::point_to_layout(&cell, at);
                     center = [on[0], on[1] + ITEM_SIZE / 2.0, on[2]];
                 } else if v.kind == "Queue" {
-                    center[1] -= looks::queue_drop();
+                    // The realistic queue is a floor area: its items rest on the floor, at
+                    // any height given to the block.
+                    let top = 2.0 * self.scene.geoms[v.b].half[1];
+                    center[1] -= top - 0.01;
                 } else if poses[i].is_none()
                     && let Some(k) = anchors[i]
                 {
@@ -1767,6 +1985,8 @@ impl Playback {
             f.item_yaw.push(yaw_to_godot(p.yaw));
             f.item_scale.push(scale);
             f.item_color.push(style::origin_color(origin));
+            f.item_modelo
+                .push(self.item_modelo_de.get(origin).copied().unwrap_or(-1));
             f.item_carrier.push(carrier);
             f.item_stack.push(stack);
             f.item_ancora_bloco.push(anchor.map_or(-1, |a| a.0 as i32));
@@ -2115,6 +2335,7 @@ mod tests {
                 f.param.len(),
                 f.color.len(),
                 f.rolled.len(),
+                f.radio.len(),
                 f.clip.len(),
                 f.clip_time.len(),
                 f.label.len(),
@@ -2129,6 +2350,7 @@ mod tests {
                 f.item_yaw.len(),
                 f.item_scale.len(),
                 f.item_color.len(),
+                f.item_modelo.len(),
                 f.item_carrier.len(),
                 f.item_stack.len(),
             ] {
@@ -2463,13 +2685,19 @@ mod tests {
             );
             let cena = t0.elapsed();
             let t0 = std::time::Instant::now();
+            let _ = utsim_scene::timeline::Timeline::build(
+                &replay,
+                utsim_scene::timeline::TransitSetting::Auto,
+            );
+            let linha = t0.elapsed();
+            let t0 = std::time::Instant::now();
             let _ = utsim_model::exposure::load_tracks(&model, &replay.records, replay.stop_time);
             let cargas = t0.elapsed();
             let t0 = std::time::Instant::now();
             let _ = crane_operator_spans(&model, &replay);
             let ponte = t0.elapsed();
             eprintln!(
-                "  {} registros: cena {cena:?}, cargas {cargas:?}, operador da ponte {ponte:?}",
+                "  {} registros: cena {cena:?} (linha do tempo {linha:?}), cargas {cargas:?}, operador da ponte {ponte:?}",
                 replay.records.len()
             );
             let end = replay.stop_time;
@@ -2487,6 +2715,94 @@ mod tests {
                 items_drawn / n as usize
             );
         }
+    }
+
+    #[test]
+    fn a_carrier_picks_the_item_at_its_own_place_and_the_others_stay_put() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../godot/roteiros/g4_pegar_no_lugar.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), true);
+        for (carrier, queue, hold) in [
+            ("empilhadeira_1", "doca", 2.2f32),
+            ("operador_1", "doca_2", 0.8f32),
+        ] {
+            let k = pb.blocks.iter().position(|v| v.name == carrier).unwrap();
+            let q = pb.blocks.iter().position(|v| v.name == queue).unwrap();
+            let (cb, qb) = (pb.blocks[k].b, pb.blocks[q].b);
+            let list: Vec<_> = pb
+                .scene
+                .timeline
+                .handoffs(cb)
+                .iter()
+                .filter(|h| h.pickup && h.other == qb)
+                .copied()
+                .collect();
+            assert!(list.len() >= 4, "{carrier}: {} coletas", list.len());
+            let mut checked = 0;
+            for h in &list {
+                // Half way to the hand-off: the carrier stands at the item, wherever its
+                // place is on the queue.
+                let Some((_, true, _)) = pb.scene.carrier_window(cb, h.t - 0.1) else {
+                    continue;
+                };
+                let (_, start, _) = pb.scene.timeline.state_span(cb, h.t - 0.1).unwrap();
+                let t = start + (h.t - start) * 0.35;
+                let target = pb.rest_center(qb, h.item, t).expect("o lugar da peça");
+                let f = pb.frame(t);
+                let at = f.position[k];
+                let d = ((at[0] - target[0]).powi(2) + (at[2] - target[2]).powi(2)).sqrt();
+                eprintln!(
+                    "{carrier} pega a peça {} em t={t:.1}: a {d:.2} m do lugar",
+                    h.item
+                );
+                assert!(d <= hold, "{carrier} a {d:.2} m da peça em t={t:.1}");
+                // The other items on the queue keep their places across the pick-up.
+                let before = pb.scene.resting_at(qb, start - 0.05);
+                let after_t = h.t + 0.05;
+                let after = pb.scene.resting_at(qb, after_t);
+                for &(i, _) in before.iter().filter(|(i, _)| *i != h.item) {
+                    if !after.iter().any(|&(j, _)| j == i) {
+                        continue;
+                    }
+                    let a = pb.rest_center(qb, i, start - 0.05).unwrap();
+                    let b = pb.rest_center(qb, i, after_t).unwrap();
+                    assert!(
+                        (a[0] - b[0]).abs() + (a[2] - b[2]).abs() < 1e-4,
+                        "a peça {i} mudou de lugar: {a:?} -> {b:?}"
+                    );
+                }
+                checked += 1;
+            }
+            assert!(checked >= 3, "{carrier}: {checked} coletas conferidas");
+        }
+    }
+
+    #[test]
+    fn the_radio_operator_holds_the_radio_control_only_while_running_the_crane() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../godot/roteiros/g4_ponte_radio.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), true);
+        let op = pb.blocks.iter().position(|v| v.name == "operador").unwrap();
+        let spans = &pb.operando_ponte[pb.blocks[op].b];
+        assert!(spans.len() >= 2 && spans.iter().all(|s| s.2), "{spans:?}");
+        let (a, z, _) = spans[0];
+        eprintln!("rádio: {spans:?}");
+        let f = pb.frame((a + z) / 2.0);
+        assert!(f.radio[op]);
+        assert_eq!(f.clip[op], Clip::IdleCarry.index() as i32);
+        assert!(!pb.frame(a - 1.0).radio[op]);
+        // The pendant does not show the radio.
+        let path = path.with_file_name("g4_ponte_botoeira.ron");
+        let model = Model::load(&path).expect("model");
+        let replay = model.replay(0).expect("replay");
+        let pb = Playback::new(&replay, Some(&model), path.parent(), true);
+        let op = pb.blocks.iter().position(|v| v.name == "operador").unwrap();
+        let (a, z, radio) = pb.operando_ponte[pb.blocks[op].b][0];
+        assert!(!radio && !pb.frame((a + z) / 2.0).radio[op]);
     }
 
     #[test]
@@ -2546,7 +2862,7 @@ mod tests {
         // Running the crane, standing or walking with the load: where the trace says,
         // never at the post of the station under the hook.
         let mut walked = false;
-        for &(a, z) in spans.iter().take(3) {
+        for &(a, z, _) in spans.iter().take(3) {
             let end = z.min(replay.stop_time);
             for s in 1..40 {
                 let t = a + (end - a) * s as f64 / 40.0;

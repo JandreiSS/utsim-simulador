@@ -50,6 +50,9 @@ var _last_color: Array = []
 var task_target := PackedVector3Array()
 var _last_label: Array = []
 var _pallets := false
+## The Blender elements the sources draw their items with (`visual.item`), by the frame's
+## `item_modelo`: `{source, name, key, path, scale, offset}`.
+var _item_modelos: Array = []
 var _clips2: AnimationLibrary
 ## The clips of the UAL1 mannequin, for the people with a Blender body (same skeleton).
 var _clips1: AnimationLibrary
@@ -63,6 +66,9 @@ var _animated := PackedInt32Array()
 var _pontes := PackedInt32Array()
 ## Items of the last frame put on a point of a Blender element: [block, point, node].
 var _anchored: Array = []
+## The crane's radio control (`controle_remoto.glb`), loaded on first use; false when the
+## file is not imported.
+var _radio_scene: Variant = null
 var labels_visible := true
 ## A camada de segurança e qualidade (camada_seguranca.gd), quando a reprodução tem uma.
 var camada: CamadaSeguranca
@@ -150,6 +156,7 @@ func build(pb: Object, keep_templates := false) -> void:
 	playback = pb
 	info = pb.static_scene()
 	_pallets = info.get("pallets", false)
+	_item_modelos = info.get("item_modelos", [])
 	blocks = info["blocks"]
 	if skeletal_available():
 		_clips2 = _library_of(UAL2)
@@ -202,7 +209,14 @@ func build(pb: Object, keep_templates := false) -> void:
 			if b.get("sized", false) and not fell_back:
 				# The floor frame (`espera_chao`) grows side by side, its stripes as thin as
 				# they are; every other element is stretched whole.
-				if not _fit_floor_frame(asset, b["size"]):
+				# The stretch comes from the bridge when it knows the element's box, so the
+				# points, part tables and table tops follow the same fit.
+				if _fit_floor_frame(asset, b["size"]):
+					pass
+				elif b.has("stretch"):
+					asset.scale = asset.scale * (b["stretch"] as Vector3)
+					asset.position = b["fit_offset"]
+				else:
 					_fit_to_size(root, asset, b["size"])
 			if b.has("color") and not b.get("skeletal", false):
 				_tint_named(asset, "pintura", b["color"])
@@ -211,7 +225,7 @@ func build(pb: Object, keep_templates := false) -> void:
 			if not fell_back and not clips.is_empty() and _bind_clips(rig, asset, clips):
 				_animated.append(i)
 			if not fell_back:
-				_bind_points(rig, asset, b.get("pontos", PackedStringArray()))
+				_bind_points(rig, asset, b.get("pontos", PackedStringArray()), b.get("pontos_ajuste", PackedVector3Array()))
 			if b.has("ponte_json") and not fell_back and _bind_ponte(rig, asset, String(b["ponte_json"])):
 				_pontes.append(i)
 			if b.get("skeletal", false):
@@ -525,12 +539,17 @@ func _bind_clips(rig: Dictionary, asset: Node3D, clips: PackedStringArray) -> bo
 
 ## The nodes of the points where a Blender element holds a part or a load (`block.pontos`,
 ## indexed by the frame's `item_ancora_ponto`), found once; null where the file lacks one.
-func _bind_points(rig: Dictionary, asset: Node3D, names: PackedStringArray) -> void:
+func _bind_points(rig: Dictionary, asset: Node3D, names: PackedStringArray, adjust := PackedVector3Array()) -> void:
 	if names.is_empty():
 		return
 	var nodes: Array = []
-	for n in names:
-		nodes.append(asset.find_child(n, true, false))
+	for k in names.size():
+		var n := asset.find_child(names[k], true, false) as Node3D
+		if n != null and k < adjust.size():
+			# Seated on the surface under it, clear of what would cut the item (the bridge
+			# moved the point in the element's frame, the root's: `Elemento::assentar`).
+			n.position += adjust[k]
+		nodes.append(n)
 	rig["pontos"] = nodes
 
 
@@ -1162,6 +1181,7 @@ func apply(t: float, dt: float, snap := false) -> void:
 		if _last_label[i] != label[i]:
 			_last_label[i] = label[i]
 			set_label_text(rig["label"], label[i])
+	_apply_radios(f)
 	_apply_items(f)
 	if camada != null:
 		camada.aplicar(t)
@@ -1181,6 +1201,7 @@ func _apply_items(f: Dictionary) -> void:
 	var stack: PackedInt32Array = f["item_stack"]
 	var anchor_block: PackedInt32Array = f.get("item_ancora_bloco", PackedInt32Array())
 	var anchor_point: PackedInt32Array = f.get("item_ancora_ponto", PackedInt32Array())
+	var imodel: PackedInt32Array = f.get("item_modelo", PackedInt32Array())
 	_anchored.clear()
 	var seen := {}
 	for k in ids.size():
@@ -1188,7 +1209,7 @@ func _apply_items(f: Dictionary) -> void:
 		seen[id] = true
 		var node: Node3D = items.get(id)
 		if node == null:
-			node = _new_item(icolor[k])
+			node = _new_item(icolor[k], imodel[k] if k < imodel.size() else -1)
 			items[id] = node
 		var p := ipos[k]
 		var s := iscale[k]
@@ -1224,6 +1245,49 @@ func _apply_items(f: Dictionary) -> void:
 			n.queue_free()
 
 
+## The radio control between the hands of whoever runs a crane by radio (`radio` of the
+## frame), turned with the person (`+x` forward, as the element is made).
+func _apply_radios(f: Dictionary) -> void:
+	var radio: PackedInt32Array = f.get("radio", PackedInt32Array())
+	for i in mobiles:
+		var rig: Dictionary = rigs[i]
+		var on := i < radio.size() and radio[i] == 1 and rig.has("person")
+		var n: Node3D = rig.get("radio")
+		if not on:
+			if n != null:
+				n.visible = false
+			continue
+		var hands = (rig["person"] as Pessoa).hands()
+		if n == null:
+			n = _new_radio(rig["root"])
+			rig["radio"] = n
+		if n == null or hands == null:
+			if n != null:
+				n.visible = false
+			continue
+		var root: Node3D = rig["root"]
+		n.position = root.global_transform.affine_inverse() * (hands as Vector3)
+		n.basis = Basis.IDENTITY
+		n.visible = true
+
+
+func _new_radio(root: Node3D) -> Node3D:
+	if _radio_scene == null:
+		var path := MODELOS3D + "controle_remoto.glb"
+		_radio_scene = load(path) if ResourceLoader.exists(path) else false
+	if not (_radio_scene is PackedScene):
+		return null
+	var n := (_radio_scene as PackedScene).instantiate() as Node3D
+	n.name = "controle_remoto"
+	root.add_child(n)
+	return n
+
+
+## Whether block `i` shows the radio control now (for the test scripts).
+func holds_radio(i: int) -> bool:
+	return i >= 0 and i < rigs.size() and rigs[i].has("radio") 		and (rigs[i]["radio"] as Node3D).visible
+
+
 ## How many items of the last frame sit on point `point_name` of block `i` (anchored to
 ## it and drawn within 0.6 m of its node).
 func items_at_point(i: int, point_name: String) -> int:
@@ -1239,6 +1303,66 @@ func items_at_point(i: int, point_name: String) -> int:
 		if at != null and (a[2] as Node3D).global_position.distance_to(at.global_position) < 0.6:
 			n += 1
 	return n
+
+
+## The meshes the last `cuts_at_point` found cutting the item, with the box of one triangle.
+var cut_by := {}
+
+
+## Triangles of block `i`'s element that the item on its point `point_name` cuts (by the
+## triangles' boxes against the item's cube, a hair above its bottom); -1 when no item is
+## on that point.
+func cuts_at_point(i: int, point_name: String) -> int:
+	if i < 0 or i >= rigs.size() or not rigs[i].has("pontos") or not rigs[i].has("asset"):
+		return -1
+	var names: PackedStringArray = blocks[i].get("pontos", PackedStringArray())
+	var item: Node3D = null
+	for a in _anchored:
+		if int(a[0]) == i and int(a[1]) < names.size() and names[int(a[1])] == point_name:
+			item = a[2] as Node3D
+	if item == null:
+		return -1
+	var half := item.scale.x * ITEM_SIZE * 0.5
+	var c := item.global_position
+	var lo := c - Vector3(half, half - 0.003, half)
+	var hi := c + Vector3(half, half, half)
+	var n := 0
+	cut_by.clear()
+	for m in (rigs[i]["asset"] as Node3D).find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null or not mi.is_visible_in_tree():
+			continue
+		var xf := mi.global_transform
+		var faces := mi.mesh.get_faces()
+		for k in range(0, faces.size() - 2, 3):
+			var p0 := xf * faces[k]
+			var p1 := xf * faces[k + 1]
+			var p2 := xf * faces[k + 2]
+			var a := p0.min(p1).min(p2)
+			var b := p0.max(p1).max(p2)
+			if a.x < hi.x and b.x > lo.x and a.y < hi.y and b.y > lo.y and a.z < hi.z and b.z > lo.z:
+				n += 1
+				cut_by[String(mi.get_parent().name) + "/" + String(mi.name)] = [a, b]
+	return n
+
+
+## The point node (global), its position under its parent, the item on it (global) and
+## the adjustment the bridge sent, for the scripts' reports.
+func point_debug(i: int, point_name: String) -> String:
+	if i < 0 or i >= rigs.size() or not rigs[i].has("pontos"):
+		return "sem pontos"
+	var names: PackedStringArray = blocks[i].get("pontos", PackedStringArray())
+	var k := names.find(point_name)
+	var nodes: Array = rigs[i]["pontos"]
+	if k < 0 or k >= nodes.size() or nodes[k] == null:
+		return "sem o ponto"
+	var n := nodes[k] as Node3D
+	var item := Vector3.INF
+	for a in _anchored:
+		if int(a[0]) == i and int(a[1]) == k:
+			item = (a[2] as Node3D).global_position
+	var adj: PackedVector3Array = blocks[i].get("pontos_ajuste", PackedVector3Array())
+	return "nó %s (local %s, pai %s), peça %s, ajuste %s" % [n.global_position, n.position, n.get_parent().name, item, adj[k] if k < adj.size() else "nenhum"]
 
 
 ## Height (global y) of point `point_name` of block `i`'s Blender element, or NAN.
@@ -1304,9 +1428,21 @@ func _type_ring(mix: Array, at: Vector3) -> MeshInstance3D:
 
 ## An item: a pallet with 2 x 2 x 2 boxes in a scene with pallet loads, else one box,
 ## filling the ITEM_SIZE cube (origin at its centre), cardboard tinted by the origin.
-func _new_item(origin: Color) -> Node3D:
+func _new_item(origin: Color, model := -1) -> Node3D:
 	var node := Node3D.new()
 	add_child(node)
+	if model >= 0 and model < _item_modelos.size():
+		# The Blender element the source draws its items with, in the item's cube.
+		var m: Dictionary = _item_modelos[model]
+		var asset := _instance(m)
+		if asset != null:
+			asset.scale = Vector3.ONE * float(m["scale"])
+			asset.position = m["offset"]
+			asset.name = "modelo_" + String(m["name"])
+			node.add_child(asset)
+			node.set_meta("modelo", String(m["name"]))
+			return node
+	node.set_meta("modelo", "caixa")
 	var card := Color("b8875a").lerp(origin, 0.35)
 	var e := ITEM_SIZE
 	var half := e * 0.5

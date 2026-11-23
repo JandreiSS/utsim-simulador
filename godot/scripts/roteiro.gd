@@ -1096,6 +1096,15 @@ func _check(c: Dictionary, k: int) -> void:
 						report.call("rótulo de %s em t=%s" % [want["objeto"], want["t"]], text.contains(String(want["contem"])), text)
 					if want.has("nao_contem"):
 						report.call("rótulo de %s em t=%s sem %s" % [want["objeto"], want["t"], want["nao_contem"]], not text.contains(String(want["nao_contem"])), text)
+			"radio":
+				# {"objeto", "t", "segura": bool}: the person shows the crane's radio control
+				# between the hands (running a crane by radio) or not.
+				_main.seek(float(want["t"]), true)
+				var i: int = _main.cena.block_index(String(want["objeto"]))
+				report.call("bloco %s" % want["objeto"], i >= 0, "")
+				if i >= 0:
+					var holds: bool = _main.cena.holds_radio(i)
+					report.call("%s com o controle em t=%s" % [want["objeto"], want["t"]], holds == bool(want.get("segura", true)), "segura" if holds else "não segura")
 			"no_posicao":
 				var found := false
 				for n in _main.editor.rede.net["nodes"]:
@@ -1341,6 +1350,81 @@ func _check(c: Dictionary, k: int) -> void:
 					if want.has("rotulo"):
 						var text: String = (cena.rigs[i]["label"] as Label3D).text
 						report.call("rótulo de %s contém %s" % [want["objeto"], want["rotulo"]], text.contains(String(want["rotulo"])), text)
+			"pega_no_lugar":
+				# {"objeto", "fila", "de", "ate", "passo", "distancia_max", "minimo"}: each time
+				# the carrier loads from that queue (sampled from `de` to `ate`, after it has
+				# reached the item and before the hand-off), it stands at most `distancia_max`
+				# (floor distance) from the nearest item resting on the queue: it goes to the
+				# item's own place, not to a fixed point of the queue. At least `minimo` loads.
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				var q: int = cena.block_index(String(want["fila"]))
+				report.call("blocos %s e %s" % [want["objeto"], want["fila"]], i >= 0 and q >= 0, "")
+				if i >= 0 and q >= 0:
+					var loads := 0
+					var worst := 0.0
+					var counted := false
+					var t := float(want.get("de", 0.0))
+					while t <= float(want["ate"]):
+						var f: Dictionary = cena.playback.frame(t)
+						var motion: PackedInt32Array = f["motion"]
+						var param: PackedFloat32Array = f["param"]
+						var loading := motion[i] == 2
+						if not loading:
+							counted = false
+						elif not counted and param[i] >= 0.2 and param[i] <= 0.45:
+							_main.seek(t, true)
+							var root: Vector3 = (cena.rigs[i]["root"] as Node3D).global_position
+							var qroot: Node3D = cena.rigs[q]["root"]
+							var qs: Vector3 = cena.blocks[q]["size"]
+							var best := INF
+							for id in cena.items:
+								var node: Node3D = cena.items[id]
+								if not node.visible:
+									continue
+								var local: Vector3 = qroot.global_transform.affine_inverse() * node.global_position
+								if absf(local.x) > qs.x * 0.5 + 0.2 or absf(local.z) > qs.z * 0.5 + 0.2:
+									continue
+								best = minf(best, Vector2(node.global_position.x - root.x, node.global_position.z - root.z).length())
+							if best < INF:
+								loads += 1
+								worst = maxf(worst, best)
+								counted = true
+								print("[roteiro]   carga em t=%.2f (fase %.2f): %s em %s, a %.2f m da peça mais perto" % [t, param[i], want["objeto"], root, best])
+						t += float(want.get("passo", 0.25))
+					report.call("%s pega no lugar da peça (%d cargas)" % [want["objeto"], loads], loads >= int(want.get("minimo", 1)) and worst <= float(want["distancia_max"]), "a até %.2f m da peça mais perto" % worst)
+			"sem_corte":
+				# {"objeto", "t", "ponto"}: the item on that point of the block's Blender
+				# element cuts none of its triangles (it sits on the top, clear of a clamp).
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var i: int = cena.block_index(String(want["objeto"]))
+				var n: int = cena.cuts_at_point(i, String(want["ponto"]))
+				print("[roteiro]   ponto %s de %s: %s" % [want["ponto"], want["objeto"], cena.point_debug(i, String(want["ponto"]))])
+				if n > 0:
+					print("[roteiro]   cortam: %s" % [cena.cut_by])
+				report.call("peça em %s de %s sem corte" % [want["ponto"], want["objeto"]], n == 0, "%d triângulo(s) cortado(s)" % n if n >= 0 else "nenhuma peça no ponto")
+			"modelo_peca":
+				# {"t", "modelo", "minimo", "nenhum_outro"}: the items drawn now with that model
+				# (a Blender element of `visual.item`, or "caixa"): at least `minimo` of them,
+				# and with `nenhum_outro` no visible item with another model.
+				if want.has("t"):
+					_main.seek(float(want["t"]), true)
+				var cena: CenaUtsim = _main.cena
+				var n := 0
+				var others := 0
+				for id in cena.items:
+					var node: Node3D = cena.items[id]
+					if not node.visible:
+						continue
+					if String(node.get_meta("modelo", "")) == String(want["modelo"]):
+						n += 1
+					else:
+						others += 1
+				report.call("peças com o modelo %s" % want["modelo"], n >= int(want.get("minimo", 1)), "%d (outras %d)" % [n, others])
+				if bool(want.get("nenhum_outro", false)):
+					report.call("nenhuma peça com outro modelo", others == 0, "%d" % others)
 			"item_em_ponto":
 				# {"objeto", "t", "ponto", "altura_entre": [a, b]}: an item sits on that point
 				# of the block's Blender element (the part it works on, the load on its forks

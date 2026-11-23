@@ -1,0 +1,25 @@
+// Ponto de partida do roteiro g4_tamanho.json: objetos com as dimensões mudadas no modelo.
+// A fila simples tem 8 m × 2 m (o padrão é 4 m × 1,4 m) e a mesa de espera (o elemento
+// "espera" do Blender) tem 1,2 m de altura (o padrão é 0,82 m). As peças chegam a cada
+// segundo (26 em cada linha) e o posto leva 1000 s: em 30 s cada espera tem 25 peças.
+Model(
+    format: 2,
+    name: "tamanhos",
+    run: (stop_time: 60.0, seed: 1, replications: 1),
+    objects: [
+        (name: "fonte_fila", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(26)),
+         position: (-10.0, 0.0, 0.0)),
+        (name: "fila_longa", kind: Queue(), position: (0.0, 0.0, 0.0), size: Some((8.0, 2.0, 0.3))),
+        (name: "posto_fila", kind: Processor(process: Const(1000.0)), position: (10.0, 0.0, 0.0)),
+        (name: "fonte_mesa", kind: Source(interarrival: Const(1.0), first_at_zero: true, max_arrivals: Some(26)),
+         position: (-10.0, 6.0, 0.0)),
+        (name: "mesa_alta", kind: Queue(), position: (0.0, 6.0, 0.0), size: Some((2.8, 1.0, 1.2)),
+         visual: (asset: "espera")),
+        (name: "posto_mesa", kind: Processor(process: Const(1000.0)), position: (10.0, 6.0, 0.0)),
+        (name: "saida", kind: Sink, position: (14.0, 3.0, 0.0)),
+    ],
+    connections: [
+        ("fonte_fila", "fila_longa"), ("fila_longa", "posto_fila"), ("posto_fila", "saida"),
+        ("fonte_mesa", "mesa_alta"), ("mesa_alta", "posto_mesa"), ("posto_mesa", "saida"),
+    ],
+)

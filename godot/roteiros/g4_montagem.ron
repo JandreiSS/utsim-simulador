@@ -1,0 +1,15 @@
+// Ponto de partida do roteiro g4_montagem.json: uma montagem (o posto do Blender) junta um
+// palete e duas caixas em 20 s. A peça em montagem fica no ponto_peca, sobre a placa do
+// gabarito da bancada (0,94 m), sem cortar o grampo.
+Model(
+    format: 2,
+    name: "montagem",
+    run: (stop_time: 120.0, seed: 1, replications: 1),
+    objects: [
+        (name: "paletes", kind: Source(interarrival: Const(30.0), first_at_zero: true), position: (-5.0, 2.0, 0.0)),
+        (name: "caixas", kind: Source(interarrival: Const(5.0), first_at_zero: true), position: (-5.0, -2.0, 0.0)),
+        (name: "montagem", kind: Combiner(components: [2], mode: Pack, process: Const(20.0)), position: (0.0, 0.0, 0.0)),
+        (name: "saida", kind: Sink, position: (5.0, 0.0, 0.0)),
+    ],
+    connections: [("paletes", "montagem"), ("caixas", "montagem"), ("montagem", "saida")],
+)

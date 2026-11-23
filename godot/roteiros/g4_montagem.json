@@ -1,0 +1,13 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Montagem no posto do Blender: a peça em montagem fica sobre a placa do gabarito da bancada (0,94 m), sem cortar o grampo ao lado."},
+		{"abrir": "g4_montagem.ron"},
+		{"modo": "simular"},
+		{"conferir": {"item_em_ponto": {"objeto": "montagem", "t": 15.0, "ponto": "ponto_peca", "altura_entre": [0.935, 0.945]}}},
+		{"conferir": {"sem_corte": {"objeto": "montagem", "t": 15.0, "ponto": "ponto_peca"}}},
+		{"tempo": 15.0},
+		{"focar": {"objeto": "montagem", "distancia": 2.2, "giro": 0.5, "inclinacao": 0.35}},
+		{"capturar": "g4_montagem_01_tampo"}
+	]
+}

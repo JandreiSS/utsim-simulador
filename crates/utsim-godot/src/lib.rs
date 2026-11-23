@@ -593,6 +593,21 @@ impl UtsimPlayback {
         put(&mut d, "bounds_min", v3(lo));
         put(&mut d, "bounds_max", v3(hi));
         put(&mut d, "pallets", c.pallets);
+        // The Blender elements the sources draw their items with (`visual.item`):
+        // `{source, name, key, path, scale, offset}`, indexed by the frame's `item_modelo`.
+        let mut item_modelos = VarArray::new();
+        for m in &c.item_modelos {
+            let mut e = asset_dict(&AssetInfo {
+                source: "modelos3d",
+                name: m.stem.clone(),
+                key: m.stem.clone(),
+                path: m.path.clone(),
+            });
+            put(&mut e, "scale", m.scale);
+            put(&mut e, "offset", v3(m.offset));
+            item_modelos.push(&e.to_variant());
+        }
+        put(&mut d, "item_modelos", item_modelos);
         // The corrected clips of the Blender bodies (`pessoa_clipes`).
         if let Some((path, names)) = c.modelos3d.as_ref().and_then(modelos3d::clipes_corrigidos) {
             put(
@@ -639,6 +654,8 @@ impl UtsimPlayback {
             }
             put(&mut e, "clips", strings(&v.clips));
             put(&mut e, "pontos", strings(&c.anchor_points(i)));
+            // Where each part point was moved to seat the item (`Elemento::assentar`).
+            put(&mut e, "pontos_ajuste", vectors(&c.anchor_adjust(i)));
             if let Some(l) = &v.look
                 && let Some((a, fallback)) = c.asset_of(i)
             {
@@ -658,6 +675,11 @@ impl UtsimPlayback {
                 let (asset_yaw, offset) = c.asset_pose(i).unwrap_or((l.yaw, l.offset));
                 put(&mut e, "asset_yaw", asset_yaw);
                 put(&mut e, "offset", v3(offset));
+                if let Some(f) = c.encaixe(i) {
+                    // Stretched to the size of the model: the same fit the points follow.
+                    put(&mut e, "stretch", v3(f.stretch));
+                    put(&mut e, "fit_offset", v3(f.offset));
+                }
                 if let Some(col) = l.color {
                     put(&mut e, "color", rgb(col));
                 }
@@ -879,6 +901,8 @@ impl UtsimPlayback {
             PackedFloat32Array::from(f.rolled.as_slice()),
         );
         put(&mut d, "clip", PackedInt32Array::from(f.clip.as_slice()));
+        let radio: Vec<i32> = f.radio.iter().map(|&r| i32::from(r)).collect();
+        put(&mut d, "radio", PackedInt32Array::from(radio.as_slice()));
         put(
             &mut d,
             "clip_time",
@@ -933,6 +957,11 @@ impl UtsimPlayback {
             PackedFloat32Array::from(f.item_scale.as_slice()),
         );
         put(&mut d, "item_color", colors(&f.item_color));
+        put(
+            &mut d,
+            "item_modelo",
+            PackedInt32Array::from(f.item_modelo.as_slice()),
+        );
         put(
             &mut d,
             "item_carrier",

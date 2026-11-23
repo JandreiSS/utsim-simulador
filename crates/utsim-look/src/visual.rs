@@ -837,6 +837,7 @@ mod tests {
             scale: Some(2.0),
             yaw: Some(90.0),
             color: Some("#ff0000".into()),
+            item: None,
         };
         let l = look_of("Rack", None, Some(&visual), &g, Context::default(), None).unwrap();
         let Source::Library(Spec::PortaPaletes(r)) = l.source else {

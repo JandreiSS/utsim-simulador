@@ -1,0 +1,14 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Pegar no lugar da peça: a espera acumula peças, cada uma no seu lugar; a empilhadeira e a pessoa vão até a peça que levam (o garfo ou as mãos debaixo dela), não a um ponto fixo da espera, e as outras peças não se mexem."},
+		{"abrir": "g4_pegar_no_lugar.ron"},
+		{"modo": "simular"},
+		{"nota": "A partir de 10 s: na primeira carga a peça ainda está chegando da origem (o voo dela até a espera termina junto com a carga), e quem leva já espera no lugar dela."},
+		{"conferir": {"pega_no_lugar": {"objeto": "empilhadeira_1", "fila": "doca", "de": 10.0, "ate": 160.0, "passo": 0.25, "distancia_max": 2.2, "minimo": 3}}},
+		{"conferir": {"pega_no_lugar": {"objeto": "operador_1", "fila": "doca_2", "de": 10.0, "ate": 160.0, "passo": 0.25, "distancia_max": 0.8, "minimo": 3}}},
+		{"tempo": 60.0},
+		{"focar": {"objeto": "doca", "distancia": 9.0, "giro": 0.6, "inclinacao": 0.45}},
+		{"capturar": "g4_pegar_no_lugar_01"}
+	]
+}

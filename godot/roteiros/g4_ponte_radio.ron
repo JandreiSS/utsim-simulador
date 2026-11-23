@@ -1,0 +1,39 @@
+// Roteiro g4_ponte_radio: a ponte rolante da caldeiraria (examples/ponte_rolante.ron),
+// operada do chão pelo rádio (`operator: Radio`). A cada transporte o operador vai até a
+// carga, 1 m fora da área sob ela, e opera a ponte dali com o controle remoto nas mãos; a
+// ponte espera por ele (WaitingOperator) e anda na sua própria velocidade. Ele começa
+// longe (x = -30). O mesmo modelo do g4_ponte_botoeira, com o rádio no lugar da botoeira.
+Model(
+    name: "Ponte rolante pelo rádio",
+    description: "A ponte rolante da caldeiraria, operada do chão pelo rádio",
+    run: (stop_time: 14400.0, warmup: 0.0, seed: 7, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Exp(mean: 2400.0),
+            labels: {"weight": Uniform(min: 2000.0, max: 8000.0)}), position: (1.0, 3.0, 0.0)),
+        (name: "recebimento", kind: Queue(), transport: "ponte", position: (3.0, 3.0, 0.0)),
+        (name: "corte", kind: Processor(process: Triangular(min: 240.0, mode: 300.0, max: 420.0)),
+            transport: "ponte", position: (14.0, 15.0, 0.8)),
+        (name: "solda", kind: Processor(process: Triangular(min: 360.0, mode: 480.0, max: 600.0)),
+            transport: "ponte", position: (28.0, 4.0, 0.8)),
+        (name: "expedicao", kind: Sink, position: (37.0, 14.0, 0.0)),
+        (name: "ponte", kind: Crane(
+            bridge: (speed: 0.8, acceleration: 0.2, deceleration: 0.2),
+            trolley: (speed: 0.4, acceleration: 0.2, deceleration: 0.2),
+            hoist: (speed: 0.1, acceleration: 0.1, deceleration: 0.1),
+            hook_height: 6.0,
+            attach: Triangular(min: 40.0, mode: 60.0, max: 90.0),
+            detach: Triangular(min: 20.0, mode: 30.0, max: 45.0),
+            capacity_t: 10.0,
+            operator: Radio(team: "operador"),
+            motion: Safe,
+        ), position: (20.0, 9.0, 0.0), size: Some((40.0, 18.0, 8.0))),
+        (name: "operador", kind: Transporter(speed: 0.8), position: (-30.0, 3.0, 0.0),
+            visual: Some((asset: Some("pessoa")))),
+    ],
+    connections: [
+        ("chegada", "recebimento"),
+        ("recebimento", "corte"),
+        ("corte", "solda"),
+        ("solda", "expedicao"),
+    ],
+)
