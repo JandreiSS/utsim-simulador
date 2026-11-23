@@ -204,8 +204,14 @@ mod tests {
         let mut seen = 0;
         for f in files {
             let text = std::fs::read_to_string(&f).unwrap();
-            for (at, _) in text.match_indices("fx(\"") {
-                let rest = &text[at + 4..];
+            for (at, _) in text.match_indices("fx(") {
+                let before = text[..at].chars().next_back();
+                if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                    continue;
+                }
+                let Some(rest) = text[at + 3..].trim_start().strip_prefix('"') else {
+                    continue;
+                };
                 let key = &rest[..rest.find('"').unwrap()];
                 let after = rest[key.len() + 1..].trim_start();
                 let Some(after) = after.strip_prefix(',') else {
@@ -228,10 +234,13 @@ mod tests {
                     .map(|(i, _)| i)
                     .unwrap();
                 let passed: std::collections::BTreeSet<String> = list[..end]
-                    .split("(\"")
+                    .split('(')
                     .skip(1)
+                    .filter_map(|p| p.trim_start().strip_prefix('"'))
                     .filter_map(|p| p.split_once("\",").map(|(n, _)| n.to_string()))
-                    .filter(|n| n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+                    .filter(|n| {
+                        !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    })
                     .collect();
                 seen += 1;
                 if vars.get(key) != Some(&passed) {
