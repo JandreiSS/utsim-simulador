@@ -175,6 +175,13 @@ A pessoa fica ocupada até a peça ser solta e o gancho voltar para cima. Esse t
 A ponte precisa de `size`. Ela não opera postos (`operators.team` não pode ser uma ponte)
 e não tem perfil de pessoa.
 
+No UTSim 3D, todos esses campos estão no painel de propriedades da ponte, em
+**Parâmetros**: velocidade e acelerações de cada eixo, ordem dos movimentos, altura do
+gancho, capacidade, rótulo do peso, engate e desengate, controle (cabine, botoeira ou
+rádio, com a equipe do operador), área sob a carga, afastar as pessoas e folga entre
+pontes. A linha **Caminho** diz com quais pontes ela divide o caminho. O comprimento do
+caminho e o vão ficam em **Posição**, nas dimensões do objeto.
+
 ## Métricas
 
 | Métrica | Significado |

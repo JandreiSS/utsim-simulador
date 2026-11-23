@@ -28,7 +28,8 @@ use std::f64::consts::PI;
 use utsim_core::{Dist, OffWindow, OutputRule, ShiftEnd, ShiftTable};
 use utsim_edit::Command;
 use utsim_model::{
-    Model, Movement, ObjectDef, ObjectKind, Profile, RunSettings, ShiftSpec, VisualDef, is_mobile,
+    CraneControl, Model, Movement, ObjectDef, ObjectKind, Profile, RunSettings, ShiftSpec,
+    VisualDef, is_mobile,
 };
 
 use crate::catalogue;
@@ -832,10 +833,16 @@ fn size_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     )];
     match obj.size {
         Some(d) => {
-            for (i, (axis, label)) in [("x", "Comprimento"), ("y", "Largura"), ("z", "Altura")]
-                .iter()
-                .enumerate()
-            {
+            let labels = if matches!(obj.kind, ObjectKind::Crane { .. }) {
+                [
+                    ("x", "Comprimento do caminho"),
+                    ("y", "Vão"),
+                    ("z", "Altura do caminho"),
+                ]
+            } else {
+                [("x", "Comprimento"), ("y", "Largura"), ("z", "Altura")]
+            };
+            for (i, (axis, label)) in labels.iter().enumerate() {
                 out.push(
                     float(s, &format!("size.{axis}"), label, d[i])
                         .depth(1)
@@ -1502,8 +1509,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 Value::Text(format!("{} posições", bays * levels)),
             ));
         }
-        // Crane fields in the inspector: Interface session (the RON is edited by hand meanwhile).
-        ObjectKind::Crane { .. } => {}
+        ObjectKind::Crane { .. } => out.extend(crane_fields(model, obj)),
         ObjectKind::Dispatcher { team, rule, .. } => {
             let mut choices: Vec<Choice> = transporter_names(model)
                 .iter()
@@ -1539,6 +1545,371 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         }
     }
     out
+}
+
+/// The axes of a crane, as the inspector lists them: field, label, what it moves.
+const CRANE_AXES: [(&str, &str, &str); 3] = [
+    ("bridge", "Ponte", "ao longo do caminho"),
+    ("trolley", "Carro", "ao longo da viga, no vão"),
+    ("hoist", "Gancho", "subindo e descendo a carga"),
+];
+
+/// Fields of an overhead crane (`ObjectKind::Crane`): the three axes, the hook, the
+/// handling times, who runs it, the runway it may share and the area under the load.
+/// The runway length and the span are the object's own dimensions (Posição).
+fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
+    let s = S_PARAMS;
+    let ObjectKind::Crane {
+        bridge,
+        trolley,
+        hoist,
+        hook_height,
+        attach,
+        detach,
+        capacity_t,
+        motion,
+        weight_label,
+        home,
+        load_zone,
+        operator,
+        bridge_gap,
+        keep_clear,
+    } = &obj.kind
+    else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for ((path, label, what), axis) in CRANE_AXES.iter().zip([bridge, trolley, hoist]) {
+        out.push(Field::new(
+            s,
+            &format!("{path}.info"),
+            label,
+            FieldType::Info,
+            Value::Text(format!("Movimento {what}.")),
+        ));
+        out.push(
+            float(s, &format!("{path}.speed"), "Velocidade", axis.speed)
+                .depth(1)
+                .min(0.001)
+                .unit("m/u.t."),
+        );
+        for (sub, sub_label, v) in [
+            ("acceleration", "Aceleração", axis.acceleration),
+            ("deceleration", "Desaceleração", axis.deceleration),
+        ] {
+            out.push(
+                Field::new(
+                    s,
+                    &format!("{path}.{sub}"),
+                    sub_label,
+                    FieldType::Float,
+                    v.map_or(Value::Null, Value::Float),
+                )
+                .optional(v.is_some())
+                .depth(1)
+                .min(0.001)
+                .help("Desligada, a velocidade muda na hora."),
+            );
+        }
+    }
+    out.push(
+        pick(
+            s,
+            "motion",
+            "Ordem dos movimentos",
+            &ron::debug(motion),
+            &[
+                ("Safe", "Segura (sobe, anda, desce)"),
+                ("Sequential", "Um eixo de cada vez"),
+                ("Parallel", "Os três juntos"),
+            ],
+        )
+        .help("Segura: o gancho sobe à altura de passagem, a ponte e o carro andam juntos e o gancho desce."),
+    );
+    out.push(
+        float(
+            s,
+            "hook_height",
+            "Altura de passagem do gancho",
+            *hook_height,
+        )
+        .min(0.0)
+        .unit("m"),
+    );
+    out.push(
+        float(s, "capacity_t", "Capacidade", *capacity_t)
+            .min(0.001)
+            .unit("t"),
+    );
+    out.push(
+        Field::new(
+            s,
+            "weight_label",
+            "Rótulo do peso do item",
+            FieldType::Text,
+            Value::Text(weight_label.clone()),
+        )
+        .help("Rótulo com o peso de cada item, em kg: itens acima da capacidade geram um aviso."),
+    );
+    out.push(dist_field(s, "attach", "Tempo de engate", attach));
+    out.push(dist_field(s, "detach", "Tempo de desengate", detach));
+    out.push(boolean(
+        s,
+        "home",
+        "Voltar à posição própria quando ociosa",
+        *home,
+    ));
+    let (control, team) = match operator {
+        CraneControl::Cabin => ("Cabin", None),
+        CraneControl::Pendant { team } => ("Pendant", Some(team)),
+        CraneControl::Radio { team } => ("Radio", Some(team)),
+    };
+    out.push(
+        pick(
+            s,
+            "operator",
+            "Controle",
+            control,
+            &[
+                ("Cabin", "Cabine (operador não modelado)"),
+                ("Pendant", "Botoeira (a pessoa anda com a carga)"),
+                ("Radio", "Rádio (a pessoa encontra a ponte na carga)"),
+            ],
+        )
+        .help("Na botoeira, a ponte não anda mais rápido que a pessoa; no rádio, ela mantém a própria velocidade e espera a pessoa chegar."),
+    );
+    if let Some(team) = team {
+        // People and dispatchers run the crane; not other cranes.
+        let mut choices: Vec<Choice> = model
+            .objects
+            .iter()
+            .filter(|o| {
+                matches!(
+                    o.kind,
+                    ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. }
+                )
+            })
+            .map(|o| choice(&o.name, &o.name))
+            .collect();
+        if !choices.iter().any(|c| &c.value == team) {
+            choices.push(choice(team, &format!("{team} (não existe)")));
+        }
+        out.push(
+            Field::new(
+                s,
+                "operator.team",
+                "Equipe do operador",
+                FieldType::Choice,
+                Value::Text(team.clone()),
+            )
+            .choices(choices)
+            .depth(1),
+        );
+    }
+    out.push(
+        float(s, "load_zone", "Meia largura da área sob a carga", *load_zone)
+            .min(0.0)
+            .unit("m")
+            .help("Meio lado do quadrado sob o gancho onde ninguém deve ficar com a carga suspensa (análise de exposição)."),
+    );
+    out.push(
+        boolean(s, "keep_clear", "Afastar as pessoas do caminho da carga", *keep_clear)
+            .help("Antes de andar carregada, a ponte espera quem passa pela faixa da carga; e quem ia entrar nela para na borda até a carga passar."),
+    );
+    out.push(
+        float(s, "bridge_gap", "Folga entre pontes", *bridge_gap)
+            .min(0.0)
+            .unit("m")
+            .help("Distância mantida entre os ganchos de duas pontes no mesmo caminho: uma não passa a outra."),
+    );
+    let lanes = model.crane_lanes();
+    let lane_text = match lanes.get(obj.name.as_str()) {
+        Some(lane) => {
+            let mut others: Vec<&str> = lanes
+                .iter()
+                .filter(|(n, l)| l.id == lane.id && **n != obj.name.as_str())
+                .map(|(n, _)| *n)
+                .collect();
+            others.sort_unstable();
+            format!(
+                "Divide o caminho com {} (folga de {} m entre os ganchos)",
+                others.join(", "),
+                metres(lane.gap)
+            )
+        }
+        None if obj.size.is_none() => {
+            "Ligue as dimensões (Posição): comprimento do caminho × vão.".to_string()
+        }
+        None => "Sozinha no caminho".to_string(),
+    };
+    out.push(Field::new(
+        s,
+        "lane.info",
+        "Caminho",
+        FieldType::Info,
+        Value::Text(lane_text),
+    ));
+    out
+}
+
+/// The edit of a crane field, or `None` for other objects and fields.
+fn edit_crane(
+    model: &Model,
+    obj: &ObjectDef,
+    head: &str,
+    rest: &str,
+    value: &Value,
+) -> Option<Result<Command, String>> {
+    let ObjectKind::Crane {
+        attach,
+        detach,
+        operator,
+        ..
+    } = &obj.kind
+    else {
+        return None;
+    };
+    // The fields every object has (downtime, shifts, transport…) go on to the others.
+    const OWN: [&str; 14] = [
+        "bridge",
+        "trolley",
+        "hoist",
+        "hook_height",
+        "attach",
+        "detach",
+        "capacity_t",
+        "motion",
+        "weight_label",
+        "home",
+        "load_zone",
+        "operator",
+        "bridge_gap",
+        "keep_clear",
+    ];
+    if !OWN.contains(&head) {
+        return None;
+    }
+    let name = obj.name.as_str();
+    let axis_of = |head: &str| -> Option<utsim_objects::Axis> {
+        let ObjectKind::Crane {
+            bridge,
+            trolley,
+            hoist,
+            ..
+        } = &obj.kind
+        else {
+            return None;
+        };
+        match head {
+            "bridge" => Some(*bridge),
+            "trolley" => Some(*trolley),
+            "hoist" => Some(*hoist),
+            _ => None,
+        }
+    };
+    let axis_text = |a: &utsim_objects::Axis| {
+        let opt = |key: &str, v: Option<f64>| {
+            v.map_or(String::new(), |v| {
+                format!(", {key}: Some({})", ron::float(v))
+            })
+        };
+        format!(
+            "(speed: {}{}{})",
+            ron::float(a.speed),
+            opt("acceleration", a.acceleration),
+            opt("deceleration", a.deceleration)
+        )
+    };
+    let what = if rest.is_empty() {
+        head.to_string()
+    } else {
+        format!("{head}.{rest}")
+    };
+    let w = what.as_str();
+    Some((|| -> Result<Command, String> {
+        if let Some(mut a) = axis_of(head) {
+            match rest {
+                "speed" => {
+                    let v = f64_of(value, w)?;
+                    if !(v.is_finite() && v > 0.0) {
+                        return Err("a velocidade deve ser maior que zero".into());
+                    }
+                    a.speed = v;
+                }
+                "acceleration.on" => a.acceleration = bool_of(value, w)?.then_some(1.0),
+                "deceleration.on" => a.deceleration = bool_of(value, w)?.then_some(1.0),
+                "acceleration" => a.acceleration = opt_f64(value, w)?,
+                "deceleration" => a.deceleration = opt_f64(value, w)?,
+                _ => return Err(format!("campo desconhecido: {w}")),
+            }
+            return Ok(set(name, head, axis_text(&a)));
+        }
+        match (head, rest) {
+            ("attach" | "detach", _) => {
+                let mut d = if head == "attach" { attach } else { detach }.clone();
+                edit_dist(&mut d, rest, value)?;
+                Ok(set(name, head, ron::dist(&d)))
+            }
+            ("hook_height" | "capacity_t" | "load_zone" | "bridge_gap", "") => {
+                let v = f64_of(value, w)?;
+                if !v.is_finite() || v < 0.0 || (head == "capacity_t" && v <= 0.0) {
+                    return Err(format!("{w}: número maior ou igual a zero"));
+                }
+                Ok(set(name, head, ron::float(v)))
+            }
+            ("home" | "keep_clear", "") => Ok(set(name, head, bool_of(value, w)?.to_string())),
+            ("weight_label", "") => {
+                let t = value.as_text().ok_or("rótulo esperado")?.trim();
+                if t.is_empty() {
+                    return Err("o rótulo do peso não pode ficar vazio".into());
+                }
+                Ok(set(name, head, ron::string(t)))
+            }
+            ("motion", "") => match value.as_text() {
+                Some(m @ ("Safe" | "Sequential" | "Parallel")) => Ok(set(name, head, m.into())),
+                _ => Err("ordem: Safe, Sequential ou Parallel".into()),
+            },
+            ("operator", "") => {
+                let first = || {
+                    model.objects.iter().find_map(|o| {
+                        matches!(
+                            o.kind,
+                            ObjectKind::Transporter { .. } | ObjectKind::Dispatcher { .. }
+                        )
+                        .then_some(o.name.as_str())
+                    })
+                };
+                let text = match value.as_text() {
+                    Some("Cabin") => "Cabin".to_string(),
+                    Some(k @ ("Pendant" | "Radio")) => {
+                        let team = operator.team().or_else(first).ok_or(
+                            "crie antes uma pessoa (ou um despachante) para operar a ponte",
+                        )?;
+                        format!("{k}(team: {})", ron::string(team))
+                    }
+                    _ => return Err("controle: Cabin, Pendant ou Radio".into()),
+                };
+                Ok(set(name, head, text))
+            }
+            ("operator", "team") => {
+                let team = value.as_text().ok_or("nome esperado")?.trim();
+                if team.is_empty() {
+                    return Err("escolha a equipe do operador".into());
+                }
+                let kind = match operator {
+                    CraneControl::Radio { .. } => "Radio",
+                    CraneControl::Pendant { .. } => "Pendant",
+                    CraneControl::Cabin => return Err("escolha antes botoeira ou rádio".into()),
+                };
+                Ok(set(
+                    name,
+                    head,
+                    format!("{kind}(team: {})", ron::string(team)),
+                ))
+            }
+            _ => Err(format!("{name} não tem o campo \"{w}\"")),
+        }
+    })())
 }
 
 fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
@@ -1932,7 +2303,8 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             .help("Giro em graus, anti-horário visto de cima (R gira 90°, Ctrl+R 15°)."),
         );
     }
-    if !is_mobile(&obj.kind) {
+    // The crane moves but has its own area (runway length × span).
+    if !is_mobile(&obj.kind) || matches!(obj.kind, ObjectKind::Crane { .. }) {
         out.extend(size_fields(model, obj));
     }
     out.extend(serves_fields(model, obj));
@@ -2741,6 +3113,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
         return command;
     }
     if let Some(command) = edit_waiting(obj, head, rest, value) {
+        return command;
+    }
+    if let Some(command) = edit_crane(model, obj, head, rest, value) {
         return command;
     }
     if rest == "on" {
@@ -3656,6 +4031,73 @@ mod tests {
             .is_err()
         );
         assert!(edit(d.model(), "p", "process.nope", &Value::Float(1.0)).is_err());
+    }
+
+    #[test]
+    fn the_crane_fields_are_edited_in_the_inspector() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ponte_rolante.ron");
+        let mut d = Document::open(&path).expect("exemplo da ponte");
+        let crane = |d: &Document| match &object(d, "ponte").kind {
+            ObjectKind::Crane {
+                bridge,
+                hoist,
+                operator,
+                keep_clear,
+                bridge_gap,
+                motion,
+                attach,
+                ..
+            } => (
+                *bridge,
+                *hoist,
+                operator.clone(),
+                *keep_clear,
+                *bridge_gap,
+                *motion,
+                attach.clone(),
+            ),
+            _ => panic!("não é ponte"),
+        };
+        assert_eq!(field(&d, "ponte", "size.y").label, "Vão");
+        apply(&mut d, "ponte", "bridge.speed", Value::Float(0.75));
+        apply(&mut d, "ponte", "hoist.acceleration.on", Value::Bool(true));
+        apply(&mut d, "ponte", "hoist.acceleration", Value::Float(0.2));
+        apply(&mut d, "ponte", "keep_clear", Value::Bool(true));
+        apply(&mut d, "ponte", "bridge_gap", Value::Float(3.5));
+        apply(&mut d, "ponte", "motion", Value::Text("Parallel".into()));
+        apply(&mut d, "ponte", "attach.mode", Value::Float(50.0));
+        let (bridge, hoist, _, keep_clear, gap, motion, _) = crane(&d);
+        assert_eq!(bridge.speed, 0.75);
+        assert_eq!(hoist.acceleration, Some(0.2));
+        assert!(keep_clear);
+        assert_eq!(gap, 3.5);
+        assert_eq!(motion, utsim_objects::CraneMotion::Parallel);
+        assert_eq!(
+            field(&d, "ponte", "hoist.acceleration").value,
+            Value::Float(0.2)
+        );
+        // From the cabin to the pendant, then to another team, then to the radio.
+        d.apply(Command::Add(Box::new(
+            template("Transporter", "op", [0.0; 3]).unwrap(),
+        )))
+        .unwrap();
+        let team = "op".to_string();
+        apply(&mut d, "ponte", "operator", Value::Text("Pendant".into()));
+        apply(&mut d, "ponte", "operator.team", Value::Text(team.clone()));
+        apply(&mut d, "ponte", "operator", Value::Text("Radio".into()));
+        assert_eq!(crane(&d).2, CraneControl::Radio { team: team.clone() });
+        assert_eq!(field(&d, "ponte", "operator.team").value, Value::Text(team));
+        apply(&mut d, "ponte", "operator", Value::Text("Cabin".into()));
+        assert!(
+            object_fields(d.model(), object(&d, "ponte"))
+                .iter()
+                .all(|f| f.path != "operator.team")
+        );
+        assert!(edit(d.model(), "ponte", "bridge.speed", &Value::Float(0.0)).is_err());
+        assert_eq!(
+            field(&d, "ponte", "lane.info").value,
+            Value::Text("Sozinha no caminho".into())
+        );
     }
 
     #[test]

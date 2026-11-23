@@ -2439,6 +2439,56 @@ mod tests {
         );
     }
 
+    /// Cost of a frame in a large scene (`cargo test -p utsim-godot --release --
+    /// --ignored frame_cost --nocapture`).
+    #[test]
+    #[ignore]
+    fn frame_cost_of_a_large_scene() {
+        use utsim_model::synthetic::{Shape, generate};
+        for (shape, objects, items) in [(Shape::Network, 2000, 20000), (Shape::Line, 1000, 20000)] {
+            let model = generate(shape, objects, items).unwrap();
+            let t0 = std::time::Instant::now();
+            let replay = model.replay(0).expect("replay");
+            let run = t0.elapsed();
+            let t0 = std::time::Instant::now();
+            let pb = Playback::new(&replay, Some(&model), None, false);
+            let build = t0.elapsed();
+            let t0 = std::time::Instant::now();
+            let _ = Scene::build(
+                &replay,
+                &SceneOptions {
+                    model: Some(&model),
+                    ..SceneOptions::default()
+                },
+            );
+            let cena = t0.elapsed();
+            let t0 = std::time::Instant::now();
+            let _ = utsim_model::exposure::load_tracks(&model, &replay.records, replay.stop_time);
+            let cargas = t0.elapsed();
+            let t0 = std::time::Instant::now();
+            let _ = crane_operator_spans(&model, &replay);
+            let ponte = t0.elapsed();
+            eprintln!(
+                "  {} registros: cena {cena:?}, cargas {cargas:?}, operador da ponte {ponte:?}",
+                replay.records.len()
+            );
+            let end = replay.stop_time;
+            let n = 60;
+            let t0 = std::time::Instant::now();
+            let mut items_drawn = 0;
+            for k in 0..n {
+                let f = pb.frame(end * (k as f64 + 0.5) / n as f64);
+                items_drawn += f.item_id.len();
+            }
+            let per = t0.elapsed() / n;
+            eprintln!(
+                "{shape:?} {objects} objetos: rodar {run:?}, montar {build:?}, quadro {per:?} ({} blocos, {} itens por quadro)",
+                pb.blocks.len(),
+                items_drawn / n as usize
+            );
+        }
+    }
+
     #[test]
     fn the_pendant_operator_stands_beside_the_load_and_the_crane_waits_for_them() {
         use utsim_core::{State, TraceEvent};
