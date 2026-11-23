@@ -8,7 +8,11 @@ Pela linha de comando, `utsim-qualidade` abre a janela.
 
 A unidade é uma pasta que a equipe compartilha. Cada alteração vira um pequeno arquivo novo dentro dela, que ninguém edita depois. Assim duas pessoas podem trabalhar ao mesmo tempo sem perder alterações. A mesma pasta serve ao UTSim Segurança do Trabalho: os postos que você cria aqui aparecem lá.
 
-Na tela inicial, escreva o seu nome (o autor de cada alteração), o caminho da pasta e use "Abrir unidade". Para começar uma unidade nova, preencha também o nome dela e use "Criar unidade". O programa lembra o seu nome e a última pasta num arquivo de configuração no seu computador.
+O app abre direto no trabalho, numa unidade nova que ainda não tem pasta: dá para cadastrar postos, rodar a simulação e usar as outras telas na hora. A barra do canto de cima à esquerda tem a chave "Salvamento automático" e os botões Salvar (Ctrl+S) e Salvar como (Ctrl+Shift+S), com o aviso "Não salvo" ou "Salvo". O primeiro Salvar pede o nome da unidade e onde fica a pasta, e cria a pasta com tudo o que já foi feito. Ele nunca passa por cima de uma pasta que já tem arquivos.
+
+Depois de salva, a unidade grava sozinha cada alteração, como sempre. Com a chave desligada, as alterações ficam esperando o Salvar, e o aviso volta para "Não salvo". A escolha fica guardada para cada unidade. Fechar a janela, abrir outra unidade ou começar uma nova com trabalho não salvo pergunta antes: Salvar, Não salvar ou Cancelar. "Salvar como" numa unidade já salva copia a pasta inteira para um lugar novo e passa a trabalhar na cópia.
+
+No Início, "Abrir unidade" e as unidades recentes abrem uma pasta que já existe (as unidades de versões anteriores abrem como sempre), e "Nova unidade" começa outra em branco. O seu nome, o autor de cada alteração, vem do usuário do computador e pode ser trocado no Início. O programa lembra o seu nome e as últimas pastas num arquivo de configuração no seu computador.
 
 ## Postos
 
