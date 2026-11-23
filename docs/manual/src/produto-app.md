@@ -1,6 +1,6 @@
-# UTSim Desenvolvimento de Produto
+# UTSim Produto
 
-O UTSim Desenvolvimento de Produto é um aplicativo da família UTSim com janela própria. Ele
+O UTSim Produto (desenvolvimento de produto) é um aplicativo da família UTSim com janela própria. Ele
 organiza os requisitos do produto, as fases do desenvolvimento com os portões, a estrutura do
 produto com as variantes e os roteiros, e gera a partir disso um modelo que o UTSim simula.
 Funciona sem internet e sem servidor. Esta é a primeira versão (MVP).
@@ -85,6 +85,12 @@ mudar à vontade, inclusive criar e tirar fases. No portão da fase atual, o app
 decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
 volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
 quem e a justificativa.
+
+O botão **Relatório do portão**, embaixo de cada fase, grava o relatório daquela fase na
+pasta `relatorios` do projeto, em HTML (abre no navegador) e em PDF: objetivo e datas, o que
+ainda falta no portão, as entregas, o checklist, os aprovadores com a situação da assinatura,
+as decisões tomadas naquele portão e uma linha por aprovador para assinar no papel. Cada
+clique grava um arquivo novo, com a data e a hora no nome.
 
 ## Estrutura, variantes e roteiros
 

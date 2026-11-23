@@ -635,6 +635,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             for line in m.arrival_lines() {
                 println!("chegadas: {line}");
             }
+            for line in m.dispatch_lines() {
+                println!("despacho: {line}");
+            }
         }
         Cmd::Rede { acao } => rede::run(acao)?,
         Cmd::Corredores { model, svg } => corredores::run(&model, svg.as_deref())?,

@@ -2,6 +2,7 @@
 //! node), for the "Rede" and "Fluidos" layers of `Editar`. Like the object panel they
 //! read the [`Document`] and return [`Command`]s; nothing is changed here.
 
+use crate::texto::{dx, fx, tx, vx};
 use bevy_egui::egui::{self, Id, Ui};
 use utsim_edit::fluids::{FLUID_PALETTE, fluid_entry, fluid_kind_id, fluid_template};
 use utsim_edit::network::{attachments, edge_index, edge_length};
@@ -66,16 +67,16 @@ fn name_field(
 ) -> Option<String> {
     let check = |t: &str| {
         if t.trim().is_empty() {
-            Err("o nome não pode ficar vazio".to_string())
+            Err(tx("prop-network-o_nome_nao_pode_ficar").to_string())
         } else if t != current && taken(t) {
-            Err(format!("já existe um nó chamado \"{t}\""))
+            Err(fx("prop-network-ja_existe_um_no_chamado", &[("t", vx(&t))]))
         } else {
             Ok(())
         }
     };
     let mut to = None;
     ui.horizontal(|ui| {
-        ui.label("Nome");
+        ui.label(tx("prop-network-nome"));
         to = text_commit(ui, id((key.0, key.1, "#nome")), current, false, &check);
     });
     to
@@ -98,7 +99,7 @@ pub fn node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command> {
             to,
         });
     }
-    ui.weak("Nó da rede de caminhos");
+    ui.weak(tx("prop-network-no_da_rede_de_caminhos"));
     let mut moved = Vec::new();
     position_fields(ui, ("no", name), node.position, &mut moved);
     for position in moved {
@@ -108,17 +109,14 @@ pub fn node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command> {
         });
     }
     ui.separator();
-    ui.strong("Arestas");
+    ui.strong(tx("prop-network-arestas"));
     let edges: Vec<&EdgeDef> = net
         .edges
         .iter()
         .filter(|e| e.from == name || e.to == name)
         .collect();
     if edges.is_empty() {
-        ui.colored_label(
-            RED,
-            "Nenhuma: use a ferramenta \"Aresta\" e clique em outro nó.",
-        );
+        ui.colored_label(RED, tx("prop-network-nenhuma_use_a_ferramenta_aresta"));
     }
     for e in edges {
         ui.horizontal(|ui| {
@@ -126,7 +124,7 @@ pub fn node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command> {
             ui.label(format!("{} ({len:.2} m)", edge_text(e)));
             if ui
                 .small_button("x")
-                .on_hover_text("Remover aresta")
+                .on_hover_text(tx("prop-network-remover_aresta"))
                 .clicked()
             {
                 out.push(Command::RemoveEdge {
@@ -142,9 +140,9 @@ pub fn node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command> {
         .map(|(o, _)| o)
         .collect();
     ui.separator();
-    ui.strong("Objetos ligados a este nó");
+    ui.strong(tx("prop-network-objetos_ligados_a_este_no"));
     if attached.is_empty() {
-        ui.weak("Nenhum (cada objeto atendido entra pelo nó mais próximo).");
+        ui.weak(tx("prop-network-nenhum_cada_objeto_atendido_entra"));
     } else {
         ui.label(attached.join(", "));
     }
@@ -165,10 +163,11 @@ pub fn edge_panel(ui: &mut Ui, doc: &Document, from: &str, to: &str) -> Vec<Comm
         to: to.to_string(),
         edge: e,
     };
-    ui.strong(format!("Aresta {}", edge_text(edge)));
+    ui.strong(fx("prop-network-aresta", &[("edge", vx(&edge_text(edge)))]));
     let len = edge_length(net, from, to).unwrap_or(0.0);
-    ui.label(format!(
-        "Comprimento: {len:.2} m (calculado pelas posições dos nós)"
+    ui.label(fx(
+        "prop-network-comprimento_m_calculado_pelas_posicoes",
+        &[("len", dx(format!("{:.2}", len)))],
     ));
     ui.separator();
     let current = if edge.two_way {
@@ -177,12 +176,30 @@ pub fn edge_panel(ui: &mut Ui, doc: &Document, from: &str, to: &str) -> Vec<Comm
         Direction::Forward
     };
     let options = [
-        (Direction::TwoWay, format!("Mão dupla ({from} <-> {to})")),
-        (Direction::Forward, format!("Mão única ({from} -> {to})")),
-        (Direction::Backward, format!("Mão única ({to} -> {from})")),
+        (
+            Direction::TwoWay,
+            fx(
+                "prop-network-mao_dupla",
+                &[("from", vx(&from)), ("to", vx(&to))],
+            ),
+        ),
+        (
+            Direction::Forward,
+            fx(
+                "prop-network-mao_unica",
+                &[("from", vx(&from)), ("to", vx(&to))],
+            ),
+        ),
+        (
+            Direction::Backward,
+            fx(
+                "prop-network-mao_unica-2",
+                &[("to", vx(&to)), ("from", vx(&from))],
+            ),
+        ),
     ];
     ui.horizontal(|ui| {
-        ui.label("Sentido");
+        ui.label(tx("prop-network-sentido"));
         let shown = options
             .iter()
             .find(|(d, _)| *d == current)
@@ -201,8 +218,8 @@ pub fn edge_panel(ui: &mut Ui, doc: &Document, from: &str, to: &str) -> Vec<Comm
     ui.horizontal(|ui| {
         let mut on = edge.capacity.is_some();
         if ui
-            .checkbox(&mut on, "Limitar veículos (AGV)")
-            .on_hover_text("Quantos AGVs podem estar na aresta ao mesmo tempo")
+            .checkbox(&mut on, tx("prop-network-limitar_veiculos_agv"))
+            .on_hover_text(tx("prop-network-quantos_agvs_podem_estar_na"))
             .changed()
         {
             out.push(set(EdgeDef {
@@ -220,11 +237,11 @@ pub fn edge_panel(ui: &mut Ui, doc: &Document, from: &str, to: &str) -> Vec<Comm
                 }
             }
             None => {
-                ui.weak("sem limite");
+                ui.weak(tx("prop-network-sem_limite"));
             }
         }
     });
-    ui.weak("Só AGVs (agv: true) respeitam a capacidade; os demais passam livremente.");
+    ui.weak(tx("prop-network-so_agvs_agv_true_respeitam"));
     out
 }
 
@@ -259,7 +276,7 @@ fn opt_float(
                 }
             }
             None => {
-                ui.weak("sem limite");
+                ui.weak(tx("prop-network-sem_limite"));
             }
         }
     });
@@ -280,9 +297,9 @@ fn object_picker(ui: &mut Ui, key: Id, doc: &Document, current: &str) -> Option<
     let objects = converter_objects(doc);
     let mut chosen = None;
     ui.horizontal(|ui| {
-        ui.label("Objeto discreto");
+        ui.label(tx("prop-network-objeto_discreto"));
         let shown = if current.is_empty() {
-            "(escolha)"
+            tx("prop-network-escolha")
         } else {
             current
         };
@@ -299,7 +316,10 @@ fn object_picker(ui: &mut Ui, key: Id, doc: &Document, current: &str) -> Option<
     if !current.is_empty() && !objects.iter().any(|o| o == current) {
         ui.colored_label(
             RED,
-            format!("\"{current}\" não é um objeto discreto do modelo"),
+            fx(
+                "prop-network-nao_e_um_objeto_discreto",
+                &[("current", vx(&current))],
+            ),
         );
     }
     chosen
@@ -311,7 +331,7 @@ fn kind_fields(ui: &mut Ui, doc: &Document, name: &str, kind: &FluidKind) -> Opt
     let mut next = None;
     match kind {
         FluidKind::Source { rate } => {
-            if let Some(rate) = labeled(ui, key("rate"), "Vazão", *rate) {
+            if let Some(rate) = labeled(ui, key("rate"), tx("prop-network-vazao"), *rate) {
                 next = Some(FluidKind::Source { rate });
             }
         }
@@ -327,39 +347,76 @@ fn kind_fields(ui: &mut Ui, doc: &Document, name: &str, kind: &FluidKind) -> Opt
                 max_in,
                 max_out,
             };
-            if let Some(c) = labeled(ui, key("capacity"), "Capacidade", *capacity) {
+            if let Some(c) = labeled(
+                ui,
+                key("capacity"),
+                tx("prop-network-capacidade"),
+                *capacity,
+            ) {
                 next = Some(tank(c, *initial, *max_in, *max_out));
             }
-            if let Some(v) = labeled(ui, key("initial"), "Nível inicial", *initial) {
+            if let Some(v) = labeled(
+                ui,
+                key("initial"),
+                tx("prop-network-nivel_inicial"),
+                *initial,
+            ) {
                 next = Some(tank(*capacity, v, *max_in, *max_out));
             }
-            if let Some(v) = opt_float(ui, key("max_in"), "Entrada máxima", *max_in, 1.0) {
+            if let Some(v) = opt_float(
+                ui,
+                key("max_in"),
+                tx("prop-network-entrada_maxima"),
+                *max_in,
+                1.0,
+            ) {
                 next = Some(tank(*capacity, *initial, v, *max_out));
             }
-            if let Some(v) = opt_float(ui, key("max_out"), "Saída máxima", *max_out, 1.0) {
+            if let Some(v) = opt_float(
+                ui,
+                key("max_out"),
+                tx("prop-network-saida_maxima"),
+                *max_out,
+                1.0,
+            ) {
                 next = Some(tank(*capacity, *initial, *max_in, v));
             }
         }
         FluidKind::Pipe { max_rate } => {
-            if let Some(max_rate) = labeled(ui, key("max_rate"), "Vazão máxima", *max_rate) {
+            if let Some(max_rate) = labeled(
+                ui,
+                key("max_rate"),
+                tx("prop-network-vazao_maxima"),
+                *max_rate,
+            ) {
                 next = Some(FluidKind::Pipe { max_rate });
             }
         }
         FluidKind::Sink { max_rate } => {
-            if let Some(max_rate) = opt_float(ui, key("max_rate"), "Vazão máxima", *max_rate, 1.0)
-            {
+            if let Some(max_rate) = opt_float(
+                ui,
+                key("max_rate"),
+                tx("prop-network-vazao_maxima"),
+                *max_rate,
+                1.0,
+            ) {
                 next = Some(FluidKind::Sink { max_rate });
             }
         }
         FluidKind::FromItems { object, volume } => {
-            ui.weak("Cada item que entra no objeto vira este volume, entregue de uma vez.");
+            ui.weak(tx("prop-network-cada_item_que_entra_no"));
             if let Some(o) = object_picker(ui, key("object"), doc, object) {
                 next = Some(FluidKind::FromItems {
                     object: o,
                     volume: *volume,
                 });
             }
-            if let Some(v) = labeled(ui, key("volume"), "Volume por item", *volume) {
+            if let Some(v) = labeled(
+                ui,
+                key("volume"),
+                tx("prop-network-volume_por_item"),
+                *volume,
+            ) {
                 next = Some(FluidKind::FromItems {
                     object: object.clone(),
                     volume: v,
@@ -371,7 +428,7 @@ fn kind_fields(ui: &mut Ui, doc: &Document, name: &str, kind: &FluidKind) -> Opt
             volume,
             max_rate,
         } => {
-            ui.weak("A cada volume completo, cria um item dentro do objeto.");
+            ui.weak(tx("prop-network-a_cada_volume_completo_cria"));
             let to_items = |object: &str, volume, max_rate| FluidKind::ToItems {
                 object: object.to_string(),
                 volume,
@@ -380,10 +437,21 @@ fn kind_fields(ui: &mut Ui, doc: &Document, name: &str, kind: &FluidKind) -> Opt
             if let Some(o) = object_picker(ui, key("object"), doc, object) {
                 next = Some(to_items(&o, *volume, *max_rate));
             }
-            if let Some(v) = labeled(ui, key("volume"), "Volume por item", *volume) {
+            if let Some(v) = labeled(
+                ui,
+                key("volume"),
+                tx("prop-network-volume_por_item"),
+                *volume,
+            ) {
                 next = Some(to_items(object, v, *max_rate));
             }
-            if let Some(v) = opt_float(ui, key("max_rate"), "Vazão máxima", *max_rate, 1.0) {
+            if let Some(v) = opt_float(
+                ui,
+                key("max_rate"),
+                tx("prop-network-vazao_maxima"),
+                *max_rate,
+                1.0,
+            ) {
                 next = Some(to_items(object, *volume, v));
             }
         }
@@ -411,7 +479,10 @@ pub fn fluid_node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command>
     let prefix = format!("fluidos.{name}:");
     for issue in doc.issues() {
         if issue.message.starts_with(&prefix) || issue.message.contains(&format!("'{name}'")) {
-            ui.colored_label(RED, format!("Problema: {}", issue.message));
+            ui.colored_label(
+                RED,
+                fx("prop-network-problema", &[("message", vx(&issue.message))]),
+            );
         }
     }
     let taken = |t: &str| def.nodes.iter().any(|n| n.name == t);
@@ -423,7 +494,7 @@ pub fn fluid_node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command>
     }
     let current = fluid_kind_id(&node.kind);
     ui.horizontal(|ui| {
-        ui.label("Tipo");
+        ui.label(tx("prop-network-tipo"));
         let shown = fluid_entry(current).map_or(current, |e| e.label);
         egui::ComboBox::from_id_salt(id(("fluido", name, "#tipo")))
             .selected_text(shown)
@@ -457,21 +528,21 @@ pub fn fluid_node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command>
         });
     }
     ui.separator();
-    ui.strong("Ligações");
+    ui.strong(tx("prop-network-ligacoes"));
     let links: Vec<&(String, String)> = def
         .links
         .iter()
         .filter(|(a, b)| a == name || b == name)
         .collect();
     if links.is_empty() {
-        ui.weak("Nenhuma: use a ferramenta \"Ligar\" e clique no próximo nó.");
+        ui.weak(tx("prop-network-nenhuma_use_a_ferramenta_ligar"));
     }
     for (a, b) in links {
         ui.horizontal(|ui| {
             ui.label(format!("{a} -> {b}"));
             if ui
                 .small_button("x")
-                .on_hover_text("Remover ligação")
+                .on_hover_text(tx("prop-network-remover_ligacao"))
                 .clicked()
             {
                 out.push(Command::RemoveFluidLink {

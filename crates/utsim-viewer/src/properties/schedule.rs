@@ -5,6 +5,7 @@
 //! 10080) is read as a day (or week) in minutes, 24 (168) in hours and 86400 (604800)
 //! in seconds; only then the table shows clock times and rates per hour.
 
+use crate::texto::{fx, tx, vx};
 use utsim_core::Dist;
 use utsim_model::{ArrivalPeriod, ArrivalSchedule, PeriodArrivals};
 
@@ -28,9 +29,9 @@ impl Unit {
 
     pub fn name(self) -> &'static str {
         match self {
-            Unit::Seconds => "segundos",
-            Unit::Minutes => "minutos",
-            Unit::Hours => "horas",
+            Unit::Seconds => tx("prop-schedule-segundos"),
+            Unit::Minutes => tx("prop-schedule-minutos"),
+            Unit::Hours => tx("prop-schedule-horas"),
         }
     }
 }
@@ -75,30 +76,29 @@ pub fn parse_time(text: &str, cycle: f64) -> Result<f64, String> {
         let (day, hm) = rest
             .trim()
             .split_once(' ')
-            .ok_or_else(|| format!("use \"dia N hh:mm\" (recebido \"{t}\")"))?;
+            .ok_or_else(|| fx("prop-schedule-use_dia_n_hh_mm", &[("t", vx(&t))]))?;
         let day: u32 = day
             .parse()
             .ok()
             .filter(|d| *d >= 1)
-            .ok_or_else(|| format!("dia inválido em \"{t}\" (a partir de 1)"))?;
-        let unit = unit_of_cycle(cycle).ok_or_else(|| "use um número".to_string())?;
+            .ok_or_else(|| fx("prop-schedule-dia_invalido_em_a_partir", &[("t", vx(&t))]))?;
+        let unit =
+            unit_of_cycle(cycle).ok_or_else(|| tx("prop-schedule-use_um_numero").to_string())?;
         return Ok(parse_time(hm, cycle)? + f64::from(day - 1) * 24.0 * unit.per_hour());
     }
     if let Some((h, m)) = t.split_once(':') {
-        let unit = unit_of_cycle(cycle).ok_or_else(|| {
-            "hh:mm só vale com ciclo de dia ou semana (1440 min, 24 h, 86400 s); use um número"
-                .to_string()
-        })?;
+        let unit = unit_of_cycle(cycle)
+            .ok_or_else(|| tx("prop-schedule-hh_mm_so_vale_com").to_string())?;
         let h: u32 = h
             .trim()
             .parse()
-            .map_err(|_| format!("hora inválida em \"{t}\""))?;
+            .map_err(|_| fx("prop-schedule-hora_invalida_em", &[("t", vx(&t))]))?;
         let m: u32 = m
             .trim()
             .parse()
-            .map_err(|_| format!("minuto inválido em \"{t}\""))?;
+            .map_err(|_| fx("prop-schedule-minuto_invalido_em", &[("t", vx(&t))]))?;
         if m >= 60 {
-            return Err(format!("minuto inválido em \"{t}\" (0 a 59)"));
+            return Err(fx("prop-schedule-minuto_invalido_em_0_a", &[("t", vx(&t))]));
         }
         return Ok(f64::from(h * 60 + m) / 60.0 * unit.per_hour());
     }
@@ -106,11 +106,16 @@ pub fn parse_time(text: &str, cycle: f64) -> Result<f64, String> {
         .parse::<f64>()
         .ok()
         .filter(|v| v.is_finite())
-        .ok_or_else(|| format!("\"{t}\" não é um horário (hh:mm) nem um número"))
+        .ok_or_else(|| fx("prop-schedule-nao_e_um_horario_hh", &[("t", vx(&t))]))
 }
 
-/// Modes of a period, in menu order, with their labels.
-pub const MODES: [&str; 4] = ["igual ao padrão", "distribuição", "taxa", "sem chegadas"];
+/// Modes of a period, in menu order, as label keys (`editor.ftl`).
+pub const MODES: [&str; 4] = [
+    "prop-modo-igual-ao-padrao",
+    "prop-modo-distribuicao",
+    "prop-modo-taxa",
+    "prop-modo-sem-chegadas",
+];
 
 pub fn mode_index(a: &PeriodArrivals) -> usize {
     match a {
