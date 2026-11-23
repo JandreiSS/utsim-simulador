@@ -4,6 +4,7 @@
 //! saving work like for any other edit. In `Simular` the same diagram shows live token
 //! counts per activity.
 
+use crate::texto::{dx, fx, tx, vx};
 use std::collections::HashSet;
 
 use bevy_egui::egui::{
@@ -146,9 +147,9 @@ fn list_column(
     out: &mut Vec<Command>,
 ) {
     let model = doc.model();
-    ui.heading("Fluxos");
+    ui.heading(tx("flows-ui-fluxos"));
     if model.flows.is_empty() {
-        ui.weak("Nenhum fluxo neste modelo.");
+        ui.weak(tx("flows-ui-nenhum_fluxo_neste_modelo"));
     }
     for f in &model.flows {
         let on = state.flow.as_deref() == Some(f.name.as_str());
@@ -162,8 +163,8 @@ fn list_column(
     };
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(editable, egui::Button::new("Novo fluxo"))
-            .on_hover_text("Cria um fluxo Gerar tokens, Esperar, Fim")
+            .add_enabled(editable, egui::Button::new(tx("flows-ui-novo_fluxo")))
+            .on_hover_text(tx("flows-ui-cria_um_fluxo_gerar_tokens"))
             .clicked()
         {
             let name = flows::unique("fluxo", taken);
@@ -172,8 +173,11 @@ fn list_column(
             state.activity = None;
         }
         if ui
-            .add_enabled(editable && flow.is_some(), egui::Button::new("Remover"))
-            .on_hover_text("Remove o fluxo selecionado (Ctrl+Z desfaz)")
+            .add_enabled(
+                editable && flow.is_some(),
+                egui::Button::new(tx("flows-ui-remover")),
+            )
+            .on_hover_text(tx("flows-ui-remove_o_fluxo_selecionado_ctrl"))
             .clicked()
             && let Some(f) = flow
         {
@@ -184,12 +188,12 @@ fn list_column(
     ui.separator();
     ui.add_enabled_ui(editable, |ui| {
         ui.horizontal(|ui| {
-            ui.label("Nome");
+            ui.label(tx("flows-ui-nome"));
             let check = |t: &str| {
                 if t.trim().is_empty() {
-                    Err("o nome não pode ficar vazio".to_string())
+                    Err(tx("flows-ui-o_nome_nao_pode_ficar").to_string())
                 } else if t != f.name && taken(t) {
-                    Err(format!("já existe um objeto ou fluxo chamado \"{t}\""))
+                    Err(fx("flows-ui-ja_existe_um_objeto_ou", &[("t", vx(&t))]))
                 } else {
                     Ok(())
                 }
@@ -206,8 +210,8 @@ fn list_column(
 }
 
 fn resources_editor(ui: &mut Ui, f: &FlowDef, out: &mut Vec<Command>) {
-    ui.strong("Recursos");
-    ui.weak("Contadores compartilhados (ex.: docas).");
+    ui.strong(tx("flows-ui-recursos"));
+    ui.weak(tx("flows-ui-contadores_compartilhados_ex_docas"));
     let mut new = f.clone();
     let mut changed = false;
     let mut remove = None;
@@ -223,7 +227,7 @@ fn resources_editor(ui: &mut Ui, f: &FlowDef, out: &mut Vec<Command>) {
                 flows::rename_resource(&mut new, &r.name, &to);
                 changed = true;
             }
-            ui.label("cap.");
+            ui.label(tx("flows-ui-cap"));
             let mut cap = r.capacity;
             if num(ui, id.with("cap"), &mut cap, 1.0, 1usize) {
                 new.resources[i].capacity = cap;
@@ -231,7 +235,7 @@ fn resources_editor(ui: &mut Ui, f: &FlowDef, out: &mut Vec<Command>) {
             }
             if ui
                 .small_button("x")
-                .on_hover_text("Remover recurso")
+                .on_hover_text(tx("flows-ui-remover_recurso"))
                 .clicked()
             {
                 remove = Some(i);
@@ -242,7 +246,7 @@ fn resources_editor(ui: &mut Ui, f: &FlowDef, out: &mut Vec<Command>) {
         new.resources.remove(i);
         changed = true;
     }
-    if ui.small_button("+ recurso").clicked() {
+    if ui.small_button(tx("flows-ui-recurso")).clicked() {
         let name = flows::unique("recurso", |n| f.resources.iter().any(|r| r.name == n));
         new.resources.push(ResourceDef { name, capacity: 1 });
         changed = true;
@@ -269,24 +273,24 @@ fn center_column(
 ) {
     let Some(f) = flow else {
         ui.add_space(8.0);
-        ui.label("Crie um fluxo com \"Novo fluxo\" para desenhar a lógica do modelo.");
+        ui.label(tx("flows-ui-crie_um_fluxo_com_novo"));
         return;
     };
     ui.horizontal_wrapped(|ui| {
         ui.strong(&f.name);
         ui.separator();
         ui.add_enabled_ui(editable, |ui| {
-            ui.label("Adicionar:");
+            ui.label(tx("flows-ui-adicionar"));
             ComboBox::from_id_salt("fluxos_tipo")
-                .selected_text(KINDS[state.add_kind].1)
+                .selected_text(tx(KINDS[state.add_kind].1))
                 .show_ui(ui, |ui| {
                     for (i, (_, label)) in KINDS.iter().enumerate() {
-                        ui.selectable_value(&mut state.add_kind, i, *label);
+                        ui.selectable_value(&mut state.add_kind, i, tx(label));
                     }
                 });
-            if ui.button("Adicionar atividade").clicked() {
+            if ui.button(tx("flows-ui-adicionar_atividade")).clicked() {
                 let (key, label) = KINDS[state.add_kind];
-                let base = label.to_lowercase().replace(' ', "_");
+                let base = tx(label).to_lowercase().replace(' ', "_");
                 let name = flows::unique_activity_name(f, &base);
                 if let Some(act) = flows::new_activity(key, &name, objects, &f.resources) {
                     let mut new = f.clone();
@@ -307,9 +311,9 @@ fn center_column(
             if ui
                 .add_enabled(
                     state.activity.is_some(),
-                    egui::Button::new("Excluir atividade"),
+                    egui::Button::new(tx("flows-ui-excluir_atividade")),
                 )
-                .on_hover_text("Remove a atividade e as ligações que chegam nela")
+                .on_hover_text(tx("flows-ui-remove_a_atividade_e_as"))
                 .clicked()
                 && let Some(sel) = state.activity.take()
             {
@@ -325,13 +329,16 @@ fn center_column(
     if problems.len() > 3 {
         ui.colored_label(
             RED,
-            format!("... e mais {} problema(s)", problems.len() - 3),
+            fx(
+                "flows-ui-e_mais_problema_s",
+                &[("problems", vx(&(problems.len() - 3)))],
+            ),
         );
     }
     if let Some(l) = live {
-        ui.weak(format!(
-            "Simulação em t = {:.2}: o número em cada caixa é a quantidade de tokens ali.",
-            l.t
+        ui.weak(fx(
+            "flows-ui-simulacao_em_t_o_numero",
+            &[("t", dx(format!("{:.2}", l.t)))],
         ));
     }
     diagram(ui, state, f, problems, live);
@@ -403,7 +410,7 @@ fn diagram(
     live: Option<&Live>,
 ) {
     if f.activities.is_empty() {
-        ui.weak("Fluxo vazio: adicione uma atividade.");
+        ui.weak(tx("flows-ui-fluxo_vazio_adicione_uma_atividade"));
         return;
     }
     let cells = flows::layout_cells(f);
@@ -576,9 +583,9 @@ fn activity_column(
     editable: bool,
     out: &mut Vec<Command>,
 ) {
-    ui.heading("Atividade");
+    ui.heading(tx("flows-ui-atividade"));
     let (Some(f), Some(name)) = (flow, state.activity.clone()) else {
-        ui.weak("Clique numa atividade do diagrama para ver e editar seus campos.");
+        ui.weak(tx("flows-ui-clique_numa_atividade_do_diagrama"));
         return;
     };
     let Some(idx) = f.activities.iter().position(|a| a.name == name) else {
@@ -587,13 +594,13 @@ fn activity_column(
     if let Some(l) = live
         && let Some(fb) = (l.flow_block)(&f.name)
     {
-        ui.label(format!(
-            "Tokens agora: {}",
-            l.timeline.tokens_at(fb, idx, l.t)
+        ui.label(fx(
+            "flows-ui-tokens_agora",
+            &[("t", vx(&l.timeline.tokens_at(fb, idx, l.t)))],
         ));
     }
     if !editable {
-        ui.weak("Volte para Editar para alterar o fluxo.");
+        ui.weak(tx("flows-ui-volte_para_editar_para_alterar"));
     }
     ui.add_enabled_ui(editable, |ui| {
         if let Some(edit) = edit_activity(ui, f, idx, objects) {
@@ -641,7 +648,7 @@ fn expr_box(ui: &mut Ui, id: Id, current: &str, width: f32) -> Option<String> {
 fn object_combo(ui: &mut Ui, id: Id, value: &mut String, objects: &[String]) -> bool {
     let mut changed = false;
     let text = if value.is_empty() {
-        "(escolha)".to_string()
+        tx("flows-ui-escolha").to_string()
     } else {
         value.clone()
     };
@@ -656,7 +663,10 @@ fn object_combo(ui: &mut Ui, id: Id, value: &mut String, objects: &[String]) -> 
             }
         });
     if !value.is_empty() && !objects.contains(value) {
-        ui.colored_label(RED, format!("objeto \"{value}\" não existe"));
+        ui.colored_label(
+            RED,
+            fx("flows-ui-objeto_nao_existe", &[("value", vx(&value))]),
+        );
     }
     changed
 }
@@ -717,7 +727,7 @@ fn labels_editor(
             }
             if ui
                 .small_button("x")
-                .on_hover_text("Remover rótulo")
+                .on_hover_text(tx("flows-ui-remover_rotulo"))
                 .clicked()
             {
                 remove = Some(k.clone());
@@ -741,7 +751,7 @@ fn labels_editor(
         labels.remove(&k);
         changed = true;
     }
-    if ui.small_button("+ rótulo").clicked() {
+    if ui.small_button(tx("flows-ui-rotulo")).clicked() {
         let key = flows::unique("rotulo", |n| labels.contains_key(n));
         labels.insert(key, "1".to_string());
         changed = true;
@@ -754,15 +764,15 @@ fn labels_editor(
 fn next_editor(ui: &mut Ui, id: Id, a: &mut ActivityDef, names: &[String]) -> bool {
     let mut changed = false;
     if matches!(a.kind, Activity::Sink) {
-        ui.strong("Próxima atividade");
-        ui.weak("Fim do fluxo: o token termina aqui.");
+        ui.strong(tx("flows-ui-proxima_atividade"));
+        ui.weak(tx("flows-ui-fim_do_fluxo_o_token"));
         return false;
     }
     let decide = matches!(a.kind, Activity::Decide { .. });
     ui.strong(if decide {
-        "Ramos (para onde o token vai)"
+        tx("flows-ui-ramos_para_onde_o_token")
     } else {
-        "Próxima atividade"
+        tx("flows-ui-proxima_atividade")
     });
     let mut remove = None;
     let ActivityDef { kind, next, .. } = a;
@@ -783,7 +793,7 @@ fn next_editor(ui: &mut Ui, id: Id, a: &mut ActivityDef, names: &[String]) -> bo
                 });
             if ui
                 .small_button("x")
-                .on_hover_text("Remover ligação")
+                .on_hover_text(tx("flows-ui-remover_ligacao"))
                 .clicked()
             {
                 remove = Some(k);
@@ -794,14 +804,15 @@ fn next_editor(ui: &mut Ui, id: Id, a: &mut ActivityDef, names: &[String]) -> bo
                 DecideRule::Probability(w) => {
                     if let Some(weight) = w.get_mut(k) {
                         ui.horizontal(|ui| {
-                            changed |= labeled_float(ui, id.with(("w", k)), "     peso", weight);
+                            changed |=
+                                labeled_float(ui, id.with(("w", k)), tx("flows-ui-peso"), weight);
                         });
                     }
                 }
                 DecideRule::Condition(c) => {
                     if let Some(cond) = c.get_mut(k) {
                         ui.horizontal(|ui| {
-                            ui.label("     se");
+                            ui.label(tx("flows-ui-se"));
                             if let Some(t) = expr_box(ui, id.with(("c", k)), cond, 150.0) {
                                 *cond = t;
                                 changed = true;
@@ -821,9 +832,9 @@ fn next_editor(ui: &mut Ui, id: Id, a: &mut ActivityDef, names: &[String]) -> bo
         let mut pick = None;
         ComboBox::from_id_salt(id.with("ligar"))
             .selected_text(if decide {
-                "+ ligar a outro ramo..."
+                tx("flows-ui-ligar_a_outro_ramo")
             } else {
-                "+ ligar a..."
+                tx("flows-ui-ligar_a")
             })
             .show_ui(ui, |ui| {
                 for n in names.iter().filter(|n| !a.next.contains(n)) {
@@ -851,12 +862,15 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
     let id = Id::new(("fluxo-ed", &flow.name, &act.name));
 
     ui.horizontal(|ui| {
-        ui.label("Nome");
+        ui.label(tx("flows-ui-nome"));
         let check = |t: &str| {
             if t.trim().is_empty() {
-                Err("o nome não pode ficar vazio".to_string())
+                Err(tx("flows-ui-o_nome_nao_pode_ficar").to_string())
             } else if t != act.name && flow.activities.iter().any(|a| a.name == t) {
-                Err(format!("já existe uma atividade chamada \"{t}\""))
+                Err(fx(
+                    "flows-ui-ja_existe_uma_atividade_chamada",
+                    &[("t", vx(&t))],
+                ))
             } else {
                 Ok(())
             }
@@ -880,34 +894,34 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
             first_at_zero,
             limit,
         } => {
-            ui.strong("Intervalo entre tokens");
+            ui.strong(tx("flows-ui-intervalo_entre_tokens"));
             changed |= dist_editor(ui, id.with("ia"), interarrival);
             changed |= ui
-                .checkbox(first_at_zero, "criar um token em t = 0")
+                .checkbox(first_at_zero, tx("flows-ui-criar_um_token_em_t"))
                 .changed();
             let mut on = limit.is_some();
             ui.horizontal(|ui| {
-                if ui.checkbox(&mut on, "limitar a").changed() {
+                if ui.checkbox(&mut on, tx("flows-ui-limitar_a")).changed() {
                     *limit = on.then_some(100);
                     changed = true;
                 }
                 if let Some(n) = limit {
                     changed |= num(ui, id.with("limite"), n, 1.0, 1u64);
-                    ui.label("tokens");
+                    ui.label(tx("flows-ui-tokens"));
                 }
             });
         }
         Activity::Schedule { times } => {
-            ui.strong("Horários");
+            ui.strong(tx("flows-ui-horarios"));
             let mut remove = None;
             for (i, (t, count)) in times.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
-                    changed |= labeled_float(ui, id.with(("t", i)), "t =", t);
-                    ui.label("tokens");
+                    changed |= labeled_float(ui, id.with(("t", i)), tx("flows-ui-t"), t);
+                    ui.label(tx("flows-ui-tokens"));
                     changed |= num(ui, id.with(("n", i)), count, 1.0, 1u32);
                     if ui
                         .small_button("x")
-                        .on_hover_text("Remover horário")
+                        .on_hover_text(tx("flows-ui-remover_horario"))
                         .clicked()
                     {
                         remove = Some(i);
@@ -918,7 +932,7 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
                 times.remove(i);
                 changed = true;
             }
-            if ui.small_button("+ horário").clicked() {
+            if ui.small_button(tx("flows-ui-horario")).clicked() {
                 let at = times.last().map_or(0.0, |(t, _)| t + 10.0);
                 times.push((at, 1));
                 changed = true;
@@ -926,25 +940,25 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
         }
         Activity::OnEvent { block, event } | Activity::WaitFor { block, event } => {
             ui.horizontal(|ui| {
-                ui.label("Objeto");
+                ui.label(tx("flows-ui-objeto"));
                 changed |= object_combo(ui, id.with("obj"), block, objects);
             });
             ui.horizontal(|ui| {
-                ui.label("Evento");
+                ui.label(tx("flows-ui-evento"));
                 changed |= event_combo(ui, id.with("ev"), event);
             });
-            ui.weak("O token passa a carregar o item desse evento.");
+            ui.weak(tx("flows-ui-o_token_passa_a_carregar"));
         }
         Activity::Delay { time } => {
-            ui.strong("Tempo de espera");
+            ui.strong(tx("flows-ui-tempo_de_espera"));
             changed |= dist_editor(ui, id.with("t"), time);
         }
         Activity::Decide { rule } => {
-            const RULES: [&str; 4] = [
-                "Probabilidade",
-                "Pelo rótulo",
-                "Condições",
-                "Agente externo",
+            let rules: [&str; 4] = [
+                tx("flows-ui-probabilidade"),
+                tx("flows-ui-pelo_rotulo"),
+                tx("flows-ui-condicoes"),
+                tx("flows-ui-agente_externo"),
             ];
             let index = match rule {
                 DecideRule::Probability(_) => 0,
@@ -954,11 +968,11 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
             };
             let mut picked = index;
             ui.horizontal(|ui| {
-                ui.label("Regra");
+                ui.label(tx("flows-ui-regra"));
                 ComboBox::from_id_salt(id.with("regra"))
-                    .selected_text(RULES[index])
+                    .selected_text(rules[index])
                     .show_ui(ui, |ui| {
-                        for (i, name) in RULES.iter().enumerate() {
+                        for (i, name) in rules.iter().enumerate() {
                             ui.selectable_value(&mut picked, i, *name);
                         }
                     });
@@ -978,7 +992,7 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
             match rule {
                 DecideRule::ByLabel(label) => {
                     ui.horizontal(|ui| {
-                        ui.label("rótulo do token (1, 2, ...)");
+                        ui.label(tx("flows-ui-rotulo_do_token_1_2"));
                         let (c, _) = line(ui, id.with("rotulo"), label, 90.0);
                         if let Some(t) = c
                             && !t.trim().is_empty()
@@ -989,20 +1003,20 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
                     });
                 }
                 DecideRule::Condition(_) => {
-                    ui.weak("A primeira condição verdadeira vence; nenhuma = último ramo.");
+                    ui.weak(tx("flows-ui-a_primeira_condicao_verdadeira_vence"));
                 }
                 DecideRule::Probability(_) => {
-                    ui.weak("Pesos relativos, um por ramo.");
+                    ui.weak(tx("flows-ui-pesos_relativos_um_por_ramo"));
                 }
                 DecideRule::Agent { observation } => {
-                    ui.weak("Um agente externo escolhe o ramo; a simulação pausa e mostra estas observações:");
+                    ui.weak(tx("flows-ui-um_agente_externo_escolhe_o"));
                     for (i, obs) in observation.iter_mut().enumerate() {
                         if let Some(t) = expr_box(ui, id.with(("obs", i)), obs, 180.0) {
                             *obs = t;
                             changed = true;
                         }
                     }
-                    if ui.small_button("+ observação").clicked() {
+                    if ui.small_button(tx("flows-ui-observacao")).clicked() {
                         observation.push("now".to_string());
                         changed = true;
                     }
@@ -1010,15 +1024,15 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
             }
         }
         Activity::Assign { labels } => {
-            ui.strong("Rótulos");
-            ui.weak("nome atribui ao token; item.nome ao item carregado.");
+            ui.strong(tx("flows-ui-rotulos"));
+            ui.weak(tx("flows-ui-nome_atribui_ao_token_item"));
             changed |= labels_editor(ui, id.with("rot"), labels);
         }
         Activity::Acquire { resource, count } | Activity::Release { resource, count } => {
             ui.horizontal(|ui| {
-                ui.label("Recurso");
+                ui.label(tx("flows-ui-recurso-2"));
                 let text = if resource.is_empty() {
-                    "(escolha)".to_string()
+                    tx("flows-ui-escolha").to_string()
                 } else {
                     resource.clone()
                 };
@@ -1034,33 +1048,39 @@ fn edit_activity(ui: &mut Ui, flow: &FlowDef, idx: usize, objects: &[String]) ->
                     });
             });
             if !resource.is_empty() && !resources.contains(resource) {
-                ui.colored_label(RED, format!("recurso \"{resource}\" não existe"));
+                ui.colored_label(
+                    RED,
+                    fx(
+                        "flows-ui-recurso_nao_existe",
+                        &[("resource", vx(&resource))],
+                    ),
+                );
             }
             if resources.is_empty() {
-                ui.weak("Crie um recurso na coluna da esquerda.");
+                ui.weak(tx("flows-ui-crie_um_recurso_na_coluna"));
             }
             ui.horizontal(|ui| {
-                ui.label("quantidade");
+                ui.label(tx("flows-ui-quantidade"));
                 changed |= num(ui, id.with("qtd"), count, 1.0, 1usize);
             });
         }
         Activity::CreateItem { into, port, labels } => {
             ui.horizontal(|ui| {
-                ui.label("Dentro do objeto");
+                ui.label(tx("flows-ui-dentro_do_objeto"));
                 changed |= object_combo(ui, id.with("obj"), into, objects);
             });
             ui.horizontal(|ui| {
-                ui.label("porta de entrada");
+                ui.label(tx("flows-ui-porta_de_entrada"));
                 changed |= num(ui, id.with("porta"), port, 1.0, 0usize);
             });
-            ui.strong("Rótulos do item");
+            ui.strong(tx("flows-ui-rotulos_do_item"));
             changed |= labels_editor(ui, id.with("rot"), labels);
         }
         Activity::Batch { size } => {
             ui.horizontal(|ui| {
-                ui.label("Juntar");
+                ui.label(tx("flows-ui-juntar"));
                 changed |= num(ui, id.with("lote"), size, 1.0, 1usize);
-                ui.label("tokens");
+                ui.label(tx("flows-ui-tokens"));
             });
         }
         Activity::Sink => {}

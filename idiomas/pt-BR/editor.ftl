@@ -835,3 +835,159 @@ res-painel-viavel = Viável
 res-painel-vs_melhor = Δ vs melhor
 res-painel-equivalente = { $delta } equivalente
 res-painel-objeto_metrica = objeto.métrica
+
+# Parte 4: fluxos, câmeras e modelos 3D (flows*.rs, cameras.rs, camera_modes.rs, models.rs)
+
+## Tipos de atividade e modos de câmera
+
+fluxo-tipo-gerar-tokens = Gerar tokens
+fluxo-tipo-agenda = Agenda
+fluxo-tipo-ao-evento = Ao evento
+fluxo-tipo-esperar = Esperar
+fluxo-tipo-decidir = Decidir
+fluxo-tipo-atribuir = Atribuir
+fluxo-tipo-adquirir = Adquirir
+fluxo-tipo-liberar = Liberar
+fluxo-tipo-aguardar-evento = Aguardar evento
+fluxo-tipo-criar-item = Criar item
+fluxo-tipo-lote = Lote
+fluxo-tipo-fim = Fim
+camera-modo-orbita = Órbita
+camera-modo-seguir = Seguir
+camera-modo-primeira-pessoa = Primeira pessoa
+camera-modo-do-recurso = Do recurso
+
+## camera_modes.rs
+
+camera-modes-seguir_e_do_recurso_so = Seguir e Do recurso só funcionam em Simular
+camera-modes-o_modelo_nao_tem_recursos = O modelo não tem recursos móveis para seguir
+camera-modes-camera = Câmera: { $modo }
+camera-modes-orbita_seguir_um_recurso_andar = Órbita, seguir um recurso, andar pela planta ou ver do recurso (teclas 1 a 4)
+camera-modes-recurso = recurso: { $name }
+camera-modes-distancia_m = distância (m)
+camera-modes-velocidade_m_s = velocidade (m/s)
+camera-modes-travar_o_mouse_l = Travar o mouse (L)
+camera-modes-sair_esc = Sair (Esc)
+
+## cameras.rs
+
+cameras-esquerdo_arrasta_desloca_direito_gira = esquerdo arrasta (desloca), direito gira, roda aproxima
+cameras-direito_gira_em_volta_do = direito gira em volta do recurso, roda muda a distância, Esc sai
+cameras-wasd_anda_shift_corre_direito = WASD anda, Shift corre, direito (ou L) olha, roda muda a velocidade, Esc sai
+cameras-direito_olha_em_volta_esc = direito olha em volta, Esc sai
+
+## flows.rs
+
+flows-o_nome_nao_pode_ficar = o nome não pode ficar vazio
+flows-ja_existe_uma_atividade_chamada = já existe uma atividade chamada "{ $to }"
+
+## flows_ui.rs
+
+flows-ui-fluxos = Fluxos
+flows-ui-nenhum_fluxo_neste_modelo = Nenhum fluxo neste modelo.
+flows-ui-novo_fluxo = Novo fluxo
+flows-ui-cria_um_fluxo_gerar_tokens = Cria um fluxo Gerar tokens, Esperar, Fim
+flows-ui-remover = Remover
+flows-ui-remove_o_fluxo_selecionado_ctrl = Remove o fluxo selecionado (Ctrl+Z desfaz)
+flows-ui-nome = Nome
+flows-ui-o_nome_nao_pode_ficar = o nome não pode ficar vazio
+flows-ui-ja_existe_um_objeto_ou = já existe um objeto ou fluxo chamado "{ $t }"
+flows-ui-recursos = Recursos
+flows-ui-contadores_compartilhados_ex_docas = Contadores compartilhados (ex.: docas).
+flows-ui-cap = cap.
+flows-ui-remover_recurso = Remover recurso
+flows-ui-recurso = + recurso
+flows-ui-crie_um_fluxo_com_novo = Crie um fluxo com "Novo fluxo" para desenhar a lógica do modelo.
+flows-ui-adicionar = Adicionar:
+flows-ui-adicionar_atividade = Adicionar atividade
+flows-ui-excluir_atividade = Excluir atividade
+flows-ui-remove_a_atividade_e_as = Remove a atividade e as ligações que chegam nela
+flows-ui-e_mais_problema_s = ... e mais { $problems ->
+    [one] { $problems } problema
+   *[other] { $problems } problemas
+}
+flows-ui-simulacao_em_t_o_numero = Simulação em t = { $t }: o número em cada caixa é a quantidade de tokens ali.
+flows-ui-fluxo_vazio_adicione_uma_atividade = Fluxo vazio: adicione uma atividade.
+flows-ui-atividade = Atividade
+flows-ui-clique_numa_atividade_do_diagrama = Clique numa atividade do diagrama para ver e editar seus campos.
+flows-ui-tokens_agora = Tokens agora: { $t }
+flows-ui-volte_para_editar_para_alterar = Volte para Editar para alterar o fluxo.
+flows-ui-escolha = (escolha)
+flows-ui-objeto_nao_existe = objeto "{ $value }" não existe
+flows-ui-remover_rotulo = Remover rótulo
+flows-ui-rotulo = + rótulo
+flows-ui-proxima_atividade = Próxima atividade
+flows-ui-fim_do_fluxo_o_token = Fim do fluxo: o token termina aqui.
+flows-ui-ramos_para_onde_o_token = Ramos (para onde o token vai)
+flows-ui-remover_ligacao = Remover ligação
+flows-ui-peso = {"     "}peso
+flows-ui-se = {"     "}se
+flows-ui-ligar_a_outro_ramo = + ligar a outro ramo...
+flows-ui-ligar_a = + ligar a...
+flows-ui-ja_existe_uma_atividade_chamada = já existe uma atividade chamada "{ $t }"
+flows-ui-intervalo_entre_tokens = Intervalo entre tokens
+flows-ui-criar_um_token_em_t = criar um token em t = 0
+flows-ui-limitar_a = limitar a
+flows-ui-tokens = tokens
+flows-ui-horarios = Horários
+flows-ui-t = t =
+flows-ui-remover_horario = Remover horário
+flows-ui-horario = + horário
+flows-ui-objeto = Objeto
+flows-ui-evento = Evento
+flows-ui-o_token_passa_a_carregar = O token passa a carregar o item desse evento.
+flows-ui-tempo_de_espera = Tempo de espera
+flows-ui-probabilidade = Probabilidade
+flows-ui-pelo_rotulo = Pelo rótulo
+flows-ui-condicoes = Condições
+flows-ui-agente_externo = Agente externo
+flows-ui-regra = Regra
+flows-ui-rotulo_do_token_1_2 = rótulo do token (1, 2, ...)
+flows-ui-a_primeira_condicao_verdadeira_vence = A primeira condição verdadeira vence; nenhuma = último ramo.
+flows-ui-pesos_relativos_um_por_ramo = Pesos relativos, um por ramo.
+flows-ui-um_agente_externo_escolhe_o = Um agente externo escolhe o ramo; a simulação pausa e mostra estas observações:
+flows-ui-observacao = + observação
+flows-ui-rotulos = Rótulos
+flows-ui-nome_atribui_ao_token_item = nome atribui ao token; item.nome ao item carregado.
+flows-ui-recurso-2 = Recurso
+flows-ui-recurso_nao_existe = recurso "{ $resource }" não existe
+flows-ui-crie_um_recurso_na_coluna = Crie um recurso na coluna da esquerda.
+flows-ui-quantidade = quantidade
+flows-ui-dentro_do_objeto = Dentro do objeto
+flows-ui-porta_de_entrada = porta de entrada
+flows-ui-rotulos_do_item = Rótulos do item
+flows-ui-juntar = Juntar
+
+## models.rs
+
+models-visual = Visual:
+models-simples = simples
+models-realista = realista
+models-modelos_3d_articulados_da_biblioteca = Modelos 3D articulados da biblioteca (empilhadeira, AGV, operador...)
+
+## Estados dos blocos (painel do bloco e gráficos de estados)
+
+estado-sem-estado = sem estado
+estado-ocioso = ocioso
+estado-vazio = vazio
+estado-gerando = gerando
+estado-liberando = liberando
+estado-coletando = coletando
+estado-preparacao = preparação
+estado-processando = processando
+estado-bloqueado = bloqueado
+estado-aguardando-operador = aguardando operador
+estado-aguardando-transporte = aguardando transporte
+estado-em-falha = em falha
+estado-fora-do-turno = fora do turno
+estado-viajando-vazio = viajando vazio
+estado-viajando-carregado = viajando carregado
+estado-carregando = carregando
+estado-descarregando = descarregando
+estado-trabalhando-no-posto = trabalhando no posto
+estado-parado = parado (comando externo)
+estado-aguardando-tecnico = aguardando técnico
+estado-em-manutencao = em manutenção preventiva
+estado-em-pausa = em pausa (fadiga)
+estado-operador-entrando = operador entrando
+estado-operador-saindo = operador saindo

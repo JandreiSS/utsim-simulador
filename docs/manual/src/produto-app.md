@@ -10,30 +10,67 @@ abre direto um projeto.
 
 ## O projeto
 
-Cada projeto é uma pasta com o arquivo `produto.json`. A pasta pode ficar no Google Drive.
-Tudo o que você muda é gravado sozinho, menos de um segundo depois. O botão **Gravar
-revisão**, embaixo da barra lateral, guarda uma cópia que nunca muda em
-`revisoes/r0001.json`, `r0002.json` e assim por diante: use antes de cada portão.
+O app abre num projeto em branco, na **Visão geral**. Dá para montar à vontade e salvar
+depois: nada pede pasta nem nome antes.
 
-Na abertura, escreva o seu nome (ele vai no histórico e nas decisões), depois abra ou crie um
-projeto. Um projeto novo já vem com cinco fases: Ideia, Conceito, Projeto, Validação e
+- **Salvar** (Ctrl+S), na barra de cima, pergunta na primeira vez o nome do produto e onde
+  criar a pasta do projeto. Enquanto o projeto não foi salvo, a barra mostra "Não salvo".
+- Depois de salvo, o projeto é uma pasta com o arquivo `produto.json`. A pasta pode ficar no
+  Google Drive.
+- A chave **Salvamento automático**, no canto de cima à esquerda, fica ligada depois do
+  primeiro Salvar: tudo o que você muda é gravado sozinho, menos de dois segundos depois.
+  Desligada, o projeto grava só no Salvar, a barra mostra "Não salvo" enquanto houver mudança
+  e fechar pergunta antes. Ligar a chave num projeto que nunca foi salvo abre o Salvar. A
+  escolha fica guardada para cada projeto, neste computador. Com a chave desligada, o que as
+  outras pessoas gravaram só chega depois do seu Salvar.
+- **Salvar como…** (Ctrl+Shift+S) copia o projeto para outra pasta, com as revisões, os
+  relatórios e as assinaturas, e continua nela. A pasta antiga fica como estava.
+- Fechar a janela, começar outro projeto ou abrir um projeto com trabalho que ainda não foi
+  salvo pergunta antes: **Salvar**, **Não salvar** ou **Cancelar**.
+- O botão **Gravar revisão**, embaixo da barra lateral, guarda uma cópia que nunca muda em
+  `revisoes/r0001.json`, `r0002.json` e assim por diante: use antes de cada portão.
+
+O diário da equipe, as assinaturas, o relatório do portão e as revisões precisam da pasta:
+aparecem depois do primeiro Salvar. O seu nome (vai no histórico e nas decisões) vem do
+usuário do computador; troque no **Início**, onde também ficam "Abrir projeto" e os recentes.
+
+A **Visão geral** mostra os passos de quem monta um projeto, na ordem, com o que cada um já
+tem e um botão para ir: Requisitos, Casa da qualidade, Estrutura, Roteiros, Características,
+Para a simulação e Fases e portões. É ali também que se escreve o nome e a descrição do
+produto. Um projeto novo já vem com cinco fases: Ideia, Conceito, Projeto, Validação e
 Lançamento.
 
 ## Requisitos
 
-Cada requisito tem tipo (cliente, técnico, regulatório, segurança, qualidade), código
-automático (`RC-001`, `RT-001`...), prioridade, estado, fonte, descrição e critério de
-aceitação. Um requisito novo entra abaixo do escolhido, e o campo "Abaixo de" muda a
-hierarquia.
+Escolha o tipo, escreva o título e clique em Adicionar. O código é automático (`RC-001`,
+`RT-001`...). O editor mostra só o que faz sentido para o tipo, e cada campo explica o que é
+quando você passa o ponteiro:
+
+| Tipo | O que é | Campo próprio |
+|---|---|---|
+| Cliente | O que o cliente quer, nas palavras dele | **Quem pediu** |
+| Técnico | Como o produto atende um pedido, com número | **Atende a** (o requisito que ele traduz) |
+| Regulatório | O que uma norma ou lei exige | **Norma ou lei** |
+| Segurança | O que evita um perigo | **Perigo ou norma** |
+| Qualidade | Um nível de qualidade a manter | — |
+
+Todos têm título, prioridade, descrição, **Como saber que foi atendido** e **Situação**
+(rascunho, proposto, aprovado, implementado, verificado, rejeitado). Um requisito técnico novo
+entra abaixo do que estiver escolhido; os outros entram no topo.
 
 - **Especificações** dizem o requisito em número: alvo, LIE, LSE, unidade e, se quiser, a
   característica do produto ligada.
 - **Verificações** dizem como cada especificação se prova (teste, inspeção, análise,
   demonstração) e o resultado.
-- **Registrar alteração** sobe a versão e guarda quem, quando e o quê.
+- **Mais detalhes** guarda o que se usa menos: a posição na hierarquia ("Abaixo de"), a
+  origem e o histórico. **Registrar alteração** sobe a versão e guarda quem, quando e o quê.
+
+As especificações já vêm abertas nos tipos que pedem número (técnico, segurança, qualidade) e
+recolhidas como "Em números (opcional)" nos outros. As verificações abrem quando já existe
+alguma, ou no tipo regulatório, que pede evidência.
 
 Um requisito aprovado fica travado. Ele só muda por um **pedido de mudança**: abra o pedido,
-escreva o motivo e o impacto, marque os requisitos afetados e aprove. Aprovar sobe a versão
+escreva o motivo e o impacto, marque os requisitos afetados (só os já aprovados aparecem) e aprove. Aprovar sobe a versão
 de cada requisito marcado e volta cada um para "proposto", para ser revisto. Um pedido aberto
 ou rejeitado pode ser excluído (o primeiro clique pede confirmação); um aprovado fica, porque
 está no histórico dos requisitos que mudou.
@@ -194,7 +231,7 @@ digital com valor legal.
 
 ## Atalhos e exemplo
 
-- **Ctrl+S** grava agora; **Ctrl+Shift+S** grava uma revisão.
+- **Ctrl+S** salva; **Ctrl+Shift+S** é o Salvar como.
 - **Ctrl+1** a **Ctrl+9** trocam de tela, na ordem da barra lateral.
 - **Ctrl+Z** desfaz e **Ctrl+Y** (ou **Ctrl+Shift+Z**) refaz, até 50 passos; os botões
   Desfazer e Refazer ficam na barra de baixo. Dentro de um campo de texto, o Ctrl+Z é do campo.
