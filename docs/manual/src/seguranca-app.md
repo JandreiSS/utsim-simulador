@@ -20,7 +20,7 @@ A tela Inventário de riscos segue cinco etapas, inspiradas na lógica do gerenc
 2. **Levantar perigos.** Cada perigo tem grupo (físico, químico, biológico, ergonômico, acidente e mecânico), descrição, fonte, circunstância e possíveis lesões.
 3. **Avaliar riscos.** Informe os controles existentes, a probabilidade e a severidade. O nível sai da matriz e aparece com a cor dele. Passe o mouse sobre o nível para ver a decisão que a empresa definiu para ele.
 4. **Planejar ações.** Cada ação segue a hierarquia de controle, na ordem eliminar, substituir, controle de engenharia, controle administrativo e EPI. Informe o responsável, o prazo, a situação e se a ação foi eficaz.
-5. **Acompanhar.** Registre reavaliações com data, probabilidade, severidade e nota. O nível atual é o da última reavaliação.
+5. **Acompanhar.** Registre reavaliações com data, probabilidade, severidade e nota. O nível atual é o da última reavaliação. Depois de registrar, o formulário fica com os valores gravados e o botão desabilita, então um clique a mais não repete a reavaliação. Mude um campo para registrar outra. Cada reavaliação do histórico tem "Editar", que a traz ao formulário para corrigir, e "Remover", que pede confirmação.
 
 No alto da tela ficam os alertas em vermelho: os perigos acima do nível mais baixo que ainda não têm ação e as ações com prazo vencido.
 
@@ -38,7 +38,9 @@ A matriz padrão é uma grade própria de 5 por 5, com níveis baixo, médio, al
 
 Escolha um modelo e use "Rodar". A simulação roda em segundo plano e mostra, com média e intervalo de confiança, o tempo das pessoas em zonas de risco, as entradas sem o EPI pedido e os quase-conflitos entre pessoas e veículos. Tudo é simulado, serve para comparar layouts e não prevê acidentes.
 
-"Sugerir perigos" propõe um perigo para cada zona em que alguém de um posto esteve. Marque os que fizerem sentido e grave. Eles entram no inventário sem avaliação, e a probabilidade e a severidade ficam por sua conta. "Gravar HTML de exposição" escreve o relatório na pasta `relatorios/`.
+Num modelo com ponte rolante e pessoas, a tela mostra também o tempo e as entradas de cada pessoa sob a carga suspensa de cada ponte (a área quadrada embaixo do gancho enquanto há peça pendurada, campo `load_zone` da ponte). A meta é zero: qualquer tempo sob a carga aparece em vermelho, entra no relatório HTML e vira um perigo sugerido para o posto da ponte ou da pessoa.
+
+"Sugerir perigos" propõe um perigo para cada zona em que alguém de um posto esteve e para cada pessoa que ficou sob a carga suspensa de uma ponte. Marque os que fizerem sentido e grave. Eles entram no inventário sem avaliação, e a probabilidade e a severidade ficam por sua conta. "Gravar HTML de exposição" escreve o relatório na pasta `relatorios/`.
 
 ## Ergonomia
 
@@ -87,13 +89,15 @@ A tabela de dias debitados de norma técnica não é embutida: a empresa digita,
 
 ## Telas de checklist, EPI e incidentes
 
-A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item.
+A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item. Uma inspeção gravada por engano sai da lista com "Remover".
+
+Em todas as telas do app, remover pede confirmação: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para inspeções, EPI, incidentes, perigos e ações do inventário.
 
 A tela EPI cadastra o tipo, o uso, o número do certificado digitado, a validade e o intervalo de troca. Abaixo do cadastro ficam as pendências: o equipamento exigido num posto que não está no cadastro e o certificado vencido.
 
 A tela Incidentes tem quatro abas:
 
-- **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo.
+- **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo. "Remover", ao lado de "Editar", tira um registro feito por engano. As pessoas da pasta restrita continuam lá.
 - **Horas-homem** guarda as horas de exposição de cada mês.
 - **Indicadores** calcula as taxas do período escolhido, o Pareto de causas e de postos, os eventos por zona e a carta `u` das lesões por mês. Esta aba nunca mostra nomes.
 - **Pessoas (restrita)** cria a pasta restrita, cadastra pessoas e anonimiza. Cadastrar e anonimizar só aparecem para quem pode gravar na pasta restrita, e a anonimização pede uma segunda confirmação porque apaga o nome para sempre.

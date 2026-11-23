@@ -228,3 +228,56 @@ def ponte_rolante(detalhe=0):
         "cabo": [(0, "scale", 2, 0.0), (1, "scale", 2, CURSO_GANCHO / base)],
     })
     return e
+
+
+def controle_remoto(detalhe=0):
+    """Controle remoto (rádio) da ponte rolante, do tipo caixa de barriga: 0,26 × 0,15 × 0,08 m,
+    com dois manetes, botão de emergência, chave, antena e as alças laterais onde as mãos
+    seguram. Origem entre as duas mãos, no centro da caixa; `+x` é para a frente do operador.
+    Nós: `corpo` e `alca` (a correia que sobe pelos ombros e passa atrás do pescoço; quem
+    desenha pode esconder)."""
+    e = Elemento("controle_remoto", detalhe)
+    d = detalhe
+    e.material("preto", 0x17181A, 0.1, 0.6)
+    e.material("correia", 0x2B2D31, 0.0, 0.9)
+    lados = 10 if d else 6
+    e.no("corpo")
+    # Caixa amarela com a tampa preta dos comandos e o para-choque de borracha em volta.
+    e.caixa("corpo", "amarelo", (-0.075, -0.13, -0.04), (0.075, 0.13, 0.025), chanfro=None if d else 0)
+    e.caixa("corpo", "preto", (-0.068, -0.123, 0.025), (0.068, 0.123, 0.032), chanfro=0)
+    e.caixa("corpo", "borracha", (-0.08, -0.135, -0.012), (0.08, 0.135, 0.002), chanfro=0)
+    # Dois manetes (ponte e carro de um lado, gancho do outro), com a coifa de borracha.
+    for y in (-0.07, 0.07):
+        e.cilindro("corpo", "borracha", (0.0, y, 0.032), (0.0, y, 0.045), 0.024, lados, raio2=0.012)
+        e.cilindro("corpo", "aco", (0.0, y, 0.045), (0.008, y, 0.075), 0.006, 6)
+        e.cilindro("corpo", "preto", (0.008, y, 0.075), (0.008, y, 0.092), 0.012, lados)
+    # Botão de emergência (cogumelo vermelho), chave e três botões.
+    e.cilindro("corpo", "amarelo", (0.035, 0.0, 0.032), (0.035, 0.0, 0.040), 0.022, lados)
+    e.cilindro("corpo", "vermelho", (0.035, 0.0, 0.040), (0.035, 0.0, 0.058), 0.018, lados)
+    e.cilindro("corpo", "aco", (-0.04, 0.0, 0.032), (-0.04, 0.0, 0.044), 0.008, 6)
+    if d:
+        for k, cor in enumerate(("verde", "amarelo", "preto")):
+            y = -0.025 + k * 0.025
+            e.cilindro("corpo", cor, (-0.005, y, 0.032), (-0.005, y, 0.038), 0.007, 6)
+    # Antena curta e as alças laterais (o arco de proteção onde as mãos seguram).
+    e.cilindro("corpo", "preto", (0.06, 0.11, 0.025), (0.06, 0.11, 0.085), 0.006, 6)
+    for s in (-1, 1):
+        y = s * 0.13
+        for x in (-0.06, 0.06):
+            e.caixa("corpo", "aco_escuro", (x - 0.006, min(y, y + s * 0.03), 0.0), (x + 0.006, max(y, y + s * 0.03), 0.012), chanfro=0)
+        e.caixa("corpo", "aco_escuro", (-0.066, min(y + s * 0.024, y + s * 0.036), -0.002), (0.066, max(y + s * 0.024, y + s * 0.036), 0.014), chanfro=0)
+    # Correia: sobe pelo peito, passa por cima dos ombros e fecha atrás do pescoço.
+    e.no("alca")
+    linha = [(-0.075, 0.0), (-0.115, 0.30), (-0.19, 0.50), (-0.30, 0.47)]
+    esp = 0.006
+    for s in (-1, 1):
+        y = s * 0.10
+        for (xa, za), (xb, zb) in zip(linha, linha[1:]):
+            dx, dz = xb - xa, zb - za
+            n = (dx * dx + dz * dz) ** 0.5
+            ox, oz = -dz / n * esp / 2, dx / n * esp / 2
+            e.prisma("alca", "correia", [(xa + ox, za + oz), (xb + ox, zb + oz), (xb - ox, zb - oz), (xa - ox, za - oz)],
+                     y - 0.016, y + 0.016, eixo=1)
+    e.caixa("alca", "correia", (-0.303, -0.116, 0.454), (-0.297, 0.116, 0.486), chanfro=0)
+    e.dados = {"largura": 0.26, "pega": 0.32, "alca_altura": 0.50}
+    return e

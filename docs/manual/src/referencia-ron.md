@@ -157,6 +157,8 @@ Veja a seção "A distância importa?" em [Recursos móveis](recursos-moveis.md)
 | `release` | `Together` (ou `OneByOne(Dist)`: itens da chegada um a um, com esse intervalo) |
 | `item_type` | nenhum: nome de um tipo de `item_types` |
 | `item_type_mix` | `[]`: `[("nome", peso), ...]`, pesos >= 0 com ao menos um > 0; não junto com `item_type` |
+| `text_labels` | `{}`: mapa de nome para texto fixo (também nas linhas de `table` e em `item_types`) |
+| `label_exprs` | `{}`: mapa de nome para expressão, calculada na criação do item (`now`, `count`, `item`) |
 
 Períodos de `schedule`: `start` e `end` obrigatórios, `[start, end)` dentro de `[0, cycle]`, em ordem e sem sobreposição; `arrivals` é `Default` (padrão, igual ao `interarrival`), `Interarrival(Dist)`, `Rate(r)` (`r > 0` chegadas por unidade de tempo, Poisson) ou `Closed`; `labels` (padrão `{}`) substitui os rótulos de mesmo nome. Fora dos períodos não há chegadas. Veja [Objetos](objetos.md#chegadas-por-período-schedule).
 
@@ -169,6 +171,7 @@ Tabela `table`: `mode` é `Times` (padrão; cada linha tem `at`, em ordem não d
 | `capacity` | ilimitada (mínimo 1) |
 | `discipline` | `Fifo` (ou `Lifo`) |
 | `batch` | nenhum: `Batch(size: n, max_wait: t, flush: b)` com `max_wait` padrão `0.0` e `flush` padrão `false` |
+| `pick` | nenhuma: `ShortestProcess` (menor tempo pela `recipe` da máquina de saída) ou `LeastSetup` (menor troca pela `changeover`); não junto com `order` |
 | `order` | nenhuma: ordem por um rótulo numérico, `Desc("prioridade")` (maior primeiro) ou `Asc("prazo")` (menor primeiro). Tem precedência sobre `discipline` (não use com `Lifo`); empates e itens sem o rótulo ficam na ordem de chegada, os sem rótulo depois dos outros |
 | `patience` | nenhuma: ninguém desiste. `Some(Dist)`: paciência sorteada por item ao entrar; quem ainda estiver na fila quando ela acaba ganha o rótulo `abandonou = 1` e sai do modelo (`abandoned.count` e `abandon_wait` no relatório). Item já prometido a um transportador não desiste. Veja [Serviços e atendimento](linhas/servicos/index.md) |
 | `gather` | nenhum: `Some((group: "pedido", count: "linhas"))` segura os itens de mesmo valor do rótulo `group` até chegarem tantos quanto diz o rótulo `count` do primeiro, e solta um só item com os outros dentro (consolidação do pedido). Não combina com `batch` |
@@ -238,6 +241,7 @@ Sem campos. Escreva `kind: Sink`.
 | `load_zone` | `2.0` (metade do lado da área sob a carga, m) |
 | `operator` | `Cabin` (ou `Pendant(team: ...)`, `Radio(team: ...)`) |
 | `bridge_gap` | `3.0` (m entre os ganchos de duas pontes no mesmo caminho) |
+| `keep_clear` | `false` (com `true`, as pessoas não passam no caminho da carga) |
 
 Precisa de `size` (curso da ponte, vão, altura útil). Veja [Ponte rolante](ponte-rolante.md).
 

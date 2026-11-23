@@ -2,6 +2,7 @@
 //! model or a custom table, and what happens at the end of a shift) and the model's
 //! "Calendários" section, shown with the run settings.
 
+use crate::texto::{dx, fx, tx, vx};
 use bevy_egui::egui::{self, Id, Ui};
 use utsim_core::{OffWindow, ShiftEnd, ShiftTable};
 use utsim_edit::{Command, Document};
@@ -10,25 +11,24 @@ use utsim_model::ShiftSpec;
 use super::panel::{Editor, RED, clear_temp, labeled_float, set_temp, temp};
 use super::ron_text as ron;
 
-/// `(value, label, hover)` of the end-of-shift choices.
+/// `(value, label key, hover key)` of the end-of-shift choices.
 const ENDS: [(ShiftEnd, &str, &str); 2] = [
     (
         ShiftEnd::Pause,
-        "Pausar",
-        "O trabalho em andamento congela no fim do turno e continua quando o turno volta",
+        "prop-turno-pausar",
+        "prop-turno-pausar-dica",
     ),
     (
         ShiftEnd::Finish,
-        "Terminar",
-        "No fim do turno o objeto não aceita itens novos, termina o item em andamento \
-         (hora extra) e só então sai de turno; o turno seguinte começa na hora de sempre",
+        "prop-turno-terminar",
+        "prop-turno-terminar-dica",
     ),
 ];
 
 fn end_label(end: ShiftEnd) -> &'static str {
     ENDS.iter()
         .find(|(e, ..)| *e == end)
-        .map_or("", |(_, l, _)| l)
+        .map_or("", |(_, l, _)| tx(l))
 }
 
 /// "Ao fim do turno" combo. `inherit` adds the calendar's own choice as the first
@@ -42,21 +42,27 @@ fn end_combo(
     let mut picked = current;
     let shown = match (current, inherit) {
         (Some(e), _) => end_label(e).to_string(),
-        (None, Some(e)) => format!("como no calendário ({})", end_label(e).to_lowercase()),
+        (None, Some(e)) => fx(
+            "prop-shifts-ui-como_no_calendario",
+            &[("to_lowercase", vx(&end_label(e).to_lowercase()))],
+        ),
         (None, None) => end_label(ShiftEnd::Pause).to_string(),
     };
     ui.horizontal(|ui| {
-        ui.label("Ao fim do turno");
+        ui.label(tx("prop-shifts-ui-ao_fim_do_turno"));
         egui::ComboBox::from_id_salt(id)
             .selected_text(shown)
             .show_ui(ui, |ui| {
                 if let Some(e) = inherit {
-                    let text = format!("como no calendário ({})", end_label(e).to_lowercase());
+                    let text = fx(
+                        "prop-shifts-ui-como_no_calendario",
+                        &[("to_lowercase", vx(&end_label(e).to_lowercase()))],
+                    );
                     ui.selectable_value(&mut picked, None, text);
                 }
                 for (e, label, hover) in ENDS {
-                    ui.selectable_value(&mut picked, Some(e), label)
-                        .on_hover_text(hover);
+                    ui.selectable_value(&mut picked, Some(e), tx(label))
+                        .on_hover_text(tx(hover));
                 }
             });
     });
@@ -68,14 +74,29 @@ fn end_combo(
 fn windows_editor(ui: &mut Ui, id: Id, t: &mut ShiftTable) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
-        changed |= labeled_float(ui, id.with("period"), "período", &mut t.period);
+        changed |= labeled_float(
+            ui,
+            id.with("period"),
+            tx("prop-shifts-ui-periodo"),
+            &mut t.period,
+        );
     });
     let mut remove = None;
     for (i, w) in t.off.iter_mut().enumerate() {
         ui.horizontal(|ui| {
-            changed |= labeled_float(ui, id.with(("s", i)), "início", &mut w.start);
-            changed |= labeled_float(ui, id.with(("d", i)), "duração", &mut w.duration);
-            if ui.small_button("remover").clicked() {
+            changed |= labeled_float(
+                ui,
+                id.with(("s", i)),
+                tx("prop-shifts-ui-inicio"),
+                &mut w.start,
+            );
+            changed |= labeled_float(
+                ui,
+                id.with(("d", i)),
+                tx("prop-shifts-ui-duracao"),
+                &mut w.duration,
+            );
+            if ui.small_button(tx("prop-shifts-ui-remover")).clicked() {
                 remove = Some(i);
             }
         });
@@ -84,7 +105,10 @@ fn windows_editor(ui: &mut Ui, id: Id, t: &mut ShiftTable) -> bool {
         t.off.remove(i);
         changed = true;
     }
-    if ui.small_button("adicionar janela").clicked() {
+    if ui
+        .small_button(tx("prop-shifts-ui-adicionar_janela"))
+        .clicked()
+    {
         let start = t.off.last().map_or(0.0, |w| w.start + w.duration);
         let duration = ((t.period - start) / 2.0).max(0.0);
         t.off.push(OffWindow { start, duration });
@@ -98,9 +122,12 @@ fn table_info(ui: &mut Ui, t: &ShiftTable) {
     match t.validate() {
         Ok(()) => {
             // `+ 0.0` turns -0.0 into 0.0 ("fora de turno: -0,0%" in the pilot).
-            ui.weak(format!(
-                "fora de turno: {:.1}% do período",
-                100.0 * t.off_fraction() + 0.0
+            ui.weak(fx(
+                "prop-shifts-ui-fora_de_turno_do_periodo",
+                &[(
+                    "off_fraction",
+                    dx(format!("{:.1}", 100.0 * t.off_fraction() + 0.0)),
+                )],
             ));
         }
         Err(e) => {
@@ -137,7 +164,7 @@ impl Editor<'_> {
         let calendars: Vec<String> = self.doc.model().calendars.keys().cloned().collect();
         let mut on = current.is_some();
         if ui
-            .checkbox(&mut on, "Turnos (janelas fora de turno)")
+            .checkbox(&mut on, tx("prop-shifts-ui-turnos_janelas_fora_de_turno"))
             .changed()
         {
             let text = match (on, calendars.first()) {
@@ -154,21 +181,24 @@ impl Editor<'_> {
                 let has = !calendars.is_empty();
                 let r = ui.add_enabled(
                     has,
-                    egui::RadioButton::new(using.is_some(), "usar calendário"),
+                    egui::RadioButton::new(using.is_some(), tx("prop-shifts-ui-usar_calendario")),
                 );
                 let r = if has {
                     r
                 } else {
-                    r.on_disabled_hover_text(
-                        "Crie calendários na seção Calendários do painel Simulação \
-                         (clique num ponto vazio da cena)",
-                    )
+                    r.on_disabled_hover_text(tx(
+                        "prop-shifts-ui-crie_calendarios_na_secao_calendarios",
+                    ))
                 };
                 if r.clicked() && using.is_none() {
                     let spec = ShiftSpec::calendar(calendars[0].clone());
                     self.set(field, ron::shift_spec(&spec));
                 }
-                if ui.radio(using.is_none(), "personalizado").clicked() && using.is_some() {
+                if ui
+                    .radio(using.is_none(), tx("prop-shifts-ui-personalizado"))
+                    .clicked()
+                    && using.is_some()
+                {
                     // Start the custom table from the calendar it used.
                     let table = match spec {
                         ShiftSpec::Calendar { name, on_end } => {
@@ -208,10 +238,12 @@ impl Editor<'_> {
                     }
                     match self.doc.model().calendars.get(name) {
                         Some(t) => {
-                            ui.weak(format!(
-                                "período {}, {} janela(s) fora de turno",
-                                ron::float(t.period),
-                                t.off.len()
+                            ui.weak(fx(
+                                "prop-shifts-ui-periodo_janela_s_fora_de",
+                                &[
+                                    ("period", vx(&ron::float(t.period))),
+                                    ("off", vx(&t.off.len())),
+                                ],
                             ));
                             table_info(ui, t);
                             if let Some(new) =
@@ -225,7 +257,13 @@ impl Editor<'_> {
                             }
                         }
                         None => {
-                            ui.colored_label(RED, format!("o calendário '{name}' não existe"));
+                            ui.colored_label(
+                                RED,
+                                fx(
+                                    "prop-shifts-ui-o_calendario_nao_existe",
+                                    &[("name", vx(&name))],
+                                ),
+                            );
                         }
                     }
                 }
@@ -254,7 +292,7 @@ impl Editor<'_> {
             let mut name = temp::<String>(ui, name_id).unwrap_or_default();
             let r = ui.add(
                 egui::TextEdit::singleline(&mut name)
-                    .hint_text("nome do calendário")
+                    .hint_text(tx("prop-shifts-ui-nome_do_calendario"))
                     .desired_width(120.0),
             );
             if r.changed() {
@@ -263,8 +301,11 @@ impl Editor<'_> {
             let name = name.trim().to_string();
             let free = !name.is_empty() && !self.doc.model().calendars.contains_key(&name);
             if ui
-                .add_enabled(free, egui::Button::new("salvar como calendário"))
-                .on_hover_text("Outros objetos podem usar o mesmo calendário")
+                .add_enabled(
+                    free,
+                    egui::Button::new(tx("prop-shifts-ui-salvar_como_calendario")),
+                )
+                .on_hover_text(tx("prop-shifts-ui-outros_objetos_podem_usar_o"))
                 .clicked()
             {
                 let spec = ShiftSpec::calendar(name.clone());
@@ -288,70 +329,69 @@ impl Editor<'_> {
 pub fn calendars_section(ui: &mut Ui, doc: &Document) -> Vec<Command> {
     let mut out = Vec::new();
     let model = doc.model();
-    egui::CollapsingHeader::new(format!("Calendários ({})", model.calendars.len()))
-        .id_salt("utsim-calendarios")
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.weak(
-                "Tabelas de turno com nome. Um objeto usa uma delas em Turnos > usar \
-                 calendário; mudar o calendário muda todos os objetos que o usam.",
-            );
-            for (name, table) in &model.calendars {
-                let users: Vec<&str> = model
-                    .objects
-                    .iter()
-                    .filter(|o| o.shifts.as_ref().and_then(ShiftSpec::calendar_name) == Some(name))
-                    .map(|o| o.name.as_str())
-                    .collect();
-                let id = Id::new(("utsim-calendario", name));
-                egui::CollapsingHeader::new(name)
-                    .id_salt(id)
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        rename_calendar(ui, doc, id, name, table, &mut out);
-                        let mut t = table.clone();
-                        let mut changed = windows_editor(ui, id, &mut t);
-                        table_info(ui, table);
-                        if let Some(Some(e)) =
-                            end_combo(ui, id.with("end"), Some(table.on_end), None)
-                        {
-                            t.on_end = e;
-                            changed = true;
-                        }
-                        if changed {
-                            out.push(Command::Set {
-                                key: format!("calendars.{name}"),
-                                value: ron::shifts(&t),
-                            });
-                        }
-                        if users.is_empty() {
-                            ui.weak("nenhum objeto usa este calendário");
-                        } else {
-                            ui.weak(format!("usado por: {}", users.join(", ")));
-                        }
-                        let r = ui.add_enabled(
-                            users.is_empty(),
-                            egui::Button::new("remover calendário"),
-                        );
-                        if !users.is_empty() {
-                            r.on_disabled_hover_text(
-                                "Troque os objetos para outro calendário ou para personalizado antes",
-                            );
-                        } else if r.clicked() {
-                            out.push(Command::Set {
-                                key: format!("calendars.{name}"),
-                                value: "None".into(),
-                            });
-                        }
-                    });
-            }
-            if ui.button("novo calendário").clicked() {
-                out.push(Command::Set {
-                    key: format!("calendars.{}", free_name(doc, "turno")),
-                    value: ron::shifts(&default_table()),
+    egui::CollapsingHeader::new(fx(
+        "prop-shifts-ui-calendarios",
+        &[("calendars", vx(&model.calendars.len()))],
+    ))
+    .id_salt("utsim-calendarios")
+    .default_open(true)
+    .show(ui, |ui| {
+        ui.weak(tx("prop-shifts-ui-tabelas_de_turno_com_nome"));
+        for (name, table) in &model.calendars {
+            let users: Vec<&str> = model
+                .objects
+                .iter()
+                .filter(|o| o.shifts.as_ref().and_then(ShiftSpec::calendar_name) == Some(name))
+                .map(|o| o.name.as_str())
+                .collect();
+            let id = Id::new(("utsim-calendario", name));
+            egui::CollapsingHeader::new(name)
+                .id_salt(id)
+                .default_open(true)
+                .show(ui, |ui| {
+                    rename_calendar(ui, doc, id, name, table, &mut out);
+                    let mut t = table.clone();
+                    let mut changed = windows_editor(ui, id, &mut t);
+                    table_info(ui, table);
+                    if let Some(Some(e)) = end_combo(ui, id.with("end"), Some(table.on_end), None) {
+                        t.on_end = e;
+                        changed = true;
+                    }
+                    if changed {
+                        out.push(Command::Set {
+                            key: format!("calendars.{name}"),
+                            value: ron::shifts(&t),
+                        });
+                    }
+                    if users.is_empty() {
+                        ui.weak(tx("prop-shifts-ui-nenhum_objeto_usa_este_calendario"));
+                    } else {
+                        ui.weak(fx(
+                            "prop-shifts-ui-usado_por",
+                            &[("users", vx(&users.join(", ")))],
+                        ));
+                    }
+                    let r = ui.add_enabled(
+                        users.is_empty(),
+                        egui::Button::new(tx("prop-shifts-ui-remover_calendario")),
+                    );
+                    if !users.is_empty() {
+                        r.on_disabled_hover_text(tx("prop-shifts-ui-troque_os_objetos_para_outro"));
+                    } else if r.clicked() {
+                        out.push(Command::Set {
+                            key: format!("calendars.{name}"),
+                            value: "None".into(),
+                        });
+                    }
                 });
-            }
-        });
+        }
+        if ui.button(tx("prop-shifts-ui-novo_calendario")).clicked() {
+            out.push(Command::Set {
+                key: format!("calendars.{}", free_name(doc, "turno")),
+                value: ron::shifts(&default_table()),
+            });
+        }
+    });
     out
 }
 
@@ -367,15 +407,18 @@ fn rename_calendar(
     let check = |t: &str| {
         let t = t.trim();
         if t.is_empty() {
-            Err("o nome não pode ficar vazio".to_string())
+            Err(tx("prop-shifts-ui-o_nome_nao_pode_ficar").to_string())
         } else if t != name && doc.model().calendars.contains_key(t) {
-            Err(format!("já existe um calendário chamado \"{t}\""))
+            Err(fx(
+                "prop-shifts-ui-ja_existe_um_calendario_chamado",
+                &[("t", vx(&t))],
+            ))
         } else {
             Ok(())
         }
     };
     ui.horizontal(|ui| {
-        ui.label("Nome");
+        ui.label(tx("prop-shifts-ui-nome"));
         let Some(new) = super::panel::text_commit(ui, id.with("name"), name, false, &check) else {
             return;
         };

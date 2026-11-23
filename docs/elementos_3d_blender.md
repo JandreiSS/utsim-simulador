@@ -31,7 +31,7 @@ Com `UTSIM_BLENDER=1`, o `scripts/verificar.sh` gera tudo de novo e falha se alg
   clipes (em laço ou não, e os nós que movem) e as medidas que a ponte usa (`dados`).
 
 Sem compressão Draco ou meshopt: o `GLTFDocument` do Godot não as lê. A leveza vem do
-nível de detalhe baixo e de malhas sem textura (cerca de 1,4 MB para os 28 arquivos).
+nível de detalhe baixo e de malhas sem textura (menos de 3 MB para todos os elementos, sem contar as pessoas).
 
 ## Convenções
 
@@ -306,6 +306,25 @@ os clipes corrigidos, com os mesmos nomes de nó e de clipe.
   `ponto_porta` continua 0,6 m além. Na prensa o operador fica no centro, de frente para a
   mesa, porque o painel fica junto da saída da peça.
 
+## Forno de padaria (`forno.glb`)
+
+Forno rotativo de padaria, de 1,5 × 1,3 × 2,1 m, mais a coifa e a chaminé
+(`forno` em `tools/blender/elementos/maquinas.py`). É uma máquina como o `cnc`: tem os mesmos
+pontos, clipes e estados, e pode entrar no lugar dele sem ajuste na cena.
+
+- Nós: `chassi`, `porta` (de vidro, com dobradiça vertical na aresta esquerda), `carrinho` (o
+  carrinho de assadeiras com os pães), `tampa` (manutenção do queimador, no lado `+x`) e `luz`.
+- Pontos: os cinco das máquinas e `ponto_puxador`, filho da `porta`, no meio do puxador.
+  `ponto_peca` é filho do `carrinho` e fica na assadeira vazia do meio, no eixo dele: a peça gira
+  no lugar enquanto assa. `ponto_entrada` e `ponto_saida` ficam na frente, um de cada lado da porta.
+- Clipes: `ciclo` (o carrinho dá duas voltas em z), `porta_abrir` (a porta gira `dados.porta_giro`
+  graus em z, para fora), `setup` (o carrinho vai a um quarto de volta e retorna), `quebra` (a
+  tampa do queimador abre) e `ciclo_auto`.
+- O operador fica no painel, à direita da porta, fora do arco em que ela abre.
+- `dados`: `porta_giro` (−95), `camara` e `carrinho` (`[x, y, z]`, em metros).
+
+O teste `o_forno_abre_a_porta_para_fora_e_gira_o_carrinho` confere a porta, o operador e a peça.
+
 ## Ponte rolante (`ponte_rolante.glb`)
 
 Ponte rolante birrail sobre caminho de rolamento em colunas (`tools/blender/elementos/ponte.py`).
@@ -353,6 +372,23 @@ ponte em `x`, o carro em `y` e o gancho na altura `h`, `ponte` vai para `x`, `ca
 (dentro de `ponte`), `gancho` desce `gancho_repouso - h`, e o `cabo` ganha esse mesmo comprimento.
 
 O teste `a_ponte_rolante_anda_nos_tres_eixos` confere os três movimentos e os cursos.
+
+### Controle remoto (`controle_remoto.glb`)
+
+O rádio de quem opera a ponte rolante a pé, do tipo caixa de barriga
+(`controle_remoto` em `tools/blender/elementos/ponte.py`): caixa amarela de 0,26 × 0,15 × 0,08 m,
+dois manetes, botão de emergência, chave, antena e as alças laterais onde as mãos seguram.
+
+- Origem entre as duas mãos, no centro da caixa. `+x` é a frente do operador e `z` é para cima.
+  Não fica no piso: o `minimo` é negativo em z.
+- Nós: `corpo` e `alca`. A `alca` é a correia, que sobe pelo peito e fecha atrás do pescoço,
+  0,50 m acima e 0,30 m atrás da origem; serve para o corpo padrão e pode ser escondida.
+- `dados.pega` = 0,32 (a distância entre as alças laterais, perto dos 0,45 m entre os pulsos no
+  clipe de segurar carga), `dados.largura` = 0,26 e `dados.alca_altura` = 0,50.
+- Como usar: no ponto médio das mãos da pessoa, girado com ela, com os braços do clipe
+  `Walk_Carry_Loop` (o mesmo de quem está parado com carga).
+
+O teste `o_controle_remoto_cabe_nas_maos` confere a origem, a pega e a altura da correia.
 
 ## Peças da esteira por trajeto
 

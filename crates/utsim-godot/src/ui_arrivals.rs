@@ -358,6 +358,7 @@ pub fn add_row(t: &ArrivalTable, default: &Dist) -> ArrivalTable {
         count: 1,
         item_type: last.and_then(|r| r.item_type.clone()),
         labels: BTreeMap::new(),
+        text_labels: BTreeMap::new(),
     });
     out
 }
@@ -530,6 +531,7 @@ pub fn parse_paste(
             count: 1,
             item_type: None,
             labels: BTreeMap::new(),
+            text_labels: BTreeMap::new(),
         };
         let mut slot = 0;
         for (k, cell) in cells(line).into_iter().enumerate() {
@@ -2043,6 +2045,7 @@ mod tests {
             count,
             item_type: ty.map(str::to_string),
             labels: BTreeMap::new(),
+            text_labels: BTreeMap::new(),
         }
     }
 

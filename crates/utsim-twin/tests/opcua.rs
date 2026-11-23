@@ -3,6 +3,11 @@
 //! the twin's OPC UA client subscribes to its nodes, uses `TempoSimulado` as the clock
 //! and must raise a deviation alert on the machine. The session is recorded and the
 //! replay gives the same report.
+//!
+//! The factory's clock starts only once the twin is subscribed: at speed 250 a second of
+//! connection (the client makes its key pair, then the session) is 250 simulated
+//! seconds, and a twin that joined late saw the first windows empty and the deviation
+//! after window 5 (the test failed under load and passed on the retry).
 
 mod common;
 
@@ -28,6 +33,7 @@ fn deviation_from_the_synthetic_factory_over_opcua() {
     // The plant: cycle 0.85 instead of the model's 0.6.
     let stop_plant = Arc::new(AtomicBool::new(false));
     let (tx, rx) = channel::<String>();
+    let (go_tx, go) = channel::<()>();
     let stop2 = stop_plant.clone();
     let factory = std::thread::spawn(move || {
         let plant = common::model(0.85, 1e9);
@@ -35,6 +41,10 @@ fn deviation_from_the_synthetic_factory_over_opcua() {
         let names = emu.block_names().to_vec();
         let mut fe = OpcUaFrontend::start("linha", &names, 0, 250.0).unwrap();
         tx.send(fe.endpoint().to_string()).unwrap();
+        // Time 0 is published; the clock waits for the twin's subscription.
+        if go.recv().is_err() {
+            return;
+        }
         let opts = RunOptions {
             speed: 250.0,
             tick: Duration::from_millis(20),
@@ -63,6 +73,18 @@ fn deviation_from_the_synthetic_factory_over_opcua() {
     let recorder = Recorder::start(&dir, &header).unwrap();
     let cancel = Arc::new(AtomicBool::new(false));
     let started = live::start(utsim_twin::connect::build(&cfg).unwrap(), &cancel).unwrap();
+    // The connector reports `conectado` after the monitored items are created.
+    let health = started.health[0].1.clone();
+    let asked = std::time::Instant::now();
+    while !health.lock().unwrap().conectado {
+        assert!(
+            asked.elapsed() < Duration::from_secs(60),
+            "o gêmeo não assinou a fábrica: {:?}",
+            health.lock().unwrap()
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    go_tx.send(()).unwrap();
     let shared = Shared {
         health: started.health.clone(),
         twin: Mutex::new(

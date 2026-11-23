@@ -195,6 +195,27 @@ O exemplo `examples/chegadas_por_tabela.ron` junta os três jeitos: um horário 
 
 Nos experimentos, as chaves `pedidos.table`, `pedidos.table.rows[n]` e `pedidos.table.rows[n].<campo>` (`at`, `count`, `labels`, `labels.<nome>`) mudam a tabela; por exemplo `"pedidos.table.rows[1].count": "15"`.
 
+### Rótulos de texto e calculados na criação
+
+Os `labels` da fonte são números sorteados. Dois campos dão outros rótulos aos itens:
+
+- `text_labels` (`rotulos_texto`): textos fixos, como `{"cliente": "Loja 12", "origem": "doca"}`.
+  Valem na fonte, em cada linha da tabela e em cada tipo de `item_types`. Servem para
+  relatórios, para a etiqueta no 3D e para escolher a saída num script
+  (`item.cliente == "Loja 12"`), não para contas.
+- `label_exprs` (`rotulos_expr`): rótulos calculados quando o item é criado, por uma expressão,
+  como `{"prazo": "now + 480", "seq": "count"}`. A expressão vê `now` (o instante), `count`
+  (quantos itens a fonte já criou, este incluído) e `item` (os rótulos que ele já tem). As
+  funções de sorteio dos scripts (`uniform`, `exponential`, `normal`, `triangular`, `random`)
+  usam a sequência aleatória da fonte, e a rodada continua reprodutível. O resultado é um
+  número ou um texto.
+
+A ordem de aplicação é: rótulos do tipo, `labels` da fonte, `text_labels` da fonte, rótulos
+da linha da tabela e, por último, `label_exprs`, em ordem alfabética do nome. Cada etapa
+substitui o rótulo de mesmo nome da anterior, e uma expressão vê as que vieram antes dela. O
+`utsim check` mostra os dois campos na linha `chegadas:` da fonte, e uma expressão que não
+compila é erro de validação com o nome do campo.
+
 ## Queue (Fila)
 
 Guarda itens enquanto o próximo objeto não está pronto.
@@ -227,6 +248,19 @@ Na interface 3D a Queue se chama **Espera**: há um só item na Biblioteca (os n
 | Prioridade: menor rótulo primeiro (prazo) | `order: Some(Asc("prazo"))` |
 
 Com prioridade aparece o campo **Rótulo da prioridade**, o nome do rótulo lido em cada item; empates e itens sem o rótulo saem na ordem de chegada. LIFO e `order` nunca vão juntos: escolher uma política limpa a outra. O arquivo `.ron` não muda de formato, e um modelo antigo com uma pilha abre como Espera LIFO (na cena o rótulo diz `· LIFO`).
+
+#### Despacho pela máquina (`pick`)
+
+Duas regras de despacho olham a máquina que a fila alimenta:
+
+| Regra | No arquivo | De onde vem o tempo |
+|---|---|---|
+| Menor tempo de processamento primeiro (SPT) | `pick: Some(ShortestProcess)` (`MenorTempo`) | a média do tempo da receita (`recipe`) do produto de cada item; produtos sem receita usam a média do `process` |
+| Menor setup primeiro | `pick: Some(LeastSetup)` (`MenorSetup`) | a média do tempo da troca (`changeover`) do produto que a fila mandou por último para o produto de cada item; o mesmo produto vem primeiro (sem troca), e trocas fora da matriz usam a média do `setup` |
+
+A fila usa a primeira máquina de saída que tem a receita (ou a matriz). Sem ela, o modelo é recusado com uma mensagem que diz o que falta. Empates saem na ordem de chegada. `pick` não vai junto com `order`. O `utsim check` mostra, na linha `despacho:`, a máquina e os tempos que cada fila usa.
+
+O menor setup é uma regra gulosa: escolhe a próxima peça pela troca mais rápida agora, sem planejar a sequência inteira. Ela funciona melhor com a fila alimentando uma máquina só. Para prioridade e data de entrega, use `order` (acima). Para um tempo de processamento que não vem de receita, calcule um rótulo na criação (`label_exprs`) e use `order: Some(Asc(...))`.
 
 ### Espera real (`waiting_area`)
 
