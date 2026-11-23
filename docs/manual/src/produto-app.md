@@ -27,7 +27,7 @@ depois: nada pede pasta nem nome antes.
   relatórios e as assinaturas, e continua nela. A pasta antiga fica como estava.
 - Fechar a janela, começar outro projeto ou abrir um projeto com trabalho que ainda não foi
   salvo pergunta antes: **Salvar**, **Não salvar** ou **Cancelar**.
-- O botão **Gravar revisão**, embaixo da barra lateral, guarda uma cópia que nunca muda em
+- O botão **Gravar revisão** (Ctrl+R), embaixo da barra lateral, guarda uma cópia que nunca muda em
   `revisoes/r0001.json`, `r0002.json` e assim por diante: use antes de cada portão.
 
 O diário da equipe, as assinaturas, o relatório do portão e as revisões precisam da pasta:
@@ -118,10 +118,21 @@ Arraste uma fase que ainda não começou para mudar a ordem.
 
 Um projeto novo escolhe o modelo de fases: o padrão ou o **APQP** (planejar e definir,
 projeto do produto, projeto do processo, validação do produto e do processo, retroalimentação
-e melhoria), cada fase com o seu checklist. Antes da primeira decisão de portão dá para trocar
-de modelo na própria tela. Cada fase tem entregas, checklist e aprovadores, que você pode
-mudar à vontade, inclusive criar e tirar fases. No portão da fase atual, o app lista o que falta. Com tudo pronto, a
-decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
+e melhoria), cada fase com o seu checklist.
+
+O detalhe da fase segue o caminho de quem conduz o portão, em quatro passos:
+
+1. **O que entregar**: os documentos, protótipos ou relatórios da fase. Marque cada um quando
+   estiver pronto.
+2. **O que conferir**: o checklist, as perguntas que precisam de "sim" antes de seguir.
+3. **Quem aprova**: as pessoas ou áreas que precisam concordar. Quem aprova marca "aprovou" e
+   pode assinar.
+4. **Decidir no portão**: à direita, o app lista o que falta e mostra as quatro saídas. Cada
+   botão explica o que faz quando você passa o ponteiro.
+
+Em **Mais detalhes** ficam as datas previstas, a troca do modelo de fases (antes da primeira
+decisão de portão) e **Excluir fase**. O botão **+ Nova fase** fica acima do detalhe. Com tudo
+pronto, a decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
 volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
 quem e a justificativa. Um projeto parado (ou concluído) volta com **Reabrir o projeto**, na
 fase em que estava, e a reabertura também entra na linha do tempo.
@@ -129,7 +140,7 @@ fase em que estava, e a reabertura também entra na linha do tempo.
 Só sai uma fase que ainda não começou e não tem decisão registrada. As decisões e as
 assinaturas das outras fases continuam nas suas fases quando uma fase sai ou muda de lugar.
 
-O botão **Relatório do portão**, embaixo de cada fase, grava o relatório daquela fase na
+O botão **Relatório do portão**, ao lado do portão de cada fase, grava o relatório daquela fase na
 pasta `relatorios` do projeto, em HTML (abre no navegador) e em PDF: objetivo e datas, o que
 ainda falta no portão, as entregas, o checklist, os aprovadores com a situação da assinatura,
 as decisões tomadas naquele portão e uma linha por aprovador para assinar no papel. Cada
@@ -147,7 +158,15 @@ A demanda diz quanto de cada variante entra na simulação.
 
 Nos **Roteiros**, cada item tem as operações em ordem, com o recurso (o posto ou a máquina),
 a capacidade, o tempo de processo e o setup como distribuição. Uma operação pode ter tempo
-próprio em uma variante.
+próprio em uma variante. Cada operação tem o título no topo e, à direita, o **Excluir
+operação**, que pede confirmação ali mesmo.
+
+Na Estrutura, o editor do item mostra nome, tipo e unidade; o código e a cor no 3D ficam em
+**Mais detalhes**.
+
+Em todas as telas vale o mesmo: o botão que cria começa com **+**, o que apaga se chama
+**Excluir** e pede confirmação no lugar, e o rótulo de cada campo explica o que é quando você
+passa o ponteiro.
 
 Nas **Características**, cada medida tem nominal, LIE, LSE, unidade, classe e a operação onde
 nasce. O desvio é o do processo esperado; zero quer dizer um oitavo da tolerância (Cp 1,33).
@@ -231,7 +250,7 @@ digital com valor legal.
 
 ## Atalhos e exemplo
 
-- **Ctrl+S** salva; **Ctrl+Shift+S** é o Salvar como.
+- **Ctrl+S** salva; **Ctrl+Shift+S** é o Salvar como; **Ctrl+R** grava uma revisão.
 - **Ctrl+1** a **Ctrl+9** trocam de tela, na ordem da barra lateral.
 - **Ctrl+Z** desfaz e **Ctrl+Y** (ou **Ctrl+Shift+Z**) refaz, até 50 passos; os botões
   Desfazer e Refazer ficam na barra de baixo. Dentro de um campo de texto, o Ctrl+Z é do campo.
