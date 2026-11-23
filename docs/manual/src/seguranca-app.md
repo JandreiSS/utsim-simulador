@@ -20,7 +20,7 @@ A tela Inventário de riscos segue cinco etapas, inspiradas na lógica do gerenc
 2. **Levantar perigos.** Cada perigo tem grupo (físico, químico, biológico, ergonômico, acidente e mecânico), descrição, fonte, circunstância e possíveis lesões.
 3. **Avaliar riscos.** Informe os controles existentes, a probabilidade e a severidade. O nível sai da matriz e aparece com a cor dele. Passe o mouse sobre o nível para ver a decisão que a empresa definiu para ele.
 4. **Planejar ações.** Cada ação segue a hierarquia de controle, na ordem eliminar, substituir, controle de engenharia, controle administrativo e EPI. Informe o responsável, o prazo, a situação e se a ação foi eficaz.
-5. **Acompanhar.** Registre reavaliações com data, probabilidade, severidade e nota. O nível atual é o da última reavaliação.
+5. **Acompanhar.** Registre reavaliações com data, probabilidade, severidade e nota. O nível atual é o da última reavaliação. Depois de registrar, o formulário fica com os valores gravados e o botão desabilita, então um clique a mais não repete a reavaliação. Mude um campo para registrar outra. Cada reavaliação do histórico tem "Editar", que a traz ao formulário para corrigir, e "Remover", que pede confirmação.
 
 No alto da tela ficam os alertas em vermelho: os perigos acima do nível mais baixo que ainda não têm ação e as ações com prazo vencido.
 
