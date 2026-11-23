@@ -10,7 +10,7 @@ As normas aparecem aqui só pelo número e pelo tema, para situar o assunto. O p
 
 ## Pasta de unidade e postos
 
-A pasta de unidade e a tela Postos são as mesmas do [UTSim Qualidade](qualidade-app.md), e os dois aplicativos podem abrir a mesma pasta. Veja lá como criar a unidade, cadastrar os postos e importá-los de um modelo.
+A pasta de unidade e a tela Postos são as mesmas do [UTSim Qualidade](qualidade-app.md), e os dois aplicativos podem abrir a mesma pasta. Veja lá como a unidade começa sem pasta e é salva depois (Salvar, Salvar como e a chave "Salvamento automático", no canto de cima à esquerda), como cadastrar os postos e como importá-los de um modelo. A pasta restrita dos dados pessoais só pode ser criada depois que a unidade foi salva numa pasta, porque fica junto dela.
 
 ## Inventário de riscos por posto
 

@@ -124,4 +124,4 @@ com o seu intervalo de confiança.
 - Ligue o horário comercial e veja quanto do lead time é noite e fim de semana.
 - Teste só uma mudança por vez, para saber quanto cada uma vale.
 - Dê aos analistas a [multitarefa](multitarefa.md) e veja o efeito das trocas.
-- Leve o estudo ao UTSim Seis Sigma com o `--json` do relatório.
+- Leve o estudo ao UTSim LSS com o `--json` do relatório.

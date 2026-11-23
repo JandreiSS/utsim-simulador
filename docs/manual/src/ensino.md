@@ -2,7 +2,7 @@
 
 O UTSim Ensino é o app de ensino da família UTSim. O aluno aprende engenharia de produção resolvendo problemas de uma fábrica simulada: lê a situação, faz uma previsão, decide dentro do orçamento e manda simular. A nota vem da própria simulação, com replicações e intervalo de confiança. Ninguém digita gabarito.
 
-O app é instalado pelo launcher, como o UTSim e o UTSim Seis Sigma. Ele abre em computadores de laboratório sem placa de vídeo.
+O app é instalado pelo launcher, como o UTSim e o UTSim LSS. Ele abre em computadores de laboratório sem placa de vídeo.
 
 ## Primeiro uso
 
@@ -86,9 +86,9 @@ Os dados de cada aluno são gerados da semente dele, e o deslocamento da média 
 Há dois caminhos para analisar:
 
 - **No jogo.** A seção "Dados da sua fábrica" mostra as primeiras linhas de cada conjunto e as ferramentas do jogo (estudo de R&R, médias por grupo, amplitude móvel, efeitos do fatorial).
-- **No UTSim Seis Sigma.** "Levar para o UTSim Seis Sigma" cria um projeto DMAIC de treino (`.lss`), marcado como treino e fora dos indicadores do programa, com cada conjunto registrado com a origem "Simulado" e o modelo da fábrica em `modelos/`. O aluno analisa lá com as ferramentas completas e digita as respostas no jogo.
+- **No UTSim LSS.** "Levar para o UTSim LSS" cria um projeto DMAIC de treino (`.lss`), marcado como treino e fora dos indicadores do programa, com cada conjunto registrado com a origem "Simulado" e o modelo da fábrica em `modelos/`. O aluno analisa lá com as ferramentas completas e digita as respostas no jogo.
 
-Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de qualidade que o Seis Sigma, sobre os mesmos valores com 4 casas do arquivo. "Gravar os dados (.csv)" grava os conjuntos numa pasta, para outra ferramenta.
+Os dois caminhos dão o mesmo número, porque o jogo usa as mesmas funções de qualidade que o UTSim LSS, sobre os mesmos valores com 4 casas do arquivo. "Gravar os dados (.csv)" grava os conjuntos numa pasta, para outra ferramenta.
 
 ### Pacote de qualidade e segurança do trabalho
 
@@ -150,11 +150,11 @@ Depois de resolver uma missão, a caixa de areia abre a mesma fábrica sem meta 
 
 O professor envia um convite (`.utsc`). Na aba **Turma**, o aluno indica o convite e, se a turma usa uma pasta compartilhada no Google Drive, a pasta sincronizada no computador. Com a pasta, cada tentativa é gravada nela assim que termina. Sem a pasta, o botão "Gravar entrega" grava um arquivo `.utsr` com todas as tentativas, para enviar ao professor pelo ambiente da disciplina, por e-mail ou pen drive.
 
-Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo. A assinatura e a cadeia são as mesmas do UTSim Seis Sigma. Elas revelam um arquivo alterado, uma tentativa que falta no meio ou um diário restaurado de uma cópia antiga, mas não impedem a edição e não valem como assinatura digital com validade jurídica.
+Cada tentativa é assinada com a chave do aluno, criada no primeiro uso, e encadeada à anterior. A entrega leva as decisões e as respostas, não a nota: o professor simula de novo. A assinatura e a cadeia são as mesmas do UTSim LSS. Elas revelam um arquivo alterado, uma tentativa que falta no meio ou um diário restaurado de uma cópia antiga, mas não impedem a edição e não valem como assinatura digital com validade jurídica.
 
 ### Programa Lean Seis Sigma da empresa
 
-Quem está num programa Lean Seis Sigma no UTSim Seis Sigma pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim Seis Sigma do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
+Quem está num programa Lean Seis Sigma no UTSim LSS pode ligar o Ensino a ele. Na aba Turma, o aluno indica a pasta do programa e clica em "Ligar". O app usa a identidade do UTSim LSS do mesmo computador e confere se a pessoa está no cadastro do programa. Depois disso, cada missão resolvida registra "praticou" no mapa de competências do aluno, nas ferramentas que o pacote liga aos conceitos da missão. Na campanha são estas: CTQ (voc_ctq), MSA, capacidade, DOE, carta de controle (cep) e, pelo lead time, WIP e takt, VSM. A evidência traz o pacote, a missão e a melhor nota. "Registrar as missões já resolvidas" envia as anteriores, e uma entrada que já está lá não se repete. As provas não registram nada. O nível "demonstrou" continua sendo dado só pelo master black belt.
 
 O professor que é instrutor ou master black belt do programa também registra a turma inteira. Na aba Professor, depois da correção, a seção "Programa Lean Seis Sigma da empresa" recebe a pasta do programa, e "Registrar a turma no programa" grava "praticou", com origem "exercício", para cada aluno que resolveu missões. O aluno é ligado à pessoa do programa pelo e-mail da lista de alunos, sem diferença entre maiúsculas e minúsculas. Nomes e registros da turma não vão para o programa. A mensagem diz quantas competências foram enviadas e quais alunos ficaram de fora, seja por não haver pessoa com aquele e-mail, seja por aviso na entrega (cadeia quebrada ou assinatura inválida). Enviar de novo não repete as entradas.
 

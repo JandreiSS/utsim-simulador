@@ -1,10 +1,11 @@
-# UTSim Seis Sigma (gerenciador de projetos Lean Seis Sigma)
+# UTSim LSS (gerenciador de projetos Lean Seis Sigma)
 
-O UTSim Seis Sigma é o aplicativo da família UTSim para conduzir projetos de melhoria Lean
+O UTSim LSS é o aplicativo da família UTSim para conduzir projetos de melhoria Lean
 Seis Sigma: termo de abertura, fases e tollgates, quadro de ações, riscos, reuniões,
 cronograma, ganhos e as ferramentas de cada fase. É um programa de janela própria (não abre o
 navegador), funciona sem internet e não precisa de servidor: a equipe trabalha numa pasta
-compartilhada do Google Drive. O nome ainda é provisório.
+compartilhada do Google Drive. LSS vem de Lean Seis Sigma; até a versão 0.16.0 o app se
+chamava UTSim Seis Sigma, e os projetos, o programa e os atalhos daquela época continuam valendo.
 
 Já funcionam a **fundação** (etapa L0 do `docs/plano_lean_seis_sigma.md`: o formato do
 projeto, o trabalho em equipe pela pasta compartilhada, a visão geral e o quadro de ações), a
@@ -17,8 +18,8 @@ A estatística (etapa L3) aparece na navegação com o que vai trazer.
 
 ## Instalar e abrir
 
-O UTSim Seis Sigma é um produto próprio no launcher (veja [Launcher](launcher.md)), com o
-nome "UTSim Seis Sigma". Escolha-o na lista, instale e clique em "Abrir". Ele não precisa do
+O UTSim LSS é um produto próprio no launcher (veja [Launcher](launcher.md)), com o
+nome "UTSim LSS". Escolha-o na lista, instale e clique em "Abrir". Ele não precisa do
 editor de simulação instalado.
 
 Pela linha de comando, `utsim-seis-sigma` abre a janela e `utsim-seis-sigma "pasta.lss"` abre
@@ -749,7 +750,7 @@ para partir dali.
 ### Ferramentas da qualidade do DMADV
 
 A casa da qualidade (QFD), as tolerâncias por Monte Carlo e o poka-yoke ligado ao FMEA são
-ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o Seis Sigma guarda o
+ferramentas da qualidade: as telas delas ficam no UTSim Qualidade, e o UTSim LSS guarda o
 resultado como entregável quando elas forem abertas de lá.
 
 ## Roteiro DMAIC
@@ -1503,7 +1504,7 @@ Melhoria da linha 2.lss/
   (`%LOCALAPPDATA%\UTSim\seis-sigma\cache\` no Windows, `~/.cache/utsim/seis-sigma/` no
   Linux) para abrir mais rápido. Pode ser apagado a qualquer momento.
 - Cada arquivo tem `"formato": N`. Um projeto num formato mais novo que o programa dá a
-  mensagem "projeto no formato N; esta versão do UTSim Seis Sigma lê até M": atualize pelo
+  mensagem "projeto no formato N; esta versão do UTSim LSS lê até M": atualize pelo
   launcher.
 
 ## Levar o projeto para quem não está na pasta
@@ -1517,7 +1518,7 @@ importado é uma cópia: as mudanças feitas nele não voltam para a pasta origi
 
 Com as telas de estatística e o MSA, o MVP do plano está completo (L0 a L7 com P1). O modo de ensino
 (projetos-exemplo, exercícios corrigidos, casos) será um app próprio baseado no UTSim, fora do
-UTSim Seis Sigma; o mapa de competências já recebe dele as evidências de prática. A versão 2
+UTSim LSS; o mapa de competências já recebe dele as evidências de prática. A versão 2
 trouxe o ganho estimado lançado do estudo de cenários, o MSA completo, o planejamento de
 experimentos de dois níveis, o mapa do fluxo de valor e o espaguete, os gráficos nos PDF e a
 exportação dos painéis. A P6 trouxe a seleção de soluções (ponderada e Pugh), a auditoria 5S, o SMED, o

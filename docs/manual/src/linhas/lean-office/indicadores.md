@@ -47,4 +47,4 @@ O `--html` de `utsim linha lean_office relatorio` grava uma página com:
 - o **fluxograma de raias por departamento**, com as raias do campo `department` e as
   passagens entre departamentos contadas.
 
-O `--json` grava os indicadores de cada replicação, para planilhas e para o UTSim Seis Sigma.
+O `--json` grava os indicadores de cada replicação, para planilhas e para o UTSim LSS.

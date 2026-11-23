@@ -8,7 +8,11 @@ Pela linha de comando, `utsim-qualidade` abre a janela.
 
 A unidade é uma pasta que a equipe compartilha. Cada alteração vira um pequeno arquivo novo dentro dela, que ninguém edita depois. Assim duas pessoas podem trabalhar ao mesmo tempo sem perder alterações. A mesma pasta serve ao UTSim Segurança do Trabalho: os postos que você cria aqui aparecem lá.
 
-Na tela inicial, escreva o seu nome (o autor de cada alteração), o caminho da pasta e use "Abrir unidade". Para começar uma unidade nova, preencha também o nome dela e use "Criar unidade". O programa lembra o seu nome e a última pasta num arquivo de configuração no seu computador.
+O app abre direto no trabalho, numa unidade nova que ainda não tem pasta: dá para cadastrar postos, rodar a simulação e usar as outras telas na hora. A barra do canto de cima à esquerda tem a chave "Salvamento automático" e os botões Salvar (Ctrl+S) e Salvar como (Ctrl+Shift+S), com o aviso "Não salvo" ou "Salvo". O primeiro Salvar pede o nome da unidade e onde fica a pasta, e cria a pasta com tudo o que já foi feito. Ele nunca passa por cima de uma pasta que já tem arquivos.
+
+Depois de salva, a unidade grava sozinha cada alteração, como sempre. Com a chave desligada, as alterações ficam esperando o Salvar, e o aviso volta para "Não salvo". A escolha fica guardada para cada unidade. Fechar a janela, abrir outra unidade ou começar uma nova com trabalho não salvo pergunta antes: Salvar, Não salvar ou Cancelar. "Salvar como" numa unidade já salva copia a pasta inteira para um lugar novo e passa a trabalhar na cópia.
+
+No Início, "Abrir unidade" e as unidades recentes abrem uma pasta que já existe (as unidades de versões anteriores abrem como sempre), e "Nova unidade" começa outra em branco. O seu nome, o autor de cada alteração, vem do usuário do computador e pode ser trocado no Início. O programa lembra o seu nome e as últimas pastas num arquivo de configuração no seu computador.
 
 ## Postos
 
@@ -52,7 +56,7 @@ Ao editar uma linha de inspeção aparece o painel de amostragem por atributos. 
 
 A tela 8D lista os 8D da unidade e abre um para edição. Há uma seção para cada uma das oito disciplinas, com o texto que explica o que ela pede, e a disciplina seguinte aparece em destaque. A contenção atrasada em relação a hoje é avisada em vermelho. Na causa raiz, cada causa tem a categoria dos 6M e a marca de confirmada por dado, e sob cada causa ficam os porquês. As ações têm verificação por dado (carta ou estudo no modelo) e a prevenção registra a atualização da FMEA e do plano de controle. O 8D só encerra quando D1 a D7 estão completas, e "Encerrar o 8D" já grava. As outras mudanças só vão para a unidade em "Gravar". Se o 8D gravado muda com o 8D aberto (Desfazer, Refazer ou outra pessoa), a tela recarrega quando não há mudanças por gravar. Quando há, o rascunho fica, um aviso em vermelho diz que gravar troca o gravado pela tela, e "Recarregar o gravado" descarta o rascunho. Desfazer a criação de um 8D aberto deixa o rascunho como um 8D novo, por gravar.
 
-Quando a causa não aparece, o botão "Enviar para a carteira do Seis Sigma" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
+Quando a causa não aparece, o botão "Enviar para a carteira do UTSim LSS" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
 
 ## CEP
 
@@ -110,7 +114,7 @@ Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.r
 
 ## Limites desta versão
 
-O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
+O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim LSS.
 
 ## Modelo (mão dupla com o UTSim)
 
