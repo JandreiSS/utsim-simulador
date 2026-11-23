@@ -34,7 +34,9 @@ Os botões "Gravar relatório HTML" e "Gravar CSV das medições" escrevem os ar
 
 Escolha o modelo e o número de replicações e use "Rodar". O cálculo roda em segundo plano. Os custos do modelo aparecem com o rótulo "Origem: Simulado". A tabela mostra, para as quatro categorias (prevenção, avaliação, falha interna e falha externa), a média, o intervalo de confiança de 95 %, os lançamentos digitados e o total. Abaixo ficam os custos por posto e por defeito.
 
-Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar.
+Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções) têm categoria, descrição, valor e posto, e ficam gravados na unidade. Eles entram no total na próxima vez que você rodar. Um lançamento digitado errado sai com "Remover", na própria linha, e o total muda ao rodar de novo.
+
+Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
 
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 
@@ -89,7 +91,7 @@ Outros programas da família abrem o UTSim Qualidade já no lugar certo:
 - **Do UTSim 3D**, "Abrir no UTSim Qualidade" nas abas do nó abre a tela Modelo com o nó escolhido, mesmo sem unidade aberta. O UTSim grava o que estiver pendente e entrega a edição. Se outra pessoa ou outro programa estiver editando, o modelo abre só para leitura, com o aviso de quem edita.
 - **Do UTSim Ensino**, "Analisar no UTSim Qualidade" abre os dados da missão (CSV ou xlsx) num estudo novo, "Análise de ...", com a ferramenta da missão e os limites já preenchidos. O estudo fica na última unidade aberta ou, sem unidade, na unidade "Análises avulsas", que o aplicativo cria sozinho. Os dados ficam com a origem Importado. Se a missão não diz a ferramenta, a tela Ferramentas pergunta qual usar.
 
-Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.ron> --utsim-no=<nó>` ou `utsim-qualidade --utsim-abrir=<dados.csv> --utsim-ferramenta=capacidade --utsim-lie=24,985 --utsim-lse=25,015`. Outro app da família também pode mandar um pedido (`--utsim-pedido=<arquivo>`): o UTSim Qualidade confere se os arquivos de dados são os mesmos do pedido, abre o estudo e, ao fechar, grava a resposta com os indicadores de cada aplicação para o app que pediu. Quando o pedido traz um modelo e nenhum dado (é o caso do UTSim Desenvolvimento de Produto), a resposta leva a capacidade simulada de cada característica do modelo como ele está no disco ao fechar, com LIE, LSE, média, desvio, Cp, Cpk e o intervalo dele, Pp, Ppk e PPM (resultado `capacidade_simulada`, até 30 replicações). As opções aparecem em `utsim-qualidade --ajuda`.
+Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.ron> --utsim-no=<nó>` ou `utsim-qualidade --utsim-abrir=<dados.csv> --utsim-ferramenta=capacidade --utsim-lie=24,985 --utsim-lse=25,015`. Outro app da família também pode mandar um pedido (`--utsim-pedido=<arquivo>`): o UTSim Qualidade confere se os arquivos de dados são os mesmos do pedido, abre o estudo e, ao fechar, grava a resposta com os indicadores de cada aplicação para o app que pediu. Quando o pedido traz um modelo e nenhum dado (é o caso do UTSim Produto), a resposta leva a capacidade simulada de cada característica do modelo como ele está no disco ao fechar, com LIE, LSE, média, desvio, Cp, Cpk e o intervalo dele, Pp, Ppk e PPM (resultado `capacidade_simulada`, até 30 replicações). As opções aparecem em `utsim-qualidade --ajuda`.
 
 ## Limites desta versão
 

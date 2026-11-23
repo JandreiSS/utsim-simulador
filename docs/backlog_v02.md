@@ -55,7 +55,7 @@ Cada uma roda numa cópia isolada do repositório (worktree) e entrega um branch
 
 | Tarefa | Modelo |
 |---|---|
-| Regras de despacho (prioridade, menor tempo, data de entrega) e setup dependente da sequência (matriz de setup) | Opus |
+| ~~Regras de despacho (prioridade, menor tempo, data de entrega) e setup dependente da sequência (matriz de setup)~~ feito: prioridade e data de entrega por `order`, matriz de troca por `changeover`, e em 2026-11-19 menor tempo (`pick: ShortestProcess`) e menor setup (`pick: LeastSetup`) | Opus |
 | Produção puxada: kanban, CONWIP, supermercado | Opus |
 | Equipes de manutenção para as quebras (MTBF/MTTR com técnico como recurso) | Sonnet |
 | Custos por estado, por item e por recurso, com relatório de custo | Sonnet |

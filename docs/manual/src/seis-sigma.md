@@ -797,7 +797,10 @@ Escolha o conjunto, a análise e as colunas:
 "Calcular" mostra os números, a conclusão e o gráfico (valores, linha central e limites,
 pontos com sinal); "Guardar a análise" grava a **receita** (função, colunas e parâmetros), o
 conjunto com o hash e a origem, o resultado e a versão do app. "Refazer" roda a receita de
-novo sobre o mesmo arquivo e confere se os números são os mesmos.
+novo sobre o mesmo arquivo e confere se os números são os mesmos. "Apagar", ao lado do
+conjunto escolhido e de cada análise guardada, pede um segundo clique ("Apagar mesmo") antes
+de apagar; um conjunto com análises guardadas só sai depois delas. Apagar é uma operação do
+diário como as outras: o histórico continua lá.
 
 O estudo do tipo 1 usa Cg = 0,2·T / (6·s) e Cgk = (0,1·T − |média − referência|) / (3·s),
 com T a tolerância; o instrumento é capaz com Cg e Cgk ≥ 1,33.
@@ -1185,8 +1188,9 @@ dos dados.
 
 - **Painel do MBB**: funil (contagem por estágio, conversão entre estágios, idade média),
   tempo de ciclo por fase (mediana e percentil 80 dos dias entre aprovações de tollgate, por
-  abordagem, contra a meta padrão: Definir 30, Medir 45, Analisar 45, Melhorar 60, Controlar
-  60 dias), ganhos por estado e unidade com o total oficial só com o validado, belts por área
+  abordagem, contra a meta de cada fase: a padrão é Definir 30, Medir 45, Analisar 45,
+  Melhorar 60, Controlar 60 dias, e o MBB troca a de qualquer fase em "Meta de dias por fase",
+  logo abaixo da tabela, para o programa todo; vazio volta à padrão), ganhos por estado e unidade com o total oficial só com o validado, belts por área
   (ativos, formados, certificados, cobertura, certificações de três anos a 90 dias do fim),
   uso das ferramentas por fase e as nunca aplicadas, tollgates vencidos por unidade e belt e
   as revisões pendentes, e a carga por nível e por pessoa.
