@@ -52,7 +52,7 @@ Ao editar uma linha de inspeção aparece o painel de amostragem por atributos. 
 
 A tela 8D lista os 8D da unidade e abre um para edição. Há uma seção para cada uma das oito disciplinas, com o texto que explica o que ela pede, e a disciplina seguinte aparece em destaque. A contenção atrasada em relação a hoje é avisada em vermelho. Na causa raiz, cada causa tem a categoria dos 6M e a marca de confirmada por dado, e sob cada causa ficam os porquês. As ações têm verificação por dado (carta ou estudo no modelo) e a prevenção registra a atualização da FMEA e do plano de controle. O 8D só encerra quando D1 a D7 estão completas. Nada vai para a unidade antes de "Gravar".
 
-Quando a causa não aparece, o botão "Enviar para a carteira do Seis Sigma" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
+Quando a causa não aparece, o botão "Enviar para a carteira do UTSim LSS" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
 
 ## CEP
 
@@ -97,7 +97,7 @@ Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.r
 
 ## Limites desta versão
 
-O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
+O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim LSS.
 
 ## Modelo (mão dupla com o UTSim)
 
