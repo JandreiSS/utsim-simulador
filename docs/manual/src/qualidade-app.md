@@ -38,6 +38,8 @@ Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções
 
 Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
 
+Desfazer e Refazer, na barra de baixo, valem em todas as telas que gravam na unidade. Desfazer volta a sua última gravação feita desde que o app abriu (um registro gravado, alterado ou removido volta ao que era). Fora dos campos de texto, Ctrl+Z desfaz e Ctrl+Y ou Ctrl+Shift+Z refazem. Na tela Modelo os atalhos ficam com o editor do modelo. Se outra pessoa mudou o mesmo registro depois, nada é desfeito e a barra avisa.
+
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 
 ## Planos
