@@ -2,6 +2,8 @@
 //! of `idiomas/<código>/godot.ftl` (`docs/traducao.md`, round 8). The screens read them by
 //! [`tx`]; the GDScript side through the bridge.
 
+use std::fmt::Display;
+
 use utsim_idiomas::{Catalogo, Valor};
 
 /// The texts of UTSim 3D in the five languages, embedded from `idiomas/`.
@@ -15,6 +17,27 @@ pub fn tx(chave: &'static str) -> &'static str {
 /// The text of a key with named values.
 pub fn fx(chave: &str, args: &[(&str, Valor)]) -> String {
     TEXTOS.f(chave, args)
+}
+
+/// A value: a number when it reads back the same (so plurals work), else text.
+pub fn vx(x: &impl Display) -> Valor<'static> {
+    let s = x.to_string();
+    if let Ok(n) = s.parse::<i64>()
+        && n.to_string() == s
+    {
+        return n.into();
+    }
+    s.into()
+}
+
+/// A number already formatted, with the decimal mark of the current language.
+pub fn dx(s: String) -> Valor<'static> {
+    utsim_idiomas::marca_decimal(&s).into()
+}
+
+/// A text as it is.
+pub fn sx(s: String) -> Valor<'static> {
+    s.into()
 }
 
 #[cfg(test)]
@@ -35,7 +58,14 @@ mod tests {
     #[test]
     fn every_key_in_the_sources_exists() {
         assert!(TEXTOS.faltas().is_empty(), "{:?}", TEXTOS.faltas());
-        const PREFIXES: [&str; 5] = ["aba-", "barra-", "configuracoes-", "props-", "vivo-"];
+        const PREFIXES: [&str; 6] = [
+            "aba-",
+            "barra-",
+            "configuracoes-",
+            "godot-",
+            "props-",
+            "vivo-",
+        ];
         let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut missing = Vec::new();
         let mut seen = 0;

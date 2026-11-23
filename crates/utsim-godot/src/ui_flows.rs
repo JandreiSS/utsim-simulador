@@ -13,6 +13,7 @@
 //! `atividades=`, `pico=`, `sobreposicoes=`, `cortadas=` and `zoom=` for the checks) and
 //! `Fluxos_Grafico`.
 
+use crate::texto::tx;
 use egui::{
     Align, Align2, Color32, FontId, Layout, Pos2, Rect, RichText, ScrollArea, Sense, Shape, Stroke,
     StrokeKind, Ui, UiBuilder, Vec2, pos2, vec2,
@@ -137,7 +138,13 @@ pub fn show(
         StrokeKind::Inside,
     );
     let panel = ui.allocate_rect(rect, Sense::hover());
-    named(ui, reg, "PainelFluxos", &panel, "Fluxos de tokens");
+    named(
+        ui,
+        reg,
+        "PainelFluxos",
+        &panel,
+        tx("godot-ui-flows-fluxos_de_tokens"),
+    );
     let inner = rect.shrink2(Vec2::new(14.0, 12.0));
     let mut child = ui.new_child(
         UiBuilder::new()
@@ -150,7 +157,7 @@ pub fn show(
     mem.flow = mem.flow.min(v.graphs.len().saturating_sub(1));
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Fluxos de tokens")
+            RichText::new(tx("godot-ui-flows-fluxos_de_tokens"))
                 .size(sizes::HEADING)
                 .strong()
                 .color(colors::HEADING),
@@ -184,19 +191,23 @@ pub fn show(
             }
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if button(ui, reg, "Fluxos_Fechar", "Fechar", "Fechar os fluxos", true) {
+            if button(
+                ui,
+                reg,
+                "Fluxos_Fechar",
+                tx("godot-ui-flows-fechar"),
+                tx("godot-ui-flows-fechar_os_fluxos"),
+                true,
+            ) {
                 out.push("fluxos:fechar".into());
             }
         });
     });
     let Some(g) = v.graphs.get(mem.flow) else {
-        explain(ui, "O modelo não tem fluxos de tokens.");
+        explain(ui, tx("godot-ui-flows-o_modelo_nao_tem_fluxos"));
         return;
     };
-    explain(
-        ui,
-        "Tokens em cada atividade no instante da reprodução; embaixo, as contagens ao longo da rodada (a linha vertical t é o instante atual).",
-    );
+    explain(ui, tx("godot-ui-flows-tokens_em_cada_atividade_no"));
     let width_of = |text: &str, size: f32| {
         ui.painter()
             .layout_no_wrap(text.to_owned(), FontId::proportional(size), colors::TEXT)
@@ -208,22 +219,36 @@ pub fn show(
     let zoom = *mem.zoom.get_or_insert_with(|| fit(room, content));
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Zoom (Ctrl + roda no grafo)")
+            RichText::new(tx("godot-ui-flows-zoom_ctrl_roda_no_grafo"))
                 .small()
                 .color(colors::TEXT_WEAK),
         );
-        if button(ui, reg, "Fluxos_ZoomMenos", "−", "Diminui", true) {
+        if button(
+            ui,
+            reg,
+            "Fluxos_ZoomMenos",
+            "−",
+            tx("godot-ui-flows-diminui"),
+            true,
+        ) {
             mem.zoom = Some((zoom / 1.25).clamp(0.3, 2.5));
         }
-        if button(ui, reg, "Fluxos_ZoomMais", "+", "Aumenta", true) {
+        if button(
+            ui,
+            reg,
+            "Fluxos_ZoomMais",
+            "+",
+            tx("godot-ui-flows-aumenta"),
+            true,
+        ) {
             mem.zoom = Some((zoom * 1.25).clamp(0.3, 2.5));
         }
         if button(
             ui,
             reg,
             "Fluxos_Ajustar",
-            "Ajustar",
-            "Cabe na largura",
+            tx("godot-ui-flows-ajustar"),
+            tx("godot-ui-flows-cabe_na_largura"),
             true,
         ) {
             mem.zoom = Some(fit(room, content));
@@ -304,7 +329,14 @@ pub fn show(
             x: "tempo".into(),
             y: "tokens".into(),
         };
-        draw_chart(ui, reg, "Fluxos_Grafico", &chart, "sem contagens", h);
+        draw_chart(
+            ui,
+            reg,
+            "Fluxos_Grafico",
+            &chart,
+            tx("godot-ui-flows-sem_contagens"),
+            h,
+        );
     }
 }
 
