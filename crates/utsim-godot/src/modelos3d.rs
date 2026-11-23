@@ -66,6 +66,13 @@ pub type Trecho = (f32, f32, usize);
 /// The line of the state table that stands for `processing` at a station nobody operates.
 pub const PROCESSING_AUTO: &str = "processing_auto";
 
+/// The line a door holds open between items (`Animado::door_runs`): not a state of the
+/// simulation nor of the catalogue.
+pub const DOOR_OPEN: &str = "porta_aberta";
+
+/// The radio control of the crane (`controle_remoto`), held by its operator.
+pub const RADIO: &str = "controle_remoto";
+
 /// A point of an element (an empty node): its place and where its `+x` looks.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct Ponto {
@@ -109,7 +116,7 @@ fn one() -> f32 {
 }
 
 /// One file of the catalogue (`catalogo.json`; the fields the bridge uses).
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct Elemento {
     pub arquivo: String,
     #[serde(default)]
@@ -127,9 +134,434 @@ pub struct Elemento {
     pub pontos: BTreeMap<String, Ponto>,
     #[serde(default)]
     pub tamanho: [f32; 3],
+    /// Lowest corner of the element's box (model coordinates, Z up); with
+    /// [`Elemento::tamanho`], the box the engine stretches to a size given in the model.
+    #[serde(default)]
+    pub minimo: [f32; 3],
+    /// How far each part point of the root was moved to seat the item on the surface
+    /// under it (Godot frame of the element: x, y up, -model y), by [`Elemento::assentar`].
+    #[serde(skip)]
+    pub ajustes: BTreeMap<String, [f32; 3]>,
+    /// Whether [`Catalogo::assentar`] already ran for this element.
+    #[serde(skip)]
+    pub assentado: bool,
+}
+
+/// Every triangle of a binary glTF (`.glb`) in the file's own frame (Y up), each node's
+/// transform applied, with the name of the node that holds it; a node a clip moves also
+/// at every key of the clip (what it sweeps), its node name then ending in [`SWEPT`]. A small reader of what the
+/// Blender elements use (float positions, 8/16/32-bit indices, triangle lists, the
+/// default scene); `None` when the bytes are not a readable `.glb`.
+pub fn glb_triangles(bytes: &[u8]) -> Option<Vec<(String, [[f32; 3]; 3])>> {
+    let u32_at = |o: usize| -> Option<u32> {
+        Some(u32::from_le_bytes(bytes.get(o..o + 4)?.try_into().ok()?))
+    };
+    if bytes.get(0..4)? != b"glTF" {
+        return None;
+    }
+    let json_len = u32_at(12)? as usize;
+    let json: serde_json::Value = serde_json::from_slice(bytes.get(20..20 + json_len)?).ok()?;
+    let bin_at = 20 + json_len;
+    let bin_len = u32_at(bin_at)? as usize;
+    let bin = bytes.get(bin_at + 8..bin_at + 8 + bin_len)?;
+    let num = |v: &serde_json::Value| v.as_u64().map(|n| n as usize);
+    // An accessor's values as f32 tuples (`comps` each) or as indices.
+    let read = |i: usize| -> Option<(Vec<f32>, usize)> {
+        let a = &json["accessors"][i];
+        let view = &json["bufferViews"][num(&a["bufferView"])?];
+        let comps = match a["type"].as_str()? {
+            "SCALAR" => 1,
+            "VEC2" => 2,
+            "VEC3" => 3,
+            "VEC4" => 4,
+            _ => return None,
+        };
+        let (size, kind) = match a["componentType"].as_u64()? {
+            5126 => (4, 'f'),
+            5125 => (4, 'I'),
+            5123 => (2, 'H'),
+            5121 => (1, 'B'),
+            _ => return None,
+        };
+        let start = num(&view["byteOffset"]).unwrap_or(0) + num(&a["byteOffset"]).unwrap_or(0);
+        let stride = num(&view["byteStride"]).unwrap_or(size * comps);
+        let count = num(&a["count"])?;
+        let mut out = Vec::with_capacity(count * comps);
+        for k in 0..count {
+            for c in 0..comps {
+                let o = start + k * stride + c * size;
+                let b = bin.get(o..o + size)?;
+                out.push(match kind {
+                    'f' => f32::from_le_bytes(b.try_into().ok()?),
+                    'I' => u32::from_le_bytes(b.try_into().ok()?) as f32,
+                    'H' => u16::from_le_bytes(b.try_into().ok()?) as f32,
+                    _ => b[0] as f32,
+                });
+            }
+        }
+        Some((out, comps))
+    };
+    type M4 = [[f32; 4]; 4];
+    // A node's own matrix; `pose` replaces its translation, rotation or scale (a key of a
+    // clip).
+    let local = |n: &serde_json::Value, pose: [Option<&[f32]>; 3]| -> M4 {
+        if let Some(m) = n["matrix"].as_array().filter(|m| m.len() == 16) {
+            let f = |k: usize| m[k].as_f64().unwrap_or(0.0) as f32;
+            return [
+                [f(0), f(1), f(2), f(3)],
+                [f(4), f(5), f(6), f(7)],
+                [f(8), f(9), f(10), f(11)],
+                [f(12), f(13), f(14), f(15)],
+            ];
+        }
+        let v = |key: &str, d: &[f32]| -> Vec<f32> {
+            n[key].as_array().map_or_else(
+                || d.to_vec(),
+                |a| a.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect(),
+            )
+        };
+        let t = pose[0].map_or_else(|| v("translation", &[0.0; 3]), <[f32]>::to_vec);
+        let r = pose[1].map_or_else(|| v("rotation", &[0.0, 0.0, 0.0, 1.0]), <[f32]>::to_vec);
+        let s = pose[2].map_or_else(|| v("scale", &[1.0; 3]), <[f32]>::to_vec);
+        let (x, y, z, w) = (r[0], r[1], r[2], r[3]);
+        // Column-major: m[column][row].
+        [
+            [
+                (1.0 - 2.0 * (y * y + z * z)) * s[0],
+                (2.0 * (x * y + z * w)) * s[0],
+                (2.0 * (x * z - y * w)) * s[0],
+                0.0,
+            ],
+            [
+                (2.0 * (x * y - z * w)) * s[1],
+                (1.0 - 2.0 * (x * x + z * z)) * s[1],
+                (2.0 * (y * z + x * w)) * s[1],
+                0.0,
+            ],
+            [
+                (2.0 * (x * z + y * w)) * s[2],
+                (2.0 * (y * z - x * w)) * s[2],
+                (1.0 - 2.0 * (x * x + y * y)) * s[2],
+                0.0,
+            ],
+            [t[0], t[1], t[2], 1.0],
+        ]
+    };
+    let mul = |a: M4, b: M4| -> M4 {
+        let mut r = [[0.0; 4]; 4];
+        for (c, col) in r.iter_mut().enumerate() {
+            for (row, v) in col.iter_mut().enumerate() {
+                *v = (0..4).map(|k| a[k][row] * b[c][k]).sum();
+            }
+        }
+        r
+    };
+    let apply = |m: M4, p: [f32; 3]| -> [f32; 3] {
+        let mut r = [0.0; 3];
+        for (row, v) in r.iter_mut().enumerate() {
+            *v = m[0][row] * p[0] + m[1][row] * p[1] + m[2][row] * p[2] + m[3][row];
+        }
+        r
+    };
+    let identity: M4 = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let scene = num(&json["scene"]).unwrap_or(0);
+    let nodes = json["nodes"].as_array()?;
+    let mut out = Vec::new();
+    // The triangles of node `k`'s mesh under the world matrix `m`.
+    let emit = |k: usize, m: M4, out: &mut Vec<(String, [[f32; 3]; 3])>| -> Option<()> {
+        let node = &nodes[k];
+        let name = node["name"].as_str().unwrap_or("").to_string();
+        let Some(mesh) = num(&node["mesh"]) else {
+            return Some(());
+        };
+        for p in json["meshes"][mesh]["primitives"].as_array()? {
+            if num(&p["mode"]).is_some_and(|mode| mode != 4) {
+                continue;
+            }
+            let Some((pos, 3)) = num(&p["attributes"]["POSITION"]).and_then(read) else {
+                continue;
+            };
+            let pos: Vec<[f32; 3]> = (0..pos.len() / 3)
+                .map(|k| apply(m, [pos[3 * k], pos[3 * k + 1], pos[3 * k + 2]]))
+                .collect();
+            let idx: Vec<usize> = match num(&p["indices"]).and_then(read) {
+                Some((i, 1)) => i.into_iter().map(|v| v as usize).collect(),
+                _ => (0..pos.len()).collect(),
+            };
+            for t in (0..idx.len() / 3).map(|k| &idx[3 * k..3 * k + 3]) {
+                if let (Some(a), Some(b), Some(c)) = (pos.get(t[0]), pos.get(t[1]), pos.get(t[2])) {
+                    out.push((name.clone(), [*a, *b, *c]));
+                }
+            }
+        }
+        Some(())
+    };
+    // The subtree of node `k` whose own world matrix is `m` (its children at rest).
+    let subtree =
+        |k: usize, m: M4, parents: &mut Vec<M4>, out: &mut Vec<(String, [[f32; 3]; 3])>| {
+            let mut stack = vec![(k, m)];
+            while let Some((k, m)) = stack.pop() {
+                let _ = emit(k, m, out);
+                if let Some(children) = nodes[k]["children"].as_array() {
+                    for c in children.iter().filter_map(num) {
+                        if let Some(slot) = parents.get_mut(c) {
+                            *slot = m;
+                        }
+                        stack.push((c, mul(m, local(&nodes[c], [None; 3]))));
+                    }
+                }
+            }
+        };
+    // At rest, keeping each node's parent matrix for the poses below.
+    let mut parents = vec![identity; nodes.len()];
+    for k in json["scenes"][scene]["nodes"]
+        .as_array()?
+        .iter()
+        .filter_map(num)
+    {
+        subtree(k, local(&nodes[k], [None; 3]), &mut parents, &mut out);
+    }
+    // Every key of every clip: a moving node (a clamp, a door) at each of its poses, so
+    // what it sweeps counts too.
+    let rest_parents = parents.clone();
+    for anim in json["animations"].as_array().into_iter().flatten() {
+        // Per node, the keys of its translation, rotation and scale (values, width).
+        type Keys = [Option<(Vec<f32>, usize)>; 3];
+        let mut keyed: BTreeMap<usize, Keys> = BTreeMap::new();
+        for ch in anim["channels"].as_array().into_iter().flatten() {
+            let (Some(k), Some(path)) = (num(&ch["target"]["node"]), ch["target"]["path"].as_str())
+            else {
+                continue;
+            };
+            let slot = match path {
+                "translation" => 0,
+                "rotation" => 1,
+                "scale" => 2,
+                _ => continue,
+            };
+            let sampler = &anim["samplers"][num(&ch["sampler"]).unwrap_or(usize::MAX)];
+            if let Some(values) = num(&sampler["output"]).and_then(read) {
+                keyed.entry(k).or_default()[slot] = Some(values);
+            }
+        }
+        for (k, paths) in keyed {
+            if k >= nodes.len() {
+                continue;
+            }
+            let keys = paths
+                .iter()
+                .flatten()
+                .map(|(v, c)| v.len() / (*c).max(1))
+                .max()
+                .unwrap_or(0);
+            for j in 0..keys {
+                let at = |slot: usize| -> Option<&[f32]> {
+                    let (v, c) = paths[slot].as_ref()?;
+                    v.get(j * c..j * c + c)
+                };
+                let m = mul(rest_parents[k], local(&nodes[k], [at(0), at(1), at(2)]));
+                let from = out.len();
+                subtree(k, m, &mut parents, &mut out);
+                for (name, _) in &mut out[from..] {
+                    name.push(SWEPT);
+                }
+            }
+        }
+    }
+    Some(out)
+}
+
+/// The mark at the end of the node name of a triangle a clip moves there ([`glb_triangles`]):
+/// it counts as an obstacle, never as a surface to stand on.
+pub const SWEPT: char = '~';
+
+/// Triangles of an element with the node that holds each ([`glb_triangles`]).
+type Tris = [(String, [[f32; 3]; 3])];
+
+/// Height of the surface under `(x, z)` (Godot frame) among `tris`: the highest triangle
+/// over that point whose height there is at most `top` (not a pose of a clip, [`SWEPT`]).
+fn surface(tris: &Tris, x: f32, z: f32, top: f32) -> Option<f32> {
+    let mut best: Option<f32> = None;
+    for (_, [a, b, c]) in tris.iter().filter(|(n, _)| !n.ends_with(SWEPT)) {
+        // Barycentric coordinates of (x, z) in the triangle's floor projection.
+        let d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+        if d.abs() < 1e-9 {
+            continue;
+        }
+        let u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d;
+        let v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d;
+        let w = 1.0 - u - v;
+        if u < -1e-5 || v < -1e-5 || w < -1e-5 {
+            continue;
+        }
+        let y = u * a[1] + v * b[1] + w * c[1];
+        if y <= top && best.is_none_or(|h| y > h) {
+            best = Some(y);
+        }
+    }
+    best
+}
+
+/// Whether a cube of `edge` standing at `bottom` centred on `(x, z)` (Godot frame) cuts a
+/// triangle of `tris` (by the triangles' boxes, a hair above the bottom).
+fn cuts(tris: &Tris, x: f32, z: f32, bottom: f32, edge: f32) -> bool {
+    let h = edge / 2.0;
+    let lo = [x - h, bottom + 0.003, z - h];
+    let hi = [x + h, bottom + edge, z + h];
+    tris.iter().any(|(_, t)| {
+        (0..3).all(|k| {
+            let a = t[0][k].min(t[1][k]).min(t[2][k]);
+            let b = t[0][k].max(t[1][k]).max(t[2][k]);
+            a < hi[k] && b > lo[k]
+        })
+    })
+}
+
+/// How an element is fitted to a size given in the model: its stretch along its own axes
+/// (Godot) and the offset that stands the stretched box on the floor at the root's centre.
+/// The engine applies both (`cena.gd`), and the points of the element follow them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Encaixe {
+    pub stretch: [f32; 3],
+    pub offset: [f32; 3],
+}
+
+/// Box `(min, max)` of a box `(min, max)` in the asset's own frame once scaled by `k`
+/// (per axis), turned by `yaw` about `+Y` (quarter turns: the box stays a box) and moved
+/// by `offset`.
+fn placed_box(
+    lo: [f32; 3],
+    hi: [f32; 3],
+    k: [f32; 3],
+    yaw: f32,
+    offset: [f32; 3],
+) -> ([f32; 3], [f32; 3]) {
+    let mut a = [f32::INFINITY; 3];
+    let mut b = [f32::NEG_INFINITY; 3];
+    for c in 0..8 {
+        let p = [
+            if c & 1 == 0 { lo[0] } else { hi[0] } * k[0],
+            if c & 2 == 0 { lo[1] } else { hi[1] } * k[1],
+            if c & 4 == 0 { lo[2] } else { hi[2] } * k[2],
+        ];
+        let t = turned(p, yaw);
+        for j in 0..3 {
+            a[j] = a[j].min(t[j] + offset[j]);
+            b[j] = b[j].max(t[j] + offset[j]);
+        }
+    }
+    (a, b)
 }
 
 impl Elemento {
+    /// Seats the item on each part point of the root (the points of the `peca` table that
+    /// do not move with a clip) on the surface under it, an item of `edge` (element units):
+    /// down or up to the highest surface under the point (a table top), then, when the
+    /// item would cut the element (a clamp on the table), moved the least along that
+    /// surface until it does not. A point with no surface within 6 cm under it is left as it
+    /// is. `tris` are the element's triangles.
+    pub fn assentar(&mut self, stem: &str, tris: &Tris, edge: f32) {
+        let mut names: Vec<String> = self
+            .peca
+            .values()
+            .flatten()
+            .map(|(_, _, n)| n.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+        use std::f32::consts::FRAC_1_SQRT_2 as D;
+        const DIRS: [[f32; 2]; 8] = [
+            [1.0, 0.0],
+            [-1.0, 0.0],
+            [0.0, 1.0],
+            [0.0, -1.0],
+            [D, D],
+            [-D, D],
+            [D, -D],
+            [-D, -D],
+        ];
+        for name in names {
+            let Some(p) = self.fixed_point(stem, &name).cloned() else {
+                continue;
+            };
+            let g = to_godot(p.pos);
+            // Only a surface within a few centimetres: a point over a bin or a chute is
+            // where the item is meant to be.
+            let Some(bottom) = surface(tris, g[0], g[2], g[1] + 0.06).filter(|y| *y >= g[1] - 0.06)
+            else {
+                continue;
+            };
+            let mut at = [g[0], g[2]];
+            if cuts(tris, at[0], at[1], bottom, edge) {
+                let found = (1..=40).find_map(|r| {
+                    let r = r as f32 * 0.01;
+                    DIRS.iter().find_map(|d| {
+                        let (x, z) = (g[0] + d[0] * r, g[2] + d[1] * r);
+                        let same = surface(tris, x, z, g[1] + 0.06)
+                            .is_some_and(|s| (s - bottom).abs() < 0.01);
+                        (same && !cuts(tris, x, z, bottom, edge)).then_some([x, z])
+                    })
+                });
+                if let Some(f) = found {
+                    at = f;
+                }
+            }
+            let adj = [at[0] - g[0], bottom - g[1], at[1] - g[2]];
+            if adj.iter().all(|v| v.abs() < 1e-5) {
+                continue;
+            }
+            if let Some(q) = self.pontos.get_mut(&name) {
+                // Godot (x, y, z) is model (x, -z, y).
+                q.pos = [q.pos[0] + adj[0], q.pos[1] - adj[2], q.pos[2] + adj[1]];
+            }
+            self.ajustes.insert(name, adj);
+        }
+    }
+
+    /// The element fitted to `size` (Godot extents in the root's frame): scaled by `scale`,
+    /// turned by `yaw` and moved by `offset` under the root, then stretched along each axis
+    /// to `size` and stood on the floor at the root's centre. `None` without a box.
+    pub fn encaixe(
+        &self,
+        scale: f32,
+        yaw: f32,
+        offset: [f32; 3],
+        size: [f32; 3],
+    ) -> Option<Encaixe> {
+        let (m, t) = (self.minimo, self.tamanho);
+        if t.iter().any(|v| !(v.is_finite() && *v > 1e-4))
+            || size.iter().any(|v| !(v.is_finite() && *v > 1e-4))
+        {
+            return None;
+        }
+        // The box in the asset's frame (Godot): model x, z, -y.
+        let lo = [m[0], m[2], -(m[1] + t[1])];
+        let hi = [m[0] + t[0], m[2] + t[2], -m[1]];
+        let (a, b) = placed_box(lo, hi, [scale; 3], yaw, offset);
+        let f = [
+            size[0] / (b[0] - a[0]),
+            size[1] / (b[1] - a[1]),
+            size[2] / (b[2] - a[2]),
+        ];
+        let sideways = yaw.sin().abs() > 0.7;
+        let stretch = if sideways { [f[2], f[1], f[0]] } else { f };
+        let k = [scale * stretch[0], scale * stretch[1], scale * stretch[2]];
+        let (a, b) = placed_box(lo, hi, k, yaw, offset);
+        Some(Encaixe {
+            stretch,
+            offset: [
+                offset[0] - (a[0] + b[0]) / 2.0,
+                offset[1] - a[1],
+                offset[2] - (a[2] + b[2]) / 2.0,
+            ],
+        })
+    }
+
     /// Clip names, sorted (the indices of the frame's `anim_clip`).
     pub fn clip_names(&self) -> Vec<String> {
         self.clipes.keys().cloned().collect()
@@ -162,6 +594,29 @@ impl Catalogo {
             dir: dir.to_path_buf(),
             elementos,
         })
+    }
+
+    /// Seats the part points of element `stem` on its surfaces ([`Elemento::assentar`]),
+    /// once, from the triangles of its file.
+    pub fn assentar(&mut self, stem: &str) {
+        let dir = self.dir.clone();
+        let Some(e) = self.elementos.get_mut(stem) else {
+            return;
+        };
+        if e.assentado {
+            return;
+        }
+        e.assentado = true;
+        if e.peca.is_empty() {
+            return;
+        }
+        let Some(tris) = std::fs::read(dir.join(&e.arquivo))
+            .ok()
+            .and_then(|b| glb_triangles(&b))
+        else {
+            return;
+        };
+        e.assentar(stem, &tris, utsim_scene::compose::ITEM_SIZE);
     }
 
     /// The catalogue found by [`dir_from`].
@@ -259,11 +714,49 @@ pub fn pedido(cat: &Catalogo, asset: Option<&str>) -> Option<Pedido> {
     cat.get(&n).map(|_| Pedido::Elemento(n))
 }
 
+/// A Blender element drawn as the items of a source (`visual.item`): its file, and the
+/// scale and offset that fit it in the item's cube ([`utsim_scene::compose::ITEM_SIZE`]),
+/// its longest side the cube's edge, standing on the cube's bottom at its centre (Godot,
+/// under the item's node, whose origin is the cube's centre).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModeloPeca {
+    pub stem: String,
+    pub path: String,
+    pub scale: f32,
+    pub offset: [f32; 3],
+}
+
+impl ModeloPeca {
+    /// The element `stem` of the catalogue fitted to the item's cube; `None` when the
+    /// catalogue has no such element or no box for it.
+    pub fn of(cat: &Catalogo, stem: &str) -> Option<ModeloPeca> {
+        let e = cat.get(stem)?;
+        let (m, t) = (e.minimo, e.tamanho);
+        let big = t.iter().copied().fold(0.0f32, f32::max);
+        if !(big.is_finite() && big > 1e-4) {
+            return None;
+        }
+        let edge = utsim_scene::compose::ITEM_SIZE;
+        let k = edge / big;
+        // The box's bottom centre (model x, y, z) to the cube's bottom centre.
+        let (cx, cy) = (m[0] + t[0] / 2.0, m[1] + t[1] / 2.0);
+        Some(ModeloPeca {
+            stem: stem.to_string(),
+            path: cat.path(stem).to_string_lossy().replace('\\', "/"),
+            scale: k,
+            offset: [-cx * k, -m[2] * k - edge / 2.0, cy * k],
+        })
+    }
+}
+
 /// Where an asset is placed under its block's root, and the root itself (Godot, Y up).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
     /// Uniform scale of the asset.
     pub scale: f32,
+    /// Stretch of the asset along its own axes (Godot, after `scale`): `[1, 1, 1]` but for
+    /// an element given a size in the model ([`Elemento::encaixe`]).
+    pub stretch: [f32; 3],
     /// Turn of the asset about `+Y` under the root (radians).
     pub asset_yaw: f32,
     /// Translation of the asset under the root.
@@ -277,7 +770,12 @@ pub struct Placement {
 /// space (Godot, Y up), with the heading of its `+x` (radians about `+Y`): the asset's
 /// scale, turn and offset under the root, then the root's turn and position.
 pub fn point_to_layout(p: &Ponto, at: &Placement) -> Pose {
-    let g = to_godot(p.pos).map(|v| v * at.scale);
+    let g = to_godot(p.pos);
+    let g = [
+        g[0] * at.scale * at.stretch[0],
+        g[1] * at.scale * at.stretch[1],
+        g[2] * at.scale * at.stretch[2],
+    ];
     let a = turned(g, at.asset_yaw);
     let local = [
         a[0] + at.offset[0],
@@ -498,6 +996,54 @@ impl Animado {
             }
         }
         out
+    }
+
+    /// The runs of a door that opens for the items passing through it (the `doca` at a
+    /// source or a sink: its `entering` and `leaving` lines), from the times the items
+    /// pass, in order. The door opens in the `d` before an item, stays open while items
+    /// keep coming (gaps under `3d`) and closes after the last; `d` is a quarter of the
+    /// usual gap, at most 1. `None` when the element has no such lines.
+    pub fn door_runs(&mut self, times: &[f64]) -> Option<Runs> {
+        let line = |s: &Self, n: &str| s.estados.iter().position(|(k, _)| k == n);
+        let (enter, leave) = (line(self, "entering")?, line(self, "leaving")?);
+        let hold = match line(self, DOOR_OPEN) {
+            Some(k) => k,
+            None => {
+                let p = &self.estados[enter].1;
+                let open = Passo {
+                    de: p.ate,
+                    ate: p.ate,
+                    laco: false,
+                    caminho: None,
+                    ..p.clone()
+                };
+                self.estados.push((DOOR_OPEN.to_string(), open));
+                self.estados.len() - 1
+            }
+        };
+        let mut gaps: Vec<f64> = times
+            .windows(2)
+            .map(|w| w[1] - w[0])
+            .filter(|g| *g > 1e-9)
+            .collect();
+        gaps.sort_by(f64::total_cmp);
+        let d = gaps.get(gaps.len() / 2).map_or(1.0, |m| (m / 4.0).min(1.0));
+        let mut out: Runs = Vec::new();
+        let mut k = 0;
+        while k < times.len() {
+            let start = times[k];
+            let mut end = start;
+            k += 1;
+            while k < times.len() && times[k] - end < 3.0 * d {
+                end = times[k];
+                k += 1;
+            }
+            out.push((start - d, Some(enter), None));
+            out.push((start, Some(hold), None));
+            out.push((end + d / 2.0, Some(leave), None));
+            out.push((end + 1.5 * d, None, None));
+        }
+        Some(out)
     }
 
     /// The clip at `t` (index into [`Animado::clips`], -1 for none) and its phase, in the
@@ -790,6 +1336,25 @@ impl Tampo {
         })
     }
 
+    /// The top of the element placed by `at` (its scale and stretch), in metres, with the
+    /// placement that then only turns and moves it: the grid of items is laid in metres,
+    /// so a stretched table holds more items, not wider ones.
+    pub fn placed(&self, at: &Placement) -> (Tampo, Placement) {
+        let k = |j: usize| at.scale * at.stretch[j];
+        (
+            Tampo {
+                // Model x is Godot x, model y is Godot -z, model z is Godot y.
+                area: [self.area[0] * k(0), self.area[1] * k(2)],
+                altura: self.altura * k(1),
+            },
+            Placement {
+                scale: 1.0,
+                stretch: [1.0; 3],
+                ..*at
+            },
+        )
+    }
+
     /// Columns (along `x`) and rows (across) of items of `size`.
     pub fn grade(&self, size: f32) -> (usize, usize) {
         let pitch = size.max(1e-3) * (1.0 + TAMPO_FOLGA);
@@ -924,11 +1489,99 @@ mod tests {
 
     const AT: Placement = Placement {
         scale: 1.0,
+        stretch: [1.0; 3],
         asset_yaw: 0.0,
         offset: [0.0; 3],
         root: [0.0; 3],
         turn: 0.0,
     };
+
+    #[test]
+    fn the_part_of_the_workstation_sits_on_its_top_clear_of_the_clamp() {
+        let Some(mut c) = Catalogo::find(None) else {
+            return;
+        };
+        if c.get("posto").is_none() {
+            return;
+        }
+        let before = c.get("posto").unwrap().pontos["ponto_peca"].pos;
+        c.assentar("posto");
+        let e = c.get("posto").unwrap();
+        let adj = e.ajustes["ponto_peca"];
+        let tris = glb_triangles(&std::fs::read(c.path("posto")).unwrap()).unwrap();
+        let g = to_godot(e.pontos["ponto_peca"].pos);
+        let edge = utsim_scene::compose::ITEM_SIZE;
+        // On the jig plate of the bench (0,94 m, the surface under the point), and the box
+        // cuts nothing (the clamp beside it).
+        assert!((g[1] - 0.94).abs() < 0.005, "{g:?} {adj:?}");
+        assert!(!cuts(&tris, g[0], g[2], g[1], edge), "{g:?}");
+        let top = surface(&tris, g[0], g[2], g[1] + 0.01).unwrap();
+        assert!((top - g[1]).abs() < 1e-4);
+        // Moved the least along the top, clear of where the clamp swings (the `ciclo` clip).
+        let moved =
+            ((g[0] - to_godot(before)[0]).powi(2) + (g[2] - to_godot(before)[2]).powi(2)).sqrt();
+        assert!(moved > 0.0 && moved < 0.3, "{moved}");
+        let seated = e.pontos["ponto_peca"].clone();
+        // Every element: what was moved, and by how much (each by less than 0,4 m).
+        for stem in c.elementos.keys().cloned().collect::<Vec<_>>() {
+            c.assentar(&stem);
+            for (n, a) in &c.get(&stem).unwrap().ajustes {
+                eprintln!("assentado: {stem} {n} {a:?}");
+                assert!(a.iter().all(|v| v.abs() < 0.41), "{stem} {n} {a:?}");
+            }
+        }
+        // The point as it was cut the clamp.
+        let b = to_godot(before);
+        assert!(cuts(&tris, b[0], b[2], 0.94, edge));
+        // Once only.
+        c.assentar("posto");
+        assert_eq!(c.get("posto").unwrap().pontos["ponto_peca"], seated);
+    }
+
+    #[test]
+    fn a_resized_element_stretches_and_its_points_follow() {
+        // A 1 m × 0,5 m × 1 m table (model x, y, z), its top point at the middle.
+        let e = Elemento {
+            minimo: [-0.5, -0.25, 0.0],
+            tamanho: [1.0, 0.5, 1.0],
+            ..Elemento::default()
+        };
+        // Given 2 m long, 1 m wide and 1 m tall (Godot x, y, z): twice along x and across.
+        let fit = e.encaixe(1.0, 0.0, [0.0; 3], [2.0, 1.0, 1.0]).unwrap();
+        assert!(close(fit.stretch, [2.0, 1.0, 2.0]), "{fit:?}");
+        assert!(close(fit.offset, [0.0; 3]), "{fit:?}");
+        let at = Placement {
+            stretch: fit.stretch,
+            offset: fit.offset,
+            ..AT
+        };
+        let corner = Ponto {
+            pos: [0.5, 0.25, 1.0],
+            ..Ponto::default()
+        };
+        let (pos, _) = point_to_layout(&corner, &at);
+        assert!(close(pos, [1.0, 1.0, -0.5]), "{pos:?}");
+        // Turned a quarter under the root: the axes swap, the box still fills the size.
+        let fit = e
+            .encaixe(1.0, FRAC_PI_2, [0.0; 3], [2.0, 1.0, 1.0])
+            .unwrap();
+        assert!(close(fit.stretch, [1.0, 1.0, 4.0]), "{fit:?}");
+        // Off the floor and off centre: stood on the floor at the root's centre.
+        let e = Elemento {
+            minimo: [0.0, 0.0, 0.2],
+            tamanho: [1.0, 1.0, 1.0],
+            ..Elemento::default()
+        };
+        let fit = e.encaixe(1.0, 0.0, [0.0; 3], [1.0, 2.0, 1.0]).unwrap();
+        assert!(close(fit.stretch, [1.0, 2.0, 1.0]), "{fit:?}");
+        assert!(close(fit.offset, [-0.5, -0.4, 0.5]), "{fit:?}");
+        // No box: no fit.
+        assert!(
+            Elemento::default()
+                .encaixe(1.0, 0.0, [0.0; 3], [1.0; 3])
+                .is_none()
+        );
+    }
 
     #[test]
     fn the_corrected_clips_name_the_file_and_what_they_replace() {
@@ -1216,6 +1869,36 @@ mod tests {
         // The station posts have setup now.
         let posto = Animado::resolve(c.get("posto").unwrap(), "posto", &AT, false);
         assert!(posto.line(State::Setup).is_some() && posto.line(State::Entering).is_none());
+    }
+
+    #[test]
+    fn the_dock_door_opens_before_each_item_and_stays_open_for_a_burst() {
+        let passo = |de: f32, ate: f32| Passo {
+            clip: 0,
+            de,
+            ate,
+            laco: false,
+            caminho: None,
+        };
+        let mut a = Animado {
+            clips: vec!["porta_abrir".into()],
+            estados: vec![
+                ("entering".into(), passo(0.0, 1.0)),
+                ("leaving".into(), passo(1.0, 0.0)),
+            ],
+            ..Animado::default()
+        };
+        // Two items almost together, then one every 10: the door opens one unit before.
+        let runs = a.door_runs(&[10.0, 10.05, 20.0, 30.0]).unwrap();
+        let at = |t: f64| a.anim(run_at(&runs, t), t);
+        assert_eq!(at(5.0), (-1, 0.0), "fechada antes");
+        assert!((at(9.5).1 - 0.5).abs() < 1e-4, "{:?}", at(9.5));
+        assert_eq!(at(10.03), (0, 1.0), "aberta entre as duas peças");
+        assert_eq!(at(10.3), (0, 1.0));
+        assert_eq!(at(15.0), (-1, 0.0), "fechada entre as chegadas");
+        assert_eq!(at(20.0), (0, 1.0));
+        // Without the lines (a machine), no door.
+        assert!(Animado::default().door_runs(&[1.0]).is_none());
     }
 
     #[test]

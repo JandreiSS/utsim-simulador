@@ -1,0 +1,13 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Ponte rolante operada por rádio: a pessoa segura o controle remoto (o elemento controle_remoto do Blender) entre as mãos só enquanto opera a ponte."},
+		{"abrir": "g4_ponte_radio.ron"},
+		{"modo": "simular"},
+		{"conferir": {"radio": {"objeto": "operador", "t": 1570.0, "segura": false}}},
+		{"conferir": {"radio": {"objeto": "operador", "t": 1700.0, "segura": true}}},
+		{"tempo": 1700.0},
+		{"focar": {"objeto": "operador", "distancia": 3.0, "giro": 0.6, "inclinacao": 0.3}},
+		{"capturar": "g4_ponte_radio_01_controle"}
+	]
+}

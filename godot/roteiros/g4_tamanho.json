@@ -1,0 +1,18 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Dimensões mudadas no modelo: as peças seguem o novo tamanho. A fila de 8 m usa o comprimento todo (20 colunas, a mais antiga na saída) e a mesa de 1,2 m de altura tem as peças em cima do tampo, que subiu junto (0,76 m × 1,2 / 0,82 = 1,11 m)."},
+		{"abrir": "g4_tamanho.ron"},
+		{"modo": "simular"},
+		{"nota": "Fila de 8 m × 2 m com 25 peças (a primeira já foi para o posto): cada uma no lugar da sua ordem de chegada, 19 na primeira faixa, ao longo dos 8 m, e 6 na segunda, perto da saída. No meio (os 4 m × 1,4 m do tamanho padrão) ficam só 11; antes do conserto as 25 ficavam ali."},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_longa", "t": 30.0, "quantos": 25, "dentro": [4.0, 1.0], "altura_entre": [-0.01, 0.05]}}},
+		{"conferir": {"itens_no_bloco": {"objeto": "fila_longa", "t": 30.0, "quantos": 11, "dentro": [2.0, 0.7]}}},
+		{"nota": "Mesa de 1,2 m de altura: as peças estão no tampo esticado, não na altura do tampo original (0,76 m)."},
+		{"conferir": {"itens_no_bloco": {"objeto": "mesa_alta", "t": 30.0, "dentro": [1.4, 0.5], "altura_entre": [1.08, 1.45]}}},
+		{"tempo": 30.0},
+		{"focar": {"objeto": "fila_longa", "distancia": 12.0, "giro": 0.6, "inclinacao": 0.5}},
+		{"capturar": "g4_tamanho_01_fila_longa"},
+		{"focar": {"objeto": "mesa_alta", "distancia": 5.0, "giro": 0.6, "inclinacao": 0.4}},
+		{"capturar": "g4_tamanho_02_mesa_alta"}
+	]
+}

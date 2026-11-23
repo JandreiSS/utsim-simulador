@@ -1,0 +1,15 @@
+// Ponto de partida do roteiro g4_modelo_peca.json: uma linha simples (chegada, espera,
+// posto e saída) cujas peças começam como caixas. O roteiro escolhe o modelo da peça no
+// painel de propriedades da chegada.
+Model(
+    format: 2,
+    name: "modelo da peça",
+    run: (stop_time: 120.0, seed: 1, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(2.0), first_at_zero: true), position: (-6.0, 0.0, 0.0)),
+        (name: "espera", kind: Queue(), position: (-2.0, 0.0, 0.0)),
+        (name: "posto", kind: Processor(process: Const(5.0)), position: (2.0, 0.0, 0.0)),
+        (name: "saida", kind: Sink, position: (6.0, 0.0, 0.0)),
+    ],
+    connections: [("chegada", "espera"), ("espera", "posto"), ("posto", "saida")],
+)

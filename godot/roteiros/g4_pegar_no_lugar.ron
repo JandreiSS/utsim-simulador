@@ -1,0 +1,27 @@
+// Ponto de partida do roteiro g4_pegar_no_lugar.json: uma empilhadeira e uma pessoa levam
+// peças de uma espera ao estoque, a 20 m. As peças chegam a cada 3 s e a ida e volta
+// demora mais, então a espera acumula peças; cada uma fica no seu lugar e quem leva vai até
+// ela (o garfo ou as mãos debaixo da peça), não a um ponto fixo da espera.
+Model(
+    format: 2,
+    name: "pegar no lugar",
+    run: (stop_time: 200.0, seed: 1, replications: 1),
+    objects: [
+        (name: "chegada", kind: Source(interarrival: Const(3.0), first_at_zero: true, max_arrivals: Some(12)),
+         position: (-6.0, 0.0, 0.0)),
+        (name: "doca", kind: Queue(), transport: "empilhadeira_1", position: (0.0, 0.0, 0.0), access: (0.0, -3.0)),
+        (name: "estoque", kind: Sink, position: (20.0, 0.0, 0.0), access: (0.0, -3.0)),
+        (name: "empilhadeira_1", kind: Transporter(speed: 2.0, load_time: Const(4.0), unload_time: Const(2.0)),
+         position: (0.0, -5.0, 0.0), visual: (asset: "empilhadeira")),
+        (name: "chegada_2", kind: Source(interarrival: Const(3.0), first_at_zero: true, max_arrivals: Some(12)),
+         position: (-6.0, 12.0, 0.0)),
+        (name: "doca_2", kind: Queue(), transport: "operador_1", position: (0.0, 12.0, 0.0), access: (0.0, -3.0)),
+        (name: "estoque_2", kind: Sink, position: (20.0, 12.0, 0.0), access: (0.0, -3.0)),
+        (name: "operador_1", kind: Transporter(speed: 1.5, load_time: Const(4.0), unload_time: Const(2.0)),
+         position: (0.0, 7.0, 0.0), visual: (asset: "pessoa")),
+    ],
+    connections: [
+        ("chegada", "doca"), ("doca", "estoque"),
+        ("chegada_2", "doca_2"), ("doca_2", "estoque_2"),
+    ],
+)
