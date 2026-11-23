@@ -116,8 +116,8 @@ mod tests {
     /// `editor.ftl`: a mistyped key would show up as the key itself on screen.
     #[test]
     fn every_key_in_the_sources_exists() {
-        const PREFIXES: [&str; 8] = [
-            "atalho-", "camada-", "camadas-", "dist-", "editor-", "prop-", "tipo-", "ui-",
+        const PREFIXES: [&str; 9] = [
+            "atalho-", "camada-", "camadas-", "dist-", "editor-", "prop-", "res-", "tipo-", "ui-",
         ];
         fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
             for e in std::fs::read_dir(dir).unwrap().flatten() {
@@ -157,5 +157,93 @@ mod tests {
         }
         assert!(seen > 400, "only {seen} keys found");
         assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    /// Every `fx(key, &[(name, value), ...])` call passes exactly the variables the
+    /// Portuguese message uses: a wrong name would show `{$name}` on screen.
+    #[test]
+    fn every_fx_passes_the_variables_of_its_message() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let ftl = std::fs::read_to_string(root.join("../../idiomas/pt-BR/editor.ftl")).unwrap();
+        let mut vars: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+            Default::default();
+        let mut current: Option<String> = None;
+        for line in ftl.lines() {
+            let starts_entry =
+                line.starts_with(|c: char| c.is_ascii_lowercase()) && line.contains(" =");
+            if starts_entry {
+                let key = line[..line.find(" =").unwrap()].trim().to_string();
+                vars.entry(key.clone()).or_default();
+                current = Some(key);
+            } else if line.is_empty() || line.starts_with('#') {
+                current = None;
+            }
+            if let Some(k) = &current {
+                for piece in line.split('$').skip(1) {
+                    let name: String = piece
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect();
+                    vars.get_mut(k).unwrap().insert(name);
+                }
+            }
+        }
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&root.join("src"), &mut files);
+        let mut wrong = Vec::new();
+        let mut seen = 0;
+        for f in files {
+            let text = std::fs::read_to_string(&f).unwrap();
+            for (at, _) in text.match_indices("fx(\"") {
+                let rest = &text[at + 4..];
+                let key = &rest[..rest.find('"').unwrap()];
+                let after = rest[key.len() + 1..].trim_start();
+                let Some(after) = after.strip_prefix(',') else {
+                    continue;
+                };
+                let Some(list) = after.trim_start().strip_prefix("&[") else {
+                    continue;
+                };
+                let mut depth = 1;
+                let end = list
+                    .char_indices()
+                    .find(|&(_, c)| {
+                        depth += match c {
+                            '[' => 1,
+                            ']' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .map(|(i, _)| i)
+                    .unwrap();
+                let passed: std::collections::BTreeSet<String> = list[..end]
+                    .split("(\"")
+                    .skip(1)
+                    .filter_map(|p| p.split_once("\",").map(|(n, _)| n.to_string()))
+                    .filter(|n| n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+                    .collect();
+                seen += 1;
+                if vars.get(key) != Some(&passed) {
+                    wrong.push(format!(
+                        "{}: {key} {passed:?} vs {:?}",
+                        f.display(),
+                        vars.get(key)
+                    ));
+                }
+            }
+        }
+        assert!(seen > 100, "only {seen} fx calls found");
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 }

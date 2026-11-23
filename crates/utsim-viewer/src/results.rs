@@ -5,6 +5,7 @@
 //! The statistics themselves come from `utsim_model::analysis` (one place for the
 //! numbers of the CLI and the editor); this module only reshapes them for the screen.
 
+use crate::texto::{dx, fx, tx, vx};
 use std::collections::BTreeMap;
 
 use utsim_core::State;
@@ -99,9 +100,14 @@ impl RunForm {
 
     /// One-line description, for the report.
     pub fn describe(&self) -> String {
-        format!(
-            "{} replicação(ões), de t = 0 a t = {} com aquecimento até t = {}, semente {}",
-            self.replications, self.stop_time, self.warmup, self.seed
+        fx(
+            "res-replicacao_oes_de_t_0",
+            &[
+                ("replications", vx(&self.replications)),
+                ("stop_time", dx(self.stop_time.to_string())),
+                ("warmup", dx(self.warmup.to_string())),
+                ("seed", vx(&self.seed)),
+            ],
         )
     }
 }
@@ -113,24 +119,24 @@ fn set(key: &str, value: String) -> Command {
     }
 }
 
-/// Portuguese name of a block kind as the report names it.
+/// Name of a block kind as the report names it, in the current language.
 pub fn kind_label(kind: &str) -> &'static str {
-    match kind {
-        "source" => "Chegada",
-        "queue" => "Fila",
-        "processor" => "Processo",
-        "combiner" => "Montagem",
-        "separator" => "Desmontagem",
-        "sink" => "Saída",
-        "transporter" => "Transportador",
-        "dispatcher" => "Despachante",
-        "conveyor" => "Esteira",
-        "rack" => "Porta-paletes",
-        "flow" => "Fluxo",
-        "fluid" => "Fluidos",
-        "span" => "Medição de tempo",
-        _ => "Outro",
-    }
+    tx(match kind {
+        "source" => "tipo-chegada",
+        "queue" => "tipo-fila",
+        "processor" => "tipo-processo",
+        "combiner" => "tipo-montagem",
+        "separator" => "tipo-desmontagem",
+        "sink" => "tipo-saida",
+        "transporter" => "tipo-transportador",
+        "dispatcher" => "tipo-despachante",
+        "conveyor" => "tipo-esteira",
+        "rack" => "tipo-porta-paletes",
+        "flow" => "tipo-fluxo",
+        "fluid" => "tipo-fluidos",
+        "span" => "tipo-medicao-de-tempo",
+        _ => "tipo-outro",
+    })
 }
 
 /// Distinct kinds of the rows, in first-seen order (the filter's options).
@@ -183,29 +189,20 @@ impl UtilKind {
 
     pub fn label(self) -> &'static str {
         match self {
-            UtilKind::Work => "Ocupação",
-            UtilKind::InclBlocked => "Incluindo bloqueado",
-            UtilKind::InShift => "Dentro do turno",
-            UtilKind::ExclBlocked => "Sem o tempo bloqueado",
+            UtilKind::Work => tx("res-ocupacao"),
+            UtilKind::InclBlocked => tx("res-incluindo_bloqueado"),
+            UtilKind::InShift => tx("res-dentro_do_turno"),
+            UtilKind::ExclBlocked => tx("res-sem_o_tempo_bloqueado"),
         }
     }
 
     /// What the figure means, for hover texts and captions.
     pub fn help(self) -> &'static str {
         match self {
-            UtilKind::Work => {
-                "Fração do tempo trabalhando (em processo ou preparação). Com capacidade maior \
-                 que 1, é a média de servidores ocupados dividida pela capacidade."
-            }
-            UtilKind::InclBlocked => {
-                "Ocupação mais o tempo em que o recurso segura um item pronto que não pode sair."
-            }
-            UtilKind::InShift => {
-                "Ocupação sobre o tempo em turno: o tempo fora de turno sai do denominador."
-            }
-            UtilKind::ExclBlocked => {
-                "Ocupação sobre o tempo não bloqueado: mostra a carga própria do recurso."
-            }
+            UtilKind::Work => tx("res-fracao_do_tempo_trabalhando_em"),
+            UtilKind::InclBlocked => tx("res-ocupacao_mais_o_tempo_em"),
+            UtilKind::InShift => tx("res-ocupacao_sobre_o_tempo_em"),
+            UtilKind::ExclBlocked => tx("res-ocupacao_sobre_o_tempo_nao"),
         }
     }
 
@@ -235,16 +232,16 @@ impl Column {
 
     pub fn label(self) -> &'static str {
         match self {
-            Column::Name => "Objeto",
-            Column::Kind => "Tipo",
-            Column::Input => "Entradas",
-            Column::Output => "Saídas",
-            Column::Content => "Conteúdo médio",
-            Column::Staytime => "Permanência média",
-            Column::Utilization => "Ocupação",
-            Column::UtilizationBlocked => "c/ bloqueio",
-            Column::UtilizationShift => "no turno",
-            Column::UtilizationFree => "s/ bloqueio",
+            Column::Name => tx("res-objeto"),
+            Column::Kind => tx("res-tipo"),
+            Column::Input => tx("res-entradas"),
+            Column::Output => tx("res-saidas"),
+            Column::Content => tx("res-conteudo_medio"),
+            Column::Staytime => tx("res-permanencia_media"),
+            Column::Utilization => tx("res-ocupacao"),
+            Column::UtilizationBlocked => tx("res-c_bloqueio"),
+            Column::UtilizationShift => tx("res-no_turno"),
+            Column::UtilizationFree => tx("res-s_bloqueio"),
         }
     }
 
@@ -479,7 +476,10 @@ pub fn parameters(model: &Model) -> Vec<Parameter> {
         if let Some(t) = &obj.transfer {
             out.push(Parameter {
                 key: format!("{}.transfer.speed", obj.name),
-                label: format!("{}: velocidade da transferência", obj.name),
+                label: fx(
+                    "res-velocidade_da_transferencia",
+                    &[("name", vx(&obj.name))],
+                ),
                 current: crate::properties::ron_text::float(t.speed),
             });
         }
@@ -488,7 +488,7 @@ pub fn parameters(model: &Model) -> Vec<Parameter> {
         if let Some(current) = spec::read_run(&model.run, f.key) {
             out.push(Parameter {
                 key: format!("run.{}", f.key),
-                label: format!("Simulação: {}", f.label),
+                label: fx("res-simulacao", &[("label", vx(&f.label))]),
                 current,
             });
         }
@@ -496,7 +496,7 @@ pub fn parameters(model: &Model) -> Vec<Parameter> {
     if let Some(t) = &model.run.transfer {
         out.push(Parameter {
             key: "run.transfer.speed".into(),
-            label: "Simulação: velocidade padrão das transferências".into(),
+            label: tx("res-simulacao_velocidade_padrao_das_transferencias").into(),
             current: crate::properties::ron_text::float(t.speed),
         });
     }
@@ -567,10 +567,10 @@ impl ScenarioForm {
     /// Adds a scenario with a unique name; its cells start empty (base values).
     pub fn add_row(&mut self) {
         let mut n = self.rows.len() + 1;
-        let mut name = format!("cenário {n}");
+        let mut name = fx("res-cenario", &[("n", vx(&n))]);
         while self.rows.iter().any(|r| r.name == name) {
             n += 1;
-            name = format!("cenário {n}");
+            name = fx("res-cenario", &[("n", vx(&n))]);
         }
         self.rows.push(ScenarioRow {
             name,
@@ -584,14 +584,14 @@ impl ScenarioForm {
         let mut errors = Vec::new();
         let mut out = Vec::new();
         if self.rows.is_empty() {
-            errors.push("adicione pelo menos um cenário".to_string());
+            errors.push(tx("res-adicione_pelo_menos_um_cenario").to_string());
         }
         for (i, row) in self.rows.iter().enumerate() {
             let name = row.name.trim();
             if name.is_empty() {
-                errors.push(format!("cenário {}: dê um nome", i + 1));
+                errors.push(fx("res-cenario_de_um_nome", &[("i", vx(&(i + 1)))]));
             } else if self.rows[..i].iter().any(|r| r.name.trim() == name) {
-                errors.push(format!("cenário '{name}': nome repetido"));
+                errors.push(fx("res-cenario_nome_repetido", &[("name", vx(&name))]));
             }
             let set: BTreeMap<String, String> = self
                 .keys
@@ -601,7 +601,7 @@ impl ScenarioForm {
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))
                 .collect();
             if let Err(e) = apply_patches(base, &set) {
-                errors.push(format!("cenário '{name}': {e}"));
+                errors.push(fx("res-cenario-2", &[("name", vx(&name)), ("e", vx(&e))]));
             }
             out.push(Scenario {
                 name: name.to_string(),
@@ -824,8 +824,13 @@ fn bound(text: &str, what: &str, metric: &str, errors: &mut Vec<String>) -> Opti
     match t.parse::<f64>() {
         Ok(v) if v.is_finite() => Some(v),
         _ => {
-            errors.push(format!(
-                "restrição de '{metric}': {what} '{text}' não é um número"
+            errors.push(fx(
+                "res-restricao_de_nao_e_um",
+                &[
+                    ("metric", vx(&metric)),
+                    ("what", vx(&what)),
+                    ("text", vx(&text)),
+                ],
             ));
             None
         }
@@ -838,19 +843,19 @@ impl OptForm {
     pub fn build(&self, base: &Model, model: &str) -> Result<OptProblem, Vec<String>> {
         let mut errors = Vec::new();
         if self.objective_metric.trim().is_empty() {
-            errors.push("escolha a métrica do objetivo".to_string());
+            errors.push(tx("res-escolha_a_metrica_do_objetivo").to_string());
         }
         let mut constraints = Vec::new();
         for c in &self.constraints {
             if c.metric.trim().is_empty() {
                 continue;
             }
-            let min = bound(&c.min, "mínimo", &c.metric, &mut errors);
-            let max = bound(&c.max, "máximo", &c.metric, &mut errors);
+            let min = bound(&c.min, tx("res-minimo"), &c.metric, &mut errors);
+            let max = bound(&c.max, tx("res-maximo"), &c.metric, &mut errors);
             if min.is_none() && max.is_none() {
-                errors.push(format!(
-                    "restrição de '{}': informe mínimo ou máximo",
-                    c.metric
+                errors.push(fx(
+                    "res-restricao_de_informe_minimo_ou",
+                    &[("metric", vx(&c.metric))],
                 ));
             }
             constraints.push(Constraint {

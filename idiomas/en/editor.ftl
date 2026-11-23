@@ -618,3 +618,220 @@ prop-shifts-ui-nome = Name
 prop-spec-continuas = Continuous
 prop-spec-discretas_e_empirica = Discrete and empirical
 prop-spec-combinacao = Combination
+
+# Parte 3: os resultados (results.rs, results_panel.rs)
+tipo-fluxo = Flow
+tipo-fluidos = Fluids
+tipo-medicao-de-tempo = Time measurement
+tipo-outro = Other
+res-status-replicacoes = { $n ->
+    [one] { $n } replication finished
+   *[other] { $n } replications finished
+}
+res-status-replicacoes-gargalo = { $n ->
+    [one] { $n } replication finished
+   *[other] { $n } replications finished
+}; bottleneck: { $gargalo }
+res-status-pontos = { $n ->
+    [one] { $n } point evaluated
+   *[other] { $n } points evaluated
+}
+res-status-pontos-melhor = { $n ->
+    [one] { $n } point evaluated
+   *[other] { $n } points evaluated
+}; best: { $melhor }
+
+## results.rs
+
+res-replicacao_oes_de_t_0 = { $replications ->
+    [one] { $replications } replication
+   *[other] { $replications } replications
+}, from t = 0 to t = { $stop_time } with warm-up until t = { $warmup }, seed { $seed }
+res-ocupacao = Utilization
+res-incluindo_bloqueado = Including blocked
+res-dentro_do_turno = Within the shift
+res-sem_o_tempo_bloqueado = Without blocked time
+res-fracao_do_tempo_trabalhando_em = Fraction of time working (processing or setting up). With capacity above 1, it is the mean number of busy servers divided by the capacity.
+res-ocupacao_mais_o_tempo_em = Utilization plus the time the resource holds a finished item that cannot leave.
+res-ocupacao_sobre_o_tempo_em = Utilization over the time on shift: time off shift leaves the denominator.
+res-ocupacao_sobre_o_tempo_nao = Utilization over the unblocked time: shows the resource’s own load.
+res-objeto = Object
+res-tipo = Kind
+res-entradas = Inputs
+res-saidas = Outputs
+res-conteudo_medio = Mean content
+res-permanencia_media = Mean stay time
+res-c_bloqueio = w/ blocking
+res-no_turno = on shift
+res-s_bloqueio = w/o blocking
+res-velocidade_da_transferencia = { $name }: transfer speed
+res-simulacao = Simulation: { $label }
+res-simulacao_velocidade_padrao_das_transferencias = Simulation: default transfer speed
+res-cenario = scenario { $n }
+res-adicione_pelo_menos_um_cenario = add at least one scenario
+res-cenario_de_um_nome = scenario { $i }: give it a name
+res-cenario_nome_repetido = scenario '{ $name }': repeated name
+res-cenario-2 = scenario '{ $name }': { $e }
+res-restricao_de_nao_e_um = constraint on '{ $metric }': { $what } '{ $text }' is not a number
+res-escolha_a_metrica_do_objetivo = choose the objective metric
+res-minimo = minimum
+res-maximo = maximum
+res-restricao_de_informe_minimo_ou = constraint on '{ $metric }': give a minimum or a maximum
+
+## results_panel.rs
+
+res-painel-resumo = Summary
+res-painel-graficos = Charts
+res-painel-cenarios = Scenarios
+res-painel-otimizacao = Optimization
+res-painel-ocupacao = Utilization
+res-painel-estados = States
+res-painel-serie_temporal = Time series
+res-painel-histograma = Histogram
+res-painel-a_execucao_terminou_sem_resultado = the run ended without a result
+res-painel-cenario_s_comparados = { $scenarios ->
+    [one] { $scenarios } scenario compared
+   *[other] { $scenarios } scenarios compared
+}
+res-painel-cancelado = { $what }: cancelled
+res-painel-erro = { $what }: error
+res-painel-rodando_replicacoes = Running replications
+res-painel-comparando_cenarios = Comparing scenarios
+res-painel-otimizando = Optimizing
+res-painel-resultados = Results
+res-painel-o_modelo_tem_problema_s = The model has { $blocked ->
+    [one] { $blocked } problem
+   *[other] { $blocked } problems
+}: fix them in Edit before running.
+res-painel-de = { $what }: { $done } of { $total }
+res-painel-cancelar = Cancel
+res-painel-rodada = Run
+res-painel-replicacoes = Replications
+res-painel-semente = Seed
+res-painel-tempo_de_parada = Stop time
+res-painel-aquecimento = Warm-up
+res-painel-series_temporais_a_cada = Time series every
+res-painel-histogramas_com_classes = Histograms with bins
+res-painel-rodar_replicacoes = Run replications
+res-painel-gravar_no_modelo = Save to the model
+res-painel-grava_replicacoes_tempos_e_semente = Saves replications, times and seed in the model (Ctrl+Z undoes)
+res-painel-restaurar_do_modelo = Restore from the model
+res-painel-rode_as_replicacoes_para_ver = Run the replications to see the summary per object, the bottleneck and the charts.
+res-painel-cada_valor_media_entre_replicacoes = { $describe }. Each value: mean across replications ± half-width of the 95% CI.
+res-painel-gargalo_geral = Bottleneck (overall):
+res-painel-ocupacao_a_maior_entre_processos = (utilization { $content }; the highest among processes and resources)
+res-painel-gargalo_dentro_do_turno = Bottleneck (within the shift):
+res-painel-ocupacao_no_tempo_em_turno = (utilization { $content } over the time on shift)
+res-painel-tipo = Kind:
+res-painel-todos = all
+res-painel-clique_no_titulo_de_uma = Click a column title to sort.
+res-painel-decr = {" "}(desc.)
+res-painel-cresc = {" "}(asc.)
+res-painel-metricas_proprias_tempo_no_sistema = Custom metrics (time in system, flows, tank levels...)
+res-painel-pasta_de_exportacao = Export folder:
+res-painel-exportar_csv = Export CSV
+res-painel-resumo_csv_objetos_csv_replicacoes = resumo.csv, objetos.csv, replicacoes.csv and, if any, series.csv and histogramas.csv
+res-painel-exportar_html = Export HTML
+res-painel-relatorio_com_tabelas_e_graficos = Report with tables and charts (includes the scenario comparison, if any)
+res-painel-a_exportacao_de_arquivos_existe = Exporting files is only available in the desktop app.
+res-painel-csv_gravado_em = CSV saved in { $dir }: { $files }
+res-painel-nao_foi_possivel_gravar_em = could not write to { $dir }: { $e }
+res-painel-relatorio_gravado_em = Report saved to { $file }
+res-painel-nao_foi_possivel_gravar = could not write { $file }: { $e }
+res-painel-rode_as_replicacoes_na_aba = Run the replications in the Summary tab to see the charts.
+res-painel-o_modelo_nao_tem_processos = The model has no processes or mobile resources.
+res-painel-de_cada_recurso_com_o = { $label } of each resource (%), with the 95% interval, never above 100% per server. In orange, the bottleneck (highest utilization).
+res-painel-fracao_do_tempo_em_cada = Fraction of time in each state (%), with the 3D colors.
+res-painel-objeto = Object:
+res-painel-este_objeto_nao_tem_observacoes = This object has no stay-time observations.
+res-painel-a_rodada_foi_feita_sem = The run was made without histograms.
+res-painel-medida = Measure:
+res-painel-ativar_series_temporais_e_rodar = Turn on time series and run again
+res-painel-ativar_histogramas_e_rodar_de = Turn on histograms and run again
+res-painel-ic_95 = 95% CI
+res-painel-sem_estados_registrados = No states recorded.
+res-painel-este_objeto_nao_tem_pontos = This object has no sampled points.
+res-painel-a_rodada_foi_feita_sem-2 = The run was made without time series (run.sample_interval off).
+res-painel-conteudo_de_ao_longo_do = Content of { $object } over time: mean of the replications (bold line) and each replication.
+res-painel-observacoes_de_todas_as_replicacoes = { $total } observations from all replications, from { $h } to { $h2 }.
+res-painel-parametro = Parameter:
+res-painel-atual = { $key } (current: { $current })
+res-painel-ou_chave = or key:
+res-painel-objeto_campo = object.field
+res-painel-adicionar_parametro = Add parameter
+res-painel-cada_linha_e_um_cenario = Each row is a scenario; each column, a parameter. An empty cell keeps the model’s value. Values in RON text, as in the set field of experiments.
+res-painel-experimento = Experiment:
+res-painel-cenario = Scenario
+res-painel-remover_parametro = Remove parameter
+res-painel-remover_cenario = Remove scenario
+res-painel-adicionar_cenario = Add scenario
+res-painel-metricas_separadas_por_virgula_vazio = Metrics (comma-separated; empty: all):
+res-painel-rodar_cenarios = Run scenarios
+res-painel-replicacao_oes_por_cenario_aba = { $reps ->
+    [one] { $reps } replication
+   *[other] { $reps } replications
+} per scenario (Summary tab), same seeds in all
+res-painel-media_ic_de_95_e = { $name }: mean ± 95% CI. Δ is the paired difference (same seeds) to '{ $name2 }'; ≈ marks a non-significant difference, significant ones in orange.
+res-painel-filtrar_metricas = Filter metrics:
+res-painel-metrica = Metric
+res-painel-vs = Δ vs { $name }
+res-painel-mostrar_no_grafico = Show in the chart
+res-painel-grafico_da_metrica = Metric chart:
+res-painel-arquivo_de_experimento = Experiment file:
+res-painel-abrir_experimento = Open experiment
+res-painel-experimento_aberto = Experiment '{ $name }' opened
+res-painel-experimento_aberto_os_cenarios_valem = Experiment '{ $name }' opened; the scenarios apply to the open model (the file points to { $model_path })
+res-painel-nao_foi_possivel_abrir = could not open: { $e }
+res-painel-salvar_experimento = Save experiment
+res-painel-salve_o_modelo_antes_o = save the model first: the experiment points to the model file
+res-painel-experimento_salvo_em = Experiment saved to { $target }
+res-painel-variaveis_de_decisao_mesmas_chaves = Decision variables (same keys as the scenarios), objective and constraints. All points use the same seeds; the best is compared with the others by a paired test.
+res-painel-variavel = Variable
+res-painel-dominio = Domain
+res-painel-minimo = Minimum
+res-painel-maximo = Maximum
+res-painel-passo_valores = Step / values
+res-painel-custo_por_unidade = Cost per unit
+res-painel-inteiro = integer
+res-painel-continuo = continuous
+res-painel-lista = list
+res-painel-objetivo = Objective:
+res-painel-minimizar = minimize
+res-painel-maximizar = maximize
+res-painel-peso_da_metrica = metric weight
+res-painel-custos_das_variaveis = + variable costs
+res-painel-restricoes_sobre_a_media_da = Constraints (on the metric’s mean)
+res-painel-minimo-2 = minimum
+res-painel-maximo-2 = maximum
+res-painel-adicionar_restricao = Add constraint
+res-painel-metodo = Method:
+res-painel-grade = grid
+res-painel-recozimento_simulado = simulated annealing
+res-painel-genetico = genetic
+res-painel-iteracoes = iterations
+res-painel-populacao = population
+res-painel-geracoes = generations
+res-painel-replicacoes_por_ponto = Replications per point
+res-painel-orcamento_pontos = Budget (points)
+res-painel-semente_da_busca = Search seed
+res-painel-refinar_os = Refine the
+res-painel-melhores_com = best with
+res-painel-replicacoes-2 = replications
+res-painel-otimizar = Optimize
+res-painel-melhor_ponto = Best point:
+res-painel-objetivo-2 = objective { $objective }
+res-painel-aplicar_ao_modelo = Apply to the model
+res-painel-grava_estes_valores_no_modelo = Saves these values in the model (Ctrl+Z undoes)
+res-painel-nao_atende = not met
+res-painel-media_observada = { $bound } (observed mean: { $cell })
+res-painel-nenhum_ponto_avaliado_atende_as = No evaluated point meets the constraints.
+res-painel-convergencia_melhor_objetivo_viavel_por = Convergence: best feasible objective by number of evaluated points
+res-painel-pontos_avaliados = evaluated points
+res-painel-melhor_ate_entao = best so far
+res-painel-comparacao_pareada_com_o_melhor = Paired comparison with the best (≈: no significant difference at 95%)
+res-painel-ponto = Point
+res-painel-objetivo-3 = Objective
+res-painel-viavel = Feasible
+res-painel-vs_melhor = Δ vs best
+res-painel-equivalente = { $delta } equivalent
+res-painel-objeto_metrica = object.metric

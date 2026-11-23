@@ -620,3 +620,220 @@ prop-shifts-ui-nome = Nome
 prop-spec-continuas = Continue
 prop-spec-discretas_e_empirica = Discrete ed empirica
 prop-spec-combinacao = Combinazione
+
+# Parte 3: os resultados (results.rs, results_panel.rs)
+tipo-fluxo = Flusso
+tipo-fluidos = Fluidi
+tipo-medicao-de-tempo = Misura del tempo
+tipo-outro = Altro
+res-status-replicacoes = { $n ->
+    [one] { $n } replica completata
+   *[other] { $n } repliche completate
+}
+res-status-replicacoes-gargalo = { $n ->
+    [one] { $n } replica completata
+   *[other] { $n } repliche completate
+}; collo di bottiglia: { $gargalo }
+res-status-pontos = { $n ->
+    [one] { $n } punto valutato
+   *[other] { $n } punti valutati
+}
+res-status-pontos-melhor = { $n ->
+    [one] { $n } punto valutato
+   *[other] { $n } punti valutati
+}; migliore: { $melhor }
+
+## results.rs
+
+res-replicacao_oes_de_t_0 = { $replications ->
+    [one] { $replications } replica
+   *[other] { $replications } repliche
+}, da t = 0 a t = { $stop_time } con riscaldamento fino a t = { $warmup }, seme { $seed }
+res-ocupacao = Utilizzo
+res-incluindo_bloqueado = Incluso bloccato
+res-dentro_do_turno = Nel turno
+res-sem_o_tempo_bloqueado = Senza il tempo bloccato
+res-fracao_do_tempo_trabalhando_em = Frazione del tempo in lavoro (lavorazione o attrezzaggio). Con capacità maggiore di 1, è la media dei serventi occupati divisa per la capacità.
+res-ocupacao_mais_o_tempo_em = Utilizzo più il tempo in cui la risorsa trattiene un pezzo finito che non può uscire.
+res-ocupacao_sobre_o_tempo_em = Utilizzo sul tempo di turno: il tempo fuori turno esce dal denominatore.
+res-ocupacao_sobre_o_tempo_nao = Utilizzo sul tempo non bloccato: mostra il carico proprio della risorsa.
+res-objeto = Oggetto
+res-tipo = Tipo
+res-entradas = Ingressi
+res-saidas = Uscite
+res-conteudo_medio = Contenuto medio
+res-permanencia_media = Permanenza media
+res-c_bloqueio = con blocco
+res-no_turno = nel turno
+res-s_bloqueio = senza blocco
+res-velocidade_da_transferencia = { $name }: velocità del trasferimento
+res-simulacao = Simulazione: { $label }
+res-simulacao_velocidade_padrao_das_transferencias = Simulazione: velocità predefinita dei trasferimenti
+res-cenario = scenario { $n }
+res-adicione_pelo_menos_um_cenario = aggiungi almeno uno scenario
+res-cenario_de_um_nome = scenario { $i }: dagli un nome
+res-cenario_nome_repetido = scenario '{ $name }': nome ripetuto
+res-cenario-2 = scenario '{ $name }': { $e }
+res-restricao_de_nao_e_um = vincolo su '{ $metric }': { $what } '{ $text }' non è un numero
+res-escolha_a_metrica_do_objetivo = scegli la metrica dell’obiettivo
+res-minimo = minimo
+res-maximo = massimo
+res-restricao_de_informe_minimo_ou = vincolo su '{ $metric }': indica minimo o massimo
+
+## results_panel.rs
+
+res-painel-resumo = Riepilogo
+res-painel-graficos = Grafici
+res-painel-cenarios = Scenari
+res-painel-otimizacao = Ottimizzazione
+res-painel-ocupacao = Utilizzo
+res-painel-estados = Stati
+res-painel-serie_temporal = Serie temporale
+res-painel-histograma = Istogramma
+res-painel-a_execucao_terminou_sem_resultado = l’esecuzione è terminata senza risultato
+res-painel-cenario_s_comparados = { $scenarios ->
+    [one] { $scenarios } scenario confrontato
+   *[other] { $scenarios } scenari confrontati
+}
+res-painel-cancelado = { $what }: annullato
+res-painel-erro = { $what }: errore
+res-painel-rodando_replicacoes = Esecuzione delle repliche
+res-painel-comparando_cenarios = Confronto degli scenari
+res-painel-otimizando = Ottimizzazione in corso
+res-painel-resultados = Risultati
+res-painel-o_modelo_tem_problema_s = Il modello ha { $blocked ->
+    [one] { $blocked } problema
+   *[other] { $blocked } problemi
+}: correggili in Modifica prima di eseguire.
+res-painel-de = { $what }: { $done } di { $total }
+res-painel-cancelar = Annulla
+res-painel-rodada = Esecuzione
+res-painel-replicacoes = Repliche
+res-painel-semente = Seme
+res-painel-tempo_de_parada = Tempo di arresto
+res-painel-aquecimento = Riscaldamento
+res-painel-series_temporais_a_cada = Serie temporali ogni
+res-painel-histogramas_com_classes = Istogrammi con classi
+res-painel-rodar_replicacoes = Esegui le repliche
+res-painel-gravar_no_modelo = Salva nel modello
+res-painel-grava_replicacoes_tempos_e_semente = Salva repliche, tempi e seme nel modello (Ctrl+Z annulla)
+res-painel-restaurar_do_modelo = Ripristina dal modello
+res-painel-rode_as_replicacoes_para_ver = Esegui le repliche per vedere il riepilogo per oggetto, il collo di bottiglia e i grafici.
+res-painel-cada_valor_media_entre_replicacoes = { $describe }. Ogni valore: media tra le repliche ± semiampiezza dell’IC al 95%.
+res-painel-gargalo_geral = Collo di bottiglia (generale):
+res-painel-ocupacao_a_maior_entre_processos = (utilizzo { $content }; il più alto tra processi e risorse)
+res-painel-gargalo_dentro_do_turno = Collo di bottiglia (nel turno):
+res-painel-ocupacao_no_tempo_em_turno = (utilizzo { $content } sul tempo di turno)
+res-painel-tipo = Tipo:
+res-painel-todos = tutti
+res-painel-clique_no_titulo_de_uma = Fai clic sul titolo di una colonna per ordinare.
+res-painel-decr = {" "}(decr.)
+res-painel-cresc = {" "}(cresc.)
+res-painel-metricas_proprias_tempo_no_sistema = Metriche proprie (tempo nel sistema, flussi, livelli dei serbatoi...)
+res-painel-pasta_de_exportacao = Cartella di esportazione:
+res-painel-exportar_csv = Esporta CSV
+res-painel-resumo_csv_objetos_csv_replicacoes = resumo.csv, objetos.csv, replicacoes.csv e, se presenti, series.csv e histogramas.csv
+res-painel-exportar_html = Esporta HTML
+res-painel-relatorio_com_tabelas_e_graficos = Rapporto con tabelle e grafici (include il confronto degli scenari, se presente)
+res-painel-a_exportacao_de_arquivos_existe = L’esportazione dei file esiste solo nell’applicazione desktop.
+res-painel-csv_gravado_em = CSV salvato in { $dir }: { $files }
+res-painel-nao_foi_possivel_gravar_em = impossibile scrivere in { $dir }: { $e }
+res-painel-relatorio_gravado_em = Rapporto salvato in { $file }
+res-painel-nao_foi_possivel_gravar = impossibile scrivere { $file }: { $e }
+res-painel-rode_as_replicacoes_na_aba = Esegui le repliche nella scheda Riepilogo per vedere i grafici.
+res-painel-o_modelo_nao_tem_processos = Il modello non ha processi né risorse mobili.
+res-painel-de_cada_recurso_com_o = { $label } di ogni risorsa (%), con l’intervallo al 95%, mai sopra il 100% per servente. In arancione, il collo di bottiglia (utilizzo più alto).
+res-painel-fracao_do_tempo_em_cada = Frazione del tempo in ogni stato (%), con i colori del 3D.
+res-painel-objeto = Oggetto:
+res-painel-este_objeto_nao_tem_observacoes = Questo oggetto non ha osservazioni di permanenza.
+res-painel-a_rodada_foi_feita_sem = L’esecuzione è stata fatta senza istogrammi.
+res-painel-medida = Misura:
+res-painel-ativar_series_temporais_e_rodar = Attiva le serie temporali ed esegui di nuovo
+res-painel-ativar_histogramas_e_rodar_de = Attiva gli istogrammi ed esegui di nuovo
+res-painel-ic_95 = IC 95%
+res-painel-sem_estados_registrados = Nessuno stato registrato.
+res-painel-este_objeto_nao_tem_pontos = Questo oggetto non ha punti campionati.
+res-painel-a_rodada_foi_feita_sem-2 = L’esecuzione è stata fatta senza serie temporali (run.sample_interval disattivato).
+res-painel-conteudo_de_ao_longo_do = Contenuto di { $object } nel tempo: media delle repliche (linea spessa) e ogni replica.
+res-painel-observacoes_de_todas_as_replicacoes = { $total } osservazioni da tutte le repliche, da { $h } a { $h2 }.
+res-painel-parametro = Parametro:
+res-painel-atual = { $key } (attuale: { $current })
+res-painel-ou_chave = o chiave:
+res-painel-objeto_campo = oggetto.campo
+res-painel-adicionar_parametro = Aggiungi parametro
+res-painel-cada_linha_e_um_cenario = Ogni riga è uno scenario; ogni colonna, un parametro. Una cella vuota mantiene il valore del modello. Valori in testo RON, come nel campo set degli esperimenti.
+res-painel-experimento = Esperimento:
+res-painel-cenario = Scenario
+res-painel-remover_parametro = Rimuovi parametro
+res-painel-remover_cenario = Rimuovi scenario
+res-painel-adicionar_cenario = Aggiungi scenario
+res-painel-metricas_separadas_por_virgula_vazio = Metriche (separate da virgola; vuoto: tutte):
+res-painel-rodar_cenarios = Esegui gli scenari
+res-painel-replicacao_oes_por_cenario_aba = { $reps ->
+    [one] { $reps } replica
+   *[other] { $reps } repliche
+} per scenario (scheda Riepilogo), stessi semi per tutti
+res-painel-media_ic_de_95_e = { $name }: media ± IC al 95%. Δ è la differenza appaiata (stessi semi) rispetto a '{ $name2 }'; ≈ indica differenza non significativa, in arancione quelle significative.
+res-painel-filtrar_metricas = Filtra metriche:
+res-painel-metrica = Metrica
+res-painel-vs = Δ vs { $name }
+res-painel-mostrar_no_grafico = Mostra nel grafico
+res-painel-grafico_da_metrica = Grafico della metrica:
+res-painel-arquivo_de_experimento = File dell’esperimento:
+res-painel-abrir_experimento = Apri esperimento
+res-painel-experimento_aberto = Esperimento '{ $name }' aperto
+res-painel-experimento_aberto_os_cenarios_valem = Esperimento '{ $name }' aperto; gli scenari valgono per il modello aperto (il file punta a { $model_path })
+res-painel-nao_foi_possivel_abrir = impossibile aprire: { $e }
+res-painel-salvar_experimento = Salva esperimento
+res-painel-salve_o_modelo_antes_o = salva prima il modello: l’esperimento punta al file del modello
+res-painel-experimento_salvo_em = Esperimento salvato in { $target }
+res-painel-variaveis_de_decisao_mesmas_chaves = Variabili decisionali (stesse chiavi degli scenari), obiettivo e vincoli. Tutti i punti usano gli stessi semi; il migliore è confrontato con gli altri con un test appaiato.
+res-painel-variavel = Variabile
+res-painel-dominio = Dominio
+res-painel-minimo = Minimo
+res-painel-maximo = Massimo
+res-painel-passo_valores = Passo / valori
+res-painel-custo_por_unidade = Costo per unità
+res-painel-inteiro = intero
+res-painel-continuo = continuo
+res-painel-lista = lista
+res-painel-objetivo = Obiettivo:
+res-painel-minimizar = minimizzare
+res-painel-maximizar = massimizzare
+res-painel-peso_da_metrica = peso della metrica
+res-painel-custos_das_variaveis = + costi delle variabili
+res-painel-restricoes_sobre_a_media_da = Vincoli (sulla media della metrica)
+res-painel-minimo-2 = minimo
+res-painel-maximo-2 = massimo
+res-painel-adicionar_restricao = Aggiungi vincolo
+res-painel-metodo = Metodo:
+res-painel-grade = griglia
+res-painel-recozimento_simulado = ricottura simulata
+res-painel-genetico = genetico
+res-painel-iteracoes = iterazioni
+res-painel-populacao = popolazione
+res-painel-geracoes = generazioni
+res-painel-replicacoes_por_ponto = Repliche per punto
+res-painel-orcamento_pontos = Budget (punti)
+res-painel-semente_da_busca = Seme della ricerca
+res-painel-refinar_os = Affina i
+res-painel-melhores_com = migliori con
+res-painel-replicacoes-2 = repliche
+res-painel-otimizar = Ottimizza
+res-painel-melhor_ponto = Punto migliore:
+res-painel-objetivo-2 = obiettivo { $objective }
+res-painel-aplicar_ao_modelo = Applica al modello
+res-painel-grava_estes_valores_no_modelo = Salva questi valori nel modello (Ctrl+Z annulla)
+res-painel-nao_atende = non soddisfatto
+res-painel-media_observada = { $bound } (media osservata: { $cell })
+res-painel-nenhum_ponto_avaliado_atende_as = Nessun punto valutato soddisfa i vincoli.
+res-painel-convergencia_melhor_objetivo_viavel_por = Convergenza: miglior obiettivo ammissibile per numero di punti valutati
+res-painel-pontos_avaliados = punti valutati
+res-painel-melhor_ate_entao = migliore finora
+res-painel-comparacao_pareada_com_o_melhor = Confronto appaiato con il migliore (≈: nessuna differenza significativa al 95%)
+res-painel-ponto = Punto
+res-painel-objetivo-3 = Obiettivo
+res-painel-viavel = Ammissibile
+res-painel-vs_melhor = Δ vs migliore
+res-painel-equivalente = { $delta } equivalente
+res-painel-objeto_metrica = oggetto.metrica

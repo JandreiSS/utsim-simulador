@@ -29,4 +29,39 @@ mod tests {
         assert!(tx("configuracoes-distribuicoes-ajuda").contains("{ }"));
         utsim_idiomas::definir_nesta_thread(None);
     }
+
+    /// Every key written in the sources (`"aba-..."`, `"vivo-..."`...) is in `godot.ftl`,
+    /// in the five languages: a mistyped key would show up as the key itself on screen.
+    #[test]
+    fn every_key_in_the_sources_exists() {
+        assert!(TEXTOS.faltas().is_empty(), "{:?}", TEXTOS.faltas());
+        const PREFIXES: [&str; 5] = ["aba-", "barra-", "configuracoes-", "props-", "vivo-"];
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut missing = Vec::new();
+        let mut seen = 0;
+        for e in std::fs::read_dir(&src).unwrap().flatten() {
+            let p = e.path();
+            if p.extension().is_none_or(|x| x != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&p).unwrap();
+            for piece in text.split('"').skip(1).step_by(2) {
+                let key_like = piece
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+                if key_like
+                    && PREFIXES
+                        .iter()
+                        .any(|x| piece.len() > x.len() && piece.starts_with(x))
+                {
+                    seen += 1;
+                    if !TEXTOS.tem(piece) {
+                        missing.push(format!("{}: {piece}", p.display()));
+                    }
+                }
+            }
+        }
+        assert!(seen > 40, "only {seen} keys found");
+        assert!(missing.is_empty(), "{missing:#?}");
+    }
 }

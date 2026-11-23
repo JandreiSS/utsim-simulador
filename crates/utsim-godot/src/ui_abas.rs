@@ -12,6 +12,7 @@
 //! `AbaTrava` (who edits), `AbaErro` (the last refusal) and `AbaSim_<k>` (line `k` of what
 //! the last run says, `indicadores.rs`; `AbaSimNota` above them).
 
+use crate::texto::{fx, tx};
 use std::collections::HashSet;
 
 use egui::{Button, Label, RichText, Sense, Ui, Vec2};
@@ -127,7 +128,7 @@ pub fn show(
     if let Some(quem) = &v.somente_leitura {
         let r = ui.add(
             Label::new(
-                RichText::new(format!("{quem}. Só leitura até a pessoa fechar o modelo."))
+                RichText::new(fx("aba-so-leitura", &[("quem", quem.clone().into())]))
                     .color(colors::WARNING),
             )
             .wrap(),
@@ -167,13 +168,13 @@ fn abrir_app(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, aba: Ab
     let (app, texto, ajuda) = match aba {
         Aba::Qualidade => (
             "qualidade",
-            "Abrir no UTSim Qualidade",
-            "Abre este nó no UTSim Qualidade (defeitos, inspeção, custos, CEP). O modelo é salvo antes e fica com o outro app para editar; o UTSim 3D relê o que ele gravar.",
+            tx("aba-abrir-qualidade"),
+            tx("aba-abrir-qualidade-dica"),
         ),
         Aba::Seguranca => (
             "seguranca",
-            "Abrir no UTSim Segurança",
-            "Abre este nó no UTSim Segurança do Trabalho (perigos, matriz de risco, EPI). O modelo é salvo antes e fica com o outro app para editar; o UTSim 3D relê o que ele gravar.",
+            tx("aba-abrir-seguranca"),
+            tx("aba-abrir-seguranca-dica"),
         ),
         Aba::Manutencao => return,
     };
@@ -193,7 +194,7 @@ fn simulado(ui: &mut Ui, reg: &mut Registry, s: &Simulado, aba: usize) {
         return;
     }
     let nota = if linhas.is_empty() {
-        "Calculando os números da simulação...".to_owned()
+        tx("aba-calculando").to_owned()
     } else {
         s.nota.clone()
     };
@@ -231,7 +232,7 @@ fn campo(
         }
         Tipo::Info => {
             let shown = if c.valor.is_empty() {
-                "nenhuma"
+                tx("aba-nenhuma")
             } else {
                 c.valor.as_str()
             };
@@ -273,7 +274,11 @@ fn campo(
                 .escolhas
                 .iter()
                 .map(|e| {
-                    let label = if e.is_empty() { "(nenhum)" } else { e };
+                    let label = if e.is_empty() {
+                        tx("aba-nenhum-escolha")
+                    } else {
+                        e
+                    };
                     (e.clone(), label.to_owned(), String::new())
                 })
                 .collect();
@@ -287,15 +292,24 @@ fn campo(
             let help = if c.escolhas.is_empty() {
                 c.ajuda.clone()
             } else {
-                format!(
-                    "{}{}Separe por vírgulas. Opções: {}.",
-                    c.ajuda,
-                    if c.ajuda.is_empty() { "" } else { "\n" },
-                    c.escolhas.join(", ")
-                )
+                let opcoes = fx("aba-opcoes", &[("opcoes", c.escolhas.join(", ").into())]);
+                if c.ajuda.is_empty() {
+                    opcoes
+                } else {
+                    format!("{}\n{opcoes}", c.ajuda)
+                }
             };
             row_label(ui, &c.rotulo, &help, depth, |ui, w| {
-                if let Some(t) = line_edit(ui, st, reg, &name, &c.valor, w - 4.0, false, "nenhum") {
+                if let Some(t) = line_edit(
+                    ui,
+                    st,
+                    reg,
+                    &name,
+                    &c.valor,
+                    w - 4.0,
+                    false,
+                    tx("aba-nenhum"),
+                ) {
                     editar(out, &c.caminho, t);
                 }
             });
@@ -308,7 +322,7 @@ fn campo(
         | Tipo::Distribuicao => {
             let mono = c.tipo == Tipo::Distribuicao;
             let hint = match c.tipo {
-                Tipo::RealOpcional | Tipo::InteiroOpcional => "vazio: não usa",
+                Tipo::RealOpcional | Tipo::InteiroOpcional => tx("aba-vazio-nao-usa"),
                 _ => "",
             };
             row_label(ui, &c.rotulo, &c.ajuda, depth, |ui, w| {
@@ -336,16 +350,16 @@ fn campo(
                 ui.add_space(14.0 * depth as f32);
                 ui.label(RichText::new(&c.rotulo).strong().color(colors::HEADING));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let r = ui.button("+ Adicionar").on_hover_text(format!(
-                        "Acrescenta um item em {}",
-                        c.rotulo.to_lowercase()
+                    let r = ui.button(tx("aba-adicionar")).on_hover_text(fx(
+                        "aba-adicionar-dica",
+                        &[("lista", c.rotulo.to_lowercase().into())],
                     ));
                     named(
                         ui,
                         reg,
                         &nome_campo("AbaAdicionar", &c.caminho),
                         &r,
-                        "+ Adicionar",
+                        tx("aba-adicionar"),
                     );
                     if r.clicked() {
                         out.push(PropAction::Aba(AbaAcao::Adicionar(c.caminho.clone())));
@@ -362,9 +376,9 @@ fn campo(
                 let r = r
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .on_hover_text(if fechado {
-                        "Abre o item"
+                        tx("aba-abrir-item")
                     } else {
-                        "Fecha o item"
+                        tx("aba-fechar-item")
                     });
                 named(ui, reg, &nome_campo("AbaItem", &c.caminho), &r, &c.rotulo);
                 if r.clicked() {
@@ -376,21 +390,21 @@ fn campo(
                     ui.ctx().request_repaint();
                 }
                 let titulo = if c.rotulo.is_empty() {
-                    "(sem nome)"
+                    tx("aba-sem-nome")
                 } else {
                     c.rotulo.as_str()
                 };
                 ui.label(RichText::new(titulo).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let r = ui
-                        .button("Remover")
-                        .on_hover_text("Tira este item da lista");
+                        .button(tx("aba-remover"))
+                        .on_hover_text(tx("aba-remover-dica"));
                     named(
                         ui,
                         reg,
                         &nome_campo("AbaRemover", &c.caminho),
                         &r,
-                        "Remover",
+                        tx("aba-remover"),
                     );
                     if r.clicked()
                         && let Some((lista, i)) = separar_item(&c.caminho)
