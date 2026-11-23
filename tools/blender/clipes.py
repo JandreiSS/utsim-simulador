@@ -18,7 +18,21 @@ from mathutils import Matrix
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.abspath(os.path.join(AQUI, "..", ".."))
+UAL1 = os.path.join(RAIZ, "assets", "terceiros", "quaternius_ual", "UAL1_Standard.glb")
 UAL2 = os.path.join(RAIZ, "assets", "terceiros", "quaternius_ual2", "UAL2_Standard.glb")
+
+# Clipes do UAL1 que o UTSim usa sem alteração (`pessoa_clipes_base.glb`): clipe -> laço.
+# Com este arquivo e o `pessoa_clipes.glb`, as pessoas não precisam das duas bibliotecas
+# inteiras (86 clipes, 15,7 MB) no pacote.
+BASE = {
+    "Driving_Loop": True,
+    "Idle_Loop": True,
+    "Interact": False,
+    "Jog_Fwd_Loop": True,
+    "PickUp_Table": False,
+    "Sitting_Idle_Loop": True,
+    "Walk_Loop": True,
+}
 
 # clipe: (arquivo de origem, laço, ((osso, graus para a frente), ...)), do quadril para a cabeça.
 CLIPES = {
@@ -70,6 +84,26 @@ def gerar(pasta, nome="pessoa_clipes"):
         act = bpy.data.actions[clipe]
         _corrigir(arm, act, dobras)
         feitos[clipe] = (act, laco)
+    return _gravar(arm, feitos, pasta, nome, {"esqueleto": "UAL1", "substitui": sorted(feitos)})
+
+
+def gerar_base(pasta, nome="pessoa_clipes_base"):
+    """Os clipes de `BASE`, copiados do UAL1 sem alteração, só com o esqueleto."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=UAL1)
+    arm = [o for o in bpy.data.objects if o.type == "ARMATURE"][0]
+    for o in [o for o in bpy.data.objects if o.type != "ARMATURE"]:
+        bpy.data.objects.remove(o)
+    ad = arm.animation_data or arm.animation_data_create()
+    ad.action = None
+    for tr in list(ad.nla_tracks):
+        ad.nla_tracks.remove(tr)
+    feitos = {c: (bpy.data.actions[c], laco) for c, laco in BASE.items()}
+    return _gravar(arm, feitos, pasta, nome, {"esqueleto": "UAL1", "origem": "UAL1", "copia": sorted(feitos)})
+
+
+def _gravar(arm, feitos, pasta, nome, dados):
+    """Grava só o esqueleto `arm` com os clipes de `feitos` (nome -> (ação, laço))."""
     for a in list(bpy.data.actions):
         if a.name not in feitos:
             bpy.data.actions.remove(a)
@@ -111,5 +145,5 @@ def gerar(pasta, nome="pessoa_clipes"):
         "clipes": {c: {"laco": laco, "nos": []} for c, (_, laco) in sorted(feitos.items())},
         "estados": {},
         "peca": {},
-        "dados": {"esqueleto": "UAL1", "substitui": sorted(feitos)},
+        "dados": dados,
     }
