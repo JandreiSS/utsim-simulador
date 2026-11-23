@@ -34,7 +34,9 @@ hierarquia.
 
 Um requisito aprovado fica travado. Ele só muda por um **pedido de mudança**: abra o pedido,
 escreva o motivo e o impacto, marque os requisitos afetados e aprove. Aprovar sobe a versão
-de cada requisito marcado e volta cada um para "proposto", para ser revisto.
+de cada requisito marcado e volta cada um para "proposto", para ser revisto. Um pedido aberto
+ou rejeitado pode ser excluído (o primeiro clique pede confirmação); um aprovado fica, porque
+está no histórico dos requisitos que mudou.
 
 A tela **Rastreabilidade** mostra cada requisito com as especificações e as verificações, e
 em amarelo o que falta especificar ou verificar.
@@ -84,7 +86,11 @@ de modelo na própria tela. Cada fase tem entregas, checklist e aprovadores, que
 mudar à vontade, inclusive criar e tirar fases. No portão da fase atual, o app lista o que falta. Com tudo pronto, a
 decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
 volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
-quem e a justificativa.
+quem e a justificativa. Um projeto parado (ou concluído) volta com **Reabrir o projeto**, na
+fase em que estava, e a reabertura também entra na linha do tempo.
+
+Só sai uma fase que ainda não começou e não tem decisão registrada. As decisões e as
+assinaturas das outras fases continuam nas suas fases quando uma fase sai ou muda de lugar.
 
 O botão **Relatório do portão**, embaixo de cada fase, grava o relatório daquela fase na
 pasta `relatorios` do projeto, em HTML (abre no navegador) e em PDF: objetivo e datas, o que
@@ -125,6 +131,11 @@ chegadas) e o gargalo em destaque. Abaixo, a tabela com o tempo médio de cada v
 - **Atualizar modelo** grava os tempos, as capacidades, os setups e as características num
   modelo que já existe, nos processadores com o mesmo nome do recurso. O leiaute, as ligações
   e o resto ficam como estão.
+
+O intervalo entre chegadas, a duração, o aquecimento, as replicações e o arquivo de destino
+ficam gravados no projeto: valem para todos que abrem o projeto e continuam lá na próxima vez.
+Sem destino escolhido, o app usa o último modelo gerado, ou um arquivo com o nome do projeto
+ao lado dele.
 
 Nesta versão a linha é em série. Uma variante que não passa por um recurso tem tempo zero
 nele, e uma variante que passa duas vezes pelo mesmo recurso conta só a primeira operação (o
@@ -185,6 +196,11 @@ digital com valor legal.
 
 - **Ctrl+S** grava agora; **Ctrl+Shift+S** grava uma revisão.
 - **Ctrl+1** a **Ctrl+9** trocam de tela, na ordem da barra lateral.
+- **Ctrl+Z** desfaz e **Ctrl+Y** (ou **Ctrl+Shift+Z**) refaz, até 50 passos; os botões
+  Desfazer e Refazer ficam na barra de baixo. Dentro de um campo de texto, o Ctrl+Z é do campo.
+- **Delete** pede para excluir o requisito ou o item escolhido na lista (o botão vermelho
+  Excluir fica no topo do editor, e o botão direito na lista também oferece Excluir). Esc
+  cancela; depois de excluir, o Ctrl+Z traz de volta.
 - Nas telas vazias, "Carregar o exemplo da bicicleta" preenche o projeto com requisitos,
   estrutura com duas variantes, roteiros, características e a casa da qualidade, para conhecer
   o app sem digitar nada.
