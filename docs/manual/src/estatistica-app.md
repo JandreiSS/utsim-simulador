@@ -25,7 +25,7 @@ A planilha é uma grade de células sempre pronta para digitar, como numa planil
 - duplo clique no cabeçalho renomeia a variável;
 - o botão direito abre copiar, recortar, colar, apagar, inserir e remover linhas e colunas, renomear, o tipo da coluna e ordenar.
 
-Cada coluna tem um nome e um tipo: número, texto ou data. O tipo é deduzido dos valores enquanto você digita; para escolher, use o botão direito › Tipo da coluna, e o cabeçalho mostra "(fixo)". "Automático" volta a deduzir. Numa coluna de números, `1,5` e `1.5` valem o mesmo; uma célula vazia é um valor ausente. Células que não combinam com o tipo ficam em vermelho e não entram nas contas. O rodapé mostra a célula ativa, o tamanho da seleção, a contagem, a soma e a média dos números selecionados.
+Cada coluna tem um nome e um tipo: número, texto ou data. O tipo é deduzido dos valores enquanto você digita; para escolher, use o botão direito › Tipo da coluna, e o cabeçalho mostra "(fixo)". "Automático" volta a deduzir. Numa coluna de números, `1,5` e `1.5` valem o mesmo. O separador de milhar segue a língua: em português `1.234` e `1.234,5` são mil duzentos e trinta e quatro (e quatro e meio); em inglês, `1,234` e `1,234.5`. Uma célula vazia é um valor ausente. Células que não combinam com o tipo ficam em vermelho e não entram nas contas. O rodapé mostra a célula ativa, o tamanho da seleção, a contagem, a soma e a média dos números selecionados.
 
 "Gravar" guarda a planilha na unidade. Rodar uma análise grava a planilha antes, porque o histórico guarda o hash (SHA-256) dos dados usados.
 
@@ -158,7 +158,7 @@ Quando a planilha tem os níveis no processo, o ponto estacionário e o melhor p
 
 ## Histórico
 
-A tela Histórico lista as análises da unidade, de todas as pessoas. "Rodar de novo" relê a planilha e recalcula. Se os dados mudaram desde a análise original, aparece um aviso. "Tirar" remove a análise do histórico.
+A tela Histórico lista as análises da unidade, de todas as pessoas. "Rodar de novo" relê a planilha e recalcula. Se os dados mudaram desde a análise original, aparece um aviso. "Tirar" remove a análise do histórico. "Renomear" (ou um duplo clique no nome) dá outro nome à análise: Enter grava, Esc cancela. Se a planilha de uma análise foi apagada, "Rodar de novo" fica desligado. Apagar uma planilha na tela inicial pede confirmação e diz quantas análises do histórico foram feitas sobre ela.
 
 ## Relatórios
 
