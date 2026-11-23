@@ -595,4 +595,24 @@ impl UtsimTrajetos {
         let n = name.to_string();
         self.edit(|e| e.reverse_route(&n, path)).is_some()
     }
+
+    /// O trajeto que continua `name` pela ponta e pode virar um só com ele ("": nenhum).
+    #[func]
+    fn par_para_juntar(&self, name: GString, path: bool) -> GString {
+        let n = name.to_string();
+        self.doc
+            .as_ref()
+            .and_then(|d| d.bind().editor.join_partner(&n, path))
+            .map(|s| GString::from(s.as_str()))
+            .unwrap_or_default()
+    }
+
+    /// Junta `name` com o trajeto que o continua; devolve o nome do que sumiu ("": não juntou).
+    #[func]
+    fn juntar(&mut self, name: GString, path: bool) -> GString {
+        let n = name.to_string();
+        self.edit(|e| e.join_routes(&n, path))
+            .map(|s| GString::from(s.as_str()))
+            .unwrap_or_default()
+    }
 }

@@ -525,6 +525,15 @@ func release(_p: Vector2) -> void:
 	_press = {}
 	_readout.visible = false
 	if not _dragging:
+		# A click (no drag) on the handle in the middle of a segment selects the segment
+		# (its two nodes); on the whole-route handles it does nothing.
+		if pr["handle"] == "curva":
+			var k := int(pr["index"])
+			_select(pr["name"], pr["path"], PackedInt32Array([k, k + 1]))
+			main.set_status("Trecho %d de %s selecionado: \"Apagar o trecho entre os nós\" no painel; arraste o losango para curvá-lo." % [k + 1, pr["name"]])
+			return
+		if pr["handle"] in ["mover", "girar"]:
+			return
 		# A click (no drag) on the first or last node of a route starts a new one there,
 		# as a road goes on from where another one ends.
 		var r := _route(pr["name"], pr["path"])
@@ -898,6 +907,9 @@ func panel() -> Array:
 	rows.append({"kind": "button", "name": "Trajeto_Girar", "text": "Girar o trajeto", "action": "trajeto_girar"})
 	rows.append({"kind": "button", "name": "Trajeto_GirarEsq", "text": "Girar 15° (anti-horário, R)", "action": "trajeto_girar_esq"})
 	rows.append({"kind": "button", "name": "Trajeto_GirarDir", "text": "Girar 15° (horário, Shift+R)", "action": "trajeto_girar_dir"})
+	var partner: String = tr.par_para_juntar(sel_name, sel_path)
+	if partner != "":
+		rows.append({"kind": "button", "name": "Trajeto_Juntar", "text": "Juntar com %s num trajeto só" % partner, "action": "trajeto_juntar"})
 	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
 	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": "Desenhar paralelo", "action": "trajeto_paralelo"})
 	if sel_path:
@@ -929,7 +941,7 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
 	if sel_nodes.size() == 2 and absi(sel_nodes[0] - sel_nodes[1]) == 1:
 		rows.append({"kind": "button", "name": "Trajeto_ApagarTrecho", "text": "Apagar o trecho entre os nós", "enabled": nodes.size() > 2, "action": "trajeto_apagar_trecho"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó; com dois nós vizinhos selecionados (Shift + clique), o trecho entre eles pode ser apagado. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó; um clique no losango laranja (ou dois nós vizinhos com Shift + clique) seleciona o trecho, que pode ser apagado. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
 	return rows
 
 
@@ -1036,6 +1048,14 @@ func form(what: String, value: String) -> void:
 				main.after_edit()
 				_select(sel_name, sel_path, PackedInt32Array())
 				main.set_status("Trecho apagado de %s." % sel_name)
+				return
+		"trajeto_juntar":
+			var gone: String = tr.juntar(sel_name, sel_path)
+			ok = gone != ""
+			if ok:
+				main.after_edit()
+				_select(sel_name, sel_path, PackedInt32Array())
+				main.set_status("%s e %s viraram um trajeto só (Ctrl+Z desfaz)." % [sel_name, gone])
 				return
 		"trajeto_inverter":
 			ok = tr.inverter(sel_name, sel_path)

@@ -77,6 +77,9 @@ pub struct Snap {
     pub output: Option<bool>,
 }
 
+/// Até quantos metros duas pontas contam como a mesma, para juntar trajetos.
+pub const JOIN_TOL: f64 = 0.05;
+
 fn d2(a: [f64; 3], b: [f64; 3]) -> f64 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt()
 }
@@ -1440,6 +1443,162 @@ impl Editor {
         }
         self.apply(Command::Batch(batch))
     }
+
+    /// O trajeto que continua `name` pela ponta e pode virar um só com ele: numa esteira, a
+    /// esteira desenhada que começa (a menos de [`JOIN_TOL`]) onde esta acaba, de
+    /// preferência a que ela já alimenta; num caminho, outro caminho com uma ponta numa
+    /// ponta deste. `None` se não há.
+    pub fn join_partner(&self, name: &str, path: bool) -> Option<String> {
+        let near = |a: [f64; 3], b: [f64; 3]| d2(a, b) < JOIN_TOL && (a[2] - b[2]).abs() < JOIN_TOL;
+        if path {
+            let a = self.model().aisles.iter().find(|a| a.name == name)?;
+            let ends = |a: &Aisle| {
+                let n = a.nodes();
+                (n[0].at, n[n.len() - 1].at)
+            };
+            let (s, e) = ends(a);
+            return self
+                .model()
+                .aisles
+                .iter()
+                .filter(|b| b.name != name && b.points.len() >= 2)
+                .find(|b| {
+                    let (s2, e2) = ends(b);
+                    near(s, s2) || near(s, e2) || near(e, s2) || near(e, e2)
+                })
+                .map(|b| b.name.clone());
+        }
+        let (o, r) = self.route_of(name).ok()?;
+        let last = *abs_nodes(o, &r).last()?;
+        let feeds = |t: &str| {
+            self.model()
+                .connections
+                .iter()
+                .any(|(f, x)| f == name && x == t)
+        };
+        let mut found: Vec<&str> = drawn(self.model())
+            .filter(|(n, o2, r2)| *n != name && near(abs_nodes(*o2, r2)[0], last))
+            .map(|(n, ..)| n)
+            .collect();
+        found.sort_by_key(|n| !feeds(n));
+        found.first().map(|n| n.to_string())
+    }
+
+    /// Junta `name` com o trajeto que o continua ([`Editor::join_partner`]) num trajeto só,
+    /// o inverso de dividir: fica o nome, o tipo e as entradas de `name`; o outro some e as
+    /// saídas (e as outras entradas) dele passam a este. Um passo de desfazer; devolve o
+    /// nome do que sumiu.
+    pub fn join_routes(&mut self, name: &str, path: bool) -> Result<String, String> {
+        let other = self
+            .join_partner(name, path)
+            .ok_or("nenhum trajeto começa onde este acaba")?;
+        if path {
+            let mut a = self
+                .model()
+                .aisles
+                .iter()
+                .find(|a| a.name == name)
+                .cloned()
+                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+            let mut b = self
+                .model()
+                .aisles
+                .iter()
+                .find(|x| x.name == other)
+                .cloned()
+                .ok_or_else(|| format!("não existe o caminho '{other}'"))?;
+            let end = |x: &Aisle, last: bool| {
+                let n = x.nodes();
+                if last { n[n.len() - 1].at } else { n[0].at }
+            };
+            let near = |p: [f64; 3], q: [f64; 3]| d2(p, q) < JOIN_TOL;
+            // a ... joint, joint ... b
+            if !near(end(&a, true), end(&b, false)) && !near(end(&a, true), end(&b, true)) {
+                a.reverse();
+            }
+            if !near(end(&a, true), end(&b, false)) {
+                b.reverse();
+            }
+            let k = a.points.len() - 1;
+            a.set_radius(k, 0.0);
+            for n in b.nodes().into_iter().skip(1) {
+                a.insert_point(a.points.len(), [n.at[0], n.at[1]], n.at[2]);
+                let at = a.points.len() - 1;
+                a.set_radius(at, n.radius.unwrap_or(0.0));
+            }
+            if let Some(p) = a.problem() {
+                return Err(p);
+            }
+            self.apply(Command::Batch(vec![
+                Command::RemoveAisle {
+                    name: other.clone(),
+                },
+                Command::SetAisle {
+                    name: name.to_string(),
+                    aisle: Box::new(a),
+                },
+            ]))?;
+            return Ok(other);
+        }
+        let (oa, ra) = self.route_of(name)?;
+        let (ob, rb) = self.route_of(&other)?;
+        let mut pts = abs_nodes(oa, &ra);
+        let mut radii: Vec<f64> = ra.nodes.iter().map(|n| n.radius.unwrap_or(0.0)).collect();
+        if let Some(r) = radii.last_mut() {
+            *r = 0.0;
+        }
+        pts.extend(abs_nodes(ob, &rb).into_iter().skip(1));
+        radii.extend(rb.nodes.iter().skip(1).map(|n| n.radius.unwrap_or(0.0)));
+        let origin = middle(&pts, &radii);
+        let route = BeltRoute {
+            nodes: nodes_of(&pts, &radii, origin),
+            ..ra
+        };
+        if let Some(p) = tr::problem(&route.nodes, "esteira") {
+            return Err(p);
+        }
+        let m = self.model();
+        let outs: Vec<String> = m
+            .connections
+            .iter()
+            .filter(|(f, t)| f == &other && t != name)
+            .map(|(_, t)| t.clone())
+            .collect();
+        let ins: Vec<String> = m
+            .connections
+            .iter()
+            .filter(|(f, t)| t == &other && f != name)
+            .map(|(f, _)| f.clone())
+            .filter(|f| !m.connections.contains(&(f.clone(), name.to_string())))
+            .collect();
+        let mut batch = vec![
+            Command::Remove {
+                name: other.clone(),
+            },
+            Command::Move {
+                name: name.to_string(),
+                position: origin,
+            },
+            Command::SetRoute {
+                name: name.to_string(),
+                route: Some(Box::new(route)),
+            },
+        ];
+        for t in outs {
+            batch.push(Command::Connect {
+                from: name.to_string(),
+                to: t,
+            });
+        }
+        for f in ins {
+            batch.push(Command::Connect {
+                from: f,
+                to: name.to_string(),
+            });
+        }
+        self.apply(Command::Batch(batch))?;
+        Ok(other)
+    }
 }
 
 #[cfg(test)]
@@ -1620,6 +1779,62 @@ mod tests {
         assert!(!m.connections.contains(&(src, name.clone())));
         e.doc.undo();
         assert_eq!(routes(e.model())[0].nodes[0], [0.0, 0.0, 0.8]);
+    }
+
+    #[test]
+    fn two_belts_in_series_join_into_one() {
+        let mut e = Editor::new("t");
+        let src = e.add("Source", [-2.0, 0.0, 0.0]).unwrap();
+        let a = belt(&mut e, &[[0.0, 0.0, 0.8], [4.0, 0.0, 0.8], [6.0, 0.0, 0.8]]);
+        let out = e.add("Sink", [10.0, 6.0, 0.0]).unwrap();
+        e.apply(Command::Connect {
+            from: src.clone(),
+            to: a.clone(),
+        })
+        .unwrap();
+        let second = e.split_route(&a, 1).unwrap();
+        e.apply(Command::Connect {
+            from: second.clone(),
+            to: out.clone(),
+        })
+        .unwrap();
+        assert_eq!(e.join_partner(&a, false).as_deref(), Some(second.as_str()));
+        let before = e.model().clone();
+        assert_eq!(e.join_routes(&a, false).unwrap(), second);
+        let m = e.model();
+        assert!(m.objects.iter().all(|o| o.name != second));
+        let rows = routes(m);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].nodes,
+            vec![[0.0, 0.0, 0.8], [4.0, 0.0, 0.8], [6.0, 0.0, 0.8]]
+        );
+        assert!((rows[0].length - 6.0).abs() < 1e-9);
+        assert!(m.connections.contains(&(src, a.clone())));
+        assert!(m.connections.contains(&(a.clone(), out)));
+        assert!(m.validate().is_ok());
+        assert!(e.join_partner(&a, false).is_none());
+        e.doc.undo();
+        assert_eq!(e.model(), &before);
+    }
+
+    #[test]
+    fn two_paths_end_to_end_join_into_one() {
+        let mut e = Editor::new("t");
+        let p = e
+            .add_floor_path(&[[0.0, 0.0, 0.0], [4.0, 0.0, 0.0]], &[], 1.2)
+            .unwrap();
+        // Drawn the other way: it ends where the first one ends.
+        let q = e
+            .add_floor_path(&[[4.0, 6.0, 0.5], [4.0, 0.0, 0.0]], &[], 1.2)
+            .unwrap();
+        assert_eq!(e.join_partner(&p, true).as_deref(), Some(q.as_str()));
+        e.join_routes(&p, true).unwrap();
+        let m = e.model();
+        assert_eq!(m.aisles.len(), 1);
+        let a = &m.aisles[0];
+        assert_eq!(a.points, vec![[0.0, 0.0], [4.0, 0.0], [4.0, 6.0]]);
+        assert_eq!(a.nodes()[2].at[2], 0.5);
     }
 
     #[test]
