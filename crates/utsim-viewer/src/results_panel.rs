@@ -8,12 +8,12 @@
 //! numbers come from `utsim_model::analysis` and `utsim_opt`; the pure reshaping for
 //! the screen is in `utsim_viewer::results`.
 
-use crate::texto::{dx, fx, sx, tx, vx};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
+use utsim_viewer::texto::{dx, fx, sx, tx, vx};
 
 use bevy_egui::egui::{self, Color32, RichText};
 use egui_plot::{Bar, BarChart, Legend, Line, Plot, PlotPoints};
