@@ -177,6 +177,11 @@ fn perto(a: [f32; 3], b: [f32; 3], tol: f32) -> bool {
     (0..3).all(|k| (a[k] - b[k]).abs() <= tol)
 }
 
+fn v3x2(v: &Value) -> [f32; 2] {
+    let a = v.as_array().unwrap();
+    [a[0].as_f64().unwrap() as f32, a[1].as_f64().unwrap() as f32]
+}
+
 fn v3(v: &Value) -> [f32; 3] {
     let a = v.as_array().expect("lista");
     [0, 1, 2].map(|k| a[k].as_f64().unwrap() as f32)
@@ -423,6 +428,12 @@ const CONTRATO: &[Contrato] = &[
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
     ("controle_remoto", &["corpo", "alca"], &[], &[]),
+    (
+        "doca",
+        &["parede", "porta", "luz"],
+        &["ponto_peca", "ponto_fora", "ponto_operador"],
+        &["porta_abrir"],
+    ),
     ("ventilador_mesa", &["corpo", "helice"], &[], &["girar"]),
     ("ventilador_coluna", &["corpo", "helice"], &[], &["girar"]),
     ("ventilador_mesa_caixa", &["corpo"], &[], &[]),
@@ -1201,6 +1212,104 @@ fn o_forno_abre_a_porta_para_fora_e_gira_o_carrinho() {
             "{sufixo}: peça em {peca:?}"
         );
     }
+}
+
+/// A doca: a carga fica na área marcada, do lado de dentro; o caminhão fica do lado de fora;
+/// o operador fica fora da área, olhando para ela; a porta enrola quase toda.
+#[test]
+fn a_doca_tem_a_area_de_carga_dentro_e_o_caminhao_fora() {
+    let cat = catalogo();
+    for sufixo in ["", "_medio"] {
+        let item = &cat[&format!("doca{sufixo}")];
+        let d = &item["dados"];
+        let (vao, area) = (v3x2(&d["vao"]), v3x2(&d["area"]));
+        let parede = d["parede"].as_f64().unwrap() as f32;
+        let aberta = d["porta_aberta"].as_f64().unwrap() as f32;
+        assert!(
+            vao[0] >= 2.4 && vao[1] >= 3.0,
+            "vão de {vao:?}: passa a empilhadeira"
+        );
+        assert!((0.0..0.1).contains(&aberta), "porta aberta em {aberta}");
+        let p = |n: &str| v3(&item["pontos"][n]["pos"]);
+        let (peca, fora, op) = (p("ponto_peca"), p("ponto_fora"), p("ponto_operador"));
+        assert!(
+            peca[0].abs() < 1e-4 && peca[2].abs() < 1e-4,
+            "peça em {peca:?}"
+        );
+        assert!(
+            peca[1] < -area[1] / 2.0 && peca[1] > -area[1] - 0.5,
+            "peça em {peca:?}"
+        );
+        assert!(fora[1] > parede + 1.0, "caminhão em {fora:?}");
+        assert!(op[0].abs() > area[0] / 2.0 + 0.3, "operador em {op:?}");
+        assert_eq!(
+            item["pontos"]["ponto_operador"]["giro"].as_f64().unwrap(),
+            180.0
+        );
+        assert_eq!(item["clipes"]["porta_abrir"]["nos"][0], "porta");
+        // No chão, com a parede até 4 m.
+        assert!(v3(&item["minimo"])[2].abs() < 1e-3);
+        assert!((v3(&item["tamanho"])[2] - 4.0).abs() < 1e-2);
+    }
+}
+
+/// `pessoa_clipes_base.glb`: só o esqueleto e os clipes do UAL1 que o UTSim usa, sem malha,
+/// com os mesmos nomes; muito menor que a biblioteca inteira.
+#[test]
+fn os_clipes_base_sao_os_que_o_utsim_usa() {
+    let cat = catalogo();
+    let item = &cat["pessoa_clipes_base"];
+    let g = Glb::ler("pessoa_clipes_base.glb");
+    assert_eq!(g.doc.meshes().count(), 0, "sem malha");
+    let clipes: BTreeSet<String> = g
+        .doc
+        .animations()
+        .map(|a| a.name().unwrap().to_string())
+        .collect();
+    let esperados: BTreeSet<String> = [
+        "Driving_Loop",
+        "Idle_Loop",
+        "Interact",
+        "Jog_Fwd_Loop",
+        "PickUp_Table",
+        "Sitting_Idle_Loop",
+        "Walk_Loop",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    assert_eq!(clipes, esperados);
+    let copia: BTreeSet<String> = item["dados"]["copia"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(copia, clipes);
+    // Nenhum clipe daqui está também no arquivo dos corrigidos.
+    for c in cat["pessoa_clipes"]["clipes"].as_object().unwrap().keys() {
+        assert!(!clipes.contains(c), "{c} nos dois arquivos");
+    }
+    // Os ossos animados existem no corpo das pessoas, com o mesmo nome.
+    let corpo = Glb::ler("pessoa_homem.glb");
+    let ossos: BTreeSet<String> = corpo
+        .doc
+        .skins()
+        .next()
+        .unwrap()
+        .joints()
+        .map(|j| j.name().unwrap().to_string())
+        .collect();
+    for a in g.doc.animations() {
+        for c in a.channels() {
+            let n = c.target().node().name().unwrap().to_string();
+            assert!(ossos.contains(&n) || n == "Armature", "osso {n}");
+        }
+    }
+    let tam = std::fs::metadata(dir().join("pessoa_clipes_base.glb"))
+        .unwrap()
+        .len();
+    assert!(tam < 1280 * 1024, "{tam} bytes");
 }
 
 #[test]

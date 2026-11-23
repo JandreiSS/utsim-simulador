@@ -92,10 +92,12 @@ def importar(elemento, x, y, giro, fases, escala=1.0, cor=None):
     return {o.name.split(".")[0]: o for o in novos}, novos
 
 
-# Os clipes do boneco UAL1 (as pessoas usam o mesmo esqueleto): importa uma vez e apaga a
-# malha, ficando só as ações.
+# Os clipes das pessoas (esqueleto do UAL1): importa uma vez e apaga os objetos, ficando só as
+# ações. Vêm do `pessoa_clipes_base.glb` da pasta dos modelos (só os clipes que o UTSim usa,
+# 1 MB); sem ele, da biblioteca inteira em `assets/terceiros`.
 antes = set(bpy.data.objects)
-bpy.ops.import_scene.gltf(filepath=CLIPES)
+_base = os.path.join(a.pasta, "pessoa_clipes_base.glb")
+bpy.ops.import_scene.gltf(filepath=_base if os.path.exists(_base) else CLIPES)
 for o in [o for o in bpy.data.objects if o not in antes]:
     bpy.data.objects.remove(o, do_unlink=True)
 
