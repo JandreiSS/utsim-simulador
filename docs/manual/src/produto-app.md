@@ -10,31 +10,70 @@ abre direto um projeto.
 
 ## O projeto
 
-Cada projeto é uma pasta com o arquivo `produto.json`. A pasta pode ficar no Google Drive.
-Tudo o que você muda é gravado sozinho, menos de um segundo depois. O botão **Gravar
-revisão**, embaixo da barra lateral, guarda uma cópia que nunca muda em
-`revisoes/r0001.json`, `r0002.json` e assim por diante: use antes de cada portão.
+O app abre num projeto em branco, na **Visão geral**. Dá para montar à vontade e salvar
+depois: nada pede pasta nem nome antes.
 
-Na abertura, escreva o seu nome (ele vai no histórico e nas decisões), depois abra ou crie um
-projeto. Um projeto novo já vem com cinco fases: Ideia, Conceito, Projeto, Validação e
+- **Salvar** (Ctrl+S), na barra de cima, pergunta na primeira vez o nome do produto e onde
+  criar a pasta do projeto. Enquanto o projeto não foi salvo, a barra mostra "Não salvo".
+- Depois de salvo, o projeto é uma pasta com o arquivo `produto.json`. A pasta pode ficar no
+  Google Drive.
+- A chave **Salvamento automático**, no canto de cima à esquerda, fica ligada depois do
+  primeiro Salvar: tudo o que você muda é gravado sozinho, menos de dois segundos depois.
+  Desligada, o projeto grava só no Salvar, a barra mostra "Não salvo" enquanto houver mudança
+  e fechar pergunta antes. Ligar a chave num projeto que nunca foi salvo abre o Salvar. A
+  escolha fica guardada para cada projeto, neste computador. Com a chave desligada, o que as
+  outras pessoas gravaram só chega depois do seu Salvar.
+- **Salvar como…** (Ctrl+Shift+S) copia o projeto para outra pasta, com as revisões, os
+  relatórios e as assinaturas, e continua nela. A pasta antiga fica como estava.
+- Fechar a janela, começar outro projeto ou abrir um projeto com trabalho que ainda não foi
+  salvo pergunta antes: **Salvar**, **Não salvar** ou **Cancelar**.
+- O botão **Gravar revisão** (Ctrl+R), embaixo da barra lateral, guarda uma cópia que nunca muda em
+  `revisoes/r0001.json`, `r0002.json` e assim por diante: use antes de cada portão.
+
+O diário da equipe, as assinaturas, o relatório do portão e as revisões precisam da pasta:
+aparecem depois do primeiro Salvar. O seu nome (vai no histórico e nas decisões) vem do
+usuário do computador; troque no **Início**, onde também ficam "Abrir projeto" e os recentes.
+
+A **Visão geral** mostra os passos de quem monta um projeto, na ordem, com o que cada um já
+tem e um botão para ir: Requisitos, Casa da qualidade, Estrutura, Roteiros, Características,
+Para a simulação e Fases e portões. É ali também que se escreve o nome e a descrição do
+produto. Um projeto novo já vem com cinco fases: Ideia, Conceito, Projeto, Validação e
 Lançamento.
 
 ## Requisitos
 
-Cada requisito tem tipo (cliente, técnico, regulatório, segurança, qualidade), código
-automático (`RC-001`, `RT-001`...), prioridade, estado, fonte, descrição e critério de
-aceitação. Um requisito novo entra abaixo do escolhido, e o campo "Abaixo de" muda a
-hierarquia.
+Escolha o tipo, escreva o título e clique em Adicionar. O código é automático (`RC-001`,
+`RT-001`...). O editor mostra só o que faz sentido para o tipo, e cada campo explica o que é
+quando você passa o ponteiro:
+
+| Tipo | O que é | Campo próprio |
+|---|---|---|
+| Cliente | O que o cliente quer, nas palavras dele | **Quem pediu** |
+| Técnico | Como o produto atende um pedido, com número | **Atende a** (o requisito que ele traduz) |
+| Regulatório | O que uma norma ou lei exige | **Norma ou lei** |
+| Segurança | O que evita um perigo | **Perigo ou norma** |
+| Qualidade | Um nível de qualidade a manter | — |
+
+Todos têm título, prioridade, descrição, **Como saber que foi atendido** e **Situação**
+(rascunho, proposto, aprovado, implementado, verificado, rejeitado). Um requisito técnico novo
+entra abaixo do que estiver escolhido; os outros entram no topo.
 
 - **Especificações** dizem o requisito em número: alvo, LIE, LSE, unidade e, se quiser, a
   característica do produto ligada.
 - **Verificações** dizem como cada especificação se prova (teste, inspeção, análise,
   demonstração) e o resultado.
-- **Registrar alteração** sobe a versão e guarda quem, quando e o quê.
+- **Mais detalhes** guarda o que se usa menos: a posição na hierarquia ("Abaixo de"), a
+  origem e o histórico. **Registrar alteração** sobe a versão e guarda quem, quando e o quê.
+
+As especificações já vêm abertas nos tipos que pedem número (técnico, segurança, qualidade) e
+recolhidas como "Em números (opcional)" nos outros. As verificações abrem quando já existe
+alguma, ou no tipo regulatório, que pede evidência.
 
 Um requisito aprovado fica travado. Ele só muda por um **pedido de mudança**: abra o pedido,
-escreva o motivo e o impacto, marque os requisitos afetados e aprove. Aprovar sobe a versão
-de cada requisito marcado e volta cada um para "proposto", para ser revisto.
+escreva o motivo e o impacto, marque os requisitos afetados (só os já aprovados aparecem) e aprove. Aprovar sobe a versão
+de cada requisito marcado e volta cada um para "proposto", para ser revisto. Um pedido aberto
+ou rejeitado pode ser excluído (o primeiro clique pede confirmação); um aprovado fica, porque
+está no histórico dos requisitos que mudou.
 
 A tela **Rastreabilidade** mostra cada requisito com as especificações e as verificações, e
 em amarelo o que falta especificar ou verificar.
@@ -79,14 +118,29 @@ Arraste uma fase que ainda não começou para mudar a ordem.
 
 Um projeto novo escolhe o modelo de fases: o padrão ou o **APQP** (planejar e definir,
 projeto do produto, projeto do processo, validação do produto e do processo, retroalimentação
-e melhoria), cada fase com o seu checklist. Antes da primeira decisão de portão dá para trocar
-de modelo na própria tela. Cada fase tem entregas, checklist e aprovadores, que você pode
-mudar à vontade, inclusive criar e tirar fases. No portão da fase atual, o app lista o que falta. Com tudo pronto, a
-decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
-volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
-quem e a justificativa.
+e melhoria), cada fase com o seu checklist.
 
-O botão **Relatório do portão**, embaixo de cada fase, grava o relatório daquela fase na
+O detalhe da fase segue o caminho de quem conduz o portão, em quatro passos:
+
+1. **O que entregar**: os documentos, protótipos ou relatórios da fase. Marque cada um quando
+   estiver pronto.
+2. **O que conferir**: o checklist, as perguntas que precisam de "sim" antes de seguir.
+3. **Quem aprova**: as pessoas ou áreas que precisam concordar. Quem aprova marca "aprovou" e
+   pode assinar.
+4. **Decidir no portão**: à direita, o app lista o que falta e mostra as quatro saídas. Cada
+   botão explica o que faz quando você passa o ponteiro.
+
+Em **Mais detalhes** ficam as datas previstas, a troca do modelo de fases (antes da primeira
+decisão de portão) e **Excluir fase**. O botão **+ Nova fase** fica acima do detalhe. Com tudo
+pronto, a decisão "Seguir" passa para a próxima fase. "Segurar" registra sem mudar de fase, "Voltar"
+volta uma fase e "Parar" encerra o projeto. Toda decisão fica na linha do tempo, com data,
+quem e a justificativa. Um projeto parado (ou concluído) volta com **Reabrir o projeto**, na
+fase em que estava, e a reabertura também entra na linha do tempo.
+
+Só sai uma fase que ainda não começou e não tem decisão registrada. As decisões e as
+assinaturas das outras fases continuam nas suas fases quando uma fase sai ou muda de lugar.
+
+O botão **Relatório do portão**, ao lado do portão de cada fase, grava o relatório daquela fase na
 pasta `relatorios` do projeto, em HTML (abre no navegador) e em PDF: objetivo e datas, o que
 ainda falta no portão, as entregas, o checklist, os aprovadores com a situação da assinatura,
 as decisões tomadas naquele portão e uma linha por aprovador para assinar no papel. Cada
@@ -104,7 +158,15 @@ A demanda diz quanto de cada variante entra na simulação.
 
 Nos **Roteiros**, cada item tem as operações em ordem, com o recurso (o posto ou a máquina),
 a capacidade, o tempo de processo e o setup como distribuição. Uma operação pode ter tempo
-próprio em uma variante.
+próprio em uma variante. Cada operação tem o título no topo e, à direita, o **Excluir
+operação**, que pede confirmação ali mesmo.
+
+Na Estrutura, o editor do item mostra nome, tipo e unidade; o código e a cor no 3D ficam em
+**Mais detalhes**.
+
+Em todas as telas vale o mesmo: o botão que cria começa com **+**, o que apaga se chama
+**Excluir** e pede confirmação no lugar, e o rótulo de cada campo explica o que é quando você
+passa o ponteiro.
 
 Nas **Características**, cada medida tem nominal, LIE, LSE, unidade, classe e a operação onde
 nasce. O desvio é o do processo esperado; zero quer dizer um oitavo da tolerância (Cp 1,33).
@@ -125,6 +187,11 @@ chegadas) e o gargalo em destaque. Abaixo, a tabela com o tempo médio de cada v
 - **Atualizar modelo** grava os tempos, as capacidades, os setups e as características num
   modelo que já existe, nos processadores com o mesmo nome do recurso. O leiaute, as ligações
   e o resto ficam como estão.
+
+O intervalo entre chegadas, a duração, o aquecimento, as replicações e o arquivo de destino
+ficam gravados no projeto: valem para todos que abrem o projeto e continuam lá na próxima vez.
+Sem destino escolhido, o app usa o último modelo gerado, ou um arquivo com o nome do projeto
+ao lado dele.
 
 Nesta versão a linha é em série. Uma variante que não passa por um recurso tem tempo zero
 nele, e uma variante que passa duas vezes pelo mesmo recurso conta só a primeira operação (o
@@ -183,8 +250,13 @@ digital com valor legal.
 
 ## Atalhos e exemplo
 
-- **Ctrl+S** grava agora; **Ctrl+Shift+S** grava uma revisão.
+- **Ctrl+S** salva; **Ctrl+Shift+S** é o Salvar como; **Ctrl+R** grava uma revisão.
 - **Ctrl+1** a **Ctrl+9** trocam de tela, na ordem da barra lateral.
+- **Ctrl+Z** desfaz e **Ctrl+Y** (ou **Ctrl+Shift+Z**) refaz, até 50 passos; os botões
+  Desfazer e Refazer ficam na barra de baixo. Dentro de um campo de texto, o Ctrl+Z é do campo.
+- **Delete** pede para excluir o requisito ou o item escolhido na lista (o botão vermelho
+  Excluir fica no topo do editor, e o botão direito na lista também oferece Excluir). Esc
+  cancela; depois de excluir, o Ctrl+Z traz de volta.
 - Nas telas vazias, "Carregar o exemplo da bicicleta" preenche o projeto com requisitos,
   estrutura com duas variantes, roteiros, características e a casa da qualidade, para conhecer
   o app sem digitar nada.

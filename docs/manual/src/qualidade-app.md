@@ -8,7 +8,11 @@ Pela linha de comando, `utsim-qualidade` abre a janela.
 
 A unidade é uma pasta que a equipe compartilha. Cada alteração vira um pequeno arquivo novo dentro dela, que ninguém edita depois. Assim duas pessoas podem trabalhar ao mesmo tempo sem perder alterações. A mesma pasta serve ao UTSim Segurança do Trabalho: os postos que você cria aqui aparecem lá.
 
-Na tela inicial, escreva o seu nome (o autor de cada alteração), o caminho da pasta e use "Abrir unidade". Para começar uma unidade nova, preencha também o nome dela e use "Criar unidade". O programa lembra o seu nome e a última pasta num arquivo de configuração no seu computador.
+O app abre direto no trabalho, numa unidade nova que ainda não tem pasta: dá para cadastrar postos, rodar a simulação e usar as outras telas na hora. A barra do canto de cima à esquerda tem a chave "Salvamento automático" e os botões Salvar (Ctrl+S) e Salvar como (Ctrl+Shift+S), com o aviso "Não salvo" ou "Salvo". O primeiro Salvar pede o nome da unidade e onde fica a pasta, e cria a pasta com tudo o que já foi feito. Ele nunca passa por cima de uma pasta que já tem arquivos.
+
+Depois de salva, a unidade grava sozinha cada alteração, como sempre. Com a chave desligada, as alterações ficam esperando o Salvar, e o aviso volta para "Não salvo". A escolha fica guardada para cada unidade. Fechar a janela, abrir outra unidade ou começar uma nova com trabalho não salvo pergunta antes: Salvar, Não salvar ou Cancelar. "Salvar como" numa unidade já salva copia a pasta inteira para um lugar novo e passa a trabalhar na cópia.
+
+No Início, "Abrir unidade" e as unidades recentes abrem uma pasta que já existe (as unidades de versões anteriores abrem como sempre), e "Nova unidade" começa outra em branco. O seu nome, o autor de cada alteração, vem do usuário do computador e pode ser trocado no Início. O programa lembra o seu nome e as últimas pastas num arquivo de configuração no seu computador.
 
 ## Postos
 
@@ -38,19 +42,21 @@ Os **lançamentos digitados** (treinamento, calibração, garantia, devoluções
 
 Remover pede confirmação em todas as telas do app: o primeiro clique troca o botão por "Confirmar" (em vermelho) e "Cancelar", e só o segundo apaga. Vale para os lançamentos, as linhas dos planos e o 8D.
 
+Desfazer e Refazer, na barra de baixo, valem em todas as telas que gravam na unidade. Desfazer volta a sua última gravação feita desde que o app abriu (um registro gravado, alterado ou removido volta ao que era). Fora dos campos de texto, Ctrl+Z desfaz e Ctrl+Y ou Ctrl+Shift+Z refazem. Na tela Modelo os atalhos ficam com o editor do modelo. Se outra pessoa mudou o mesmo registro depois, nada é desfeito e a barra avisa.
+
 "Rodar e comparar" calcula um segundo modelo com os mesmos números aleatórios e mostra a diferença entre os totais e se ela é significativa. "Gravar HTML do custo da qualidade" escreve `relatorios/custo_qualidade.html`.
 
 ## Planos
 
-A tela Planos guarda, por posto, o plano de controle (característica, limites, método de medição, frequência, carta e a reação ao sinal) e o plano de inspeção (o que, como, quando e quem). Cada linha pode ser incluída, editada e removida. O botão "Sugerir do modelo" lê um modelo `.ron` e propõe uma linha de controle para cada característica com limites e uma linha de inspeção para cada estação de inspeção, ligadas ao posto pelo objeto. As sugestões só vão para a unidade quando você clica em "Gravar as sugestões".
+A tela Planos guarda, por posto, o plano de controle (característica, limites, método de medição, frequência, carta e a reação ao sinal) e o plano de inspeção (o que, como, quando e quem). Cada linha pode ser incluída, editada e removida. A carta é escolhida num menu com as cartas que o CEP e as ferramentas leem (I-MR, X̄-R, X̄-S, p, np, c, u), e os limites e o alvo aparecem com a vírgula decimal da língua. O botão "Sugerir do modelo" lê um modelo `.ron` e propõe uma linha de controle para cada característica com limites e uma linha de inspeção para cada estação de inspeção, ligadas ao posto pelo objeto. As sugestões só vão para a unidade quando você clica em "Gravar as sugestões".
 
 Ao editar uma linha de inspeção aparece o painel de amostragem por atributos. Você pode projetar o plano pelos quatro números (p1, alfa, p2 e beta, simples ou duplo) ou digitar n e c. A tela mostra a probabilidade de aceitação em p1 e em p2, o AOQL para o lote informado e a curva característica de operação. "Usar este plano na linha" leva o plano para a linha, e "Gravar HTML da amostragem" escreve `relatorios/plano_amostragem.html`. Planos de uma tabela que a empresa tenha o direito de usar entram por CSV (`nome;n;c` ou `nome;n1;c1;r1;n2;c2`).
 
 ## 8D
 
-A tela 8D lista os 8D da unidade e abre um para edição. Há uma seção para cada uma das oito disciplinas, com o texto que explica o que ela pede, e a disciplina seguinte aparece em destaque. A contenção atrasada em relação a hoje é avisada em vermelho. Na causa raiz, cada causa tem a categoria dos 6M e a marca de confirmada por dado, e sob cada causa ficam os porquês. As ações têm verificação por dado (carta ou estudo no modelo) e a prevenção registra a atualização da FMEA e do plano de controle. O 8D só encerra quando D1 a D7 estão completas. Nada vai para a unidade antes de "Gravar".
+A tela 8D lista os 8D da unidade e abre um para edição. Há uma seção para cada uma das oito disciplinas, com o texto que explica o que ela pede, e a disciplina seguinte aparece em destaque. A contenção atrasada em relação a hoje é avisada em vermelho. Na causa raiz, cada causa tem a categoria dos 6M e a marca de confirmada por dado, e sob cada causa ficam os porquês. As ações têm verificação por dado (carta ou estudo no modelo) e a prevenção registra a atualização da FMEA e do plano de controle. O 8D só encerra quando D1 a D7 estão completas, e "Encerrar o 8D" já grava. As outras mudanças só vão para a unidade em "Gravar". Se o 8D gravado muda com o 8D aberto (Desfazer, Refazer ou outra pessoa), a tela recarrega quando não há mudanças por gravar. Quando há, o rascunho fica, um aviso em vermelho diz que gravar troca o gravado pela tela, e "Recarregar o gravado" descarta o rascunho. Desfazer a criação de um 8D aberto deixa o rascunho como um 8D novo, por gravar.
 
-Quando a causa não aparece, o botão "Enviar para a carteira do Seis Sigma" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
+Quando a causa não aparece, o botão "Enviar para a carteira do UTSim LSS" pede a pasta da carteira, o nome e o e-mail, e cria uma ideia na carteira com o 8D anexado. O número da ideia fica guardado no 8D depois de você gravar. O 8D precisa estar gravado antes do envio.
 
 ## CEP
 
@@ -78,6 +84,19 @@ Três ferramentas de projeto e de prevenção têm tabelas próprias, explicadas
 - **Empilhamento de tolerâncias:** uma linha por cota, com o nominal, as tolerâncias, o coeficiente (1 soma, -1 subtrai) e a distribuição (normal, normal 4, uniforme ou triangular). Com o LIE e o LSE do resultado, a ferramenta dá o pior caso, a raiz da soma dos quadrados e 100 mil montagens simuladas sempre com a mesma semente, com PPM, Cp, Cpk e a contribuição de cada cota.
 - **Poka-yoke:** uma linha por dispositivo, com o tipo (contato, valor fixo ou sequência), a função (controle ou alerta), a etapa e o modo de falha do FMEA e as notas O e D antes e depois. A tabela "Verificações" guarda cada teste, com data e se funcionou. O resultado diz o que cada dispositivo baixou no FMEA, quando é a próxima verificação e quais pedem atenção (verificação atrasada ou que falhou).
 
+### Trabalhar em cima do desenho
+
+As ferramentas de análise de causa e de priorização se editam no próprio desenho. Os dados continuam gravados no estudo como antes, e o relatório sai igual.
+
+- **Ishikawa:** a espinha de peixe ocupa a largura da tela, com o efeito na cabeça e uma categoria em cada osso (metade em cima, metade embaixo). Clique num osso, fora dos cartões, para acrescentar uma causa: escreva e tecle Enter, e o campo já abre a próxima causa do mesmo osso (Esc desiste). Duplo clique num cartão edita o texto, e apagar o texto remove a causa. Arraste um cartão para outro osso para mudar a categoria. Duplo clique no nome do osso renomeia a categoria, e "+ categoria" cria outra. O botão direito num cartão abre o menu: editar, mover para outra categoria, remover e **começar um 5 porquês com esta causa**. Essa última opção leva a causa para o primeiro 5 porquês do estudo (cria um, se não houver), como o primeiro porquê de uma cadeia, e passa para ele. As causas que já começam uma cadeia ficam com o selo "5P".
+- **5 porquês:** as cadeias aparecem como uma árvore, da esquerda para a direita, com o problema na raiz (vermelho), os porquês no meio e a ação de cada ramo na ponta (verde). Cadeias que começam com os mesmos porquês dividem os nós até onde se separam. O "+" à direita de um nó acrescenta um porquê abaixo dele: no fim da cadeia, quando o nó é o último dela, ou num ramo novo, quando ele já tem filhos. Duplo clique edita. Editar um porquê do tronco muda todas as cadeias que passam por ele, e o aviso ao passar o mouse diz quantas são. Remover um porquê corta o ramo dali para baixo.
+- **A3:** a folha tem as seções em duas colunas, como no papel: Contexto, Condição atual, Objetivo e Análise à esquerda; Contramedidas, Plano e Acompanhamento à direita. A barra no alto conta as seções preenchidas, e a seção com texto ganha a borda colorida e a marca ✔. Na Análise aparecem, em miniatura, o Pareto e o Ishikawa do mesmo estudo.
+- **FMEA:** a grade continua, e cada linha com S, O e D ganha um selo na cor do risco, com a ação prioritária e o NPR (por exemplo "3 H · 240"). Ao lado, a **matriz severidade × ocorrência** mostra cada modo de falha como um ponto. O fundo de cada célula é a faixa de S × O, e o ponto tem a cor do pior risco da célula. Em "Cor por", escolha AP (alta em vermelho, média em âmbar, baixa em verde) ou NPR (200 ou mais em vermelho, de 100 a 199 em âmbar). Clique num ponto para ir à linha na grade, que fica com a borda azul. Clicar de novo na mesma célula passa para a próxima linha dela.
+- **Pareto:** o gráfico ao lado dos dados é vivo e muda enquanto você digita. As poucas vitais ficam na cor de destaque, a curva acumulada em âmbar, a linha de 80 % tracejada em vermelho e o corte das poucas vitais marcado. Clique numa barra para filtrar a tabela de dados só com as linhas daquela categoria (a barra "Outros" mostra as categorias que ela junta). Clique de novo, ou em "Mostrar todas", para tirar o filtro.
+- **QFD:** acima das tabelas fica a casa da qualidade. Clique numa célula da matriz para trocar a relação (vazia, círculo cheio para 9, círculo vazio para 3, triângulo para 1, vazia) e num losango do telhado para trocar a correlação entre dois requisitos (vazia, ++, +, −, −−). A tabela e o telhado mudam junto, e embaixo de cada requisito aparece o peso dele.
+
+Os mesmos desenhos estão no UTSim Segurança do Trabalho e nos entregáveis do LSS.
+
 O resultado aparece ao lado dos dados, com os indicadores, os achados (o que o resultado mostra), os gráficos, as tabelas e os avisos. O relatório imprime o mesmo resultado. "Relatório desta ferramenta" gera um PDF e um HTML com capa. "Relatório do estudo" gera o consolidado com capa, sumário, resumo do estudo, uma seção por ferramenta escolhida e a conclusão. Os arquivos ficam em `relatorios/` da pasta de unidade.
 
 Na tela **Modelo**, o painel do nó mostra quantos estudos o nó tem, e "Abrir em Ferramentas" leva aos estudos dele (ou prepara um estudo novo do nó).
@@ -95,7 +114,7 @@ Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.r
 
 ## Limites desta versão
 
-O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim Seis Sigma.
+O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim LSS.
 
 ## Modelo (mão dupla com o UTSim)
 

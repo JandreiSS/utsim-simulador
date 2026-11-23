@@ -837,3 +837,159 @@ res-painel-viavel = Réalisable
 res-painel-vs_melhor = Δ vs meilleur
 res-painel-equivalente = { $delta } équivalent
 res-painel-objeto_metrica = objet.métrique
+
+# Parte 4: fluxos, câmeras e modelos 3D (flows*.rs, cameras.rs, camera_modes.rs, models.rs)
+
+## Tipos de atividade e modos de câmera
+
+fluxo-tipo-gerar-tokens = Générer des jetons
+fluxo-tipo-agenda = Planning
+fluxo-tipo-ao-evento = Sur événement
+fluxo-tipo-esperar = Attendre
+fluxo-tipo-decidir = Décider
+fluxo-tipo-atribuir = Affecter
+fluxo-tipo-adquirir = Acquérir
+fluxo-tipo-liberar = Libérer
+fluxo-tipo-aguardar-evento = Attendre un événement
+fluxo-tipo-criar-item = Créer un élément
+fluxo-tipo-lote = Lot
+fluxo-tipo-fim = Fin
+camera-modo-orbita = Orbite
+camera-modo-seguir = Suivre
+camera-modo-primeira-pessoa = Première personne
+camera-modo-do-recurso = Depuis la ressource
+
+## camera_modes.rs
+
+camera-modes-seguir_e_do_recurso_so = Suivre et Depuis la ressource ne fonctionnent qu’en Simuler
+camera-modes-o_modelo_nao_tem_recursos = Le modèle n’a pas de ressources mobiles à suivre
+camera-modes-camera = Caméra : { $modo }
+camera-modes-orbita_seguir_um_recurso_andar = Orbite, suivre une ressource, marcher dans l’usine ou voir depuis la ressource (touches 1 à 4)
+camera-modes-recurso = ressource : { $name }
+camera-modes-distancia_m = distance (m)
+camera-modes-velocidade_m_s = vitesse (m/s)
+camera-modes-travar_o_mouse_l = Verrouiller la souris (L)
+camera-modes-sair_esc = Quitter (Échap)
+
+## cameras.rs
+
+cameras-esquerdo_arrasta_desloca_direito_gira = gauche fait glisser (déplace), droit fait pivoter, molette zoome
+cameras-direito_gira_em_volta_do = droit tourne autour de la ressource, molette change la distance, Échap quitte
+cameras-wasd_anda_shift_corre_direito = WASD marche, Maj court, droit (ou L) regarde, molette change la vitesse, Échap quitte
+cameras-direito_olha_em_volta_esc = droit regarde autour, Échap quitte
+
+## flows.rs
+
+flows-o_nome_nao_pode_ficar = le nom ne peut pas être vide
+flows-ja_existe_uma_atividade_chamada = une activité nommée "{ $to }" existe déjà
+
+## flows_ui.rs
+
+flows-ui-fluxos = Flux
+flows-ui-nenhum_fluxo_neste_modelo = Aucun flux dans ce modèle.
+flows-ui-novo_fluxo = Nouveau flux
+flows-ui-cria_um_fluxo_gerar_tokens = Crée un flux Générer des jetons, Attendre, Fin
+flows-ui-remover = Retirer
+flows-ui-remove_o_fluxo_selecionado_ctrl = Retire le flux sélectionné (Ctrl+Z annule)
+flows-ui-nome = Nom
+flows-ui-o_nome_nao_pode_ficar = le nom ne peut pas être vide
+flows-ui-ja_existe_um_objeto_ou = un objet ou un flux nommé "{ $t }" existe déjà
+flows-ui-recursos = Ressources
+flows-ui-contadores_compartilhados_ex_docas = Compteurs partagés (ex. : quais).
+flows-ui-cap = cap.
+flows-ui-remover_recurso = Retirer la ressource
+flows-ui-recurso = + ressource
+flows-ui-crie_um_fluxo_com_novo = Créez un flux avec « Nouveau flux » pour dessiner la logique du modèle.
+flows-ui-adicionar = Ajouter :
+flows-ui-adicionar_atividade = Ajouter une activité
+flows-ui-excluir_atividade = Supprimer l’activité
+flows-ui-remove_a_atividade_e_as = Retire l’activité et les liaisons qui y arrivent
+flows-ui-e_mais_problema_s = ... et { $problems ->
+    [one] { $problems } autre problème
+   *[other] { $problems } autres problèmes
+}
+flows-ui-simulacao_em_t_o_numero = Simulation à t = { $t } : le nombre dans chaque case est la quantité de jetons qui s’y trouvent.
+flows-ui-fluxo_vazio_adicione_uma_atividade = Flux vide : ajoutez une activité.
+flows-ui-atividade = Activité
+flows-ui-clique_numa_atividade_do_diagrama = Cliquez sur une activité du diagramme pour voir et modifier ses champs.
+flows-ui-tokens_agora = Jetons maintenant : { $t }
+flows-ui-volte_para_editar_para_alterar = Revenez à Éditer pour modifier le flux.
+flows-ui-escolha = (choisir)
+flows-ui-objeto_nao_existe = l’objet "{ $value }" n’existe pas
+flows-ui-remover_rotulo = Retirer l’étiquette
+flows-ui-rotulo = + étiquette
+flows-ui-proxima_atividade = Activité suivante
+flows-ui-fim_do_fluxo_o_token = Fin du flux : le jeton se termine ici.
+flows-ui-ramos_para_onde_o_token = Branches (où va le jeton)
+flows-ui-remover_ligacao = Retirer la liaison
+flows-ui-peso = {"     "}poids
+flows-ui-se = {"     "}si
+flows-ui-ligar_a_outro_ramo = + relier à une autre branche...
+flows-ui-ligar_a = + relier à...
+flows-ui-ja_existe_uma_atividade_chamada = une activité nommée "{ $t }" existe déjà
+flows-ui-intervalo_entre_tokens = Intervalle entre jetons
+flows-ui-criar_um_token_em_t = créer un jeton à t = 0
+flows-ui-limitar_a = limiter à
+flows-ui-tokens = jetons
+flows-ui-horarios = Horaires
+flows-ui-t = t =
+flows-ui-remover_horario = Retirer l’horaire
+flows-ui-horario = + horaire
+flows-ui-objeto = Objet
+flows-ui-evento = Événement
+flows-ui-o_token_passa_a_carregar = Le jeton transporte alors l’élément de cet événement.
+flows-ui-tempo_de_espera = Temps d’attente
+flows-ui-probabilidade = Probabilité
+flows-ui-pelo_rotulo = Par étiquette
+flows-ui-condicoes = Conditions
+flows-ui-agente_externo = Agent externe
+flows-ui-regra = Règle
+flows-ui-rotulo_do_token_1_2 = étiquette du jeton (1, 2, ...)
+flows-ui-a_primeira_condicao_verdadeira_vence = La première condition vraie l’emporte ; aucune = dernière branche.
+flows-ui-pesos_relativos_um_por_ramo = Poids relatifs, un par branche.
+flows-ui-um_agente_externo_escolhe_o = Un agent externe choisit la branche ; la simulation se met en pause et montre ces observations :
+flows-ui-observacao = + observation
+flows-ui-rotulos = Étiquettes
+flows-ui-nome_atribui_ao_token_item = nom affecte le jeton ; item.nom l’élément transporté.
+flows-ui-recurso-2 = Ressource
+flows-ui-recurso_nao_existe = la ressource "{ $resource }" n’existe pas
+flows-ui-crie_um_recurso_na_coluna = Créez une ressource dans la colonne de gauche.
+flows-ui-quantidade = quantité
+flows-ui-dentro_do_objeto = Dans l’objet
+flows-ui-porta_de_entrada = port d’entrée
+flows-ui-rotulos_do_item = Étiquettes de l’élément
+flows-ui-juntar = Regrouper
+
+## models.rs
+
+models-visual = Rendu :
+models-simples = simple
+models-realista = réaliste
+models-modelos_3d_articulados_da_biblioteca = Modèles 3D articulés de la bibliothèque (chariot élévateur, AGV, opérateur...)
+
+## Estados dos blocos (painel do bloco e gráficos de estados)
+
+estado-sem-estado = sans état
+estado-ocioso = inactif
+estado-vazio = vide
+estado-gerando = génère
+estado-liberando = libère
+estado-coletando = collecte
+estado-preparacao = réglage
+estado-processando = en traitement
+estado-bloqueado = bloqué
+estado-aguardando-operador = attend un opérateur
+estado-aguardando-transporte = attend un transport
+estado-em-falha = en panne
+estado-fora-do-turno = hors équipe
+estado-viajando-vazio = roule à vide
+estado-viajando-carregado = roule chargé
+estado-carregando = chargement
+estado-descarregando = déchargement
+estado-trabalhando-no-posto = travaille au poste
+estado-parado = arrêté (commande externe)
+estado-aguardando-tecnico = attend un technicien
+estado-em-manutencao = en maintenance préventive
+estado-em-pausa = en pause (fatigue)
+estado-operador-entrando = opérateur qui entre
+estado-operador-saindo = opérateur qui sort

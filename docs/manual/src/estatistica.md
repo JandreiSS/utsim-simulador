@@ -3,7 +3,7 @@
 O comando `utsim estatistica` resume uma coluna de dados e faz os testes de hipótese das
 fases Medir e Analisar de um projeto Seis Sigma sobre as colunas de um arquivo CSV. As contas
 moram na crate `utsim-stats` (módulos `descriptive`, `hypothesis` e `nonparametric`), a mesma
-que o futuro aplicativo UTSim Seis Sigma vai usar. Cartas de controle, capacidade, nível sigma
+que o futuro aplicativo UTSim LSS vai usar. Cartas de controle, capacidade, nível sigma
 e MSA ficam no capítulo [Qualidade](qualidade.md).
 
 | Comando | O que faz |

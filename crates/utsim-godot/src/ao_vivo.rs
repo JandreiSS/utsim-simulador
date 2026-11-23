@@ -20,6 +20,7 @@
 //! person (only its value at the end of the replication) and the busy servers of a
 //! processor with capacity above 1 (the panel shows the time processing).
 
+use crate::texto::{fx, tx, vx};
 use std::collections::{BTreeMap, HashMap};
 
 use utsim_core::{RunReport, State, TraceEvent};
@@ -715,31 +716,34 @@ impl AoVivo {
         let x = &self.series[i];
         let n = self.numeros_de(i, t);
         let tipo = match (b.classe, b.papel) {
-            (Classe::Pessoa, _) => "pessoa".to_string(),
-            _ if b.kind == "Crane" => "ponte rolante".into(),
-            (_, Some(MobileRole::Forklift)) => "empilhadeira".into(),
+            (Classe::Pessoa, _) => tx("godot-ao-vivo-pessoa").to_string(),
+            _ if b.kind == "Crane" => tx("godot-ao-vivo-ponte_rolante").into(),
+            (_, Some(MobileRole::Forklift)) => tx("godot-ao-vivo-empilhadeira").into(),
             (_, Some(MobileRole::Agv)) => "AGV".into(),
-            (Classe::Veiculo, _) => "veículo".into(),
+            (Classe::Veiculo, _) => tx("godot-ao-vivo-veiculo").into(),
             _ => crate::results::kind_label(&b.kind.to_lowercase()).to_string(),
         };
         let janela = if self.inicio_estatisticas > 0.0 && t < self.inicio_estatisticas {
-            format!(
-                "aquecimento até {}: números desde 0",
-                num(self.inicio_estatisticas)
+            fx(
+                "godot-ao-vivo-aquecimento_ate_numeros_desde_0",
+                &[("inicio_estatisticas", vx(&num(self.inicio_estatisticas)))],
             )
         } else if self.inicio_estatisticas > 0.0 {
-            format!(
-                "desde o fim do aquecimento ({})",
-                num(self.inicio_estatisticas)
+            fx(
+                "godot-ao-vivo-desde_o_fim_do_aquecimento",
+                &[("inicio_estatisticas", vx(&num(self.inicio_estatisticas)))],
             )
         } else {
-            "desde o início".into()
+            tx("godot-ao-vivo-desde_o_inicio").into()
         };
-        let nota = format!(
-            "t = {} de {} · replicação {} · {janela}",
-            num(t),
-            num(self.fim),
-            self.replicacao
+        let nota = fx(
+            "godot-ao-vivo-t_de_replicacao",
+            &[
+                ("t", vx(&num(t))),
+                ("fim", vx(&num(self.fim))),
+                ("replicacao", vx(&self.replicacao)),
+                ("janela", vx(&janela)),
+            ],
         );
         let f = |s: State| n.fracao(s);
         let ocupado = f(State::Processing);
@@ -765,113 +769,118 @@ impl AoVivo {
             Classe::Processo => {
                 let mut agora = vec![linha(
                     "EmProcesso",
-                    "Em processamento agora",
+                    tx("vivo-em-processamento-agora"),
                     n.conteudo.to_string(),
-                    "Itens no objeto neste instante (processando ou prontos sem poder sair).",
+                    tx("vivo-itens-no-objeto-neste-instante"),
                 )];
                 if let Some(q) = n.fila {
                     agora.push(linha(
                         "Fila",
-                        "Itens em espera (fila)",
+                        tx("vivo-itens-em-espera-fila"),
                         q.to_string(),
-                        "Itens nas filas que alimentam o objeto, neste instante.",
+                        tx("vivo-itens-nas-filas-que-alimentam"),
                     ));
                 }
                 secoes.push(Secao {
-                    titulo: "Agora",
+                    titulo: tx("godot-ao-vivo-agora"),
                     linhas: agora,
                 });
                 let mut acum = vec![
                     linha(
                         "Entradas",
-                        "Entradas",
+                        tx("vivo-entradas"),
                         n.entradas.to_string(),
-                        "Itens que entraram na janela.",
+                        tx("vivo-itens-que-entraram-na-janela"),
                     ),
                     linha(
                         "Processados",
-                        "Já processados",
+                        tx("vivo-ja-processados"),
                         n.saidas.to_string(),
-                        "Itens que saíram do objeto na janela.",
+                        tx("vivo-itens-que-sairam-do-objeto"),
                     ),
                 ];
                 if self.tem_refugo || self.tem_retrabalho {
                     acum.push(if self.tem_refugo {
                         linha(
                             "Refugo",
-                            "Rejeitados para descarte",
+                            tx("vivo-rejeitados-para-descarte"),
                             n.refugo.to_string(),
-                            "Itens que chegaram a uma saída de refugo (sink_role: Scrap) vindos daqui, também por filas ou transporte.",
+                            tx("vivo-itens-que-chegaram-a-uma"),
                         )
                     } else {
                         linha(
                             "Refugo",
-                            "Rejeitados para descarte",
-                            "marque a saída de refugo".into(),
-                            "Nenhuma saída tem sink_role: Scrap; marque a saída de refugo no modelo para contar os descartes.",
+                            tx("vivo-rejeitados-para-descarte"),
+                            tx("godot-ao-vivo-marque_a_saida_de_refugo").into(),
+                            tx("vivo-nenhuma-saida-tem-sink-role"),
                         )
                     });
                     acum.push(linha(
                         "Retrabalho",
-                        "Rejeitados para retrabalho",
+                        tx("vivo-rejeitados-para-retrabalho"),
                         n.retrabalho.to_string(),
-                        "Itens que chegaram a um posto com retrabalho vindos daqui, também por filas ou transporte.",
+                        tx("vivo-itens-que-chegaram-a-um"),
                     ));
                 }
                 secoes.push(Secao {
-                    titulo: "Acumulado",
+                    titulo: tx("godot-ao-vivo-acumulado"),
                     linhas: acum,
                 });
                 let mut tempos = vec![linha(
                     "Ciclo",
-                    "Ciclo médio (permanência)",
+                    tx("vivo-ciclo-medio-permanencia"),
                     opt(n.permanencia),
-                    "Tempo médio no objeto dos itens que saíram na janela.",
+                    tx("vivo-tempo-medio-no-objeto-dos"),
                 )];
                 if n.fila.is_some() {
                     tempos.push(linha(
                         "Espera",
-                        "Espera média na fila",
+                        tx("vivo-espera-media-na-fila"),
                         opt(n.espera),
-                        "Tempo médio nas filas que alimentam o objeto.",
+                        tx("vivo-tempo-medio-nas-filas-que"),
                     ));
                 }
                 tempos.extend([
                     linha(
                         "Ocupado",
-                        "Ocupado (processando)",
+                        tx("vivo-ocupado-processando"),
                         pct(ocupado),
-                        "Fração da janela no estado processando.",
+                        tx("vivo-fracao-da-janela-no-estado"),
                     ),
                     linha(
                         "Ocioso",
-                        "Ocioso",
+                        tx("vivo-ocioso"),
                         pct(ocioso),
-                        "Fração da janela sem trabalho.",
+                        tx("vivo-fracao-da-janela-sem-trabalho"),
                     ),
                     linha(
                         "Bloqueado",
-                        "Bloqueado",
+                        tx("vivo-bloqueado"),
                         pct(bloqueado),
-                        "Pronto sem poder sair (bloqueado ou aguardando transporte).",
+                        tx("vivo-pronto-sem-poder-sair-bloqueado"),
                     ),
                     linha(
                         "Parado",
-                        "Parado (quebra)",
+                        tx("vivo-parado-quebra"),
                         pct(parado),
-                        "Quebrado, aguardando reparo ou em manutenção.",
+                        tx("vivo-quebrado-aguardando-reparo-ou-em"),
                     ),
-                    linha("Setup", "Setup", pct(f(State::Setup)), "Fração em setup."),
+                    linha(
+                        "Setup",
+                        tx("vivo-setup"),
+                        pct(f(State::Setup)),
+                        tx("vivo-fracao-em-setup"),
+                    ),
                 ]);
                 secoes.push(Secao {
-                    titulo: "Tempos",
+                    titulo: tx("godot-ao-vivo-tempos"),
                     linhas: tempos,
                 });
-                curvas.push(conteudo("Em processo (WIP)", 0));
+                curvas.push(conteudo(tx("godot-ao-vivo-em_processo_wip"), 0));
                 if !b.antes.is_empty() {
                     let antes = b.antes.clone();
                     curvas.push((
-                        "Fila".to_string(),
+                        tx("godot-ao-vivo-fila").to_string(),
                         Self::curva(t, |a, z| {
                             antes
                                 .iter()
@@ -893,56 +902,56 @@ impl AoVivo {
                 let mut linhas = vec![
                     linha(
                         "Conteudo",
-                        "Conteúdo agora",
+                        tx("vivo-conteudo-agora"),
                         n.conteudo.to_string(),
-                        "Itens no objeto neste instante.",
+                        tx("vivo-itens-no-objeto-neste-instante-2"),
                     ),
                     linha(
                         "ConteudoMedio",
-                        "Conteúdo médio",
+                        tx("vivo-conteudo-medio"),
                         num(n.conteudo_medio),
-                        "Média no tempo do conteúdo, na janela.",
+                        tx("vivo-media-no-tempo-do-conteudo"),
                     ),
                     linha(
                         "ConteudoMax",
-                        "Conteúdo máximo",
+                        tx("vivo-conteudo-maximo"),
                         n.conteudo_max.to_string(),
-                        "Maior conteúdo da janela.",
+                        tx("vivo-maior-conteudo-da-janela"),
                     ),
                 ];
                 if b.classe != Classe::Chegada {
                     linhas.push(linha(
                         "Espera",
-                        "Espera média",
+                        tx("vivo-espera-media"),
                         opt(n.permanencia),
-                        "Tempo médio no objeto dos itens que saíram na janela.",
+                        tx("vivo-tempo-medio-no-objeto-dos"),
                     ));
                     linhas.push(linha(
                         "Entradas",
-                        "Entradas",
+                        tx("vivo-entradas"),
                         n.entradas.to_string(),
-                        "Itens que entraram na janela.",
+                        tx("vivo-itens-que-entraram-na-janela"),
                     ));
                 }
                 linhas.push(linha(
                     "Saidas",
-                    "Saídas",
+                    tx("vivo-saidas"),
                     n.saidas.to_string(),
-                    "Itens que saíram na janela.",
+                    tx("vivo-itens-que-sairam-na-janela"),
                 ));
                 if b.classe == Classe::Chegada {
                     linhas.push(linha(
                         "Bloqueado",
-                        "Bloqueado",
+                        tx("vivo-bloqueado"),
                         pct(bloqueado),
-                        "Fração da janela sem poder liberar o item criado.",
+                        tx("vivo-fracao-da-janela-sem-poder"),
                     ));
                 }
                 secoes.push(Secao {
-                    titulo: "Agora e na janela",
+                    titulo: tx("godot-ao-vivo-agora_e_na_janela"),
                     linhas,
                 });
-                curvas.push(conteudo("Conteúdo", 0));
+                curvas.push(conteudo(tx("godot-ao-vivo-conteudo"), 0));
             }
             Classe::Saida => {
                 let span = t - n.inicio;
@@ -954,41 +963,41 @@ impl AoVivo {
                 let mut linhas = vec![
                     linha(
                         "Total",
-                        "Recebidos (total)",
+                        tx("vivo-recebidos-total"),
                         n.entradas.to_string(),
-                        "Itens que chegaram à saída na janela.",
+                        tx("vivo-itens-que-chegaram-a-saida"),
                     ),
                     linha(
                         "Vazao",
-                        "Vazão (por unidade de tempo)",
+                        tx("vivo-vazao-por-unidade-de-tempo"),
                         num(vazao),
-                        "Recebidos divididos pela duração da janela.",
+                        tx("vivo-recebidos-divididos-pela-duracao-da"),
                     ),
                     linha(
                         "TempoSistema",
-                        "Tempo médio no sistema",
+                        tx("vivo-tempo-medio-no-sistema"),
                         opt(n.tempo_sistema),
-                        "Da criação do item à chegada aqui.",
+                        tx("vivo-da-criacao-do-item-a"),
                     ),
                 ];
                 if let Some(p) = b.papel_saida {
                     linhas.push(linha(
                         "Papel",
-                        "Papel na qualidade",
+                        tx("vivo-papel-na-qualidade"),
                         match p {
                             SinkRole::Scrap => "refugo".into(),
                             SinkRole::Customer => "cliente".into(),
                         },
-                        "O papel da saída nos relatórios de qualidade.",
+                        tx("vivo-o-papel-da-saida-nos"),
                     ));
                 }
                 secoes.push(Secao {
-                    titulo: "Saída",
+                    titulo: tx("godot-ao-vivo-saida"),
                     linhas,
                 });
                 let ent = &x.entradas;
                 curvas.push((
-                    "Recebidos (acumulado)".to_string(),
+                    tx("godot-ao-vivo-recebidos_acumulado").to_string(),
                     Self::curva(t, |_, z| ent.n(0.0, z) as f64),
                     0,
                 ));
@@ -997,59 +1006,59 @@ impl AoVivo {
                 let mut linhas = vec![
                     linha(
                         "Utilizacao",
-                        "Utilização",
+                        tx("vivo-utilizacao"),
                         pct(n.utilizacao()),
-                        "Andando, carregando, descarregando ou trabalhando num posto.",
+                        tx("vivo-andando-carregando-descarregando-ou-trabalhando"),
                     ),
                     linha(
                         "Viagens",
-                        "Viagens",
+                        tx("vivo-viagens"),
                         n.viagens.to_string(),
-                        "Deslocamentos começados na janela.",
+                        tx("vivo-deslocamentos-comecados-na-janela"),
                     ),
                     linha(
                         "Transportados",
-                        "Itens transportados",
+                        tx("vivo-itens-transportados"),
                         n.saidas.to_string(),
-                        "Itens entregues na janela.",
+                        tx("vivo-itens-entregues-na-janela"),
                     ),
                     linha(
                         "Carregando",
-                        "Carregando agora",
+                        tx("vivo-carregando-agora"),
                         n.conteudo.to_string(),
-                        "Itens consigo neste instante.",
+                        tx("vivo-itens-consigo-neste-instante"),
                     ),
                     linha(
                         "Carregado",
-                        "Viajando carregado",
+                        tx("vivo-viajando-carregado"),
                         pct(f(State::TravelLoaded)),
-                        "Fração da janela andando com carga.",
+                        tx("vivo-fracao-da-janela-andando-com"),
                     ),
                     linha(
                         "Vazio",
-                        "Viajando vazio",
+                        tx("vivo-viajando-vazio"),
                         pct(f(State::TravelEmpty)),
-                        "Fração da janela andando sem carga.",
+                        tx("vivo-fracao-da-janela-andando-sem"),
                     ),
                 ];
                 if b.classe == Classe::Pessoa {
                     linhas.push(linha(
                         "NoPosto",
-                        "Trabalhando num posto",
+                        tx("vivo-trabalhando-num-posto"),
                         pct(f(State::Utilize)),
-                        "Fração da janela operando um processo (ou uma ponte rolante pela botoeira ou pelo rádio).",
+                        tx("vivo-fracao-da-janela-operando-um"),
                     ));
                     linhas.push(linha(
                         "Descanso",
-                        "Descanso (fadiga)",
+                        tx("vivo-descanso-fadiga"),
                         pct(f(State::Resting)),
-                        "Fração da janela em pausa para recuperar.",
+                        tx("vivo-fracao-da-janela-em-pausa"),
                     ));
                     linhas.push(linha(
                         "Pausas",
-                        "Pausas",
+                        tx("vivo-pausas"),
                         n.descansos.to_string(),
-                        "Vezes que entrou em descanso na janela.",
+                        tx("vivo-vezes-que-entrou-em-descanso"),
                     ));
                     let c = self.report.block(&b.nome).map(|r| &r.custom);
                     if let Some(m) = c.and_then(|c| c.get("person.fatigue_mean")) {
@@ -1059,38 +1068,38 @@ impl AoVivo {
                             .unwrap_or(f64::NAN);
                         linhas.push(linha(
                             "Fadiga",
-                            "Fadiga média / máxima (fim da replicação)",
+                            tx("vivo-fadiga-media-maxima-fim-da"),
                             format!("{} / {}", num(*m), num(mx)),
-                            "A fadiga não está no registro da reprodução: valores do relatório final.",
+                            tx("vivo-a-fadiga-nao-esta-no"),
                         ));
                     }
                 } else {
                     if b.kind == "Crane" {
                         linhas.push(linha(
                             "EsperaOperador",
-                            "Esperando o operador",
+                            tx("vivo-esperando-o-operador"),
                             pct(f(State::WaitingOperator)),
-                            "Fração da janela parada na carga até a pessoa da botoeira ou do rádio chegar ao lado dela.",
+                            tx("vivo-fracao-da-janela-parada-na"),
                         ));
                     }
                     linhas.push(linha(
                         "Parado",
-                        "Parado (quebra)",
+                        tx("vivo-parado-quebra"),
                         pct(parado),
-                        "Quebrado, aguardando reparo ou em manutenção.",
+                        tx("vivo-quebrado-aguardando-reparo-ou-em"),
                     ));
                 }
                 secoes.push(Secao {
                     titulo: if b.classe == Classe::Pessoa {
-                        "Pessoa"
+                        tx("godot-ao-vivo-pessoa-2")
                     } else if b.kind == "Crane" {
-                        "Ponte rolante"
+                        tx("godot-ao-vivo-ponte_rolante-2")
                     } else {
-                        "Veículo"
+                        tx("godot-ao-vivo-veiculo-2")
                     },
                     linhas,
                 });
-                curvas.push(conteudo("Itens consigo", 0));
+                curvas.push(conteudo(tx("godot-ao-vivo-itens_consigo"), 0));
             }
         }
         let estados = STATES

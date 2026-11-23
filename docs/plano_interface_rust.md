@@ -13,7 +13,7 @@ Por quê:
   dicionários em nós; com egui o painel chama o Rust direto, sem a volta pelo GDScript;
 - tudo o que é Rust é testável sem o motor (`cargo test -p utsim-godot`);
 - o mesmo visual (crate `utsim-ui-tema`) serve à interface Godot, ao launcher e ao app
-  UTSim Seis Sigma, que já são egui.
+  UTSim LSS, que já são egui.
 
 ## Arquitetura
 
@@ -82,7 +82,7 @@ Segoe UI no Windows e Noto Sans ou DejaVu Sans no Linux, lida de onde o sistema 
 sem ir no pacote, com as fontes do egui como reserva) e dois widgets: o botão primário
 ("Aplicar") e o controle segmentado (Editar | Simular). As cores são as do tema Godot
 (`godot/tema/utsim.tres`, removido no passo 5), então os painéis egui e os painéis Godot
-ficaram iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim Seis Sigma
+ficaram iguais durante a migração. **O launcher (`crates/utsim-launcher`) e o app UTSim LSS
 (`crates/utsim-lss-app`) passam a usar este tema** (`utsim_ui_tema::install(&ctx)`) quando
 forem mexidos; não foram tocados nesta frente.
 
