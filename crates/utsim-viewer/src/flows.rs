@@ -2,6 +2,7 @@
 //! labels, the automatic layered layout of a flow diagram, whole-flow commands and
 //! the structural edits (add, remove, rename, connect). Nothing here needs a window.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::BTreeMap;
 
 use utsim_core::Dist;
@@ -12,20 +13,21 @@ use crate::layout;
 
 pub use utsim_scene::tokens::TokenTrack;
 
-/// Activity kinds offered when adding an activity: RON variant name and UI label.
+/// Activity kinds offered when adding an activity: RON variant name and the key
+/// (`editor.ftl`) of its label.
 pub const KINDS: [(&str, &str); 12] = [
-    ("Source", "Gerar tokens"),
-    ("Schedule", "Agenda"),
-    ("OnEvent", "Ao evento"),
-    ("Delay", "Esperar"),
-    ("Decide", "Decidir"),
-    ("Assign", "Atribuir"),
-    ("Acquire", "Adquirir"),
-    ("Release", "Liberar"),
-    ("WaitFor", "Aguardar evento"),
-    ("CreateItem", "Criar item"),
-    ("Batch", "Lote"),
-    ("Sink", "Fim"),
+    ("Source", "fluxo-tipo-gerar-tokens"),
+    ("Schedule", "fluxo-tipo-agenda"),
+    ("OnEvent", "fluxo-tipo-ao-evento"),
+    ("Delay", "fluxo-tipo-esperar"),
+    ("Decide", "fluxo-tipo-decidir"),
+    ("Assign", "fluxo-tipo-atribuir"),
+    ("Acquire", "fluxo-tipo-adquirir"),
+    ("Release", "fluxo-tipo-liberar"),
+    ("WaitFor", "fluxo-tipo-aguardar-evento"),
+    ("CreateItem", "fluxo-tipo-criar-item"),
+    ("Batch", "fluxo-tipo-lote"),
+    ("Sink", "fluxo-tipo-fim"),
 ];
 
 /// RON variant name of an activity kind.
@@ -52,7 +54,7 @@ pub fn kind_label(kind: &Activity) -> &'static str {
     KINDS
         .iter()
         .find(|(k, _)| *k == key)
-        .map_or("?", |(_, label)| label)
+        .map_or("?", |(_, label)| tx(label))
 }
 
 pub fn event_label(e: BlockEvent) -> &'static str {
@@ -267,10 +269,13 @@ pub fn rename_resource(flow: &mut FlowDef, from: &str, to: &str) {
 /// Renames an activity, updating the `next` lists. Fails on an empty or taken name.
 pub fn rename_activity(flow: &mut FlowDef, from: &str, to: &str) -> Result<(), String> {
     if to.trim().is_empty() {
-        return Err("o nome não pode ficar vazio".into());
+        return Err(tx("flows-o_nome_nao_pode_ficar").into());
     }
     if from != to && flow.activities.iter().any(|a| a.name == to) {
-        return Err(format!("já existe uma atividade chamada \"{to}\""));
+        return Err(fx(
+            "flows-ja_existe_uma_atividade_chamada",
+            &[("to", vx(&to))],
+        ));
     }
     for a in &mut flow.activities {
         if a.name == from {
@@ -403,7 +408,7 @@ mod tests {
         for (key, label) in KINDS {
             let a = new_activity(key, "x", &objects, &resources).unwrap();
             assert_eq!(kind_key(&a.kind), key);
-            assert_eq!(kind_label(&a.kind), label);
+            assert_eq!(kind_label(&a.kind), tx(label));
         }
         assert!(new_activity("Nada", "x", &objects, &resources).is_none());
     }

@@ -27,6 +27,7 @@
 //! the tabs are `Res_Abas_<título>` and every chart records how many things it draws
 //! (bars, rows, curves or bins) for the `grafico` checks.
 
+use crate::texto::{fx, tx, vx};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -45,19 +46,36 @@ use crate::jobs::Task;
 use crate::results::{self, OptForm, RunOutput};
 use crate::ui_props::{named, named_list, named_toggle};
 
-/// The tabs, in order.
-pub const TABS: [&str; 5] = ["Resumo", "Gráficos", "Análise", "Cenários", "Otimização"];
-/// The charts of "Gráficos": id (for `choose_chart`) and label.
+/// The keys (`godot.ftl`) of the tabs, in order.
+pub const TABS: [&str; 5] = [
+    "godot-ui-results-resumo",
+    "godot-ui-results-graficos",
+    "godot-ui-results-analise",
+    "godot-ui-results-cenarios",
+    "godot-ui-results-otimizacao",
+];
+/// The charts of "Gráficos": id (for `choose_chart`) and the key of the label.
 pub const CHARTS: [(&str, &str); 4] = [
-    ("ocupacao", "Ocupação"),
-    ("estados", "Estados"),
-    ("serie", "Série temporal"),
-    ("histograma", "Histograma"),
+    ("ocupacao", "godot-ui-results-ocupacao"),
+    ("estados", "godot-ui-results-estados"),
+    ("serie", "godot-ui-results-serie_temporal"),
+    ("histograma", "godot-ui-results-histograma"),
 ];
 /// The utilisation shown: work, within shift, work plus blocked.
 pub const UTILIZATION: [&str; 3] = ["trabalho", "turno", "bloqueio"];
 /// The optimisation methods.
 pub const METHODS: [&str; 3] = ["grade", "recozimento", "genetico"];
+/// The label of an id of [`UTILIZATION`] or [`METHODS`], in the language of the interface.
+fn id_label(id: &str) -> &'static str {
+    tx(match id {
+        "trabalho" => "godot-ui-results-util-trabalho",
+        "turno" => "godot-ui-results-util-turno",
+        "bloqueio" => "godot-ui-results-util-bloqueio",
+        "grade" => "godot-ui-results-metodo-grade",
+        "recozimento" => "godot-ui-results-metodo-recozimento",
+        _ => "godot-ui-results-metodo-genetico",
+    })
+}
 /// Gap between the window and the panels around it, in points.
 pub const MARGIN: f32 = 12.0;
 /// Colour of the bars (the accent of the theme).
@@ -154,16 +172,20 @@ impl ResultsView {
         let s = &self.summary;
         let b = s["bottleneck"]
             .as_str()
-            .unwrap_or("nenhum recurso ocupado")
+            .unwrap_or(tx("godot-ui-results-nenhum_recurso_ocupado"))
             .to_owned();
         let bs = s["bottleneck_in_shift"].as_str().unwrap_or("-").to_owned();
-        format!(
-            "{}: {} replicação(ões), tempo de parada {}, aquecimento {}, semente {}.\nGargalo (geral): {b}\nGargalo (dentro do turno): {bs}",
-            text(&s["model"]),
-            text(&s["replications"]),
-            num(f(&s["stop_time"]).unwrap_or(0.0)),
-            num(f(&s["warmup"]).unwrap_or(0.0)),
-            text(&s["seed"]),
+        fx(
+            "godot-ui-results-replicacao_oes_tempo_de_parada",
+            &[
+                ("model", vx(&text(&s["model"]))),
+                ("replications", vx(&text(&s["replications"]))),
+                ("stop_time", vx(&num(f(&s["stop_time"]).unwrap_or(0.0)))),
+                ("warmup", vx(&num(f(&s["warmup"]).unwrap_or(0.0)))),
+                ("seed", vx(&text(&s["seed"]))),
+                ("b", vx(&b)),
+                ("bs", vx(&bs)),
+            ],
         )
     }
 }
@@ -319,7 +341,12 @@ fn parse_count(text: &str, what: &str, lo: u64, hi: u64) -> Result<u64, String> 
     text.trim()
         .parse::<u64>()
         .map(|n| n.clamp(lo, hi))
-        .map_err(|_| format!("{what} \"{}\" inválido: use um número inteiro", text.trim()))
+        .map_err(|_| {
+            fx(
+                "godot-ui-results-invalido_use_um_numero_inteiro",
+                &[("what", vx(&what)), ("text", vx(&text.trim()))],
+            )
+        })
 }
 
 /// The run of the button `kind` (`aquecimento`, `mais`, `little`, `gargalo_movel`,
@@ -330,10 +357,19 @@ pub fn task(kind: &str, v: &ResultsView, mem: &ResultsMemory) -> Result<Task, St
         "aquecimento" => {
             let series = match mem.warm_series.trim() {
                 "" | "wip" => WarmupSeries::Wip,
-                other => WarmupSeries::parse(other)
-                    .ok_or_else(|| format!("série \"{other}\" inválida: use objeto.medida"))?,
+                other => WarmupSeries::parse(other).ok_or_else(|| {
+                    fx(
+                        "godot-ui-results-serie_invalida_use_objeto_medida",
+                        &[("other", vx(&other))],
+                    )
+                })?,
             };
-            let window = parse_count(&mem.warm_window, "janela", 1, 200)? as usize;
+            let window = parse_count(
+                &mem.warm_window,
+                tx("godot-ui-results-campo-janela"),
+                1,
+                200,
+            )? as usize;
             Ok(Task::Warmup {
                 model: run.model.clone(),
                 series,
@@ -343,7 +379,7 @@ pub fn task(kind: &str, v: &ResultsView, mem: &ResultsMemory) -> Result<Task, St
         "mais" => {
             let extra = mem.more();
             if extra == 0 {
-                return Err("calcule antes quantas replicações faltam".into());
+                return Err(tx("godot-ui-results-calcule_antes_quantas_replicacoes_faltam").into());
             }
             Ok(Task::More {
                 base: Box::new(run.clone()),
@@ -354,10 +390,15 @@ pub fn task(kind: &str, v: &ResultsView, mem: &ResultsMemory) -> Result<Task, St
         "gargalo_movel" => Ok(Task::ShiftingBottleneck(run.model.clone())),
         "cenarios" => {
             if !v.can_run {
-                return Err("Simule o modelo antes de comparar cenários.".into());
+                return Err(tx("godot-ui-results-simule_o_modelo_antes_de").into());
             }
             let scenarios = results::parse_scenarios(&mem.sc_text)?;
-            let reps = parse_count(&mem.sc_reps, "replicações", 2, 1000)? as u32;
+            let reps = parse_count(
+                &mem.sc_reps,
+                tx("godot-ui-results-campo-replicacoes"),
+                2,
+                1000,
+            )? as u32;
             let mut model = run.model.clone();
             model.run.replications = reps;
             Ok(Task::Scenarios {
@@ -373,39 +414,52 @@ pub fn task(kind: &str, v: &ResultsView, mem: &ResultsMemory) -> Result<Task, St
         }
         "otimizacao" => {
             if !v.can_run {
-                return Err("Simule o modelo antes de otimizar.".into());
+                return Err(tx("godot-ui-results-simule_o_modelo_antes_de-2").into());
             }
             let form = OptForm {
                 metric: mem.op_metric.trim().to_owned(),
                 maximize: mem.op_max,
                 variables: mem.op_vars.clone(),
                 method: METHODS[mem.op_method.min(METHODS.len() - 1)].to_owned(),
-                replications: parse_count(&mem.op_reps, "replicações", 2, 200)? as u32,
-                budget: parse_count(&mem.op_budget, "orçamento", 1, 5000)? as usize,
+                replications: parse_count(
+                    &mem.op_reps,
+                    tx("godot-ui-results-campo-replicacoes"),
+                    2,
+                    200,
+                )? as u32,
+                budget: parse_count(
+                    &mem.op_budget,
+                    tx("godot-ui-results-campo-orcamento"),
+                    1,
+                    5000,
+                )? as usize,
             };
             Ok(Task::Optimize {
                 model: run.model.clone(),
                 problem: Box::new(form.build()?),
             })
         }
-        other => Err(format!("trabalho desconhecido: {other}")),
+        other => Err(fx(
+            "godot-ui-results-trabalho_desconhecido",
+            &[("other", vx(&other))],
+        )),
     }
 }
 
 /// The text under the warm-up chart.
 pub fn warm_text(d: &Value) -> String {
     match f(&d["suggested"]) {
-        None => format!(
-            "Série curta demais para o MSER-5 ({} pontos): aumente o tempo de parada ou a amostragem.",
-            text(&d["points"])
+        None => fx(
+            "godot-ui-results-serie_curta_demais_para_o",
+            &[("points", vx(&text(&d["points"])))],
         ),
-        Some(cut) if d["too_short"].as_bool() == Some(true) => format!(
-            "Corte sugerido: {}, mas o mínimo ficou na segunda metade da série: a rodada é curta ou não se estabiliza.",
-            num(cut)
+        Some(cut) if d["too_short"].as_bool() == Some(true) => fx(
+            "godot-ui-results-corte_sugerido_mas_o_minimo",
+            &[("cut", vx(&num(cut)))],
         ),
-        Some(cut) => format!(
-            "Corte sugerido (MSER-5): {}. Antes dele a média ainda sobe ou desce.",
-            num(cut)
+        Some(cut) => fx(
+            "godot-ui-results-corte_sugerido_mser_5_antes",
+            &[("cut", vx(&num(cut)))],
         ),
     }
 }
@@ -418,8 +472,11 @@ fn shifting_first(d: &Value) -> Option<String> {
 /// The line under the shifting bottleneck chart.
 pub fn shifting_text(d: &Value) -> String {
     match shifting_first(d) {
-        Some(n) => format!("Gargalo móvel: {n} na maior parte do tempo."),
-        None => "Nenhum recurso ativo.".into(),
+        Some(n) => fx(
+            "godot-ui-results-gargalo_movel_na_maior_parte",
+            &[("n", vx(&n))],
+        ),
+        None => tx("godot-ui-results-nenhum_recurso_ativo").into(),
     }
 }
 
@@ -440,10 +497,12 @@ pub fn done(kind: &str, data: Option<&Value>, v: &ResultsView, mem: &mut Results
     if kind == "replicacoes" {
         // "Rodar mais": the new run is already shown; how many are still missing.
         mem.precision(v);
-        return format!(
-            "{} replicações; faltam {} para o alvo.",
-            v.run.reports.len(),
-            mem.more()
+        return fx(
+            "godot-ui-results-replicacoes_faltam_para_o_alvo",
+            &[
+                ("reports", vx(&v.run.reports.len())),
+                ("more", vx(&mem.more())),
+            ],
         );
     }
     let Some(d) = data.filter(|d| !d.is_null()) else {
@@ -453,7 +512,10 @@ pub fn done(kind: &str, data: Option<&Value>, v: &ResultsView, mem: &mut Results
     match kind {
         "aquecimento" => {
             mem.warm = Some(d.clone());
-            format!("Aquecimento analisado: {}", warm_text(d))
+            fx(
+                "godot-ui-results-aquecimento_analisado",
+                &[("d", vx(&warm_text(d)))],
+            )
         }
         "little" => {
             mem.little = Some(d.clone());
@@ -464,11 +526,13 @@ pub fn done(kind: &str, data: Option<&Value>, v: &ResultsView, mem: &mut Results
                     .or_default() += 1;
             }
             let get = |k: &str| n.get(k).copied().unwrap_or(0);
-            format!(
-                "Lei de Little: {} verde(s), {} amarelo(s), {} vermelho(s).",
-                get("verde"),
-                get("amarelo"),
-                get("vermelho")
+            fx(
+                "godot-ui-results-lei_de_little_verde_s",
+                &[
+                    ("verde", vx(&get("verde"))),
+                    ("amarelo", vx(&get("amarelo"))),
+                    ("vermelho", vx(&get("vermelho"))),
+                ],
             )
         }
         "gargalo_movel" => {
@@ -477,16 +541,19 @@ pub fn done(kind: &str, data: Option<&Value>, v: &ResultsView, mem: &mut Results
         }
         "cenarios" => {
             mem.sc = Some(d.clone());
-            format!(
-                "{} cenário(s) comparados.",
-                d["scenarios"].as_array().map_or(0, Vec::len)
+            fx(
+                "godot-ui-results-cenario_s_comparados",
+                &[("n", vx(&d["scenarios"].as_array().map_or(0, Vec::len)))],
             )
         }
         "otimizacao" => {
             mem.op = Some(d.clone());
-            format!(
-                "Otimização: melhor ponto {}.",
-                d["best"].as_str().unwrap_or("nenhum")
+            fx(
+                "godot-ui-results-otimizacao_melhor_ponto",
+                &[(
+                    "ponto",
+                    vx(&d["best"].as_str().unwrap_or(tx("godot-ui-results-nenhum"))),
+                )],
             )
         }
         _ => String::new(),
@@ -638,7 +705,7 @@ pub fn series_chart(run: &RunOutput, object: &str) -> Chart {
         curves,
         markers: Vec::new(),
         x: "tempo".into(),
-        y: format!("conteúdo de {object}"),
+        y: fx("godot-ui-results-conteudo_de", &[("object", vx(&object))]),
     }
 }
 
@@ -659,12 +726,15 @@ pub fn histogram_chart(run: &RunOutput, object: &str, tally: &str) -> Chart {
 pub fn warm_chart(d: &Value) -> Chart {
     let mut markers = Vec::new();
     if let Some(cut) = f(&d["suggested"]) {
-        markers.push((cut, format!("MSER-5: {}", num(cut))));
+        markers.push((
+            cut,
+            fx("godot-ui-results-mser_5", &[("cut", vx(&num(cut)))]),
+        ));
     }
     Chart::Lines {
         curves: vec![
             Curve {
-                name: "média entre replicações".into(),
+                name: tx("godot-ui-results-media_entre_replicacoes").into(),
                 points: points(&d["mean"]),
                 color: Color32::from_rgb(102, 128, 166),
                 width: 1.0,
@@ -691,11 +761,13 @@ pub fn shifting_chart(d: &Value) -> Chart {
             .map(|r| {
                 let pct = |v: &Value| f(&v["mean"]).map_or("-".into(), |x| num(x * 100.0));
                 BarRow {
-                    label: format!(
-                        "{} (único {}%, compartilhado {}%)",
-                        text(&r["name"]),
-                        pct(&r["sole"]),
-                        pct(&r["shifting"])
+                    label: fx(
+                        "godot-ui-results-unico_compartilhado",
+                        &[
+                            ("name", vx(&text(&r["name"]))),
+                            ("sole", vx(&pct(&r["sole"]))),
+                            ("shifting", vx(&pct(&r["shifting"]))),
+                        ],
                     ),
                     value: f(&r["total"]).unwrap_or(0.0) * 100.0,
                     half: None,
@@ -709,14 +781,14 @@ pub fn shifting_chart(d: &Value) -> Chart {
 pub fn history_chart(d: &Value) -> Chart {
     Chart::Lines {
         curves: vec![Curve {
-            name: "melhor objetivo".into(),
+            name: tx("godot-ui-results-melhor_objetivo").into(),
             points: points(&d["history"]),
             color: colors::WARNING,
             width: 2.0,
         }],
         markers: Vec::new(),
-        x: "pontos avaliados".into(),
-        y: "melhor objetivo".into(),
+        x: tx("godot-ui-results-pontos_avaliados").into(),
+        y: tx("godot-ui-results-melhor_objetivo").into(),
     }
 }
 
@@ -763,7 +835,13 @@ pub fn show(
         StrokeKind::Inside,
     );
     let panel = ui.allocate_rect(rect, Sense::hover());
-    named(ui, reg, "PainelResultados", &panel, "Resultados");
+    named(
+        ui,
+        reg,
+        "PainelResultados",
+        &panel,
+        tx("godot-ui-results-resultados"),
+    );
     let inner = rect.shrink2(Vec2::new(16.0, 12.0));
     let mut child = ui.new_child(
         UiBuilder::new()
@@ -812,24 +890,26 @@ pub fn show(
 fn header(ui: &mut Ui, v: &ResultsView, reg: &mut Registry, out: &mut Vec<String>) {
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new("Resultados")
+            RichText::new(tx("godot-ui-results-resultados"))
                 .size(sizes::HEADING)
                 .strong()
                 .color(colors::HEADING),
         );
         ui.label(
-            RichText::new(format!(
-                "{} · {} replicação(ões)",
-                text(&v.summary["model"]),
-                v.run.reports.len()
+            RichText::new(fx(
+                "godot-ui-results-replicacao_oes",
+                &[
+                    ("model", vx(&text(&v.summary["model"]))),
+                    ("reports", vx(&v.run.reports.len())),
+                ],
             ))
             .color(colors::TEXT_WEAK),
         );
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let r = ui
-                .button("Fechar")
-                .on_hover_text("Fechar os resultados (a cena continua)");
-            named(ui, reg, "Res_Fechar", &r, "Fechar");
+                .button(tx("godot-ui-results-fechar"))
+                .on_hover_text(tx("godot-ui-results-fechar_os_resultados_a_cena"));
+            named(ui, reg, "Res_Fechar", &r, tx("godot-ui-results-fechar"));
             if r.clicked() {
                 out.push("resultados:fechar".into());
             }
@@ -838,7 +918,7 @@ fn header(ui: &mut Ui, v: &ResultsView, reg: &mut Registry, out: &mut Vec<String
 }
 
 fn tabs(ui: &mut Ui, mem: &mut ResultsMemory, reg: &mut Registry) {
-    tab_row(ui, reg, "Res_Abas", &TABS, &mut mem.tab);
+    tab_row(ui, reg, "Res_Abas", &TABS.map(tx), &mut mem.tab);
 }
 
 /// A row of tabs named `<abas>_<título>` (the row itself is `abas`); `at` is the one shown.
@@ -1243,7 +1323,8 @@ pub fn object_table(v: &ResultsView) -> Table {
             let first = if b {
                 Cell::colored(name, colors::WARNING).tagged("gargalo", colors::WARNING)
             } else if bs {
-                Cell::colored(name, colors::WARNING).tagged("gargalo no turno", colors::WARNING)
+                Cell::colored(name, colors::WARNING)
+                    .tagged(tx("godot-ui-results-gargalo_no_turno"), colors::WARNING)
             } else {
                 Cell::plain(name)
             };
@@ -1270,13 +1351,13 @@ pub fn object_table(v: &ResultsView) -> Table {
         .collect();
     Table {
         header: [
-            "Objeto",
-            "Tipo",
-            "Entradas",
-            "Saídas",
-            "Conteúdo médio",
-            "Permanência",
-            "Ocupação",
+            tx("godot-ui-results-objeto"),
+            tx("godot-ui-results-tipo"),
+            tx("godot-ui-results-entradas"),
+            tx("godot-ui-results-saidas"),
+            tx("godot-ui-results-conteudo_medio"),
+            tx("godot-ui-results-permanencia"),
+            tx("godot-ui-results-ocupacao"),
         ]
         .map(String::from)
         .to_vec(),
@@ -1301,7 +1382,10 @@ pub fn cards(v: &ResultsView) -> Vec<(String, String, String, bool)> {
                 }
             })
             .map_or(String::new(), |u| {
-                format!("ocupação {}", mh(&results::summary(&u), true))
+                fx(
+                    "godot-ui-results-ocupacao-2",
+                    &[("valor", vx(&mh(&results::summary(&u), true)))],
+                )
             })
     };
     let exits: f64 = v
@@ -1316,33 +1400,41 @@ pub fn cards(v: &ResultsView) -> Vec<(String, String, String, bool)> {
     let bs = s["bottleneck_in_shift"].as_str();
     vec![
         (
-            "Replicações".into(),
+            tx("godot-ui-results-replicacoes").into(),
             v.run.reports.len().to_string(),
-            format!("semente {}", text(&s["seed"])),
+            fx(
+                "godot-ui-results-semente",
+                &[("seed", vx(&text(&s["seed"])))],
+            ),
             false,
         ),
         (
-            "Tempo de parada".into(),
+            tx("godot-ui-results-tempo_de_parada").into(),
             num(f(&s["stop_time"]).unwrap_or(0.0)),
-            format!("aquecimento {}", num(f(&s["warmup"]).unwrap_or(0.0))),
+            fx(
+                "godot-ui-results-aquecimento",
+                &[("warmup", vx(&num(f(&s["warmup"]).unwrap_or(0.0))))],
+            ),
             false,
         ),
         (
-            "Gargalo".into(),
+            tx("godot-ui-results-gargalo").into(),
             b.unwrap_or("nenhum").to_owned(),
-            b.map_or("nenhum recurso ocupado".into(), |n| util(n, false)),
+            b.map_or(tx("godot-ui-results-nenhum_recurso_ocupado").into(), |n| {
+                util(n, false)
+            }),
             b.is_some(),
         ),
         (
-            "Gargalo no turno".into(),
+            tx("godot-ui-results-gargalo_no_turno-2").into(),
             bs.unwrap_or("-").to_owned(),
             bs.map_or(String::new(), |n| util(n, true)),
             bs.is_some(),
         ),
         (
-            "Saídas por replicação".into(),
+            tx("godot-ui-results-saidas_por_replicacao").into(),
             num(exits),
-            "soma das saídas do modelo".into(),
+            tx("godot-ui-results-soma_das_saidas_do_modelo").into(),
             false,
         ),
     ]
@@ -1381,12 +1473,11 @@ fn summary_tab(
                                 .color(colors::TEXT_WEAK),
                         );
                         ui.add(
-                            Label::new(
-                                RichText::new(&value)
-                                    .size(20.0)
-                                    .strong()
-                                    .color(if warn { colors::WARNING } else { colors::TEXT_STRONG }),
-                            )
+                            Label::new(RichText::new(&value).size(20.0).strong().color(if warn {
+                                colors::WARNING
+                            } else {
+                                colors::TEXT_STRONG
+                            }))
                             .truncate(),
                         );
                         ui.add(
@@ -1402,26 +1493,23 @@ fn summary_tab(
                 named(ui, reg, &format!("Res_Cartao_{k}"), &r.response, &value);
             }
         });
-        explain(
-            ui,
-            "O gargalo é o recurso mais ocupado; dentro do turno conta só o tempo em que ele trabalha (um posto parado meio dia parece ocioso no geral, mas pode estar saturado no turno).",
-        );
+        explain(ui, tx("godot-ui-results-o_gargalo_e_o_recurso"));
     });
     named(ui, reg, "Res_Resumo", &block.response, &v.summary_text());
-    heading(ui, "Por objeto");
-    explain(ui, "Média ± semiamplitude do IC de 95 % entre replicações.");
+    heading(ui, tx("godot-ui-results-por_objeto"));
+    explain(ui, tx("godot-ui-results-media_semiamplitude_do_ic_de"));
     draw_table(ui, reg, "Res_Tabela", &object_table(v));
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Exportar CSV para").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-exportar_csv_para")).color(colors::TEXT));
         let w = (ui.available_width() - 110.0).max(160.0);
         field(ui, reg, "Res_PastaCSV", &mut mem.export_dir, w, "pasta");
         if button(
             ui,
             reg,
             "Res_ExportarCSV",
-            "Exportar",
-            "Grava resumo, replicações, séries e histogramas em CSV",
+            tx("godot-ui-results-exportar"),
+            tx("godot-ui-results-grava_resumo_replicacoes_series_e"),
             true,
         ) {
             out.push("resultados:exportar".into());
@@ -1448,20 +1536,23 @@ fn charts_tab(
         mem.tally = tallies.first().cloned().unwrap_or_default();
     }
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Gráfico").color(colors::TEXT));
-        let labels: Vec<String> = CHARTS.iter().map(|c| c.1.to_owned()).collect();
+        ui.label(RichText::new(tx("godot-ui-results-grafico")).color(colors::TEXT));
+        let labels: Vec<String> = CHARTS.iter().map(|c| tx(c.1).to_owned()).collect();
         if let Some(k) = combo(ui, reg, "Res_TipoGrafico", mem.chart, &labels, 170.0) {
             mem.chart = k;
         }
         if matches!(kind, "serie" | "histograma") {
-            ui.label(RichText::new("Objeto").color(colors::TEXT));
+            ui.label(RichText::new(tx("godot-ui-results-objeto")).color(colors::TEXT));
             let at = v.objects.iter().position(|o| *o == mem.object).unwrap_or(0);
             if let Some(k) = combo(ui, reg, "Res_ObjetoGrafico", at, &v.objects, 180.0) {
                 mem.object = v.objects[k].clone();
             }
         }
         if kind == "ocupacao" {
-            let items: Vec<String> = UTILIZATION.iter().map(|s| s.to_string()).collect();
+            let items: Vec<String> = UTILIZATION
+                .iter()
+                .map(|s| id_label(s).to_string())
+                .collect();
             if let Some(k) = combo(
                 ui,
                 reg,
@@ -1481,20 +1572,29 @@ fn charts_tab(
     });
     let chart = chosen_chart(v, mem);
     let mut note = match kind {
-        "ocupacao" => "Fração do tempo trabalhando (turno: só o tempo dentro do turno; bloqueio: somando o tempo bloqueado). A barra amarela é o gargalo; o traço é o IC de 95 %.".to_owned(),
-        "estados" => "Fração do tempo em cada estado, com as cores da cena 3D.".to_owned(),
-        "serie" => format!("Conteúdo de {} no tempo: cada replicação em cinza e a média em amarelo.", mem.object),
-        _ => format!("Histograma de {}.{}, juntando todas as replicações.", mem.object, mem.tally),
+        "ocupacao" => tx("godot-ui-results-fracao_do_tempo_trabalhando_turno").to_owned(),
+        "estados" => tx("godot-ui-results-fracao_do_tempo_em_cada").to_owned(),
+        "serie" => fx(
+            "godot-ui-results-conteudo_de_no_tempo_cada",
+            &[("object", vx(&mem.object))],
+        ),
+        _ => fx(
+            "godot-ui-results-histograma_de_juntando_todas_as",
+            &[("object", vx(&mem.object)), ("tally", vx(&mem.tally))],
+        ),
     };
     let offer = matches!(kind, "serie" | "histograma") && chart.count() == 0 && v.can_run;
     if offer {
-        note.push_str(&format!(
-            " O modelo não grava {}: \"Ligar e rodar de novo\" liga e simula outra vez.",
-            if kind == "serie" {
-                "a série do conteúdo"
-            } else {
-                "os histogramas"
-            }
+        note.push_str(&fx(
+            "godot-ui-results-o_modelo_nao_grava_ligar",
+            &[(
+                "falta",
+                vx(&if kind == "serie" {
+                    tx("godot-ui-results-falta-serie")
+                } else {
+                    tx("godot-ui-results-falta-histogramas")
+                }),
+            )],
         ));
     }
     let r = explain(ui, &note);
@@ -1504,17 +1604,17 @@ fn charts_tab(
             ui,
             reg,
             "Res_LigarAmostras",
-            "Ligar e rodar de novo",
-            "Liga no modelo a série do conteúdo (run.sample_interval, pelo tempo de simulação) e os histogramas (run.histogram_bins = 20), num passo que se desfaz com Ctrl+Z, e roda as replicações de novo",
+            tx("godot-ui-results-ligar_e_rodar_de_novo"),
+            tx("godot-ui-results-liga_no_modelo_a_serie"),
             true,
         )
     {
         out.push("resultados:ligar_amostras".into());
     }
     let empty = match kind {
-        "serie" => "sem série: ligue run.sample_interval no modelo",
-        "histograma" => "sem histograma: ligue run.histogram_bins no modelo",
-        _ => "sem dados",
+        "serie" => tx("godot-ui-results-sem_serie_ligue_run_sample"),
+        "histograma" => tx("godot-ui-results-sem_histograma_ligue_run_histogram"),
+        _ => tx("godot-ui-results-sem_dados"),
     };
     draw_chart(ui, reg, "Res_Grafico", &chart, empty, 340.0);
 }
@@ -1656,7 +1756,7 @@ fn bars(ui: &mut Ui, name: &str, rows: &[BarRow]) -> egui::Response {
                 let s = Stroke::new(1.5, colors::TEXT);
                 p.line(
                     Line::new(
-                        "IC 95 %",
+                        tx("godot-ui-results-ic_95"),
                         PlotPoints::new(vec![[r.value - h, y], [r.value + h, y]]),
                     )
                     .stroke(s),
@@ -1664,7 +1764,7 @@ fn bars(ui: &mut Ui, name: &str, rows: &[BarRow]) -> egui::Response {
                 for x in [r.value - h, r.value + h] {
                     p.line(
                         Line::new(
-                            "IC 95 %",
+                            tx("godot-ui-results-ic_95"),
                             PlotPoints::new(vec![[x, y - 0.14], [x, y + 0.14]]),
                         )
                         .stroke(s),
@@ -1860,7 +1960,14 @@ pub(crate) fn histogram_with(
                     .width(width * 0.92)
                     .fill(BAR)
                     .stroke(Stroke::NONE)
-                    .name(format!("{} a {}: {}", num(lo), num(lo + width), num(*c)))
+                    .name(fx(
+                        "godot-ui-results-a",
+                        &[
+                            ("lo", vx(&num(lo))),
+                            ("hi", vx(&num(lo + width))),
+                            ("c", vx(&num(*c))),
+                        ],
+                    ))
             })
             .collect();
         p.bar_chart(BarChart::new("contagem", list));
@@ -1880,30 +1987,27 @@ fn analysis_tab(
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) {
-    heading(ui, "Aquecimento");
-    explain(
-        ui,
-        "Roda as replicações desde o tempo 0, sem aquecimento, e mostra a média entre elas (curva de Welch). O corte do MSER-5 é onde a série deixa de ter o começo vazio; \"Aplicar\" grava esse tempo em run.warmup.",
-    );
+    heading(ui, tx("godot-ui-results-aquecimento-2"));
+    explain(ui, tx("godot-ui-results-roda_as_replicacoes_desde_o"));
     let cut = mem.warm.as_ref().and_then(|d| f(&d["suggested"]));
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Série").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-serie")).color(colors::TEXT));
         field(
             ui,
             reg,
             "Res_AquecSerie",
             &mut mem.warm_series,
             200.0,
-            "wip ou objeto.medida",
+            tx("godot-ui-results-wip_ou_objeto_medida"),
         );
-        ui.label(RichText::new("Janela").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-janela")).color(colors::TEXT));
         field(ui, reg, "Res_AquecJanela", &mut mem.warm_window, 50.0, "5");
         if button(
             ui,
             reg,
             "Res_AquecAnalisar",
-            "Analisar",
-            "Roda e calcula Welch e MSER-5",
+            tx("godot-ui-results-analisar"),
+            tx("godot-ui-results-roda_e_calcula_welch_e"),
             true,
         ) {
             out.push("resultados:trabalho:aquecimento".into());
@@ -1912,8 +2016,8 @@ fn analysis_tab(
             ui,
             reg,
             "Res_AquecAplicar",
-            "Aplicar",
-            "Grava o corte sugerido em run.warmup do modelo",
+            tx("godot-ui-results-aplicar"),
+            tx("godot-ui-results-grava_o_corte_sugerido_em"),
             cut.is_some() && v.can_run,
         ) && let Some(c) = cut
         {
@@ -1932,41 +2036,38 @@ fn analysis_tab(
             reg,
             "Res_AquecGrafico",
             &warm_chart(d),
-            "sem série",
+            tx("godot-ui-results-sem_serie"),
             240.0,
         );
     }
 
-    heading(ui, "Replicações necessárias");
-    explain(
-        ui,
-        "Quantas replicações faltam para a semiamplitude do IC de 95 % ficar abaixo do alvo (5% é relativo à média; 0.5 é absoluto). \"Rodar mais\" acrescenta as que faltam às já feitas, com sementes novas.",
-    );
+    heading(ui, tx("godot-ui-results-replicacoes_necessarias"));
+    explain(ui, tx("godot-ui-results-quantas_replicacoes_faltam_para_a"));
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Precisão").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-precisao")).color(colors::TEXT));
         field(ui, reg, "Res_Precisao", &mut mem.prec_target, 80.0, "5%");
         if button(
             ui,
             reg,
             "Res_PrecisaoCalcular",
-            "Calcular",
-            "Calcula as replicações necessárias",
+            tx("godot-ui-results-calcular"),
+            tx("godot-ui-results-calcula_as_replicacoes_necessarias"),
             true,
         ) {
             mem.precision(v);
         }
         let more = mem.more();
         let label = if more > 0 {
-            format!("Rodar mais {more}")
+            fx("godot-ui-results-rodar_mais", &[("more", vx(&more))])
         } else {
-            "Rodar mais".into()
+            tx("godot-ui-results-rodar_mais-2").into()
         };
         if primary(
             ui,
             reg,
             "Res_RodarMais",
             &label,
-            "Roda as replicações que faltam e junta às atuais",
+            tx("godot-ui-results-roda_as_replicacoes_que_faltam"),
             more > 0,
         ) {
             out.push("resultados:trabalho:mais".into());
@@ -1978,9 +2079,12 @@ fn analysis_tab(
         draw_table(ui, reg, "Res_PrecisaoTabela", &t);
         let more = mem.more();
         let line = if more > 0 {
-            format!("Para todas as medidas chegarem ao alvo faltam {more} replicação(ões).")
+            fx(
+                "godot-ui-results-para_todas_as_medidas_chegarem",
+                &[("more", vx(&more))],
+            )
         } else {
-            "Todas as medidas já estão dentro do alvo.".into()
+            tx("godot-ui-results-todas_as_medidas_ja_estao").into()
         };
         let r = ui.add(Label::new(RichText::new(&line).color(colors::TEXT)).wrap());
         named(
@@ -1992,17 +2096,14 @@ fn analysis_tab(
         );
     }
 
-    heading(ui, "Consistência: lei de Little");
-    explain(
-        ui,
-        "Confere L = λ·W em cada objeto e no sistema. Verde: fecha; amarelo: a diferença é estatisticamente diferente de zero, mas pequena (até 2 %); vermelho: não fecha, o que costuma indicar aquecimento curto ou itens presos no fim.",
-    );
+    heading(ui, tx("godot-ui-results-consistencia_lei_de_little"));
+    explain(ui, tx("godot-ui-results-confere_l_w_em_cada"));
     if button(
         ui,
         reg,
         "Res_Little",
-        "Conferir",
-        "Roda as replicações e confere a lei de Little",
+        tx("godot-ui-results-conferir"),
+        tx("godot-ui-results-roda_as_replicacoes_e_confere"),
         true,
     ) {
         out.push("resultados:trabalho:little".into());
@@ -2012,17 +2113,14 @@ fn analysis_tab(
         draw_table(ui, reg, "Res_LittleTexto", &little_table(d));
     }
 
-    heading(ui, "Gargalo móvel");
-    explain(
-        ui,
-        "Em cada instante, o gargalo é o recurso no período ativo mais longo; quando dois períodos se sobrepõem, o gargalo é compartilhado. Mostra a fração do tempo de cada recurso como gargalo único e compartilhado.",
-    );
+    heading(ui, tx("godot-ui-results-gargalo_movel"));
+    explain(ui, tx("godot-ui-results-em_cada_instante_o_gargalo"));
     if button(
         ui,
         reg,
         "Res_GargaloMovel",
-        "Calcular",
-        "Roda as replicações com o rastro e calcula o gargalo móvel",
+        tx("godot-ui-results-calcular"),
+        tx("godot-ui-results-roda_as_replicacoes_com_o"),
         true,
     ) {
         out.push("resultados:trabalho:gargalo_movel".into());
@@ -2037,7 +2135,7 @@ fn analysis_tab(
             reg,
             "Res_GargaloMovelGrafico",
             &shifting_chart(d),
-            "sem dados",
+            tx("godot-ui-results-sem_dados"),
             160.0,
         );
     }
@@ -2045,9 +2143,14 @@ fn analysis_tab(
 
 pub fn precision_table(p: &Value) -> Table {
     Table {
-        header: ["Medida", "Atual", "Alvo (±)", "Faltam"]
-            .map(String::from)
-            .to_vec(),
+        header: [
+            tx("godot-ui-results-medida"),
+            tx("godot-ui-results-atual"),
+            tx("godot-ui-results-alvo"),
+            tx("godot-ui-results-faltam"),
+        ]
+        .map(String::from)
+        .to_vec(),
         right: vec![false, true, true, true],
         rows: p["rows"]
             .as_array()
@@ -2078,9 +2181,15 @@ pub fn precision_table(p: &Value) -> Table {
 
 pub fn little_table(d: &Value) -> Table {
     Table {
-        header: ["Objeto", "L", "λ·W", "Diferença", "Semáforo"]
-            .map(String::from)
-            .to_vec(),
+        header: [
+            tx("godot-ui-results-objeto"),
+            "L",
+            "λ·W",
+            tx("godot-ui-results-diferenca"),
+            tx("godot-ui-results-semaforo"),
+        ]
+        .map(String::from)
+        .to_vec(),
         right: vec![false, true, true, true, false],
         rows: little_rows(d)
             .iter()
@@ -2127,10 +2236,7 @@ fn scenarios_tab(
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) {
-    explain(
-        ui,
-        "Um cenário por bloco: [nome] e, embaixo, as mudanças (objeto.campo = valor em RON, ou run.campo). O modelo como está entra primeiro, como base. Todos usam as mesmas sementes (números aleatórios comuns), então a diferença para a base é pareada; em amarelo, as diferenças significativas.",
-    );
+    explain(ui, tx("godot-ui-results-um_cenario_por_bloco_nome"));
     area(
         ui,
         reg,
@@ -2140,7 +2246,9 @@ fn scenarios_tab(
         "[mais rápido]\nmaquina.process = Exp(mean: 2.0)\n\n[dois servidores]\nmaquina.capacity = 2",
     );
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Medidas (vírgulas; vazio: todas)").color(colors::TEXT));
+        ui.label(
+            RichText::new(tx("godot-ui-results-medidas_virgulas_vazio_todas")).color(colors::TEXT),
+        );
         field(
             ui,
             reg,
@@ -2149,7 +2257,7 @@ fn scenarios_tab(
             260.0,
             "fila.content.mean, saida.input",
         );
-        ui.label(RichText::new("Replicações").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-replicacoes")).color(colors::TEXT));
         field(
             ui,
             reg,
@@ -2162,8 +2270,8 @@ fn scenarios_tab(
             ui,
             reg,
             "Res_CenariosComparar",
-            "Comparar",
-            "Roda todos os cenários e compara",
+            tx("godot-ui-results-comparar"),
+            tx("godot-ui-results-roda_todos_os_cenarios_e"),
             true,
         ) {
             out.push("resultados:trabalho:cenarios".into());
@@ -2182,7 +2290,7 @@ pub fn scenario_table(d: &Value) -> Table {
         .flatten()
         .map(text)
         .collect();
-    let mut header = vec!["Medida".to_owned()];
+    let mut header = vec![tx("godot-ui-results-medida").to_owned()];
     header.extend(names.iter().cloned());
     let mut right = vec![false];
     right.extend(names.iter().map(|_| true));
@@ -2201,7 +2309,7 @@ pub fn scenario_table(d: &Value) -> Table {
                     if diff.is_object() {
                         let sig = diff["significant"].as_bool() == Some(true);
                         c = c.tagged(
-                            format!("Δ {}", mh(diff, false)),
+                            fx("godot-ui-results-texto", &[("valor", vx(&mh(diff, false)))]),
                             if sig {
                                 colors::WARNING
                             } else {
@@ -2226,12 +2334,9 @@ fn optimize_tab(
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) {
-    explain(
-        ui,
-        "Procura os valores das variáveis que minimizam (ou maximizam) a média de uma métrica. Uma variável por linha: chave mínimo máximo [passo] (inteiros) ou com ponto decimal (contínua, cinco valores na grade). Os pontos não significativamente diferentes do melhor (teste pareado de 95 %) ficam marcados.",
-    );
+    explain(ui, tx("godot-ui-results-procura_os_valores_das_variaveis"));
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Objetivo").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-objetivo")).color(colors::TEXT));
         field(
             ui,
             reg,
@@ -2240,7 +2345,7 @@ fn optimize_tab(
             300.0,
             "saida.time_in_system.mean",
         );
-        let r = ui.checkbox(&mut mem.op_max, "maximizar");
+        let r = ui.checkbox(&mut mem.op_max, tx("godot-ui-results-maximizar"));
         named_toggle(ui, reg, "Res_OtimMaximizar", &r, "maximizar", mem.op_max);
     });
     area(
@@ -2252,25 +2357,39 @@ fn optimize_tab(
         "maquina.capacity 1 3",
     );
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Método").color(colors::TEXT));
-        let items: Vec<String> = METHODS.iter().map(|s| s.to_string()).collect();
+        ui.label(RichText::new(tx("godot-ui-results-metodo")).color(colors::TEXT));
+        let items: Vec<String> = METHODS.iter().map(|s| id_label(s).to_string()).collect();
         if let Some(k) = combo(ui, reg, "Res_OtimMetodo", mem.op_method, &items, 130.0) {
             mem.op_method = k;
         }
-        ui.label(RichText::new("Replicações por ponto").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-replicacoes_por_ponto")).color(colors::TEXT));
         field(ui, reg, "Res_OtimReplicacoes", &mut mem.op_reps, 50.0, "5");
-        ui.label(RichText::new("Orçamento (pontos)").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-results-orcamento_pontos")).color(colors::TEXT));
         field(ui, reg, "Res_OtimOrcamento", &mut mem.op_budget, 60.0, "50");
-        if primary(ui, reg, "Res_Otimizar", "Otimizar", "Roda a busca", true) {
+        if primary(
+            ui,
+            reg,
+            "Res_Otimizar",
+            tx("godot-ui-results-otimizar"),
+            tx("godot-ui-results-roda_a_busca"),
+            true,
+        ) {
             out.push("resultados:trabalho:otimizacao".into());
         }
     });
     error(ui, &mem.op_error);
     if let Some(d) = &mem.op {
-        let best = format!(
-            "Melhor ponto: {} ({} ponto(s) simulados)",
-            d["best"].as_str().unwrap_or("nenhum viável"),
-            text(&d["simulated"])
+        let best = fx(
+            "godot-ui-results-melhor_ponto_ponto_s_simulados",
+            &[
+                (
+                    "ponto",
+                    vx(&d["best"]
+                        .as_str()
+                        .unwrap_or(tx("godot-ui-results-nenhum-viavel"))),
+                ),
+                ("simulated", vx(&text(&d["simulated"]))),
+            ],
         );
         let r = ui.label(RichText::new(&best).strong().color(colors::TEXT_STRONG));
         for line in d["explanation"].as_array().into_iter().flatten() {
@@ -2290,7 +2409,7 @@ fn optimize_tab(
             reg,
             "Res_OtimGrafico",
             &history_chart(d),
-            "sem histórico",
+            tx("godot-ui-results-sem_historico"),
             200.0,
         );
     }
@@ -2298,7 +2417,13 @@ fn optimize_tab(
 
 pub fn optimization_table(d: &Value) -> Table {
     Table {
-        header: ["Ponto", "Objetivo", ""].map(String::from).to_vec(),
+        header: [
+            tx("godot-ui-results-ponto"),
+            tx("godot-ui-results-objetivo"),
+            "",
+        ]
+        .map(String::from)
+        .to_vec(),
         right: vec![false, true, false],
         rows: d["evaluations"]
             .as_array()
@@ -2387,7 +2512,7 @@ pub(crate) mod tests {
         let row = t.rows.iter().find(|r| r.cells[0].text == b).unwrap();
         assert_eq!(row.cells[0].color, colors::WARNING);
         assert!(v.summary_text().contains(&format!("Gargalo (geral): {b}")));
-        assert!(v.summary_text().contains("3 replicação(ões)"));
+        assert!(v.summary_text().contains("3 replicações"));
         let c = cards(&v);
         assert_eq!(c[2].1, b);
         assert!(c[2].3);
@@ -2487,7 +2612,7 @@ pub(crate) mod tests {
         });
         assert_eq!(
             done("cenarios", Some(&sc), &v, &mut mem),
-            "2 cenário(s) comparados."
+            "2 cenários comparados."
         );
         let t = scenario_table(mem.sc.as_ref().unwrap());
         assert!(t.text().contains("dois servidores") && t.text().contains("Δ "));

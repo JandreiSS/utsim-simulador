@@ -21,6 +21,7 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{EguiContexts, egui};
 use utsim_scene::MobileRole;
 use utsim_viewer::cameras::{self, CameraKind, Obstacle, Pose};
+use utsim_viewer::texto::{fx, tx, vx};
 
 use crate::camera::{CameraLock, OrbitCam};
 use crate::dock::{Dock, pointer_over_ui};
@@ -569,7 +570,7 @@ pub fn drive(
     if let Some(kind) = modes.request.take() {
         let resolved = if kind.needs_resource() {
             if !sim {
-                modes.notify("Seguir e Do recurso só funcionam em Simular");
+                modes.notify(tx("camera-modes-seguir_e_do_recurso_so"));
                 None
             } else {
                 let mobile = |b: &usize| data.timeline.is_mobile(*b) && !data.is_hidden(*b);
@@ -580,7 +581,7 @@ pub fn drive(
                     .or(modes.target.filter(mobile))
                     .or((0..data.replay.blocks.len()).find(mobile));
                 if target.is_none() {
-                    modes.notify("O modelo não tem recursos móveis para seguir");
+                    modes.notify(tx("camera-modes-o_modelo_nao_tem_recursos"));
                 }
                 target
             }
@@ -725,19 +726,17 @@ fn ground_point(ray: Ray3d) -> Option<Vec3> {
 pub fn selector(ui: &mut egui::Ui, modes: &mut CameraModes) {
     let shown = modes.kind;
     egui::ComboBox::from_id_salt("camera_modo")
-        .selected_text(format!("Câmera: {}", shown.label()))
+        .selected_text(fx("camera-modes-camera", &[("modo", vx(&shown.display()))]))
         .show_ui(ui, |ui| {
             for kind in CameraKind::ALL {
-                let text = format!("{} ({})", kind.label(), kind.key());
+                let text = format!("{} ({})", kind.display(), kind.key());
                 if ui.selectable_label(kind == shown, text).clicked() {
                     modes.request(kind);
                 }
             }
         })
         .response
-        .on_hover_text(
-            "Órbita, seguir um recurso, andar pela planta ou ver do recurso (teclas 1 a 4)",
-        );
+        .on_hover_text(tx("camera-modes-orbita_seguir_um_recurso_andar"));
 }
 
 /// A small panel over the top right corner of the 3D view while a mode other than the
@@ -767,18 +766,18 @@ pub fn hud(
                 if kind == CameraKind::Orbit {
                     return;
                 }
-                ui.strong(format!("Câmera: {}", kind.label()));
+                ui.strong(fx("camera-modes-camera", &[("modo", vx(&kind.display()))]));
                 if kind.needs_resource()
                     && let Some(b) = modes.target
                     && let Some(block) = data.replay.blocks.get(b)
                 {
-                    ui.label(format!("recurso: {}", block.name));
+                    ui.label(fx("camera-modes-recurso", &[("name", vx(&block.name))]));
                 }
                 match kind {
                     CameraKind::Follow => {
                         ui.add(
                             egui::Slider::new(&mut modes.follow.dist, 2.0..=80.0)
-                                .text("distância (m)")
+                                .text(tx("camera-modes-distancia_m"))
                                 .logarithmic(true),
                         );
                     }
@@ -788,16 +787,16 @@ pub fn hud(
                                 &mut modes.walk.speed,
                                 cameras::WALK_SPEED_MIN..=cameras::WALK_SPEED_MAX,
                             )
-                            .text("velocidade (m/s)")
+                            .text(tx("camera-modes-velocidade_m_s"))
                             .logarithmic(true),
                         );
                         #[cfg(not(target_arch = "wasm32"))]
-                        ui.checkbox(&mut modes.pointer_lock, "Travar o mouse (L)");
+                        ui.checkbox(&mut modes.pointer_lock, tx("camera-modes-travar_o_mouse_l"));
                     }
                     _ => {}
                 }
                 ui.weak(kind.hint());
-                if ui.button("Sair (Esc)").clicked() {
+                if ui.button(tx("camera-modes-sair_esc")).clicked() {
                     modes.request(CameraKind::Orbit);
                 }
             });
