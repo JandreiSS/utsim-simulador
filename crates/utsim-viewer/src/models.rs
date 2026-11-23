@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use utsim_viewer::texto::tx;
 
 use bevy::asset::LoadState;
 use bevy::asset::io::embedded::EmbeddedAssetRegistry;
@@ -361,15 +362,19 @@ pub fn toggle(
     mode: &mut ResMut<VisualMode>,
     lighting: &mut ResMut<crate::scene::Lighting>,
 ) {
-    ui.label("Visual:");
+    ui.label(tx("models-visual"));
     let (on, available) = (mode.realistic, mode.available);
     ui.add_enabled_ui(available, |ui| {
-        if ui.selectable_label(!on || !available, "simples").clicked() && on {
+        if ui
+            .selectable_label(!on || !available, tx("models-simples"))
+            .clicked()
+            && on
+        {
             mode.realistic = false;
         }
         if ui
-            .selectable_label(on && available, "realista")
-            .on_hover_text("Modelos 3D articulados da biblioteca (empilhadeira, AGV, operador...)")
+            .selectable_label(on && available, tx("models-realista"))
+            .on_hover_text(tx("models-modelos_3d_articulados_da_biblioteca"))
             .clicked()
             && !on
         {

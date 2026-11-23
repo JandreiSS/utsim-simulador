@@ -8,6 +8,7 @@
 //! `yaw` is the rotation about Y that takes local `+X` (the front of a vehicle) to the
 //! horizontal direction `(cos yaw, 0, -sin yaw)`.
 
+use crate::texto::tx;
 use utsim_scene::MobileRole;
 
 use crate::view::V3;
@@ -52,7 +53,7 @@ impl CameraKind {
         CameraKind::Ride,
     ];
 
-    /// Name shown in the toolbar menu and used by scripts.
+    /// Name used by scripts (always Portuguese); the screen shows [`CameraKind::display`].
     pub fn label(self) -> &'static str {
         match self {
             CameraKind::Orbit => "Órbita",
@@ -60,6 +61,16 @@ impl CameraKind {
             CameraKind::FirstPerson => "Primeira pessoa",
             CameraKind::Ride => "Do recurso",
         }
+    }
+
+    /// Name shown in the toolbar menu, in the language of the interface.
+    pub fn display(self) -> &'static str {
+        tx(match self {
+            CameraKind::Orbit => "camera-modo-orbita",
+            CameraKind::Follow => "camera-modo-seguir",
+            CameraKind::FirstPerson => "camera-modo-primeira-pessoa",
+            CameraKind::Ride => "camera-modo-do-recurso",
+        })
     }
 
     /// Key that selects the mode (also in the shortcuts window).
@@ -80,14 +91,10 @@ impl CameraKind {
     /// One line on how to drive the mode.
     pub fn hint(self) -> &'static str {
         match self {
-            CameraKind::Orbit => "esquerdo arrasta (desloca), direito gira, roda aproxima",
-            CameraKind::Follow => {
-                "direito gira em volta do recurso, roda muda a distância, Esc sai"
-            }
-            CameraKind::FirstPerson => {
-                "WASD anda, Shift corre, direito (ou L) olha, roda muda a velocidade, Esc sai"
-            }
-            CameraKind::Ride => "direito olha em volta, Esc sai",
+            CameraKind::Orbit => tx("cameras-esquerdo_arrasta_desloca_direito_gira"),
+            CameraKind::Follow => tx("cameras-direito_gira_em_volta_do"),
+            CameraKind::FirstPerson => tx("cameras-wasd_anda_shift_corre_direito"),
+            CameraKind::Ride => tx("cameras-direito_olha_em_volta_esc"),
         }
     }
 

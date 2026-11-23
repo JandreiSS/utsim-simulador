@@ -835,3 +835,159 @@ res-painel-viavel = Feasible
 res-painel-vs_melhor = Δ vs best
 res-painel-equivalente = { $delta } equivalent
 res-painel-objeto_metrica = object.metric
+
+# Parte 4: fluxos, câmeras e modelos 3D (flows*.rs, cameras.rs, camera_modes.rs, models.rs)
+
+## Tipos de atividade e modos de câmera
+
+fluxo-tipo-gerar-tokens = Generate tokens
+fluxo-tipo-agenda = Schedule
+fluxo-tipo-ao-evento = On event
+fluxo-tipo-esperar = Wait
+fluxo-tipo-decidir = Decide
+fluxo-tipo-atribuir = Assign
+fluxo-tipo-adquirir = Acquire
+fluxo-tipo-liberar = Release
+fluxo-tipo-aguardar-evento = Wait for event
+fluxo-tipo-criar-item = Create item
+fluxo-tipo-lote = Batch
+fluxo-tipo-fim = End
+camera-modo-orbita = Orbit
+camera-modo-seguir = Follow
+camera-modo-primeira-pessoa = First person
+camera-modo-do-recurso = From the resource
+
+## camera_modes.rs
+
+camera-modes-seguir_e_do_recurso_so = Follow and From the resource only work in Simulate
+camera-modes-o_modelo_nao_tem_recursos = The model has no mobile resources to follow
+camera-modes-camera = Camera: { $modo }
+camera-modes-orbita_seguir_um_recurso_andar = Orbit, follow a resource, walk around the plant or view from the resource (keys 1 to 4)
+camera-modes-recurso = resource: { $name }
+camera-modes-distancia_m = distance (m)
+camera-modes-velocidade_m_s = speed (m/s)
+camera-modes-travar_o_mouse_l = Lock the mouse (L)
+camera-modes-sair_esc = Exit (Esc)
+
+## cameras.rs
+
+cameras-esquerdo_arrasta_desloca_direito_gira = left drags (pans), right rotates, wheel zooms
+cameras-direito_gira_em_volta_do = right rotates around the resource, wheel changes the distance, Esc exits
+cameras-wasd_anda_shift_corre_direito = WASD walks, Shift runs, right (or L) looks, wheel changes the speed, Esc exits
+cameras-direito_olha_em_volta_esc = right looks around, Esc exits
+
+## flows.rs
+
+flows-o_nome_nao_pode_ficar = the name cannot be empty
+flows-ja_existe_uma_atividade_chamada = there is already an activity called "{ $to }"
+
+## flows_ui.rs
+
+flows-ui-fluxos = Flows
+flows-ui-nenhum_fluxo_neste_modelo = No flows in this model.
+flows-ui-novo_fluxo = New flow
+flows-ui-cria_um_fluxo_gerar_tokens = Creates a flow Generate tokens, Wait, End
+flows-ui-remover = Remove
+flows-ui-remove_o_fluxo_selecionado_ctrl = Removes the selected flow (Ctrl+Z undoes)
+flows-ui-nome = Name
+flows-ui-o_nome_nao_pode_ficar = the name cannot be empty
+flows-ui-ja_existe_um_objeto_ou = there is already an object or flow called "{ $t }"
+flows-ui-recursos = Resources
+flows-ui-contadores_compartilhados_ex_docas = Shared counters (e.g. docks).
+flows-ui-cap = cap.
+flows-ui-remover_recurso = Remove resource
+flows-ui-recurso = + resource
+flows-ui-crie_um_fluxo_com_novo = Create a flow with "New flow" to draw the logic of the model.
+flows-ui-adicionar = Add:
+flows-ui-adicionar_atividade = Add activity
+flows-ui-excluir_atividade = Delete activity
+flows-ui-remove_a_atividade_e_as = Removes the activity and the links that reach it
+flows-ui-e_mais_problema_s = ... and { $problems ->
+    [one] { $problems } more problem
+   *[other] { $problems } more problems
+}
+flows-ui-simulacao_em_t_o_numero = Simulation at t = { $t }: the number in each box is how many tokens are there.
+flows-ui-fluxo_vazio_adicione_uma_atividade = Empty flow: add an activity.
+flows-ui-atividade = Activity
+flows-ui-clique_numa_atividade_do_diagrama = Click an activity in the diagram to see and edit its fields.
+flows-ui-tokens_agora = Tokens now: { $t }
+flows-ui-volte_para_editar_para_alterar = Go back to Edit to change the flow.
+flows-ui-escolha = (choose)
+flows-ui-objeto_nao_existe = object "{ $value }" does not exist
+flows-ui-remover_rotulo = Remove label
+flows-ui-rotulo = + label
+flows-ui-proxima_atividade = Next activity
+flows-ui-fim_do_fluxo_o_token = End of the flow: the token ends here.
+flows-ui-ramos_para_onde_o_token = Branches (where the token goes)
+flows-ui-remover_ligacao = Remove link
+flows-ui-peso = {"     "}weight
+flows-ui-se = {"     "}if
+flows-ui-ligar_a_outro_ramo = + link to another branch...
+flows-ui-ligar_a = + link to...
+flows-ui-ja_existe_uma_atividade_chamada = there is already an activity called "{ $t }"
+flows-ui-intervalo_entre_tokens = Interval between tokens
+flows-ui-criar_um_token_em_t = create a token at t = 0
+flows-ui-limitar_a = limit to
+flows-ui-tokens = tokens
+flows-ui-horarios = Times
+flows-ui-t = t =
+flows-ui-remover_horario = Remove time
+flows-ui-horario = + time
+flows-ui-objeto = Object
+flows-ui-evento = Event
+flows-ui-o_token_passa_a_carregar = The token then carries the item of that event.
+flows-ui-tempo_de_espera = Waiting time
+flows-ui-probabilidade = Probability
+flows-ui-pelo_rotulo = By label
+flows-ui-condicoes = Conditions
+flows-ui-agente_externo = External agent
+flows-ui-regra = Rule
+flows-ui-rotulo_do_token_1_2 = token label (1, 2, ...)
+flows-ui-a_primeira_condicao_verdadeira_vence = The first true condition wins; none = last branch.
+flows-ui-pesos_relativos_um_por_ramo = Relative weights, one per branch.
+flows-ui-um_agente_externo_escolhe_o = An external agent chooses the branch; the simulation pauses and shows these observations:
+flows-ui-observacao = + observation
+flows-ui-rotulos = Labels
+flows-ui-nome_atribui_ao_token_item = name assigns to the token; item.name to the carried item.
+flows-ui-recurso-2 = Resource
+flows-ui-recurso_nao_existe = resource "{ $resource }" does not exist
+flows-ui-crie_um_recurso_na_coluna = Create a resource in the left column.
+flows-ui-quantidade = quantity
+flows-ui-dentro_do_objeto = Inside the object
+flows-ui-porta_de_entrada = input port
+flows-ui-rotulos_do_item = Item labels
+flows-ui-juntar = Join
+
+## models.rs
+
+models-visual = Look:
+models-simples = simple
+models-realista = realistic
+models-modelos_3d_articulados_da_biblioteca = Articulated 3D models from the library (forklift, AGV, operator...)
+
+## Estados dos blocos (painel do bloco e gráficos de estados)
+
+estado-sem-estado = no state
+estado-ocioso = idle
+estado-vazio = empty
+estado-gerando = generating
+estado-liberando = releasing
+estado-coletando = collecting
+estado-preparacao = setup
+estado-processando = processing
+estado-bloqueado = blocked
+estado-aguardando-operador = waiting for operator
+estado-aguardando-transporte = waiting for transport
+estado-em-falha = down
+estado-fora-do-turno = off shift
+estado-viajando-vazio = travelling empty
+estado-viajando-carregado = travelling loaded
+estado-carregando = loading
+estado-descarregando = unloading
+estado-trabalhando-no-posto = working at the station
+estado-parado = stopped (external command)
+estado-aguardando-tecnico = waiting for a technician
+estado-em-manutencao = in preventive maintenance
+estado-em-pausa = on a break (fatigue)
+estado-operador-entrando = operator entering
+estado-operador-saindo = operator leaving
