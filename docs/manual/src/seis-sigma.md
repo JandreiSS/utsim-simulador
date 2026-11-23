@@ -49,7 +49,25 @@ a uma assinatura digital com validade jurídica.
 
 ## Criar, abrir e importar projetos
 
-Na tela inicial:
+### Começar sem pasta
+
+O UTSim LSS abre direto num projeto DMAIC em branco, já no painel, sem pedir pasta. O projeto
+fica numa pasta temporária do sistema até você salvar. A barra do canto de cima à esquerda
+tem:
+
+- **Salvamento automático**: ligado, cada mudança vai para a pasta na hora, como sempre foi;
+  desligado, as mudanças (e as assinaturas delas) esperam o Salvar. A escolha é lembrada por
+  projeto. Num projeto que ainda não tem pasta, ligar a chave pede o nome e o lugar.
+- **Salvar** (Ctrl+S): grava o que espera; no projeto sem pasta, faz o mesmo que Salvar como.
+- **Salvar como** (Ctrl+Shift+S): o nome do projeto (vira o título) e onde criar a pasta
+  `<nome>.lss`. Uma pasta que já é projeto ou que já tem arquivos não é usada: nada é
+  sobrescrito.
+- O indicador "Salvo" ou "Não salvo", também no título da janela.
+
+Fechar a janela ou o projeto com trabalho não salvo pergunta antes: Salvar, Não salvar ou
+Cancelar. "Começar sem pasta" também está na tela inicial.
+
+### Na tela inicial
 
 - **Novo projeto**: título, pasta onde criar e abordagem (DMAIC, DMADV, kaizen rápido, A3,
   PDCA ou ação direta). O programa cria a pasta `<título>.lss` com as fases padrão da
@@ -173,11 +191,41 @@ precisar mais. Ela também desliga ao fechar o projeto ou o programa.
 
 ## Telas do projeto
 
-A navegação à esquerda tem a **Carteira** e as telas do projeto.
+A navegação à esquerda tem a **Carteira** e o essencial do projeto, na ordem do trabalho:
+**Painel**, **Termo de abertura**, **Equipe**, **Fases e tollgates**, **Ferramentas**,
+**Dados e análises** e **Ações**. As outras telas (roteiro, riscos, reuniões, cronograma,
+ganhos, encerramento, experimentos, modelo, relatórios e dados) ficam em **Mais telas**, um
+clique abaixo da barra. A tela aberta aparece na barra mesmo quando é de "Mais", e um botão do
+painel que leva a uma delas abre o grupo.
 
-- **Visão geral**: as fases com a atual destacada, o andamento das ações (concluídas e
-  atrasadas), os riscos abertos e os altos, os ganhos por estado, as reuniões, o prazo com os
-  dias que faltam, os conflitos e a pasta do projeto.
+### Painel: a trilha e o "Agora faça"
+
+O painel é a primeira tela do projeto. Em cima, a **trilha**: uma estação por fase, ligadas
+por uma linha até a bandeira do fim.
+
+- O anel em volta da estação mostra quanto da fase já foi feito (os passos e o checklist do
+  portão), com a conta embaixo ("3/5"). A fase atual fica acesa na cor de destaque; a aprovada,
+  verde com ✔.
+- O **losango** depois de cada estação é o portão da fase: vazio enquanto está a fazer, âmbar
+  quando foi enviado, verde quando aprovado e vermelho quando os aprovadores pediram para
+  refazer. Um clique no losango abre o portão em **Fases e tollgates**.
+- Um clique numa estação mostra aquela fase no cartão de baixo.
+
+O cartão **Agora faça** diz o que fazer na fase:
+
+- Em destaque, o **próximo passo**, com para que serve e os botões que levam aonde ele se faz
+  (o termo, a equipe, uma ferramenta, uma análise). Num projeto DMAIC, os passos vêm do
+  roteiro (por exemplo "Problema e meta", "SIPOC e fronteiras", "Linha de base"); em qualquer
+  abordagem, os itens que faltam do checklist do portão entram também.
+- Com tudo feito, o destaque vira "Tudo pronto: peça a decisão do portão", com o botão para o
+  portão. Enviado, ele diz que falta a decisão dos aprovadores; devolvido, leva ao que
+  disseram; aprovado, oferece seguir para a próxima fase.
+- Abaixo, a lista dos passos da fase (os feitos riscados) e os **entregáveis da fase**, cada um
+  com o estado; um clique abre o entregável em Ferramentas.
+
+Mais embaixo, os números do projeto em cartões (ações feitas, atrasadas, riscos, ganhos e
+prazo) e, recolhidos em "Detalhes do projeto", o resto da antiga visão geral (as reuniões,
+os conflitos e a pasta).
 - **Termo de abertura**, **Equipe e RACI**, **Fases e tollgates**, **Ações**, **Riscos**,
   **Reuniões**, **Cronograma**, **Ganhos** e **Encerramento e lições**: descritas abaixo.
 - **Ferramentas**: os entregáveis das fases, descritos em [Ferramentas](#ferramentas).
@@ -238,6 +286,12 @@ Os campos do termo: título, processo, área, declaração do problema, Y do pro
 (SMART, com unidade e fonte), linha de base, prazo, escopo dentro e fora, caso de negócio,
 premissas, restrições, riscos iniciais e o início do cronograma.
 
+Na tela ficam à vista os seis essenciais (os que o portão confere: problema, meta, linha de
+base, prazo, escopo dentro e caso de negócio), com a barra "4 de 6 campos essenciais
+escritos". Os outros ficam em "Mais campos do termo". Com os seis escritos e nenhuma versão,
+aparece o botão "Registrar versão e pedir a aprovação". As versões, a aprovação e as
+comparações ficam em "Versões e aprovação", que já vem aberto enquanto há versão esperando.
+
 - **Registrar versão** guarda uma cópia numerada do termo com o motivo.
 - **Aprovar** só aparece na versão mais nova e só vale para quem tem o papel de patrocinador
   no projeto. A aprovação grava quem aprovou e quando e congela a linha de base do cronograma.
@@ -265,6 +319,9 @@ mudadas à mão aparecem em destaque. Um aviso lista as linhas sem exatamente um
 No alto, as fases da abordagem com a situação de cada uma e do seu tollgate. Escolha a fase e
 "Preparar o tollgate" cria o checklist padrão da fase (no DMAIC, o da seção 1.4 do plano) e
 põe o patrocinador e o champion como aprovadores.
+
+Acima do checklist, a barra mostra quantos itens já estão cumpridos. Os aprovadores com a
+regra e o histórico das decisões ficam recolhidos em "Aprovadores, decisões e registro".
 
 - **Itens manuais**: você marca e escreve a evidência.
 - **Itens verificados**: o programa confere no estado do projeto, e o ✔ ou ✖ muda sozinho:
@@ -1206,7 +1263,9 @@ dois pareceres do mesmo belt), que orientam a mentoria e o currículo.
 Os dois painéis têm filtro por unidade e ano, a regra de cada indicador ao lado e o instante
 dos dados.
 
-- **Painel do MBB**: funil (contagem por estágio, conversão entre estágios, idade média),
+- **Painel do MBB**: abre com quatro cartões (ideias no funil, ganho oficial, portões
+  atrasados e pessoas sobrecarregadas, os dois últimos em laranja quando há algum); as tabelas
+  abaixo ficam recolhidas em "Tabelas por projeto e por pessoa": funil (contagem por estágio, conversão entre estágios, idade média),
   tempo de ciclo por fase (mediana e percentil 80 dos dias entre aprovações de tollgate, por
   abordagem, contra a meta de cada fase: a padrão é Definir 30, Medir 45, Analisar 45,
   Melhorar 60, Controlar 60 dias, e o MBB troca a de qualquer fase em "Meta de dias por fase",
