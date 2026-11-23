@@ -907,6 +907,7 @@ func panel() -> Array:
 	if not sel_path:
 		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
 		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"], ["Calha (escorrega)", "calha"]], "value": r["drive"], "action": "trajeto_acionamento"})
+		rows.append({"kind": "button", "name": "Trajeto_Inverter", "text": "Inverter o sentido", "action": "trajeto_inverter"})
 		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
 	if sel_nodes.size() == 1:
 		var i := sel_nodes[0]
@@ -926,7 +927,9 @@ func panel() -> Array:
 		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
 		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
+	if sel_nodes.size() == 2 and absi(sel_nodes[0] - sel_nodes[1]) == 1:
+		rows.append({"kind": "button", "name": "Trajeto_ApagarTrecho", "text": "Apagar o trecho entre os nós", "enabled": nodes.size() > 2, "action": "trajeto_apagar_trecho"})
+	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó; com dois nós vizinhos selecionados (Shift + clique), o trecho entre eles pode ser apagado. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
 	return rows
 
 
@@ -1025,6 +1028,26 @@ func form(what: String, value: String) -> void:
 		"trajeto_excluir_no":
 			delete_selected()
 			return
+		"trajeto_apagar_trecho":
+			if sel_nodes.size() != 2:
+				return
+			ok = tr.apagar_trecho(sel_name, sel_path, mini(sel_nodes[0], sel_nodes[1]))
+			if ok:
+				main.after_edit()
+				_select(sel_name, sel_path, PackedInt32Array())
+				main.set_status("Trecho apagado de %s." % sel_name)
+				return
+		"trajeto_inverter":
+			ok = tr.inverter(sel_name, sel_path)
+			if ok:
+				var n := (r["nodes"] as PackedVector3Array).size()
+				var flipped := PackedInt32Array()
+				for i in sel_nodes:
+					flipped.append(n - 1 - i)
+				main.after_edit()
+				_select(sel_name, sel_path, flipped)
+				main.set_status("%s agora corre no sentido contrário (as ligações também)." % sel_name)
+				return
 		"trajeto_giro_graus":
 			turn_deg = v
 			return
