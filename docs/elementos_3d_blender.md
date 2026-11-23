@@ -294,6 +294,22 @@ os clipes corrigidos, com os mesmos nomes de nó e de clipe.
   clipes originais ele troca. Quem toca um clipe de pessoa usa o deste arquivo quando o nome
   está na lista, e o original nos outros casos.
 
+### Clipes base (`pessoa_clipes_base.glb`)
+
+Os sete clipes da biblioteca que o UTSim usa sem alteração (`Driving_Loop`, `Idle_Loop`,
+`Interact`, `Jog_Fwd_Loop`, `PickUp_Table`, `Sitting_Idle_Loop` e `Walk_Loop`), copiados para
+um arquivo só com o esqueleto (`gerar_base` em `tools/blender/clipes.py`). Tem 1,0 MB; as duas
+bibliotecas inteiras têm 86 clipes e 15,7 MB.
+
+- Mesmos nomes de nó e de clipe do original: quem carrega os clipes troca só o arquivo.
+- No catálogo, `pessoa_clipes_base.clipes` lista os clipes e `dados.copia` repete os nomes.
+- Com este arquivo e o `pessoa_clipes.glb`, as pessoas do Blender não precisam das bibliotecas
+  inteiras no pacote. O gerador de enunciados (`tools/blender/enunciado.py`) já usa este
+  arquivo quando ele está na pasta dos modelos. A cena do Godot e o pacote do Ensino ainda
+  carregam as bibliotecas de `assets/terceiros`; a troca fica com quem cuida deles.
+
+O teste `os_clipes_base_sao_os_que_o_utsim_usa` confere a lista, os ossos e o tamanho.
+
 ## Motorista e operador
 
 - **Empilhadeira:** `ponto_operador` é o quadril do motorista sentado (0,09 m acima do
@@ -389,6 +405,26 @@ dois manetes, botão de emergência, chave, antena e as alças laterais onde as 
   `Walk_Carry_Loop` (o mesmo de quem está parado com carga).
 
 O teste `o_controle_remoto_cabe_nas_maos` confere a origem, a pega e a altura da correia.
+
+## Doca (`doca.glb`)
+
+Doca de carga, por onde as peças entram e saem da fábrica (`doca` em
+`tools/blender/elementos/logistica.py`). Serve para a origem e para o destino das peças, que
+não tinham elemento próprio. É um trecho de parede de 3,6 × 4,0 m com porta de enrolar, abrigo
+de lona, niveladora e batentes por fora, e balizadores, semáforo e a área de carga marcada no
+piso por dentro. O lado de dentro da fábrica é `-y`; o caminhão encosta em `+y`.
+
+- Nós: `parede`, `porta` e `luz` (a luz verde do semáforo).
+- Pontos: `ponto_peca` (o centro da área de carga, no piso, por dentro), `ponto_fora` (onde a
+  carga está no caminhão, 1,2 m além da parede) e `ponto_operador` (ao lado da área, olhando
+  para ela; giro de 180°).
+- Clipe `porta_abrir` (0 fechada, 1 aberta): a porta enrola para cima, com a escala em z do nó
+  `porta` indo de 1 a `dados.porta_aberta` (0,04). A origem do nó fica no rolo, no alto do vão.
+- `dados`: `vao` (`[largura, altura]` = 2,6 × 3,2 m, passa a empilhadeira com carga), `area`
+  (`[largura, fundo]` da área de carga = 2,6 × 2,2 m), `parede` (a espessura, 0,25 m) e
+  `porta_aberta`.
+
+O teste `a_doca_tem_a_area_de_carga_dentro_e_o_caminhao_fora` confere os pontos e as medidas.
 
 ## Peças da esteira por trajeto
 

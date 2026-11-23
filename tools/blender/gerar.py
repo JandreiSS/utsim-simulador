@@ -23,6 +23,7 @@ import postos  # noqa: E402
 import ponte  # noqa: E402
 import trajeto  # noqa: E402
 import produtos  # noqa: E402
+import logistica  # noqa: E402
 import pessoas  # noqa: E402
 import clipes  # noqa: E402
 
@@ -47,6 +48,7 @@ ELEMENTOS = {
     "estante": armazenagem.estante,
     "estante_espera": armazenagem.estante_espera,
     "espera_chao": armazenagem.espera_chao,
+    "doca": logistica.doca,
     "peca": armazenagem.peca,
     "palete": armazenagem.palete,
     "caixa": armazenagem.caixa,
@@ -62,6 +64,8 @@ DETALHES = {0: "", 1: "_medio"}
 PESSOAS = {"pessoa_homem": "homem", "pessoa_mulher": "mulher"}
 # Clipes de pessoa corrigidos (`clipes.py`): só o esqueleto e as animações.
 CLIPES = "pessoa_clipes"
+# Os clipes do UAL1 que o app usa, sem alteração (`clipes.gerar_base`).
+CLIPES_BASE = "pessoa_clipes_base"
 
 
 def main():
@@ -72,7 +76,7 @@ def main():
     a = p.parse_args(argv)
     pasta = os.path.abspath(a.saida)
     os.makedirs(pasta, exist_ok=True)
-    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS) + list(PESSOAS) + [CLIPES]
+    nomes = [n for n in a.so.split(",") if n] or list(ELEMENTOS) + list(PESSOAS) + [CLIPES, CLIPES_BASE]
     caminho_cat = os.path.join(pasta, "catalogo.json")
     catalogo = {}
     if a.so and os.path.exists(caminho_cat):
@@ -81,8 +85,8 @@ def main():
         with open(caminho_cat, encoding="utf-8") as f:
             catalogo = json.load(f)
     for nome in nomes:
-        if nome == CLIPES:
-            item = clipes.gerar(pasta, nome)
+        if nome in (CLIPES, CLIPES_BASE):
+            item = (clipes.gerar if nome == CLIPES else clipes.gerar_base)(pasta, nome)
             catalogo[nome] = item
             print(f"utsim-blender: {item['arquivo']} {sorted(item['clipes'])}")
             continue
