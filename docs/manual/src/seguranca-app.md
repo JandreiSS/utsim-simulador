@@ -61,6 +61,8 @@ Escolha todos os postos ou só alguns e use "Gravar HTML do inventário". O arqu
 
 A unidade guarda as pessoas só por código (`P-1a2b3c`). Nome, setor e anotações de saúde ficam numa pasta restrita, separada da unidade, por causa da LGPD. O melhor é criar essa pasta numa pasta do Drive compartilhada só com quem pode ver os dados. O caminho dela fica gravado em `unidade.json`, e quem abre a unidade sem acesso à pasta restrita simplesmente não vê os nomes. Além do compartilhamento do Drive, o arquivo `acesso.json` da pasta restrita lista quem pode gravar nela.
 
+Nome, setor e consentimento se corrigem com "Editar", na lista de pessoas: o formulário de baixo vira "Editando" com o código, que não muda, e "Gravar alterações" grava. Como na anonimização, só a versão nova fica na pasta restrita, e os arquivos antigos com o nome ou o setor errado são apagados. Uma pessoa anonimizada não pode mais ser editada.
+
 Anonimizar uma pessoa reescreve o registro só com o código e apaga da pasta restrita os arquivos de operação antigos que tinham o nome e os dados de saúde. Os relatórios da unidade usam sempre o código, e um teste confere que nenhum nome da pasta restrita aparece nos arquivos da unidade.
 
 ## Checklist de máquinas e cadastro de EPI
@@ -87,6 +89,10 @@ Os indicadores usam as horas-homem de exposição de cada mês e uma base config
 
 A tabela de dias debitados de norma técnica não é embutida: a empresa digita, em cada caso, os dias que debita pela tabela que usa.
 
+## Desfazer
+
+Desfazer e Refazer, na barra de baixo, valem em todas as telas que gravam na unidade. Desfazer volta a sua última gravação feita desde que o app abriu: um registro gravado, alterado ou removido volta ao que era, e uma remoção que levou registros junto (como o perigo com as ações e as reavaliações dele) volta inteira num passo só. Fora dos campos de texto, Ctrl+Z desfaz e Ctrl+Y ou Ctrl+Shift+Z refazem. Na tela Modelo os atalhos ficam com o editor do modelo, que tem o próprio desfazer. O que se desfaz vira uma gravação nova, então quem divide a unidade também vê. Se outra pessoa mudou o mesmo registro depois, nada é desfeito e a barra avisa. A pasta restrita não entra no desfazer, para que um nome apagado não volte.
+
 ## Telas de checklist, EPI e incidentes
 
 A tela Checklist mostra o aviso sobre a NR-12 e o modelo em uso, que pode ser o checklist próprio do UTSim ou um roteiro da empresa lido de um CSV e guardado na unidade. Escolha o posto, informe a máquina e use "Nova inspeção". Cada item recebe conforme, não conforme ou não se aplica, com observação e ação. A inspeção só vai para a unidade em "Gravar inspeção". Depois de gravada, "Levar não conformidades ao inventário" cria os perigos do posto, uma vez só por item. Uma inspeção gravada por engano sai da lista com "Remover".
@@ -98,7 +104,7 @@ A tela EPI cadastra o tipo, o uso, o número do certificado digitado, a validade
 A tela Incidentes tem quatro abas:
 
 - **Registro** lista e grava quase-acidentes e incidentes. As pessoas envolvidas são escolhidas pelo código, entre as da pasta restrita. O nome só aparece ao lado do código quando a pasta restrita abre para você. Um registro com problema, como um nome no lugar do código, é recusado com a mensagem do motivo. "Remover", ao lado de "Editar", tira um registro feito por engano. As pessoas da pasta restrita continuam lá.
-- **Horas-homem** guarda as horas de exposição de cada mês.
+- **Horas-homem** guarda as horas de exposição de cada mês. O mês é escrito AAAA-MM, de 01 a 12 (2025/03 ou 2025-13 são recusados). Cada mês tem um registro só: digitar um mês que já tem horas mostra o valor gravado em vermelho e troca o botão por "Substituir as horas", que pede confirmação. Cada linha da lista tem "Editar", que traz o mês ao formulário, e "Remover", com confirmação.
 - **Indicadores** calcula as taxas do período escolhido, o Pareto de causas e de postos, os eventos por zona e a carta `u` das lesões por mês. Esta aba nunca mostra nomes.
 - **Pessoas (restrita)** cria a pasta restrita, cadastra pessoas e anonimiza. Cadastrar e anonimizar só aparecem para quem pode gravar na pasta restrita, e a anonimização pede uma segunda confirmação porque apaga o nome para sempre.
 
