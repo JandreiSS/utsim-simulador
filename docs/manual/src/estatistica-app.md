@@ -2,11 +2,22 @@
 
 O UTSim Estatística é o aplicativo de análise estatística da família UTSim, com janela própria. Ele trabalha com planilhas de dados digitados, importados de CSV ou xlsx, ou vindos da simulação, faz as análises mais usadas no dia a dia da engenharia e grava relatórios em HTML e PDF. Funciona sem internet e sem servidor. Esta versão cobre as etapas E1 e E2 de `docs/plano_estatistica.md`.
 
-Pela linha de comando, `utsim-estatistica` abre a janela. Com `utsim-estatistica --utsim-abrir=<arquivo.csv ou .xlsx>` (a convenção da família, usada por exemplo pelo "Analisar no UTSim Estatística" das missões do UTSim Ensino), o app já abre numa planilha nova com o arquivo: na última unidade usada, onde a planilha é gravada; sem unidade conhecida, a planilha fica aberta e a barra pede para abrir ou criar uma unidade antes de analisar.
+Pela linha de comando, `utsim-estatistica` abre a janela. Com `utsim-estatistica --utsim-abrir=<arquivo.csv ou .xlsx>` (a convenção da família, usada por exemplo pelo "Analisar no UTSim Estatística" das missões do UTSim Ensino), o app já abre numa planilha nova com o arquivo: na última unidade usada, onde a planilha é gravada; sem unidade conhecida, num estudo em branco, para salvar depois.
+
+## Começar sem pasta e salvar depois
+
+O app abre direto num estudo em branco, com uma planilha vazia: dá para digitar, colar, importar e rodar análises sem ter criado pasta nenhuma. O canto de cima à esquerda tem a chave "Salvamento automático", os botões Salvar e Salvar como e o estado ("Não salvo" ou "Salvo"); o título da janela mostra o nome do estudo, com `•` na frente quando há o que salvar.
+
+- **Salvar** (Ctrl+S): no estudo em branco, pede o nome do estudo e a pasta onde ele vai ficar. O app cria ali a pasta com esse nome e leva tudo: as planilhas, o histórico das análises e os relatórios. A partir daí o estudo é uma pasta de unidade comum. Numa pasta que já tem arquivos, o app não salva por cima.
+- **Salvar como** (Ctrl+Shift+S): faz uma cópia do estudo numa pasta nova e passa a trabalhar nela.
+- **Salvamento automático**: ligado (o padrão de cada estudo salvo), a planilha aberta é gravada sozinha um segundo depois de cada mudança. Desligado, só no Salvar. A escolha fica guardada para cada estudo. No estudo em branco, ligar a chave abre o Salvar.
+- Fechar a janela, começar um **Novo estudo** (Arquivo) ou abrir outra unidade com trabalho que ainda não foi para pasta nenhuma pergunta antes: Salvar, Não salvar ou Cancelar. Criar uma unidade nova no Início com trabalho no estudo em branco leva o trabalho para ela.
+
+Enquanto não é salvo, o estudo fica numa pasta interna do perfil (`rascunhos/`, ao lado da configuração do app). Os estudos e unidades antigos continuam abrindo pelo Início, como antes.
 
 ## A pasta de unidade
 
-O projeto fica na mesma pasta de unidade do UTSim Qualidade e do UTSim Segurança do Trabalho. Na tela Unidade, escreva o seu nome, o caminho da pasta e use "Abrir unidade" (ou preencha o nome e use "Criar unidade"). Dentro da unidade o Estatística usa:
+Um estudo salvo é uma pasta de unidade, a mesma do UTSim Qualidade e do UTSim Segurança do Trabalho. Na tela Início, escreva o seu nome, o caminho da pasta e use "Abrir unidade" (ou preencha o nome e use "Criar unidade"). Dentro da unidade o Estatística usa:
 
 - `estatistica/planilhas/`: uma planilha por arquivo;
 - o diário da unidade: o histórico das análises, que outras pessoas da equipe também veem;
@@ -27,7 +38,7 @@ A planilha é uma grade de células sempre pronta para digitar, como numa planil
 
 Cada coluna tem um nome e um tipo: número, texto ou data. O tipo é deduzido dos valores enquanto você digita; para escolher, use o botão direito › Tipo da coluna, e o cabeçalho mostra "(fixo)". "Automático" volta a deduzir. Numa coluna de números, `1,5` e `1.5` valem o mesmo. O separador de milhar segue a língua: em português `1.234` e `1.234,5` são mil duzentos e trinta e quatro (e quatro e meio); em inglês, `1,234` e `1,234.5`. Uma célula vazia é um valor ausente. Células que não combinam com o tipo ficam em vermelho e não entram nas contas. O rodapé mostra a célula ativa, o tamanho da seleção, a contagem, a soma e a média dos números selecionados.
 
-"Gravar" guarda a planilha na unidade. Rodar uma análise grava a planilha antes, porque o histórico guarda o hash (SHA-256) dos dados usados.
+"Gravar" (ou Salvar) guarda a planilha na unidade; com o salvamento automático ligado, isso acontece sozinho. Rodar uma análise grava a planilha antes, porque o histórico guarda o hash (SHA-256) dos dados usados.
 
 ### Importar
 
