@@ -25,7 +25,7 @@ vivo-janela-titulo = UTSim 3D : { $objeto }
 ## Idioma
 
 configuracoes-idioma = Langue
-configuracoes-idioma-ajuda = Pour l’instant, seules la fenêtre Paramètres et les panneaux en direct changent de langue ; les autres écrans restent en portugais.
+configuracoes-idioma-ajuda = Pour l’instant, seuls la fenêtre Paramètres, les panneaux en direct et les onglets Qualité, Sécurité et Maintenance des nœuds changent de langue ; les autres écrans restent en portugais.
 
 ## Curva de fadiga da pessoa
 
@@ -43,3 +43,35 @@ fadiga-media = Moyenne mesurée
 fadiga-erro = Non ajustée : { $erro }
 fadiga-abrir = Ouvrir dans UTSim Estatística
 fadiga-abrir-ajuda = Ouvre les relevés de cette étude des temps dans une feuille de UTSim Estatística (une ligne par temps mesuré : tâche, méthode, heure du poste et temps) pour les analyser. Le modèle ne change pas.
+
+## Abas dos nós (Qualidade, Segurança, Manutenção) e painéis ao vivo
+
+aba-so-leitura = { $quem }. Lecture seule jusqu’à ce que cette personne ferme le modèle.
+aba-abrir-qualidade = Ouvrir dans UTSim Qualité
+aba-abrir-qualidade-dica = Ouvre ce nœud dans UTSim Qualité (défauts, contrôle, coûts, MSP). Le modèle est d’abord enregistré et reste à l’autre application pour l’édition ; UTSim 3D relit ce qu’elle enregistre.
+aba-abrir-seguranca = Ouvrir dans UTSim Sécurité
+aba-abrir-seguranca-dica = Ouvre ce nœud dans UTSim Sécurité au travail (dangers, matrice des risques, EPI). Le modèle est d’abord enregistré et reste à l’autre application pour l’édition ; UTSim 3D relit ce qu’elle enregistre.
+aba-calculando = Calcul des chiffres de la simulation...
+aba-nenhuma = aucune
+aba-nenhum-escolha = (aucun)
+aba-nenhum = aucun
+aba-opcoes = Séparez par des virgules. Options : { $opcoes }.
+aba-vazio-nao-usa = vide : non utilisé
+aba-adicionar = + Ajouter
+aba-adicionar-dica = Ajoute un élément à { $lista }
+aba-abrir-item = Ouvre l’élément
+aba-fechar-item = Ferme l’élément
+aba-sem-nome = (sans nom)
+aba-remover = Retirer
+aba-remover-dica = Retire cet élément de la liste
+vivo-fechar = Fermer
+vivo-fechar-dica = Fermer le panneau (Échap ferme le plus récent)
+vivo-fixar = Épingler
+vivo-fixado = Épinglé
+vivo-fixar-dica = Épingler garde ce panneau ; le prochain clic sur un objet en ouvre un autre à côté
+vivo-sem-numeros = Pas de chiffres pour cet objet.
+vivo-eixo-tempo = temps
+vivo-eixo-itens = éléments
+vivo-sem-dados = Pas encore de données.
+vivo-estados = États dans la fenêtre
+vivo-sem-estados = aucun état

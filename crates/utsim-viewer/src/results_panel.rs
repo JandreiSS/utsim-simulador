@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
+use utsim_viewer::texto::{dx, fx, sx, tx, vx};
 
 use bevy_egui::egui::{self, Color32, RichText};
 use egui_plot::{Bar, BarChart, Legend, Line, Plot, PlotPoints};
@@ -45,10 +46,10 @@ pub enum Tab {
 impl Tab {
     pub fn label(self) -> &'static str {
         match self {
-            Tab::Summary => "Resumo",
-            Tab::Charts => "Gráficos",
-            Tab::Scenarios => "Cenários",
-            Tab::Optimize => "Otimização",
+            Tab::Summary => tx("res-painel-resumo"),
+            Tab::Charts => tx("res-painel-graficos"),
+            Tab::Scenarios => tx("res-painel-cenarios"),
+            Tab::Optimize => tx("res-painel-otimizacao"),
         }
     }
 }
@@ -72,10 +73,10 @@ impl Chart {
 
     fn label(self) -> &'static str {
         match self {
-            Chart::Utilization => "Ocupação",
-            Chart::States => "Estados",
-            Chart::Series => "Série temporal",
-            Chart::Histogram => "Histograma",
+            Chart::Utilization => tx("res-painel-ocupacao"),
+            Chart::States => tx("res-painel-estados"),
+            Chart::Series => tx("res-painel-serie_temporal"),
+            Chart::Histogram => tx("res-painel-histograma"),
         }
     }
 }
@@ -228,7 +229,10 @@ impl Results {
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    finished = Some(Msg::Run(Err("a execução terminou sem resultado".into())));
+                    finished = Some(Msg::Run(Err(tx(
+                        "res-painel-a_execucao_terminou_sem_resultado",
+                    )
+                    .into())));
                     break;
                 }
             }
@@ -241,20 +245,26 @@ impl Results {
         let outcome = match msg {
             Msg::Progress(..) => Ok(()),
             Msg::Run(r) => r.map(|out| {
-                self.status = format!(
-                    "{} replicação(ões) concluídas{}",
-                    out.reports.len(),
-                    bottleneck(&out.stats)
-                        .map(|i| format!("; gargalo: {}", out.stats[i].name))
-                        .unwrap_or_default()
-                );
+                self.status = match bottleneck(&out.stats) {
+                    Some(i) => fx(
+                        "res-status-replicacoes-gargalo",
+                        &[
+                            ("n", vx(&out.reports.len())),
+                            ("gargalo", sx(out.stats[i].name.clone())),
+                        ],
+                    ),
+                    None => fx("res-status-replicacoes", &[("n", vx(&out.reports.len()))]),
+                };
                 if self.object.is_none() {
                     self.object = bottleneck(&out.stats).map(|i| out.stats[i].name.clone());
                 }
                 self.run = Some(*out);
             }),
             Msg::Scenarios(r) => r.map(|exp| {
-                self.status = format!("{} cenário(s) comparados", exp.scenarios.len());
+                self.status = fx(
+                    "res-painel-cenario_s_comparados",
+                    &[("scenarios", vx(&exp.scenarios.len()))],
+                );
                 let names = exp.metric_names();
                 if !names.contains(&self.bar_metric) {
                     self.bar_metric = names.first().cloned().unwrap_or_default();
@@ -263,21 +273,22 @@ impl Results {
             }),
             Msg::Optimized(r) => r.map(|b| {
                 let (p, res) = *b;
-                self.status = format!(
-                    "{} ponto(s) avaliados{}",
-                    res.evaluations.len(),
-                    res.best_evaluation()
-                        .map(|e| format!("; melhor: {}", logic::point_text(&e.point)))
-                        .unwrap_or_default()
-                );
+                let n = vx(&res.evaluations.len());
+                self.status = match res.best_evaluation() {
+                    Some(e) => fx(
+                        "res-status-pontos-melhor",
+                        &[("n", n), ("melhor", sx(logic::point_text(&e.point)))],
+                    ),
+                    None => fx("res-status-pontos", &[("n", n)]),
+                };
                 self.optimized = Some((p, res));
             }),
         };
         if let Err(e) = outcome {
             self.status = if e == ModelError::Cancelled.to_string() {
-                format!("{what}: cancelado")
+                fx("res-painel-cancelado", &[("what", vx(&what))])
             } else {
-                format!("{what}: erro")
+                fx("res-painel-erro", &[("what", vx(&what))])
             };
             if e != ModelError::Cancelled.to_string() {
                 self.errors = vec![e];
@@ -297,19 +308,23 @@ impl Results {
             }
         };
         let total = model.run.replications as usize;
-        self.spawn("Rodando replicações", total, move |progress| {
-            let result = model
-                .run_replications_with(&|done| progress(done as usize, total))
-                .map_err(|e| e.to_string())
-                .map(|reports| RunOutput {
-                    stats: analysis::object_stats(&model, &reports),
-                    metrics: utsim_core::summarize(&reports),
-                    model,
-                    form,
-                    reports,
-                });
-            Msg::Run(result.map(Box::new))
-        });
+        self.spawn(
+            tx("res-painel-rodando_replicacoes"),
+            total,
+            move |progress| {
+                let result = model
+                    .run_replications_with(&|done| progress(done as usize, total))
+                    .map_err(|e| e.to_string())
+                    .map(|reports| RunOutput {
+                        stats: analysis::object_stats(&model, &reports),
+                        metrics: utsim_core::summarize(&reports),
+                        model,
+                        form,
+                        reports,
+                    });
+                Msg::Run(result.map(Box::new))
+            },
+        );
     }
 
     fn start_scenarios(&mut self, base: &Model) {
@@ -339,18 +354,22 @@ impl Results {
         let measures = self.scenarios.measures.clone();
         let reps = model.run.replications as usize;
         let total = reps * scenarios.len();
-        self.spawn("Comparando cenários", total, move |progress| {
-            let result = run_scenarios(&model, &scenarios, &measures, &|i, done| {
-                progress(i * reps + done as usize, total)
-            })
-            .map_err(|e| e.to_string())
-            .map(|scenarios| ExperimentResult {
-                name,
-                measures,
-                scenarios,
-            });
-            Msg::Scenarios(result)
-        });
+        self.spawn(
+            tx("res-painel-comparando_cenarios"),
+            total,
+            move |progress| {
+                let result = run_scenarios(&model, &scenarios, &measures, &|i, done| {
+                    progress(i * reps + done as usize, total)
+                })
+                .map_err(|e| e.to_string())
+                .map(|scenarios| ExperimentResult {
+                    name,
+                    measures,
+                    scenarios,
+                });
+                Msg::Scenarios(result)
+            },
+        );
     }
 
     fn start_optimize(&mut self, base: &Model, model_file: &str) {
@@ -363,7 +382,7 @@ impl Results {
         };
         let base = base.clone();
         let total = utsim_opt::planned_evaluations(&problem);
-        self.spawn("Otimizando", total, move |progress| {
+        self.spawn(tx("res-painel-otimizando"), total, move |progress| {
             let result = utsim_opt::optimize_with(&problem, &base, &mut |d, t| progress(d, t))
                 .map_err(|e| e.to_string())
                 .map(|r| (problem, r));
@@ -409,7 +428,7 @@ pub fn window(
         return requests;
     }
     let mut open = true;
-    egui::Window::new("Resultados")
+    egui::Window::new(tx("res-painel-resultados"))
         .id(egui::Id::new("janela_resultados"))
         .open(&mut open)
         .default_size([1000.0, 640.0])
@@ -429,8 +448,9 @@ pub fn window(
             if blocked > 0 {
                 ui.colored_label(
                     RED,
-                    format!(
-                        "O modelo tem {blocked} problema(s): corrija-os em Editar antes de rodar."
+                    fx(
+                        "res-painel-o_modelo_tem_problema_s",
+                        &[("blocked", vx(&blocked))],
                     ),
                 );
             }
@@ -465,12 +485,15 @@ fn job_bar(ui: &mut egui::Ui, res: &mut Results) {
             } else {
                 0.0
             };
-            ui.add(
-                egui::ProgressBar::new(f)
-                    .desired_width(320.0)
-                    .text(format!("{}: {} de {}", job.what, job.done, job.total)),
-            );
-            if ui.button("Cancelar").clicked() {
+            ui.add(egui::ProgressBar::new(f).desired_width(320.0).text(fx(
+                "res-painel-de",
+                &[
+                    ("what", vx(&job.what)),
+                    ("done", vx(&job.done)),
+                    ("total", vx(&job.total)),
+                ],
+            )));
+            if ui.button(tx("res-painel-cancelar")).clicked() {
                 job.cancel.store(true, Ordering::Relaxed);
             }
         });
@@ -488,37 +511,40 @@ fn summary_tab(
     requests: &mut Vec<Request>,
 ) {
     let form = res.form.get_or_insert_with(|| RunForm::of(&model.run));
-    ui.strong("Rodada");
+    ui.strong(tx("res-painel-rodada"));
     egui::Grid::new("res_rodada")
         .num_columns(4)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
-            ui.label("Replicações");
+            ui.label(tx("res-painel-replicacoes"));
             ui.add(egui::DragValue::new(&mut form.replications).range(1..=1000));
-            ui.label("Semente");
+            ui.label(tx("res-painel-semente"));
             ui.add(egui::DragValue::new(&mut form.seed));
             ui.end_row();
-            ui.label("Tempo de parada");
+            ui.label(tx("res-painel-tempo_de_parada"));
             ui.add(
                 egui::DragValue::new(&mut form.stop_time)
                     .range(1e-6..=f64::MAX)
                     .speed(10.0),
             );
-            ui.label("Aquecimento");
+            ui.label(tx("res-painel-aquecimento"));
             ui.add(
                 egui::DragValue::new(&mut form.warmup)
                     .range(0.0..=f64::MAX)
                     .speed(10.0),
             );
             ui.end_row();
-            ui.checkbox(&mut form.series, "Séries temporais a cada");
+            ui.checkbox(&mut form.series, tx("res-painel-series_temporais_a_cada"));
             ui.add_enabled(
                 form.series,
                 egui::DragValue::new(&mut form.sample_interval)
                     .range(1e-6..=f64::MAX)
                     .speed(1.0),
             );
-            ui.checkbox(&mut form.histograms, "Histogramas com classes");
+            ui.checkbox(
+                &mut form.histograms,
+                tx("res-painel-histogramas_com_classes"),
+            );
             ui.add_enabled(
                 form.histograms,
                 egui::DragValue::new(&mut form.bins).range(1..=200),
@@ -527,62 +553,71 @@ fn summary_tab(
         });
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(can_run, egui::Button::new("Rodar replicações"))
+            .add_enabled(
+                can_run,
+                egui::Button::new(tx("res-painel-rodar_replicacoes")),
+            )
             .clicked()
         {
             res.start_run(model);
         }
         if ui
-            .button("Gravar no modelo")
-            .on_hover_text("Grava replicações, tempos e semente no modelo (Ctrl+Z desfaz)")
+            .button(tx("res-painel-gravar_no_modelo"))
+            .on_hover_text(tx("res-painel-grava_replicacoes_tempos_e_semente"))
             .clicked()
             && let Some(f) = &res.form
         {
             requests.push(Request::Exec(f.commands()));
         }
-        if ui.button("Restaurar do modelo").clicked() {
+        if ui.button(tx("res-painel-restaurar_do_modelo")).clicked() {
             res.form = Some(RunForm::of(&model.run));
         }
     });
     let Some(run) = &res.run else {
         ui.separator();
-        ui.weak("Rode as replicações para ver o resumo por objeto, o gargalo e os gráficos.");
+        ui.weak(tx("res-painel-rode_as_replicacoes_para_ver"));
         return;
     };
     ui.separator();
-    ui.label(format!(
-        "{}. Cada valor: média entre replicações ± meia-amplitude do IC de 95%.",
-        run.form.describe()
+    ui.label(fx(
+        "res-painel-cada_valor_media_entre_replicacoes",
+        &[("describe", vx(&run.form.describe()))],
     ));
     let hot = bottleneck(&run.stats);
     if let Some(i) = hot {
         let s = &run.stats[i];
         ui.horizontal(|ui| {
-            ui.label("Gargalo (geral):");
+            ui.label(tx("res-painel-gargalo_geral"));
             ui.label(RichText::new(&s.name).color(HOT).strong());
-            ui.label(format!(
-                "(ocupação {}; a maior entre processos e recursos)",
-                logic::pct(&s.utilization.unwrap_or(s.content))
+            ui.label(fx(
+                "res-painel-ocupacao_a_maior_entre_processos",
+                &[(
+                    "content",
+                    vx(&logic::pct(&s.utilization.unwrap_or(s.content))),
+                )],
             ));
         });
     }
     if let Some(i) = analysis::bottleneck_in_shift(&run.stats) {
         let s = &run.stats[i];
         ui.horizontal(|ui| {
-            ui.label("Gargalo (dentro do turno):");
+            ui.label(tx("res-painel-gargalo_dentro_do_turno"));
             ui.label(RichText::new(&s.name).color(HOT).strong());
-            ui.label(format!(
-                "(ocupação {} no tempo em turno)",
-                logic::pct(
-                    &s.utilization_in_shift
-                        .or(s.utilization)
-                        .unwrap_or(s.content)
-                )
+            ui.label(fx(
+                "res-painel-ocupacao_no_tempo_em_turno",
+                &[(
+                    "content",
+                    vx(&logic::pct(
+                        &s.utilization_in_shift
+                            .or(s.utilization)
+                            .unwrap_or(s.content),
+                    )),
+                )],
             ));
         });
     }
     ui.horizontal(|ui| {
-        ui.label("Tipo:");
+        ui.label(tx("res-painel-tipo"));
         let text = res
             .kind
             .as_deref()
@@ -590,13 +625,13 @@ fn summary_tab(
         egui::ComboBox::from_id_salt("res_tipo")
             .selected_text(text)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut res.kind, None, "todos");
+                ui.selectable_value(&mut res.kind, None, tx("res-painel-todos"));
                 for k in logic::kinds(&run.stats) {
                     let label = logic::kind_label(&k);
                     ui.selectable_value(&mut res.kind, Some(k.clone()), label);
                 }
             });
-        ui.weak("Clique no título de uma coluna para ordenar.");
+        ui.weak(tx("res-painel-clique_no_titulo_de_uma"));
     });
     let (column, desc) = res.sort.unwrap_or((Column::Name, false));
     let order = match res.sort {
@@ -614,9 +649,9 @@ fn summary_tab(
                 let mark = match res.sort {
                     Some((sc, d)) if sc == c => {
                         if d {
-                            " (decr.)"
+                            tx("res-painel-decr")
                         } else {
-                            " (cresc.)"
+                            tx("res-painel-cresc")
                         }
                     }
                     _ => "",
@@ -632,7 +667,7 @@ fn summary_tab(
                     clicked = Some(c);
                 }
             }
-            ui.strong("Estados");
+            ui.strong(tx("res-painel-estados"));
             ui.end_row();
             for &i in &order {
                 let s = &run.stats[i];
@@ -699,7 +734,7 @@ fn summary_tab(
         .collect();
     if !own.is_empty() {
         ui.separator();
-        ui.strong("Métricas próprias (tempo no sistema, fluxos, níveis de tanques...)");
+        ui.strong(tx("res-painel-metricas_proprias_tempo_no_sistema"));
         egui::Grid::new("res_proprias")
             .striped(true)
             .show(ui, |ui| {
@@ -717,21 +752,21 @@ fn summary_tab(
 fn export_ui(ui: &mut egui::Ui, res: &mut Results, _path: Option<&Path>) {
     ui.separator();
     ui.horizontal(|ui| {
-        ui.label("Pasta de exportação:");
+        ui.label(tx("res-painel-pasta_de_exportacao"));
         ui.add(egui::TextEdit::singleline(&mut res.export_dir).desired_width(420.0));
     });
     ui.horizontal(|ui| {
         let ready = res.run.is_some();
         if ui
-            .add_enabled(ready, egui::Button::new("Exportar CSV"))
-            .on_hover_text("resumo.csv, objetos.csv, replicacoes.csv e, se houver, series.csv e histogramas.csv")
+            .add_enabled(ready, egui::Button::new(tx("res-painel-exportar_csv")))
+            .on_hover_text(tx("res-painel-resumo_csv_objetos_csv_replicacoes"))
             .clicked()
         {
             export_csv(res);
         }
         if ui
-            .add_enabled(ready, egui::Button::new("Exportar HTML"))
-            .on_hover_text("Relatório com tabelas e gráficos (inclui a comparação de cenários, se houver)")
+            .add_enabled(ready, egui::Button::new(tx("res-painel-exportar_html")))
+            .on_hover_text(tx("res-painel-relatorio_com_tabelas_e_graficos"))
             .clicked()
         {
             export_html(res);
@@ -742,7 +777,7 @@ fn export_ui(ui: &mut egui::Ui, res: &mut Results, _path: Option<&Path>) {
 #[cfg(target_arch = "wasm32")]
 fn export_ui(ui: &mut egui::Ui, _res: &mut Results, _path: Option<&Path>) {
     ui.separator();
-    ui.weak("A exportação de arquivos existe só no aplicativo de mesa.");
+    ui.weak(tx("res-painel-a_exportacao_de_arquivos_existe"));
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -759,12 +794,23 @@ fn export_csv(res: &mut Results) {
     });
     match result {
         Ok(files) => {
-            res.status = format!("CSV gravado em {}: {}", dir.display(), files.join(", "));
+            res.status = fx(
+                "res-painel-csv_gravado_em",
+                &[
+                    ("dir", vx(&dir.display())),
+                    ("files", vx(&files.join(", "))),
+                ],
+            );
             res.exported
                 .extend(files.iter().map(|f| dir.join(f).display().to_string()));
             res.errors.clear();
         }
-        Err(e) => res.errors = vec![format!("não foi possível gravar em {}: {e}", dir.display())],
+        Err(e) => {
+            res.errors = vec![fx(
+                "res-painel-nao_foi_possivel_gravar_em",
+                &[("dir", vx(&dir.display())), ("e", vx(&e))],
+            )]
+        }
     }
 }
 
@@ -786,11 +832,19 @@ fn export_html(res: &mut Results) {
     let file = dir.join("relatorio.html");
     match std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&file, html)) {
         Ok(()) => {
-            res.status = format!("Relatório gravado em {}", file.display());
+            res.status = fx(
+                "res-painel-relatorio_gravado_em",
+                &[("file", vx(&file.display()))],
+            );
             res.exported.push(file.display().to_string());
             res.errors.clear();
         }
-        Err(e) => res.errors = vec![format!("não foi possível gravar {}: {e}", file.display())],
+        Err(e) => {
+            res.errors = vec![fx(
+                "res-painel-nao_foi_possivel_gravar",
+                &[("file", vx(&file.display())), ("e", vx(&e))],
+            )]
+        }
     }
 }
 
@@ -803,7 +857,7 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
         }
     });
     let Some(run) = &res.run else {
-        ui.weak("Rode as replicações na aba Resumo para ver os gráficos.");
+        ui.weak(tx("res-painel-rode_as_replicacoes_na_aba"));
         return;
     };
     ui.separator();
@@ -811,7 +865,7 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
         Chart::Utilization => {
             let bars = logic::utilization_bars(&run.stats, res.util);
             if bars.is_empty() {
-                ui.weak("O modelo não tem processos nem recursos móveis.");
+                ui.weak(tx("res-painel-o_modelo_nao_tem_processos"));
                 return;
             }
             ui.horizontal(|ui| {
@@ -825,10 +879,9 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
                     }
                 }
             });
-            ui.label(format!(
-                "{} de cada recurso (%), com o intervalo de 95%, nunca acima de 100% por \
-                 servidor. Em laranja, o gargalo (maior ocupação).",
-                res.util.label()
+            ui.label(fx(
+                "res-painel-de_cada_recurso_com_o",
+                &[("label", vx(&res.util.label()))],
             ));
             ui.weak(res.util.help());
             whisker_chart(ui, "graf_ocupacao", &bars, 100.0, "%");
@@ -837,7 +890,7 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
             let rows: Vec<usize> = (0..run.stats.len())
                 .filter(|&i| res.kind.as_deref().is_none_or(|k| run.stats[i].kind == k))
                 .collect();
-            ui.label("Fração do tempo em cada estado (%), com as cores do 3D.");
+            ui.label(tx("res-painel-fracao_do_tempo_em_cada"));
             states_chart(ui, &logic::state_bars(&run.stats, &rows));
         }
         Chart::Series | Chart::Histogram => {
@@ -848,7 +901,7 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
                 .filter(|o| names.contains(o))
                 .unwrap_or_else(|| names.first().cloned().unwrap_or_default());
             ui.horizontal(|ui| {
-                ui.label("Objeto:");
+                ui.label(tx("res-painel-objeto"));
                 egui::ComboBox::from_id_salt("graf_objeto")
                     .selected_text(&object)
                     .show_ui(ui, |ui| {
@@ -867,9 +920,9 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
                 let tallies = analysis::histogram_tallies(&run.reports, &object);
                 if tallies.is_empty() {
                     ui.weak(if run.form.histograms {
-                        "Este objeto não tem observações de permanência."
+                        tx("res-painel-este_objeto_nao_tem_observacoes")
                     } else {
-                        "A rodada foi feita sem histogramas."
+                        tx("res-painel-a_rodada_foi_feita_sem")
                     });
                     if !run.form.histograms {
                         offer_rerun(ui, res, model, can_run, false);
@@ -880,7 +933,7 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
                     res.tally = tallies[0].clone();
                 }
                 ui.horizontal(|ui| {
-                    ui.label("Medida:");
+                    ui.label(tx("res-painel-medida"));
                     for t in &tallies {
                         let label = if t == "staytime" {
                             "permanência"
@@ -903,9 +956,9 @@ fn charts_tab(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool
 /// "Turn it on and run again", for charts the last run had no data for.
 fn offer_rerun(ui: &mut egui::Ui, res: &mut Results, model: &Model, can_run: bool, series: bool) {
     let label = if series {
-        "Ativar séries temporais e rodar de novo"
+        tx("res-painel-ativar_series_temporais_e_rodar")
     } else {
-        "Ativar histogramas e rodar de novo"
+        tx("res-painel-ativar_histogramas_e_rodar_de")
     };
     if ui.add_enabled(can_run, egui::Button::new(label)).clicked() {
         if let Some(f) = res.form.as_mut() {
@@ -970,14 +1023,17 @@ fn whisker_chart(ui: &mut egui::Ui, id: &str, bars: &[WhiskerBar], scale: f64, u
                     let (lo, hi, yy) = (b.lo * scale, b.hi * scale, y(i));
                     let stroke = Color32::from_gray(230);
                     plot.line(
-                        Line::new("IC 95%", PlotPoints::new(vec![[lo, yy], [hi, yy]]))
-                            .color(stroke)
-                            .width(1.5),
+                        Line::new(
+                            tx("res-painel-ic_95"),
+                            PlotPoints::new(vec![[lo, yy], [hi, yy]]),
+                        )
+                        .color(stroke)
+                        .width(1.5),
                     );
                     for x in [lo, hi] {
                         plot.line(
                             Line::new(
-                                "IC 95%",
+                                tx("res-painel-ic_95"),
                                 PlotPoints::new(vec![[x, yy - 0.15], [x, yy + 0.15]]),
                             )
                             .color(stroke)
@@ -991,7 +1047,7 @@ fn whisker_chart(ui: &mut egui::Ui, id: &str, bars: &[WhiskerBar], scale: f64, u
 
 fn states_chart(ui: &mut egui::Ui, rows: &[(String, Vec<logic::StateSegment>)]) {
     if rows.is_empty() {
-        ui.weak("Sem estados registrados.");
+        ui.weak(tx("res-painel-sem_estados_registrados"));
         return;
     }
     let n = rows.len();
@@ -1050,14 +1106,15 @@ fn series_chart(ui: &mut egui::Ui, reports: &[RunReport], object: &str, sampled:
     let series = analysis::content_series(reports, object);
     if series.mean.is_empty() {
         ui.weak(if sampled {
-            "Este objeto não tem pontos amostrados."
+            tx("res-painel-este_objeto_nao_tem_pontos")
         } else {
-            "A rodada foi feita sem séries temporais (run.sample_interval desligado)."
+            tx("res-painel-a_rodada_foi_feita_sem-2")
         });
         return;
     }
-    ui.label(format!(
-        "Conteúdo de {object} ao longo do tempo: média das replicações (linha forte) e cada replicação."
+    ui.label(fx(
+        "res-painel-conteudo_de_ao_longo_do",
+        &[("object", vx(&object))],
     ));
     Plot::new("graf_serie")
         .height(360.0)
@@ -1086,9 +1143,13 @@ fn histogram_chart(ui: &mut egui::Ui, h: &utsim_core::Histogram) {
         .map(|(c, w, n)| Bar::new(c, n).width(w * 0.95).fill(BAR))
         .collect();
     let total: u64 = h.counts.iter().sum();
-    ui.label(format!(
-        "{total} observações de todas as replicações, de {:.3} a {:.3}.",
-        h.min, h.max
+    ui.label(fx(
+        "res-painel-observacoes_de_todas_as_replicacoes",
+        &[
+            ("total", vx(&total)),
+            ("h", dx(format!("{:.3}", h.min))),
+            ("h2", dx(format!("{:.3}", h.max))),
+        ],
     ));
     Plot::new("graf_histograma")
         .height(340.0)
@@ -1109,7 +1170,7 @@ fn parameter_picker(
     let params = logic::parameters(model);
     let mut add = None;
     ui.horizontal(|ui| {
-        ui.label("Parâmetro:");
+        ui.label(tx("res-painel-parametro"));
         let selected = params
             .iter()
             .find(|p| p.key == *pick)
@@ -1120,16 +1181,19 @@ fn parameter_picker(
             .show_ui(ui, |ui| {
                 for p in &params {
                     ui.selectable_value(pick, p.key.clone(), &p.label)
-                        .on_hover_text(format!("{} (atual: {})", p.key, p.current));
+                        .on_hover_text(fx(
+                            "res-painel-atual",
+                            &[("key", vx(&p.key)), ("current", vx(&p.current))],
+                        ));
                 }
             });
-        ui.label("ou chave:");
+        ui.label(tx("res-painel-ou_chave"));
         ui.add(
             egui::TextEdit::singleline(pick)
-                .hint_text("objeto.campo")
+                .hint_text(tx("res-painel-objeto_campo"))
                 .desired_width(160.0),
         );
-        if ui.button("Adicionar parâmetro").clicked() && !pick.trim().is_empty() {
+        if ui.button(tx("res-painel-adicionar_parametro")).clicked() && !pick.trim().is_empty() {
             add = Some(pick.trim().to_string());
         }
     });
@@ -1143,12 +1207,9 @@ fn scenarios_tab(
     path: Option<&Path>,
     can_run: bool,
 ) {
-    ui.label(
-        "Cada linha é um cenário; cada coluna, um parâmetro. Célula vazia mantém o valor do \
-         modelo. Valores em texto RON, como no campo set dos experimentos.",
-    );
+    ui.label(tx("res-painel-cada_linha_e_um_cenario"));
     ui.horizontal(|ui| {
-        ui.label("Experimento:");
+        ui.label(tx("res-painel-experimento"));
         ui.text_edit_singleline(&mut res.scenarios.name);
     });
     if let Some(key) = parameter_picker(ui, "cen_param", model, &mut res.pick) {
@@ -1163,13 +1224,13 @@ fn scenarios_tab(
         .striped(true)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.strong("Cenário");
+            ui.strong(tx("res-painel-cenario"));
             for (k, key) in form.keys.iter().enumerate() {
                 ui.horizontal(|ui| {
                     ui.strong(key);
                     if ui
                         .small_button("x")
-                        .on_hover_text("Remover parâmetro")
+                        .on_hover_text(tx("res-painel-remover_parametro"))
                         .clicked()
                     {
                         remove_key = Some(k);
@@ -1183,7 +1244,7 @@ fn scenarios_tab(
                     if removable
                         && ui
                             .small_button("x")
-                            .on_hover_text("Remover cenário")
+                            .on_hover_text(tx("res-painel-remover_cenario"))
                             .clicked()
                     {
                         remove_row = Some(r);
@@ -1208,10 +1269,10 @@ fn scenarios_tab(
         form.rows.remove(r);
     }
     ui.horizontal(|ui| {
-        if ui.button("Adicionar cenário").clicked() {
+        if ui.button(tx("res-painel-adicionar_cenario")).clicked() {
             form.add_row();
         }
-        ui.label("Métricas (separadas por vírgula; vazio: todas):");
+        ui.label(tx("res-painel-metricas_separadas_por_virgula_vazio"));
         let mut text = form.measures.join(", ");
         if ui
             .add(egui::TextEdit::singleline(&mut text).desired_width(300.0))
@@ -1231,9 +1292,10 @@ fn scenarios_tab(
         .map_or(model.run.replications, |f| f.replications);
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(can_run, egui::Button::new("Rodar cenários"))
-            .on_hover_text(format!(
-                "{reps} replicação(ões) por cenário (aba Resumo), mesmas sementes em todos"
+            .add_enabled(can_run, egui::Button::new(tx("res-painel-rodar_cenarios")))
+            .on_hover_text(fx(
+                "res-painel-replicacao_oes_por_cenario_aba",
+                &[("reps", vx(&reps))],
             ))
             .clicked()
         {
@@ -1245,14 +1307,18 @@ fn scenarios_tab(
         return;
     };
     ui.separator();
-    ui.label(format!(
-        "{}: média ± IC de 95%. Δ é a diferença pareada (mesmas sementes) para '{}'; ≈ indica \
-         diferença não significativa, em laranja as significativas.",
-        exp.name,
-        exp.scenarios.first().map_or("", |s| s.name.as_str())
+    ui.label(fx(
+        "res-painel-media_ic_de_95_e",
+        &[
+            ("name", vx(&exp.name)),
+            (
+                "name2",
+                vx(&exp.scenarios.first().map_or("", |s| s.name.as_str())),
+            ),
+        ],
     ));
     ui.horizontal(|ui| {
-        ui.label("Filtrar métricas:");
+        ui.label(tx("res-painel-filtrar_metricas"));
         ui.add(egui::TextEdit::singleline(&mut res.metric_filter).desired_width(200.0));
     });
     let rows = logic::comparison_rows(exp);
@@ -1267,11 +1333,11 @@ fn scenarios_tab(
                 .striped(true)
                 .spacing([12.0, 3.0])
                 .show(ui, |ui| {
-                    ui.strong("Métrica");
+                    ui.strong(tx("res-painel-metrica"));
                     for (i, s) in exp.scenarios.iter().enumerate() {
                         ui.strong(&s.name);
                         if i > 0 {
-                            ui.strong(format!("Δ vs {}", exp.scenarios[0].name));
+                            ui.strong(fx("res-painel-vs", &[("name", vx(&exp.scenarios[0].name))]));
                         }
                     }
                     ui.end_row();
@@ -1283,7 +1349,7 @@ fn scenarios_tab(
                                 egui::Button::new(RichText::new(&row.metric).monospace())
                                     .frame(false),
                             )
-                            .on_hover_text("Mostrar no gráfico")
+                            .on_hover_text(tx("res-painel-mostrar_no_grafico"))
                             .clicked()
                         {
                             res.bar_metric = row.metric.clone();
@@ -1305,7 +1371,7 @@ fn scenarios_tab(
     ui.separator();
     let names = exp.metric_names();
     ui.horizontal(|ui| {
-        ui.label("Gráfico da métrica:");
+        ui.label(tx("res-painel-grafico_da_metrica"));
         egui::ComboBox::from_id_salt("cen_metrica")
             .width(320.0)
             .selected_text(&res.bar_metric)
@@ -1324,9 +1390,9 @@ fn scenarios_tab(
 #[cfg(not(target_arch = "wasm32"))]
 fn experiment_files(ui: &mut egui::Ui, res: &mut Results, path: Option<&Path>) {
     ui.horizontal(|ui| {
-        ui.label("Arquivo de experimento:");
+        ui.label(tx("res-painel-arquivo_de_experimento"));
         ui.add(egui::TextEdit::singleline(&mut res.experiment_path).desired_width(380.0));
-        if ui.button("Abrir experimento").clicked() {
+        if ui.button(tx("res-painel-abrir_experimento")).clicked() {
             match utsim_model::experiment::Experiment::load(res.experiment_path.trim()) {
                 Ok(exp) => {
                     res.scenarios =
@@ -1338,21 +1404,24 @@ fn experiment_files(ui: &mut egui::Ui, res: &mut Results, path: Option<&Path>) {
                     }
                     let same = path.is_some_and(|p| same_file(p, &exp.model_path()));
                     res.status = if same {
-                        format!("Experimento '{}' aberto", exp.name)
+                        fx("res-painel-experimento_aberto", &[("name", vx(&exp.name))])
                     } else {
-                        format!(
-                            "Experimento '{}' aberto; os cenários valem para o modelo aberto \
-                             (o arquivo aponta para {})",
-                            exp.name,
-                            exp.model_path().display()
+                        fx(
+                            "res-painel-experimento_aberto_os_cenarios_valem",
+                            &[
+                                ("name", vx(&exp.name)),
+                                ("model_path", vx(&exp.model_path().display())),
+                            ],
                         )
                     };
                     res.errors.clear();
                 }
-                Err(e) => res.errors = vec![format!("não foi possível abrir: {e}")],
+                Err(e) => {
+                    res.errors = vec![fx("res-painel-nao_foi_possivel_abrir", &[("e", vx(&e))])]
+                }
             }
         }
-        if ui.button("Salvar experimento").clicked() {
+        if ui.button(tx("res-painel-salvar_experimento")).clicked() {
             save_experiment(res, path);
         }
     });
@@ -1373,8 +1442,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
 fn save_experiment(res: &mut Results, path: Option<&Path>) {
     let target = PathBuf::from(res.experiment_path.trim());
     let Some(model_path) = path else {
-        res.errors =
-            vec!["salve o modelo antes: o experimento aponta para o arquivo do modelo".into()];
+        res.errors = vec![tx("res-painel-salve_o_modelo_antes_o").into()];
         return;
     };
     // The model path is written relative to the experiment file when they share a folder.
@@ -1408,11 +1476,19 @@ fn save_experiment(res: &mut Results, path: Option<&Path>) {
     );
     match std::fs::write(&target, exp.to_ron()) {
         Ok(()) => {
-            res.status = format!("Experimento salvo em {}", target.display());
+            res.status = fx(
+                "res-painel-experimento_salvo_em",
+                &[("target", vx(&target.display()))],
+            );
             res.exported.push(target.display().to_string());
             res.errors.clear();
         }
-        Err(e) => res.errors = vec![format!("não foi possível gravar {}: {e}", target.display())],
+        Err(e) => {
+            res.errors = vec![fx(
+                "res-painel-nao_foi_possivel_gravar",
+                &[("file", vx(&target.display())), ("e", vx(&e))],
+            )]
+        }
     }
 }
 
@@ -1436,10 +1512,7 @@ fn optimize_tab(
     can_run: bool,
     requests: &mut Vec<Request>,
 ) {
-    ui.label(
-        "Variáveis de decisão (mesmas chaves dos cenários), objetivo e restrições. Todos os \
-         pontos usam as mesmas sementes; o melhor é comparado com os outros por teste pareado.",
-    );
+    ui.label(tx("res-painel-variaveis_de_decisao_mesmas_chaves"));
     if let Some(key) = parameter_picker(ui, "opt_param", model, &mut res.opt_pick)
         && !res.opt.variables.iter().any(|v| v.key == key)
     {
@@ -1457,12 +1530,12 @@ fn optimize_tab(
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for h in [
-                "Variável",
-                "Domínio",
-                "Mínimo",
-                "Máximo",
-                "Passo / valores",
-                "Custo por unidade",
+                tx("res-painel-variavel"),
+                tx("res-painel-dominio"),
+                tx("res-painel-minimo"),
+                tx("res-painel-maximo"),
+                tx("res-painel-passo_valores"),
+                tx("res-painel-custo_por_unidade"),
                 "",
             ] {
                 ui.strong(h);
@@ -1477,9 +1550,21 @@ fn optimize_tab(
                         DomainKind::Choice => "lista",
                     })
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut v.kind, DomainKind::Integer, "inteiro");
-                        ui.selectable_value(&mut v.kind, DomainKind::Continuous, "contínuo");
-                        ui.selectable_value(&mut v.kind, DomainKind::Choice, "lista");
+                        ui.selectable_value(
+                            &mut v.kind,
+                            DomainKind::Integer,
+                            tx("res-painel-inteiro"),
+                        );
+                        ui.selectable_value(
+                            &mut v.kind,
+                            DomainKind::Continuous,
+                            tx("res-painel-continuo"),
+                        );
+                        ui.selectable_value(
+                            &mut v.kind,
+                            DomainKind::Choice,
+                            tx("res-painel-lista"),
+                        );
                     });
                 if v.kind == DomainKind::Choice {
                     ui.label("-");
@@ -1526,11 +1611,11 @@ fn optimize_tab(
         .map(|r| r.metrics.keys().cloned().collect())
         .unwrap_or_default();
     ui.horizontal(|ui| {
-        ui.label("Objetivo:");
-        ui.radio_value(&mut form.maximize, false, "minimizar");
-        ui.radio_value(&mut form.maximize, true, "maximizar");
+        ui.label(tx("res-painel-objetivo"));
+        ui.radio_value(&mut form.maximize, false, tx("res-painel-minimizar"));
+        ui.radio_value(&mut form.maximize, true, tx("res-painel-maximizar"));
         ui.add(egui::DragValue::new(&mut form.weight).speed(0.1))
-            .on_hover_text("peso da métrica");
+            .on_hover_text(tx("res-painel-peso_da_metrica"));
         ui.label("x");
         metric_field(
             ui,
@@ -1538,15 +1623,15 @@ fn optimize_tab(
             &mut form.objective_metric,
             &metrics,
         );
-        ui.label("+ custos das variáveis");
+        ui.label(tx("res-painel-custos_das_variaveis"));
     });
-    ui.strong("Restrições (sobre a média da métrica)");
+    ui.strong(tx("res-painel-restricoes_sobre_a_media_da"));
     let mut remove = None;
     for (i, c) in form.constraints.iter_mut().enumerate() {
         ui.horizontal(|ui| {
             ui.add(
                 egui::TextEdit::singleline(&mut c.min)
-                    .hint_text("mínimo")
+                    .hint_text(tx("res-painel-minimo-2"))
                     .desired_width(70.0),
             );
             ui.label("≤");
@@ -1554,7 +1639,7 @@ fn optimize_tab(
             ui.label("≤");
             ui.add(
                 egui::TextEdit::singleline(&mut c.max)
-                    .hint_text("máximo")
+                    .hint_text(tx("res-painel-maximo-2"))
                     .desired_width(70.0),
             );
             if ui.small_button("x").clicked() {
@@ -1565,46 +1650,50 @@ fn optimize_tab(
     if let Some(i) = remove {
         form.constraints.remove(i);
     }
-    if ui.button("Adicionar restrição").clicked() {
+    if ui.button(tx("res-painel-adicionar_restricao")).clicked() {
         form.constraints.push(logic::ConstraintRow::default());
     }
     ui.horizontal(|ui| {
-        ui.label("Método:");
-        ui.radio_value(&mut form.method, Method::Grid, "grade");
-        ui.radio_value(&mut form.method, Method::Annealing, "recozimento simulado");
-        ui.radio_value(&mut form.method, Method::Genetic, "genético");
+        ui.label(tx("res-painel-metodo"));
+        ui.radio_value(&mut form.method, Method::Grid, tx("res-painel-grade"));
+        ui.radio_value(
+            &mut form.method,
+            Method::Annealing,
+            tx("res-painel-recozimento_simulado"),
+        );
+        ui.radio_value(&mut form.method, Method::Genetic, tx("res-painel-genetico"));
         match form.method {
             Method::Grid => {}
             Method::Annealing => {
-                ui.label("iterações");
+                ui.label(tx("res-painel-iteracoes"));
                 ui.add(egui::DragValue::new(&mut form.iterations).range(1..=10_000));
             }
             Method::Genetic => {
-                ui.label("população");
+                ui.label(tx("res-painel-populacao"));
                 ui.add(egui::DragValue::new(&mut form.population).range(2..=500));
-                ui.label("gerações");
+                ui.label(tx("res-painel-geracoes"));
                 ui.add(egui::DragValue::new(&mut form.generations).range(0..=500));
             }
         }
     });
     ui.horizontal(|ui| {
-        ui.label("Replicações por ponto");
+        ui.label(tx("res-painel-replicacoes_por_ponto"));
         ui.add(egui::DragValue::new(&mut form.replications).range(2..=1000));
-        ui.label("Orçamento (pontos)");
+        ui.label(tx("res-painel-orcamento_pontos"));
         ui.add(egui::DragValue::new(&mut form.budget).range(1..=100_000));
-        ui.label("Semente da busca");
+        ui.label(tx("res-painel-semente_da_busca"));
         ui.add(egui::DragValue::new(&mut form.seed));
-        ui.checkbox(&mut form.refine, "Refinar os");
+        ui.checkbox(&mut form.refine, tx("res-painel-refinar_os"));
         ui.add_enabled(
             form.refine,
             egui::DragValue::new(&mut form.refine_top).range(1..=100),
         );
-        ui.label("melhores com");
+        ui.label(tx("res-painel-melhores_com"));
         ui.add_enabled(
             form.refine,
             egui::DragValue::new(&mut form.refine_replications).range(2..=1000),
         );
-        ui.label("replicações");
+        ui.label(tx("res-painel-replicacoes-2"));
     });
     let model_file = path
         .and_then(|p| p.file_name())
@@ -1612,7 +1701,7 @@ fn optimize_tab(
             n.to_string_lossy().to_string()
         });
     if ui
-        .add_enabled(can_run, egui::Button::new("Otimizar"))
+        .add_enabled(can_run, egui::Button::new(tx("res-painel-otimizar")))
         .clicked()
     {
         res.start_optimize(model, &model_file);
@@ -1624,16 +1713,19 @@ fn optimize_tab(
     match result.best_evaluation() {
         Some(best) => {
             ui.horizontal(|ui| {
-                ui.label("Melhor ponto:");
+                ui.label(tx("res-painel-melhor_ponto"));
                 ui.label(
                     RichText::new(logic::point_text(&best.point))
                         .color(HOT)
                         .strong(),
                 );
-                ui.label(format!("objetivo {}", logic::cell(&best.objective)));
+                ui.label(fx(
+                    "res-painel-objetivo-2",
+                    &[("objective", vx(&logic::cell(&best.objective)))],
+                ));
                 if ui
-                    .button("Aplicar ao modelo")
-                    .on_hover_text("Grava estes valores no modelo (Ctrl+Z desfaz)")
+                    .button(tx("res-painel-aplicar_ao_modelo"))
+                    .on_hover_text(tx("res-painel-grava_estes_valores_no_modelo"))
                     .clicked()
                 {
                     requests.push(Request::Exec(logic::apply_point(&best.point)));
@@ -1652,21 +1744,24 @@ fn optimize_tab(
                     let (word, color) = if *ok {
                         ("atende", Color32::from_rgb(110, 200, 120))
                     } else {
-                        ("não atende", RED)
+                        (tx("res-painel-nao_atende"), RED)
                     };
                     ui.label(RichText::new(word).color(color).strong());
-                    ui.label(format!("{bound} (média observada: {})", logic::cell(s)));
+                    ui.label(fx(
+                        "res-painel-media_observada",
+                        &[("bound", vx(&bound)), ("cell", vx(&logic::cell(s)))],
+                    ));
                 });
             }
         }
         None => {
-            ui.colored_label(RED, "Nenhum ponto avaliado atende às restrições.");
+            ui.colored_label(RED, tx("res-painel-nenhum_ponto_avaliado_atende_as"));
         }
     }
     for line in &result.explanation {
         ui.label(line);
     }
-    ui.strong("Convergência: melhor objetivo viável por número de pontos avaliados");
+    ui.strong(tx("res-painel-convergencia_melhor_objetivo_viavel_por"));
     let curve = logic::convergence(result);
     let points: Vec<[f64; 2]> = result
         .evaluations
@@ -1677,7 +1772,7 @@ fn optimize_tab(
     Plot::new("graf_convergencia")
         .height(240.0)
         .legend(Legend::default())
-        .x_axis_label("pontos avaliados")
+        .x_axis_label(tx("res-painel-pontos_avaliados"))
         .y_axis_label("objetivo")
         .show(ui, |plot| {
             plot.points(
@@ -1686,18 +1781,24 @@ fn optimize_tab(
                     .color(Color32::from_gray(160)),
             );
             plot.line(
-                Line::new("melhor até então", PlotPoints::new(curve))
+                Line::new(tx("res-painel-melhor_ate_entao"), PlotPoints::new(curve))
                     .color(HOT)
                     .width(2.0),
             );
         });
-    ui.strong("Comparação pareada com o melhor (≈: sem diferença significativa a 95%)");
+    ui.strong(tx("res-painel-comparacao_pareada_com_o_melhor"));
     let rows = logic::opt_rows(problem, result);
     egui::Grid::new("opt_pontos")
         .striped(true)
         .spacing([12.0, 3.0])
         .show(ui, |ui| {
-            for h in ["#", "Ponto", "Objetivo", "Viável", "Δ vs melhor"] {
+            for h in [
+                "#",
+                tx("res-painel-ponto"),
+                tx("res-painel-objetivo-3"),
+                tx("res-painel-viavel"),
+                tx("res-painel-vs_melhor"),
+            ] {
                 ui.strong(h);
             }
             ui.end_row();
@@ -1714,7 +1815,7 @@ fn optimize_tab(
                 let delta = if r.is_best {
                     "melhor".to_string()
                 } else if r.equivalent {
-                    format!("{} equivalente", r.delta)
+                    fx("res-painel-equivalente", &[("delta", vx(&r.delta))])
                 } else {
                     r.delta.clone()
                 };
@@ -1728,7 +1829,7 @@ fn optimize_tab(
 fn metric_field(ui: &mut egui::Ui, id: egui::Id, value: &mut String, metrics: &[String]) {
     ui.add(
         egui::TextEdit::singleline(value)
-            .hint_text("objeto.métrica")
+            .hint_text(tx("res-painel-objeto_metrica"))
             .desired_width(220.0),
     );
     if !metrics.is_empty() {

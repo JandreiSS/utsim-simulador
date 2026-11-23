@@ -2,6 +2,7 @@
 //! returns what the user committed; [`Editor`] turns commits into `Command::Set`
 //! (and `Rename`) carrying RON text from [`super::ron_text`].
 
+use crate::texto::{fx, tx, vx};
 use std::collections::BTreeMap;
 
 use bevy_egui::egui::{self, Color32, Id, Ui, emath::Numeric};
@@ -44,7 +45,7 @@ pub(crate) fn list_filter(ui: &mut Ui, id: Id, entries: usize) -> String {
     let mut text = temp::<String>(ui, id).unwrap_or_default();
     let response = ui.add(
         egui::TextEdit::singleline(&mut text)
-            .hint_text("Buscar")
+            .hint_text(tx("prop-panel-buscar"))
             .desired_width(160.0),
     );
     if response.changed() {
@@ -142,10 +143,16 @@ pub(crate) fn text_commit(
         None
     };
     if let Some(error) = &error {
-        ui.colored_label(RED, format!("Texto inválido, não aplicado: {error}"));
+        ui.colored_label(
+            RED,
+            fx(
+                "prop-panel-texto_invalido_nao_aplicado",
+                &[("error", vx(&error))],
+            ),
+        );
         if ui
-            .small_button("descartar texto")
-            .on_hover_text("Volta ao valor que está no modelo")
+            .small_button(tx("prop-panel-descartar_texto"))
+            .on_hover_text(tx("prop-panel-volta_ao_valor_que_esta"))
             .clicked()
         {
             clear_temp::<String>(ui, id);
@@ -204,7 +211,7 @@ fn parse_numbers(text: &str) -> Result<Vec<f64>, String> {
         .map(|s| {
             s.replace(',', ".")
                 .parse::<f64>()
-                .map_err(|_| format!("\"{s}\" não é um número"))
+                .map_err(|_| fx("prop-panel-nao_e_um_numero", &[("s", vx(&s))]))
         })
         .collect()
 }
@@ -217,7 +224,7 @@ pub(super) fn mean_text(m: f64) -> String {
     if m.is_finite() {
         format!("{}", (m * 1e4).round() / 1e4)
     } else {
-        "infinita".into()
+        tx("prop-panel-infinita").into()
     }
 }
 
@@ -227,7 +234,7 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
     let mut index = spec::family_index(d);
     let before = index;
     egui::ComboBox::from_id_salt(id.with("family"))
-        .selected_text(FAMILIES[index])
+        .selected_text(tx(FAMILIES[index]))
         .show_ui(ui, |ui| {
             // Tight rows, so the whole list fits below the box on a normal screen.
             ui.spacing_mut().item_spacing.y = 1.0;
@@ -236,7 +243,7 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
                 if let Some(group) = spec::family_group(i) {
                     ui.weak(group);
                 }
-                ui.selectable_value(&mut index, i, *name);
+                ui.selectable_value(&mut index, i, tx(name));
             }
         });
     if index != before {
@@ -249,9 +256,9 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
             let mut remove = None;
             for (i, (value, weight)) in table.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
-                    changed |= labeled_float(ui, id.with(("v", i)), "valor", value);
-                    changed |= labeled_float(ui, id.with(("w", i)), "peso", weight);
-                    if ui.small_button("remover").clicked() {
+                    changed |= labeled_float(ui, id.with(("v", i)), tx("prop-panel-valor"), value);
+                    changed |= labeled_float(ui, id.with(("w", i)), tx("prop-panel-peso"), weight);
+                    if ui.small_button(tx("prop-panel-remover")).clicked() {
                         remove = Some(i);
                     }
                 });
@@ -260,14 +267,14 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
                 table.remove(i);
                 changed = true;
             }
-            if ui.small_button("adicionar valor").clicked() {
+            if ui.small_button(tx("prop-panel-adicionar_valor")).clicked() {
                 let next = table.last().map_or(0.0, |(v, _)| v + 1.0);
                 table.push((next, 1.0));
                 changed = true;
             }
         }
         Dist::Empirical(xs) => {
-            ui.label("Observações em ordem crescente, separadas por espaço:");
+            ui.label(tx("prop-panel-observacoes_em_ordem_crescente_separadas"));
             let current = xs
                 .iter()
                 .map(|x| ron::float(*x))
@@ -283,7 +290,8 @@ pub(crate) fn dist_widget(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
         }
         Dist::Shifted { offset, dist } => {
             ui.horizontal(|ui| {
-                changed |= labeled_float(ui, id.with("offset"), "deslocamento", offset);
+                changed |=
+                    labeled_float(ui, id.with("offset"), tx("prop-panel-deslocamento"), offset);
             });
             ui.indent(id.with("inner"), |ui| {
                 changed |= dist_widget(ui, id.with("inner"), dist);
@@ -305,27 +313,27 @@ fn simple_params(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
         changed |= labeled_float(ui, id.with(name), name, v);
     };
     match d {
-        Dist::Const(v) => f(ui, "valor", v),
+        Dist::Const(v) => f(ui, tx("prop-panel-valor"), v),
         Dist::Uniform { min, max } => {
-            f(ui, "mín.", min);
-            f(ui, "máx.", max);
+            f(ui, tx("prop-panel-min"), min);
+            f(ui, tx("prop-panel-max"), max);
         }
-        Dist::Exp { mean } | Dist::Poisson { mean } => f(ui, "média", mean),
+        Dist::Exp { mean } | Dist::Poisson { mean } => f(ui, tx("prop-panel-media"), mean),
         Dist::Triangular { min, mode, max } => {
-            f(ui, "mín.", min);
-            f(ui, "moda", mode);
-            f(ui, "máx.", max);
+            f(ui, tx("prop-panel-min"), min);
+            f(ui, tx("prop-panel-moda"), mode);
+            f(ui, tx("prop-panel-max"), max);
         }
         Dist::Normal { mean, sd } | Dist::LogNormal { mean, sd } => {
-            f(ui, "média", mean);
-            f(ui, "desvio", sd);
+            f(ui, tx("prop-panel-media"), mean);
+            f(ui, tx("prop-panel-desvio"), sd);
         }
         Dist::Gamma { shape, scale }
         | Dist::Weibull { shape, scale }
         | Dist::LogLogistic { shape, scale }
         | Dist::PearsonV { shape, scale } => {
-            f(ui, "forma", shape);
-            f(ui, "escala", scale);
+            f(ui, tx("prop-panel-forma"), shape);
+            f(ui, tx("prop-panel-escala"), scale);
         }
         Dist::Beta {
             alpha,
@@ -333,19 +341,19 @@ fn simple_params(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
             min,
             max,
         } => {
-            f(ui, "alfa", alpha);
-            f(ui, "beta", beta);
-            f(ui, "mín.", min);
-            f(ui, "máx.", max);
+            f(ui, tx("prop-panel-alfa"), alpha);
+            f(ui, tx("prop-panel-beta"), beta);
+            f(ui, tx("prop-panel-min"), min);
+            f(ui, tx("prop-panel-max"), max);
         }
         Dist::PearsonVI {
             shape1,
             shape2,
             scale,
         } => {
-            f(ui, "forma 1", shape1);
-            f(ui, "forma 2", shape2);
-            f(ui, "escala", scale);
+            f(ui, tx("prop-panel-forma_1"), shape1);
+            f(ui, tx("prop-panel-forma_2"), shape2);
+            f(ui, tx("prop-panel-escala"), scale);
         }
         Dist::Geometric { p } => f(ui, "p", p),
         Dist::NegBinomial { r, p } => {
@@ -359,7 +367,7 @@ fn simple_params(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
         Dist::Erlang { k, mean } => {
             ui.label("k");
             changed |= num(ui, id.with("k"), k, 0.1, 1);
-            changed |= labeled_float(ui, id.with("média"), "média", mean);
+            changed |= labeled_float(ui, id.with("mean"), tx("prop-panel-media"), mean);
         }
         Dist::Binomial { n, p } => {
             ui.label("n");
@@ -375,7 +383,10 @@ fn simple_params(ui: &mut Ui, id: Id, d: &mut Dist) -> bool {
 pub(crate) fn dist_info(ui: &mut Ui, d: &Dist) {
     match d.validate() {
         Ok(()) => {
-            ui.weak(format!("média = {}", mean_text(d.mean())));
+            ui.weak(fx(
+                "prop-panel-media-2",
+                &[("mean", vx(&mean_text(d.mean())))],
+            ));
         }
         Err(e) => {
             ui.colored_label(RED, e);
@@ -486,7 +497,7 @@ impl Editor<'_> {
                     self.set(field, v.to_string());
                 }
             } else {
-                ui.weak("sem limite");
+                ui.weak(tx("prop-panel-sem_limite"));
             }
         });
     }
@@ -524,7 +535,7 @@ impl Editor<'_> {
                     self.set(field, ron::float(v));
                 }
             } else {
-                ui.weak("sem limite (velocidade constante)");
+                ui.weak(tx("prop-panel-sem_limite_velocidade_constante"));
             }
         });
     }
@@ -539,9 +550,9 @@ impl Editor<'_> {
             .collect();
         let mut team = current.to_vec();
         let mut changed = false;
-        ui.label("Equipe (transportadores do modelo):");
+        ui.label(tx("prop-panel-equipe_transportadores_do_modelo"));
         if candidates.is_empty() {
-            ui.weak("Nenhum transportador no modelo. Crie um na paleta.");
+            ui.weak(tx("prop-panel-nenhum_transportador_no_modelo_crie"));
         }
         for name in &candidates {
             let mut on = team.contains(name);
@@ -556,15 +567,21 @@ impl Editor<'_> {
         }
         for missing in current.iter().filter(|m| !candidates.contains(m)) {
             ui.horizontal(|ui| {
-                ui.colored_label(RED, format!("\"{missing}\" não é um transportador"));
-                if ui.small_button("remover").clicked() {
+                ui.colored_label(
+                    RED,
+                    fx(
+                        "prop-panel-nao_e_um_transportador",
+                        &[("missing", vx(&missing))],
+                    ),
+                );
+                if ui.small_button(tx("prop-panel-remover")).clicked() {
                     team.retain(|m| m != missing);
                     changed = true;
                 }
             });
         }
         if team.is_empty() {
-            ui.colored_label(RED, "A equipe não pode ficar vazia.");
+            ui.colored_label(RED, tx("prop-panel-a_equipe_nao_pode_ficar"));
         }
         if changed {
             self.set(field, ron::strings(&team));
@@ -587,7 +604,7 @@ impl Editor<'_> {
         if ui
             .add_enabled(
                 on || !candidates.is_empty(),
-                egui::Checkbox::new(&mut on, "Precisa de operadores"),
+                egui::Checkbox::new(&mut on, tx("prop-panel-precisa_de_operadores")),
             )
             .changed()
         {
@@ -600,7 +617,7 @@ impl Editor<'_> {
         }
         let Some((team, mut count, mut setup, mut process, requires)) = current else {
             if candidates.is_empty() {
-                ui.weak("Crie um Transportador ou Despachante para usar como equipe.");
+                ui.weak(tx("prop-panel-crie_um_transportador_ou_despachante"));
             }
             return;
         };
@@ -608,9 +625,13 @@ impl Editor<'_> {
         let mut changed = false;
         ui.indent(id, |ui| {
             ui.horizontal(|ui| {
-                ui.label("equipe");
+                ui.label(tx("prop-panel-equipe"));
                 egui::ComboBox::from_id_salt(id.with("team"))
-                    .selected_text(if team.is_empty() { "(nenhuma)" } else { &team })
+                    .selected_text(if team.is_empty() {
+                        tx("prop-panel-nenhuma")
+                    } else {
+                        &team
+                    })
                     .show_ui(ui, |ui| {
                         let wanted = list_filter(ui, id.with("team_busca"), candidates.len());
                         for name in candidates.iter().filter(|n| matches_filter(n, &wanted)) {
@@ -624,16 +645,21 @@ impl Editor<'_> {
             if !candidates.contains(&team) {
                 ui.colored_label(
                     RED,
-                    format!("\"{team}\" não é um transportador nem despachante"),
+                    fx(
+                        "prop-panel-nao_e_um_transportador_nem",
+                        &[("team", vx(&team))],
+                    ),
                 );
             }
             ui.horizontal(|ui| {
-                ui.label("quantidade");
+                ui.label(tx("prop-panel-quantidade"));
                 changed |= num(ui, id.with("count"), &mut count, 0.1, 1);
             });
-            changed |= ui.checkbox(&mut setup, "durante a preparação").changed();
             changed |= ui
-                .checkbox(&mut process, "durante o processamento")
+                .checkbox(&mut setup, tx("prop-panel-durante_a_preparacao"))
+                .changed();
+            changed |= ui
+                .checkbox(&mut process, tx("prop-panel-durante_o_processamento"))
                 .changed();
         });
         if changed {
@@ -652,11 +678,14 @@ impl Editor<'_> {
             .map(str::to_string)
             .collect();
         ui.horizontal(|ui| {
-            ui.label("Transporte de saída");
+            ui.label(tx("prop-panel-transporte_de_saida"));
             egui::ComboBox::from_id_salt(self.id(field))
-                .selected_text(current.unwrap_or("nenhum"))
+                .selected_text(current.unwrap_or(tx("prop-panel-nenhum")))
                 .show_ui(ui, |ui| {
-                    if ui.selectable_label(current.is_none(), "nenhum").clicked() {
+                    if ui
+                        .selectable_label(current.is_none(), tx("prop-panel-nenhum"))
+                        .clicked()
+                    {
                         self.set(field, "None".into());
                     }
                     let wanted = list_filter(ui, id.with("busca"), candidates.len());
@@ -672,12 +701,12 @@ impl Editor<'_> {
         });
         match current {
             None => {
-                ui.weak("Os itens passam direto ao próximo bloco.");
+                ui.weak(tx("prop-panel-os_itens_passam_direto_ao"));
             }
             Some(t) if !candidates.iter().any(|c| c == t) => {
                 ui.colored_label(
                     RED,
-                    format!("\"{t}\" não é um transportador nem despachante"),
+                    fx("prop-panel-nao_e_um_transportador_nem-2", &[("t", vx(&t))]),
                 );
             }
             Some(_) => {}
@@ -689,7 +718,7 @@ impl Editor<'_> {
     /// one undo step. The current base is the node at the transporter's position.
     fn home_node_field(&mut self, ui: &mut Ui, obj: &ObjectDef) {
         let Some(net) = &self.doc.model().network else {
-            ui.weak("Sem rede de caminhos: a base é a posição do transportador.");
+            ui.weak(tx("prop-panel-sem_rede_de_caminhos_a"));
             return;
         };
         let at = net
@@ -699,9 +728,9 @@ impl Editor<'_> {
             .map(|n| n.name.clone());
         let mut chosen = None;
         ui.horizontal(|ui| {
-            ui.label("Base (nó da rede)");
+            ui.label(tx("prop-panel-base_no_da_rede"));
             egui::ComboBox::from_id_salt(self.id("#base"))
-                .selected_text(at.as_deref().unwrap_or("fora da rede"))
+                .selected_text(at.as_deref().unwrap_or(tx("prop-panel-fora_da_rede")))
                 .show_ui(ui, |ui| {
                     let wanted = list_filter(ui, self.id("#base_busca"), net.nodes.len());
                     for n in net
@@ -728,7 +757,7 @@ impl Editor<'_> {
                 },
             ]));
         }
-        ui.weak("Escolher um nó põe o transportador nele e liga \"Voltar à base\".");
+        ui.weak(tx("prop-panel-escolher_um_no_poe_o"));
     }
 
     /// Combo over `(ron text, label)` options; `current` is the RON text of the value.
@@ -768,7 +797,10 @@ impl Editor<'_> {
             ui.horizontal(|ui| {
                 ui.strong(label);
                 // The pending text is kept when switching modes, so invalid text is not lost.
-                if ui.checkbox(&mut raw, "editar como texto").changed() {
+                if ui
+                    .checkbox(&mut raw, tx("prop-panel-editar_como_texto"))
+                    .changed()
+                {
                     set_temp(ui, raw_id, raw);
                 }
             });
@@ -817,12 +849,12 @@ impl Editor<'_> {
         let mut list = current.to_vec();
         let mut changed = false;
         let mut remove = None;
-        ui.label("Quantidade de itens exigida em cada entrada de componentes:");
+        ui.label(tx("prop-panel-quantidade_de_itens_exigida_em"));
         for (i, c) in list.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.label(format!("entrada {}", i + 1));
+                ui.label(fx("prop-panel-entrada", &[("i", vx(&(i + 1)))]));
                 changed |= num(ui, id.with(i), c, 0.1, 1);
-                if ui.small_button("remover").clicked() {
+                if ui.small_button(tx("prop-panel-remover")).clicked() {
                     remove = Some(i);
                 }
             });
@@ -831,14 +863,16 @@ impl Editor<'_> {
             list.remove(i);
             changed = true;
         }
-        if ui.small_button("adicionar entrada").clicked() {
+        if ui
+            .small_button(tx("prop-panel-adicionar_entrada"))
+            .clicked()
+        {
             list.push(1);
             changed = true;
         }
-        ui.weak(format!(
-            "O objeto precisa de {} ligações de entrada (1 contêiner + {}).",
-            list.len() + 1,
-            list.len()
+        ui.weak(fx(
+            "prop-panel-o_objeto_precisa_de_ligacoes",
+            &[("list", vx(&(list.len() + 1))), ("list2", vx(&list.len()))],
         ));
         if changed {
             self.set(field, ron::usizes(&list));
@@ -861,11 +895,11 @@ impl Editor<'_> {
                 .id_salt(sub)
                 .default_open(true)
                 .show(ui, |ui| {
-                    if let Some(new) = dist_block(ui, sub, "Valor do rótulo", d) {
+                    if let Some(new) = dist_block(ui, sub, tx("prop-panel-valor_do_rotulo"), d) {
                         map.insert(name.clone(), new);
                         changed = true;
                     }
-                    if ui.small_button("remover rótulo").clicked() {
+                    if ui.small_button(tx("prop-panel-remover_rotulo")).clicked() {
                         remove = Some(name.clone());
                     }
                 });
@@ -879,7 +913,7 @@ impl Editor<'_> {
             let mut name = temp::<String>(ui, name_id).unwrap_or_default();
             let response = ui.add(
                 egui::TextEdit::singleline(&mut name)
-                    .hint_text("nome do rótulo")
+                    .hint_text(tx("prop-panel-nome_do_rotulo"))
                     .desired_width(120.0),
             );
             if response.changed() {
@@ -888,7 +922,7 @@ impl Editor<'_> {
             let name = name.trim().to_string();
             let free = !name.is_empty() && !map.contains_key(&name);
             if ui
-                .add_enabled(free, egui::Button::new("adicionar rótulo"))
+                .add_enabled(free, egui::Button::new(tx("prop-panel-adicionar_rotulo")))
                 .clicked()
             {
                 map.insert(name, Dist::Const(1.0));
@@ -905,7 +939,10 @@ impl Editor<'_> {
     fn batch_field(&mut self, ui: &mut Ui, field: &str, current: Option<(usize, f64, bool)>) {
         let id = self.id(field);
         let mut on = current.is_some();
-        if ui.checkbox(&mut on, "Lote (agrupar itens)").changed() {
+        if ui
+            .checkbox(&mut on, tx("prop-panel-lote_agrupar_itens"))
+            .changed()
+        {
             self.set(
                 field,
                 if on {
@@ -921,19 +958,19 @@ impl Editor<'_> {
         let mut changed = false;
         ui.indent(id, |ui| {
             ui.horizontal(|ui| {
-                ui.label("tamanho do lote");
+                ui.label(tx("prop-panel-tamanho_do_lote"));
                 changed |= num(ui, id.with("size"), &mut size, 0.1, 1);
             });
             ui.horizontal(|ui| {
                 changed |= labeled_float(
                     ui,
                     id.with("wait"),
-                    "espera máxima (0 = esperar sempre)",
+                    tx("prop-panel-espera_maxima_0_esperar_sempre"),
                     &mut max_wait,
                 );
             });
             if ui
-                .checkbox(&mut flush, "fechar a entrada até o lote sair")
+                .checkbox(&mut flush, tx("prop-panel-fechar_a_entrada_ate_o"))
                 .changed()
             {
                 changed = true;
@@ -945,13 +982,13 @@ impl Editor<'_> {
     }
 
     fn output_field(&mut self, ui: &mut Ui, obj: &ObjectDef) {
-        const RULES: [&str; 6] = [
-            "Primeira livre",
-            "Rodízio",
-            "Aleatória",
-            "Pesos",
-            "Por rótulo",
-            "Script",
+        let rules: [&str; 6] = [
+            tx("prop-panel-primeira_livre"),
+            tx("prop-panel-rodizio"),
+            tx("prop-panel-aleatoria"),
+            tx("prop-panel-pesos"),
+            tx("prop-panel-por_rotulo"),
+            tx("prop-panel-script"),
         ];
         let field = "output";
         let id = self.id(field);
@@ -973,11 +1010,11 @@ impl Editor<'_> {
         };
         let mut picked = index;
         ui.horizontal(|ui| {
-            ui.label("Regra de saída");
+            ui.label(tx("prop-panel-regra_de_saida"));
             egui::ComboBox::from_id_salt(id.with("rule"))
-                .selected_text(RULES[index])
+                .selected_text(rules[index])
                 .show_ui(ui, |ui| {
-                    for (i, name) in RULES.iter().enumerate() {
+                    for (i, name) in rules.iter().enumerate() {
                         ui.selectable_value(&mut picked, i, *name);
                     }
                 });
@@ -998,7 +1035,7 @@ impl Editor<'_> {
             OutputRule::Weighted(weights) => {
                 let mut w = weights.clone();
                 let mut changed = false;
-                ui.label("Peso de cada saída (na ordem das ligações):");
+                ui.label(tx("prop-panel-peso_de_cada_saida_na"));
                 // The destination of each port, so the weights are not read blindly.
                 let dests: Vec<&String> = self
                     .doc
@@ -1011,8 +1048,10 @@ impl Editor<'_> {
                 for (i, weight) in w.iter_mut().enumerate() {
                     ui.horizontal(|ui| {
                         let label = match dests.get(i) {
-                            Some(to) => format!("saída {} ({to})", i + 1),
-                            None => format!("saída {}", i + 1),
+                            Some(to) => {
+                                fx("prop-panel-saida", &[("i", vx(&(i + 1))), ("to", vx(&to))])
+                            }
+                            None => fx("prop-panel-saida-2", &[("i", vx(&(i + 1)))]),
                         };
                         changed |= labeled_float(ui, id.with(("w", i)), &label, weight);
                     });
@@ -1020,9 +1059,15 @@ impl Editor<'_> {
                 if w.len() != n_out {
                     ui.colored_label(
                         RED,
-                        format!("Há {} pesos, mas o objeto tem {n_out} saídas.", w.len()),
+                        fx(
+                            "prop-panel-ha_pesos_mas_o_objeto",
+                            &[("w", vx(&w.len())), ("n_out", vx(&n_out))],
+                        ),
                     );
-                    if ui.small_button("ajustar ao número de saídas").clicked() {
+                    if ui
+                        .small_button(tx("prop-panel-ajustar_ao_numero_de_saidas"))
+                        .clicked()
+                    {
                         w.resize(n_out, 1.0);
                         changed = true;
                     }
@@ -1033,10 +1078,10 @@ impl Editor<'_> {
             }
             OutputRule::ByLabel(label) => {
                 ui.horizontal(|ui| {
-                    ui.label("rótulo com o número da porta");
+                    ui.label(tx("prop-panel-rotulo_com_o_numero_da"));
                     let ok = |t: &str| {
                         if t.trim().is_empty() {
-                            Err("o nome do rótulo não pode ficar vazio".to_string())
+                            Err(tx("prop-panel-o_nome_do_rotulo_nao").to_string())
                         } else {
                             Ok(())
                         }
@@ -1047,7 +1092,7 @@ impl Editor<'_> {
                 });
             }
             OutputRule::Script(src) => {
-                ui.label("Script que devolve o número da porta (1, 2, ...)");
+                ui.label(tx("prop-panel-script_que_devolve_o_numero"));
                 let check = |t: &str| utsim_script::compile_port_script(t).map(|_| ());
                 if let Some(text) = script_box(ui, id.with("script"), src, 4, &check) {
                     self.set(field, ron::output(&OutputRule::Script(text)));
@@ -1062,7 +1107,7 @@ impl Editor<'_> {
         let id = self.id(field);
         let mut on = current.is_some();
         if ui
-            .checkbox(&mut on, "Script ao entrar um item (on_entry)")
+            .checkbox(&mut on, tx("prop-panel-script_ao_entrar_um_item"))
             .changed()
         {
             self.set(
@@ -1075,7 +1120,7 @@ impl Editor<'_> {
             );
         }
         if let Some(src) = current {
-            ui.weak("Roda para cada item que entra, antes de qualquer outra regra.");
+            ui.weak(tx("prop-panel-roda_para_cada_item_que"));
             let check = |t: &str| utsim_script::compile_item_script(t).map(|_| ());
             if let Some(text) = script_box(ui, id.with("script"), src, 5, &check) {
                 self.set(field, ron::string(&text));
@@ -1100,7 +1145,10 @@ impl Editor<'_> {
         let field = "downtime";
         let id = self.id(field);
         let mut on = current.is_some();
-        if ui.checkbox(&mut on, "Quebras (MTBF/MTTR)").changed() {
+        if ui
+            .checkbox(&mut on, tx("prop-panel-quebras_mtbf_mttr"))
+            .changed()
+        {
             let default = Downtime {
                 mtbf: Dist::Exp { mean: 100.0 },
                 mttr: Dist::Exp { mean: 10.0 },
@@ -1118,12 +1166,21 @@ impl Editor<'_> {
         let mut new = dt.clone();
         let mut changed = false;
         ui.indent(id, |ui| {
-            if let Some(d) = dist_block(ui, id.with("mtbf"), "Tempo entre falhas (MTBF)", &dt.mtbf)
-            {
+            if let Some(d) = dist_block(
+                ui,
+                id.with("mtbf"),
+                tx("prop-panel-tempo_entre_falhas_mtbf"),
+                &dt.mtbf,
+            ) {
                 new.mtbf = d;
                 changed = true;
             }
-            if let Some(d) = dist_block(ui, id.with("mttr"), "Tempo de reparo (MTTR)", &dt.mttr) {
+            if let Some(d) = dist_block(
+                ui,
+                id.with("mttr"),
+                tx("prop-panel-tempo_de_reparo_mttr"),
+                &dt.mttr,
+            ) {
                 new.mttr = d;
                 changed = true;
             }
@@ -1140,11 +1197,8 @@ impl Editor<'_> {
         let id = self.id(field);
         let mut on = current.is_some();
         if ui
-            .checkbox(&mut on, "Transferência pela distância")
-            .on_hover_text(
-                "Os itens levam atraso + distância / velocidade para chegar ao próximo bloco \
-                 pelas ligações diretas (sem transportador)",
-            )
+            .checkbox(&mut on, tx("prop-panel-transferencia_pela_distancia"))
+            .on_hover_text(tx("prop-panel-os_itens_levam_atraso_distancia"))
             .changed()
         {
             let default = TransferDef {
@@ -1165,22 +1219,22 @@ impl Editor<'_> {
         let mut new = *t;
         ui.indent(id, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Velocidade");
+                ui.label(tx("prop-panel-velocidade"));
                 let mut v = t.speed;
                 if num(ui, id.with("speed"), &mut v, float_speed(t.speed), 0.001) {
                     new.speed = v;
                 }
-                ui.label("Atraso");
+                ui.label(tx("prop-panel-atraso"));
                 let mut d = t.delay;
                 if num(ui, id.with("delay"), &mut d, float_speed(t.delay), 0.0) {
                     new.delay = d;
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Caminho");
+                ui.label(tx("prop-panel-caminho"));
                 for (label, path) in [
-                    ("reta", TransferPath::Straight),
-                    ("pela rede", TransferPath::Network),
+                    (tx("prop-panel-reta"), TransferPath::Straight),
+                    (tx("prop-panel-pela_rede"), TransferPath::Network),
                 ] {
                     if ui.selectable_label(t.path == path, label).clicked() {
                         new.path = path;
@@ -1204,23 +1258,37 @@ impl Editor<'_> {
                 schedule,
                 ..
             } => {
-                self.dist_field(ui, "Tempo entre chegadas", "interarrival", interarrival);
+                self.dist_field(
+                    ui,
+                    tx("prop-panel-tempo_entre_chegadas"),
+                    "interarrival",
+                    interarrival,
+                );
                 self.bool_field(
                     ui,
-                    "Primeira chegada em t = 0",
+                    tx("prop-panel-primeira_chegada_em_t_0"),
                     "first_at_zero",
                     *first_at_zero,
                 );
-                self.opt_uint_field(ui, "Máximo de chegadas", "max_arrivals", *max_arrivals, 100);
+                self.opt_uint_field(
+                    ui,
+                    tx("prop-panel-maximo_de_chegadas"),
+                    "max_arrivals",
+                    *max_arrivals,
+                    100,
+                );
                 self.choice_field(
                     ui,
-                    "Se a saída estiver bloqueada",
+                    tx("prop-panel-se_a_saida_estiver_bloqueada"),
                     "on_blocked",
                     &ron::debug(on_blocked),
-                    &[("Wait", "Esperar"), ("Drop", "Descartar (perda)")],
+                    &[
+                        ("Wait", tx("prop-panel-esperar")),
+                        ("Drop", tx("prop-panel-descartar_perda")),
+                    ],
                 );
                 ui.separator();
-                ui.strong("Rótulos");
+                ui.strong(tx("prop-panel-rotulos"));
                 self.labels_field(ui, "labels", labels);
                 ui.separator();
                 self.schedule_field(ui, interarrival, labels, schedule.as_ref());
@@ -1233,19 +1301,19 @@ impl Editor<'_> {
             } => {
                 self.opt_uint_field(
                     ui,
-                    "Capacidade limitada",
+                    tx("prop-panel-capacidade_limitada"),
                     "capacity",
                     capacity.map(|c| c as u64),
                     10,
                 );
                 self.choice_field(
                     ui,
-                    "Disciplina",
+                    tx("prop-panel-disciplina"),
                     "discipline",
                     &ron::debug(discipline),
                     &[
-                        ("Fifo", "FIFO (primeiro a entrar, primeiro a sair)"),
-                        ("Lifo", "LIFO (último a entrar, primeiro a sair)"),
+                        ("Fifo", tx("prop-panel-fifo_primeiro_a_entrar_primeiro")),
+                        ("Lifo", tx("prop-panel-lifo_ultimo_a_entrar_primeiro")),
                     ],
                 );
                 self.batch_field(ui, "batch", batch.map(|b| (b.size, b.max_wait, b.flush)));
@@ -1257,17 +1325,22 @@ impl Editor<'_> {
                 operators,
                 ..
             } => {
-                self.uint_field(ui, "Capacidade", "capacity", *capacity, 1);
+                self.uint_field(ui, tx("prop-panel-capacidade"), "capacity", *capacity, 1);
                 self.opt_dist_field(
                     ui,
-                    "Preparação (setup)",
+                    tx("prop-panel-preparacao_setup"),
                     "setup",
                     setup.as_ref(),
                     Dist::Const(1.0),
                 );
-                self.dist_field(ui, "Tempo de processamento", "process", process);
+                self.dist_field(
+                    ui,
+                    tx("prop-panel-tempo_de_processamento"),
+                    "process",
+                    process,
+                );
                 ui.separator();
-                ui.strong("Operadores");
+                ui.strong(tx("prop-panel-operadores"));
                 self.operators_field(
                     ui,
                     "operators",
@@ -1291,23 +1364,28 @@ impl Editor<'_> {
                 self.components_field(ui, "components", components);
                 self.choice_field(
                     ui,
-                    "Modo",
+                    tx("prop-panel-modo"),
                     "mode",
                     &ron::debug(mode),
                     &[
-                        ("Pack", "Embalar (só o contêiner sai)"),
-                        ("Join", "Juntar (componentes destruídos)"),
-                        ("Batch", "Lote (todos saem)"),
+                        ("Pack", tx("prop-panel-embalar_so_o_conteiner_sai")),
+                        ("Join", tx("prop-panel-juntar_componentes_destruidos")),
+                        ("Batch", tx("prop-panel-lote_todos_saem")),
                     ],
                 );
                 self.opt_dist_field(
                     ui,
-                    "Preparação (setup)",
+                    tx("prop-panel-preparacao_setup"),
                     "setup",
                     setup.as_ref(),
                     Dist::Const(1.0),
                 );
-                self.dist_field(ui, "Tempo de processamento", "process", process);
+                self.dist_field(
+                    ui,
+                    tx("prop-panel-tempo_de_processamento"),
+                    "process",
+                    process,
+                );
             }
             ObjectKind::Separator { mode, process } => {
                 // `Unpack` or `Split(n)`, as RON text.
@@ -1316,14 +1394,17 @@ impl Editor<'_> {
                     .strip_prefix("Split(")
                     .and_then(|s| s.strip_suffix(')'))
                     .and_then(|s| s.parse::<usize>().ok());
-                let options = [("Unpack", "Desembalar"), ("Split(2)", "Dividir em cópias")];
+                let options = [
+                    ("Unpack", tx("prop-panel-desembalar")),
+                    ("Split(2)", tx("prop-panel-dividir_em_copias")),
+                ];
                 let shown = if split.is_some() {
                     "Split(2)"
                 } else {
                     "Unpack"
                 };
                 ui.horizontal(|ui| {
-                    ui.label("Modo");
+                    ui.label(tx("prop-panel-modo"));
                     egui::ComboBox::from_id_salt(self.id("mode"))
                         .selected_text(
                             options
@@ -1341,16 +1422,21 @@ impl Editor<'_> {
                 });
                 if let Some(mut n) = split {
                     ui.horizontal(|ui| {
-                        ui.label("número de itens gerados");
+                        ui.label(tx("prop-panel-numero_de_itens_gerados"));
                         if num(ui, self.id("split"), &mut n, 0.1, 1) {
                             self.set("mode", format!("Split({n})"));
                         }
                     });
                 }
-                self.dist_field(ui, "Tempo de processamento", "process", process);
+                self.dist_field(
+                    ui,
+                    tx("prop-panel-tempo_de_processamento"),
+                    "process",
+                    process,
+                );
             }
             ObjectKind::Sink => {
-                ui.weak("A saída não tem parâmetros.");
+                ui.weak(tx("prop-panel-a_saida_nao_tem_parametros"));
             }
             ObjectKind::Transporter {
                 speed,
@@ -1363,14 +1449,42 @@ impl Editor<'_> {
                 agv,
                 ..
             } => {
-                self.float_field(ui, "Velocidade máxima", "speed", *speed);
-                self.opt_float_field(ui, "Aceleração", "acceleration", *acceleration, 1.0);
-                self.opt_float_field(ui, "Desaceleração", "deceleration", *deceleration, 1.0);
-                self.uint_field(ui, "Capacidade (itens)", "capacity", *capacity, 1);
-                self.dist_field(ui, "Tempo de carga", "load_time", load_time);
-                self.dist_field(ui, "Tempo de descarga", "unload_time", unload_time);
-                self.bool_field(ui, "Voltar à base quando ocioso", "home", *home);
-                self.bool_field(ui, "AGV (controle de tráfego na rede)", "agv", *agv);
+                self.float_field(ui, tx("prop-panel-velocidade_maxima"), "speed", *speed);
+                self.opt_float_field(
+                    ui,
+                    tx("prop-panel-aceleracao"),
+                    "acceleration",
+                    *acceleration,
+                    1.0,
+                );
+                self.opt_float_field(
+                    ui,
+                    tx("prop-panel-desaceleracao"),
+                    "deceleration",
+                    *deceleration,
+                    1.0,
+                );
+                self.uint_field(
+                    ui,
+                    tx("prop-panel-capacidade_itens"),
+                    "capacity",
+                    *capacity,
+                    1,
+                );
+                self.dist_field(ui, tx("prop-panel-tempo_de_carga"), "load_time", load_time);
+                self.dist_field(
+                    ui,
+                    tx("prop-panel-tempo_de_descarga"),
+                    "unload_time",
+                    unload_time,
+                );
+                self.bool_field(
+                    ui,
+                    tx("prop-panel-voltar_a_base_quando_ocioso"),
+                    "home",
+                    *home,
+                );
+                self.bool_field(ui, tx("prop-panel-agv_controle_de_trafego_na"), "agv", *agv);
             }
             ObjectKind::Conveyor {
                 length,
@@ -1379,22 +1493,33 @@ impl Editor<'_> {
                 accumulating,
                 ..
             } => {
-                self.float_field(ui, "Comprimento", "length", *length);
-                self.float_field(ui, "Velocidade", "speed", *speed);
-                self.float_field(ui, "Comprimento por item", "item_length", *item_length);
+                self.float_field(ui, tx("prop-panel-comprimento"), "length", *length);
+                self.float_field(ui, tx("prop-panel-velocidade"), "speed", *speed);
+                self.float_field(
+                    ui,
+                    tx("prop-panel-comprimento_por_item"),
+                    "item_length",
+                    *item_length,
+                );
                 self.bool_field(
                     ui,
-                    "Acumula itens quando a saída bloqueia",
+                    tx("prop-panel-acumula_itens_quando_a_saida"),
                     "accumulating",
                     *accumulating,
                 );
-                ui.weak(format!(
-                    "Capacidade: {} itens",
-                    if item_length.is_finite() && *item_length > 0.0 && length.is_finite() {
-                        (length / item_length).floor().max(0.0) as u64
-                    } else {
-                        0
-                    }
+                ui.weak(fx(
+                    "prop-panel-capacidade_itens-2",
+                    &[(
+                        "item_length",
+                        vx(
+                            &if item_length.is_finite() && *item_length > 0.0 && length.is_finite()
+                            {
+                                (length / item_length).floor().max(0.0) as u64
+                            } else {
+                                0
+                            },
+                        ),
+                    )],
                 ));
             }
             ObjectKind::Rack {
@@ -1406,25 +1531,38 @@ impl Editor<'_> {
                 level_height,
                 ..
             } => {
-                self.uint_field(ui, "Colunas", "bays", *bays, 1);
-                self.uint_field(ui, "Níveis", "levels", *levels, 1);
+                self.uint_field(ui, tx("prop-panel-colunas"), "bays", *bays, 1);
+                self.uint_field(ui, tx("prop-panel-niveis"), "levels", *levels, 1);
                 self.opt_dist_field(
                     ui,
-                    "Permanência mínima",
+                    tx("prop-panel-permanencia_minima"),
                     "dwell",
                     dwell.as_ref(),
                     Dist::Const(10.0),
                 );
                 self.choice_field(
                     ui,
-                    "Regra de ocupação",
+                    tx("prop-panel-regra_de_ocupacao"),
                     "placement",
                     &ron::debug(placement),
-                    &spec::RACK_PLACEMENTS,
+                    &spec::RACK_PLACEMENTS.map(|(r, k)| (r, tx(k))),
                 );
-                self.float_field(ui, "Largura da coluna", "bay_width", *bay_width);
-                self.float_field(ui, "Altura do nível", "level_height", *level_height);
-                ui.weak(format!("Capacidade: {} posições", bays * levels));
+                self.float_field(
+                    ui,
+                    tx("prop-panel-largura_da_coluna"),
+                    "bay_width",
+                    *bay_width,
+                );
+                self.float_field(
+                    ui,
+                    tx("prop-panel-altura_do_nivel"),
+                    "level_height",
+                    *level_height,
+                );
+                ui.weak(fx(
+                    "prop-panel-capacidade_posicoes",
+                    &[("levels", vx(&(bays * levels)))],
+                ));
             }
             // The crane is edited in the 3D app (UTSim 3D), not in this viewer.
             ObjectKind::Crane { .. } => {}
@@ -1432,10 +1570,10 @@ impl Editor<'_> {
                 self.team_field(ui, "team", team);
                 self.choice_field(
                     ui,
-                    "Regra de escolha",
+                    tx("prop-panel-regra_de_escolha"),
                     "rule",
                     &ron::debug(rule),
-                    &spec::DISPATCH_RULES,
+                    &spec::DISPATCH_RULES.map(|(r, k)| (r, tx(k))),
                 );
             }
         }
@@ -1450,15 +1588,18 @@ fn name_field(ui: &mut Ui, doc: &Document, name: &str, out: &mut Vec<Command>) {
     let taken = |t: &str| doc.model().objects.iter().any(|o| o.name == t);
     let check = |t: &str| {
         if t.trim().is_empty() {
-            Err("o nome não pode ficar vazio".to_string())
+            Err(tx("prop-panel-o_nome_nao_pode_ficar").to_string())
         } else if t != name && taken(t) {
-            Err(format!("já existe um objeto chamado \"{t}\""))
+            Err(fx(
+                "prop-panel-ja_existe_um_objeto_chamado",
+                &[("t", vx(&t))],
+            ))
         } else {
             Ok(())
         }
     };
     ui.horizontal(|ui| {
-        ui.label("Nome");
+        ui.label(tx("prop-panel-nome"));
         let id = Id::new(("utsim-props", name, "#name"));
         if let Some(to) = text_commit(ui, id, name, false, &check) {
             out.push(Command::Rename {
@@ -1499,14 +1640,17 @@ fn properties_panel_for(
         .filter(|i| i.object.as_deref() == Some(selected))
         .collect();
     for issue in &issues {
-        ui.colored_label(RED, format!("Problema: {}", issue.message));
+        ui.colored_label(
+            RED,
+            fx("prop-panel-problema", &[("message", vx(&issue.message))]),
+        );
     }
     if !issues.is_empty() {
         ui.separator();
     }
 
     name_field(ui, doc, &obj.name, &mut out);
-    ui.weak(spec::kind_name(&obj.kind));
+    ui.weak(spec::kind_label(&obj.kind));
     if with_position {
         ui.separator();
         super::position::position_field(ui, obj, &mut out);
@@ -1545,7 +1689,10 @@ fn properties_panel_for(
 }
 
 /// Text shown for "no asset": the default look of the kind.
-pub const DEFAULT_ASSET: &str = "(padrão do tipo)";
+/// Shown for "no asset chosen" (the kind's default look).
+pub fn default_asset() -> &'static str {
+    tx("prop-panel-padrao_do_tipo")
+}
 
 /// The "Aparência" section: `visual` of the object (asset from the built-in library or
 /// the third-party catalogue, colour, scale, yaw) and "Restaurar padrão". Emits one
@@ -1554,25 +1701,25 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
     let current = obj.visual.clone().unwrap_or_default();
     let mut next = current.clone();
     let id = |field: &str| Id::new(("utsim-props", &obj.name, "#visual", field));
-    egui::CollapsingHeader::new("Aparência")
+    egui::CollapsingHeader::new(tx("prop-panel-aparencia"))
         .id_salt(id("secao"))
         .default_open(true)
         .show(ui, |ui| {
-            let shown = current.asset.as_deref().unwrap_or(DEFAULT_ASSET);
+            let shown = current.asset.as_deref().unwrap_or(default_asset());
             ui.horizontal(|ui| {
-                ui.label("Ativo:");
+                ui.label(tx("prop-panel-ativo"));
                 ui.strong(shown);
             });
             if let Some(e) = current.asset.as_deref().and_then(terceiros::by_name) {
                 ui.weak(format!("{}. {}", e.credit(), e.uso));
                 if !e.clipes.is_empty() {
-                    ui.weak("Clipes de animação ainda não são tocados: pose de repouso.");
+                    ui.weak(tx("prop-panel-clipes_de_animacao_ainda_nao"));
                 }
             }
             let filter_id = id("busca");
             let mut filter = temp::<String>(ui, filter_id).unwrap_or_default();
             ui.horizontal(|ui| {
-                ui.label("Buscar");
+                ui.label(tx("prop-panel-buscar"));
                 let r = ui.add(egui::TextEdit::singleline(&mut filter).desired_width(150.0));
                 if r.changed() {
                     set_temp(ui, filter_id, filter.clone());
@@ -1585,14 +1732,14 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
                 .max_height(180.0)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    if matches(DEFAULT_ASSET)
+                    if matches(default_asset())
                         && ui
-                            .selectable_label(current.asset.is_none(), DEFAULT_ASSET)
+                            .selectable_label(current.asset.is_none(), default_asset())
                             .clicked()
                     {
                         next.asset = None;
                     }
-                    ui.weak("Biblioteca do UTSim");
+                    ui.weak(tx("prop-panel-biblioteca_do_utsim"));
                     for spec in utsim_assets::Spec::defaults() {
                         let n = spec.name();
                         if !matches(n) {
@@ -1601,13 +1748,13 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
                         let on = current.asset.as_deref() == Some(n);
                         if ui
                             .selectable_label(on, n)
-                            .on_hover_text("UTSim (gerado por utsim-assets)")
+                            .on_hover_text(tx("prop-panel-utsim_gerado_por_utsim_assets"))
                             .clicked()
                         {
                             next.asset = Some(n.to_string());
                         }
                     }
-                    ui.weak("Terceiros (assets/terceiros)");
+                    ui.weak(tx("prop-panel-terceiros_assets_terceiros"));
                     for e in terceiros::entries() {
                         if !matches(&e.nome) {
                             continue;
@@ -1634,7 +1781,7 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
                 });
             ui.horizontal(|ui| {
                 let mut on = current.color.is_some();
-                if ui.checkbox(&mut on, "Cor").changed() {
+                if ui.checkbox(&mut on, tx("prop-panel-cor")).changed() {
                     next.color = on.then(|| "#d08030".to_string());
                 }
                 if let Some(rgb) = current.color.as_deref().and_then(visual::parse_color) {
@@ -1646,14 +1793,14 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Escala");
+                ui.label(tx("prop-panel-escala-2"));
                 let mut s = current.scale.unwrap_or(1.0);
                 if num(ui, id("escala"), &mut s, 0.01, 0.01) {
                     next.scale = (s != 1.0).then_some(s);
                 }
                 // For one object the rotation lives in "Posição".
                 if with_yaw {
-                    ui.label("Giro (graus)");
+                    ui.label(tx("prop-panel-giro_graus"));
                     let mut y = current.yaw.unwrap_or(0.0);
                     if num(ui, id("giro"), &mut y, 1.0, -360.0) {
                         next.yaw = (y != 0.0).then_some(y);
@@ -1662,8 +1809,8 @@ fn appearance_field(ui: &mut Ui, obj: &ObjectDef, with_yaw: bool, out: &mut Vec<
             });
             let custom = obj.visual.is_some();
             if ui
-                .add_enabled(custom, egui::Button::new("Restaurar padrão"))
-                .on_hover_text("Volta à aparência padrão do tipo de objeto")
+                .add_enabled(custom, egui::Button::new(tx("prop-panel-restaurar_padrao")))
+                .on_hover_text(tx("prop-panel-volta_a_aparencia_padrao_do"))
                 .clicked()
             {
                 next = VisualDef::default();
@@ -1686,13 +1833,27 @@ pub fn run_panel(ui: &mut Ui, doc: &Document) -> Vec<Command> {
         read: Box::new(|field| spec::read_run(run, field)),
         out: Vec::new(),
     };
-    ui.strong("Simulação");
-    editor.float_field(ui, "Tempo de simulação", "stop_time", run.stop_time);
-    editor.float_field(ui, "Aquecimento", "warmup", run.warmup);
-    editor.uint_field(ui, "Semente", "seed", run.seed, 0);
-    editor.uint_field(ui, "Replicações", "replications", run.replications, 1);
+    ui.strong(tx("prop-panel-simulacao"));
+    editor.float_field(
+        ui,
+        tx("prop-panel-tempo_de_simulacao"),
+        "stop_time",
+        run.stop_time,
+    );
+    editor.float_field(ui, tx("prop-panel-aquecimento"), "warmup", run.warmup);
+    editor.uint_field(ui, tx("prop-panel-semente"), "seed", run.seed, 0);
+    editor.uint_field(
+        ui,
+        tx("prop-panel-replicacoes"),
+        "replications",
+        run.replications,
+        1,
+    );
     for issue in doc.issues().iter().filter(|i| i.object.is_none()) {
-        ui.colored_label(RED, format!("Problema: {}", issue.message));
+        ui.colored_label(
+            RED,
+            fx("prop-panel-problema", &[("message", vx(&issue.message))]),
+        );
     }
     let mut out = editor.out;
     ui.separator();

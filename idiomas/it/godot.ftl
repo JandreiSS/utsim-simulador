@@ -25,7 +25,7 @@ vivo-janela-titulo = UTSim 3D: { $objeto }
 ## Idioma
 
 configuracoes-idioma = Lingua
-configuracoes-idioma-ajuda = Per ora cambiano lingua solo la finestra Impostazioni e i pannelli dal vivo; le altre schermate restano in portoghese.
+configuracoes-idioma-ajuda = Per ora cambiano lingua solo la finestra Impostazioni, i pannelli dal vivo e le schede Qualità, Sicurezza e Manutenzione dei nodi; le altre schermate restano in portoghese.
 
 ## Curva de fadiga da pessoa
 
@@ -43,3 +43,35 @@ fadiga-media = Media misurata
 fadiga-erro = Non adattata: { $erro }
 fadiga-abrir = Apri in UTSim Estatística
 fadiga-abrir-ajuda = Apre le letture di questo studio dei tempi in un foglio di UTSim Estatística (una riga per tempo misurato: compito, metodo, ora del turno e tempo) per analizzarle. Il modello non cambia.
+
+## Abas dos nós (Qualidade, Segurança, Manutenção) e painéis ao vivo
+
+aba-so-leitura = { $quem }. Sola lettura finché quella persona non chiude il modello.
+aba-abrir-qualidade = Apri in UTSim Qualità
+aba-abrir-qualidade-dica = Apre questo nodo in UTSim Qualità (difetti, ispezione, costi, SPC). Il modello viene salvato prima e resta all’altra applicazione per la modifica; UTSim 3D rilegge ciò che essa salva.
+aba-abrir-seguranca = Apri in UTSim Sicurezza
+aba-abrir-seguranca-dica = Apre questo nodo in UTSim Sicurezza sul lavoro (pericoli, matrice dei rischi, DPI). Il modello viene salvato prima e resta all’altra applicazione per la modifica; UTSim 3D rilegge ciò che essa salva.
+aba-calculando = Calcolo dei numeri della simulazione...
+aba-nenhuma = nessuna
+aba-nenhum-escolha = (nessuno)
+aba-nenhum = nessuno
+aba-opcoes = Separa con virgole. Opzioni: { $opcoes }.
+aba-vazio-nao-usa = vuoto: non usato
+aba-adicionar = + Aggiungi
+aba-adicionar-dica = Aggiunge un elemento a { $lista }
+aba-abrir-item = Apre l’elemento
+aba-fechar-item = Chiude l’elemento
+aba-sem-nome = (senza nome)
+aba-remover = Rimuovi
+aba-remover-dica = Toglie questo elemento dall’elenco
+vivo-fechar = Chiudi
+vivo-fechar-dica = Chiudi il pannello (Esc chiude il più recente)
+vivo-fixar = Fissa
+vivo-fixado = Fissato
+vivo-fixar-dica = Fissa mantiene questo pannello; il prossimo clic su un oggetto ne apre un altro accanto
+vivo-sem-numeros = Nessun numero per questo oggetto.
+vivo-eixo-tempo = tempo
+vivo-eixo-itens = elementi
+vivo-sem-dados = Ancora nessun dato.
+vivo-estados = Stati nella finestra
+vivo-sem-estados = nessuno stato

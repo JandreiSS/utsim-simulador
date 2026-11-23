@@ -208,8 +208,8 @@ pub fn show(
         |ui| {
             let r = ui
                 .add(egui::Button::new("×").min_size(vec2(24.0, 22.0)))
-                .on_hover_text("Fechar o painel (Esc fecha o mais recente)");
-            named(ui, reg, &format!("{pre}_Fechar"), &r, "Fechar");
+                .on_hover_text(tx("vivo-fechar-dica"));
+            named(ui, reg, &format!("{pre}_Fechar"), &r, tx("vivo-fechar"));
             if r.clicked() {
                 out.push(format!("vivo:fechar:{k}"));
             }
@@ -225,11 +225,23 @@ pub fn show(
                 out.push(format!("vivo:soltar:{k}"));
             }
             let r = ui
-                .selectable_label(p.fixo, if p.fixo { "Fixado" } else { "Fixar" })
-                .on_hover_text(
-                    "Fixar mantém este painel; o próximo clique num objeto abre outro ao lado",
-                );
-            named_toggle(ui, reg, &format!("{pre}_Fixar"), &r, "Fixar", p.fixo);
+                .selectable_label(
+                    p.fixo,
+                    if p.fixo {
+                        tx("vivo-fixado")
+                    } else {
+                        tx("vivo-fixar")
+                    },
+                )
+                .on_hover_text(tx("vivo-fixar-dica"));
+            named_toggle(
+                ui,
+                reg,
+                &format!("{pre}_Fixar"),
+                &r,
+                tx("vivo-fixar"),
+                p.fixo,
+            );
             if r.clicked() {
                 out.push(format!("vivo:fixar:{k}"));
             }
@@ -248,7 +260,7 @@ pub fn show(
         },
     );
     let Some(l) = &p.leitura else {
-        ui.label(RichText::new("Sem números para este objeto.").color(colors::TEXT_WEAK));
+        ui.label(RichText::new(tx("vivo-sem-numeros")).color(colors::TEXT_WEAK));
         return;
     };
     let r = ui.add(
@@ -296,15 +308,15 @@ pub fn show(
                     })
                     .collect(),
                 markers: Vec::new(),
-                x: "tempo".into(),
-                y: "itens".into(),
+                x: tx("vivo-eixo-tempo").into(),
+                y: tx("vivo-eixo-itens").into(),
             };
             draw_chart(
                 ui,
                 reg,
                 &format!("{pre}_Grafico"),
                 &chart,
-                "Sem dados ainda.",
+                tx("vivo-sem-dados"),
                 120.0,
             );
             ui.add_space(6.0);
@@ -315,7 +327,7 @@ pub fn show(
 /// A bar of the states of the window, in the colours of the 3D view, and its legend.
 fn estados(ui: &mut Ui, reg: &mut Registry, name: &str, l: &Leitura) {
     ui.label(
-        RichText::new("Estados na janela")
+        RichText::new(tx("vivo-estados"))
             .size(sizes::SMALL)
             .strong()
             .color(colors::ACCENT),
@@ -382,7 +394,7 @@ fn estados(ui: &mut Ui, reg: &mut Registry, name: &str, l: &Leitura) {
         ui.painter().text(
             rect.center(),
             Align2::CENTER_CENTER,
-            "sem estados",
+            tx("vivo-sem-estados"),
             FontId::proportional(sizes::SMALL),
             colors::TEXT_WEAK,
         );

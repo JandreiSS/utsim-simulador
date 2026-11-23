@@ -34,6 +34,16 @@ pub fn vx(x: &impl Display) -> Valor<'static> {
     s.into()
 }
 
+/// A number already formatted, with the decimal mark of the current language.
+pub fn dx(s: String) -> Valor<'static> {
+    utsim_idiomas::marca_decimal(&s).into()
+}
+
+/// A text as it is.
+pub fn sx(s: String) -> Valor<'static> {
+    s.into()
+}
+
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct Preferencias {
@@ -100,5 +110,149 @@ mod tests {
         utsim_idiomas::definir_nesta_thread(None);
         vistos.dedup();
         assert_eq!(vistos.len(), Idioma::TODOS.len(), "{vistos:?}");
+    }
+
+    /// Every key written in the sources (`"prop-..."`, `"editor-..."`...) is in
+    /// `editor.ftl`: a mistyped key would show up as the key itself on screen.
+    #[test]
+    fn every_key_in_the_sources_exists() {
+        const PREFIXES: [&str; 9] = [
+            "atalho-", "camada-", "camadas-", "dist-", "editor-", "prop-", "res-", "tipo-", "ui-",
+        ];
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        let mut missing = Vec::new();
+        let mut seen = 0;
+        for f in files {
+            let text = std::fs::read_to_string(&f).unwrap();
+            for piece in text.split('"').skip(1).step_by(2) {
+                let key_like = !piece.is_empty()
+                    && piece.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                    });
+                if key_like
+                    && PREFIXES
+                        .iter()
+                        .any(|p| piece.len() > p.len() && piece.starts_with(p))
+                {
+                    seen += 1;
+                    if !TEXTOS.tem(piece) {
+                        missing.push(format!("{}: {piece}", f.display()));
+                    }
+                }
+            }
+        }
+        assert!(seen > 400, "only {seen} keys found");
+        assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    /// Every `fx(key, &[(name, value), ...])` call passes exactly the variables the
+    /// Portuguese message uses: a wrong name would show `{$name}` on screen.
+    #[test]
+    fn every_fx_passes_the_variables_of_its_message() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let ftl = std::fs::read_to_string(root.join("../../idiomas/pt-BR/editor.ftl")).unwrap();
+        let mut vars: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+            Default::default();
+        let mut current: Option<String> = None;
+        for line in ftl.lines() {
+            let starts_entry =
+                line.starts_with(|c: char| c.is_ascii_lowercase()) && line.contains(" =");
+            if starts_entry {
+                let key = line[..line.find(" =").unwrap()].trim().to_string();
+                vars.entry(key.clone()).or_default();
+                current = Some(key);
+            } else if line.is_empty() || line.starts_with('#') {
+                current = None;
+            }
+            if let Some(k) = &current {
+                for piece in line.split('$').skip(1) {
+                    let name: String = piece
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect();
+                    vars.get_mut(k).unwrap().insert(name);
+                }
+            }
+        }
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&root.join("src"), &mut files);
+        let mut wrong = Vec::new();
+        let mut seen = 0;
+        for f in files {
+            let text = std::fs::read_to_string(&f).unwrap();
+            for (at, _) in text.match_indices("fx(") {
+                let before = text[..at].chars().next_back();
+                if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                    continue;
+                }
+                let Some(rest) = text[at + 3..].trim_start().strip_prefix('"') else {
+                    continue;
+                };
+                let key = &rest[..rest.find('"').unwrap()];
+                let after = rest[key.len() + 1..].trim_start();
+                let Some(after) = after.strip_prefix(',') else {
+                    continue;
+                };
+                let Some(list) = after.trim_start().strip_prefix("&[") else {
+                    continue;
+                };
+                let mut depth = 1;
+                let end = list
+                    .char_indices()
+                    .find(|&(_, c)| {
+                        depth += match c {
+                            '[' => 1,
+                            ']' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .map(|(i, _)| i)
+                    .unwrap();
+                let passed: std::collections::BTreeSet<String> = list[..end]
+                    .split('(')
+                    .skip(1)
+                    .filter_map(|p| p.trim_start().strip_prefix('"'))
+                    .filter_map(|p| p.split_once("\",").map(|(n, _)| n.to_string()))
+                    .filter(|n| {
+                        !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    })
+                    .collect();
+                seen += 1;
+                if vars.get(key) != Some(&passed) {
+                    wrong.push(format!(
+                        "{}: {key} {passed:?} vs {:?}",
+                        f.display(),
+                        vars.get(key)
+                    ));
+                }
+            }
+        }
+        assert!(seen > 100, "only {seen} fx calls found");
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 }

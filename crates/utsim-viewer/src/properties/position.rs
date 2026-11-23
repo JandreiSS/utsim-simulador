@@ -3,6 +3,7 @@
 //! the look's `yaw` (degrees, counter-clockwise seen from above), so it only turns what
 //! is drawn, not how the object behaves in the simulation.
 
+use crate::texto::tx;
 use bevy_egui::egui::{Id, Ui};
 use utsim_edit::Command;
 use utsim_model::{ObjectDef, VisualDef};
@@ -13,7 +14,7 @@ use super::panel::num;
 /// for the position, one `SetVisual` for the rotation.
 pub(crate) fn position_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command>) {
     let id = |axis: &str| Id::new(("utsim-props", &obj.name, "#pos", axis.to_string()));
-    ui.strong("Posição (m)");
+    ui.strong(tx("prop-position-posicao_m"));
     let mut next = obj.position;
     let mut moved = false;
     ui.horizontal(|ui| {
@@ -30,7 +31,7 @@ pub(crate) fn position_field(ui: &mut Ui, obj: &ObjectDef, out: &mut Vec<Command
     }
     let current = obj.visual.clone().unwrap_or_default();
     ui.horizontal(|ui| {
-        ui.label("Giro (graus)");
+        ui.label(tx("prop-position-giro_graus"));
         let mut yaw = current.yaw.unwrap_or(0.0);
         if num(ui, id("giro"), &mut yaw, 1.0, f64::MIN) {
             let visual = VisualDef {

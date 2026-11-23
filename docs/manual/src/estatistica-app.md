@@ -54,7 +54,7 @@ Arquivo › Exportar planilha em xlsx grava `estatistica/exportados/<nome>.xlsx`
 | ANOVA | um fator com as comparações de Tukey, dois fatores |
 | Não paramétricos | Mann-Whitney, Wilcoxon pareado, Kruskal-Wallis, mediana de Mood, Friedman |
 | Tabelas | qui-quadrado de independência, com as contagens observadas e esperadas |
-| Regressão e correlação | regressão linear (coeficientes, VIF, resíduos), correlação de Pearson ou Spearman com valores-p |
+| Regressão e correlação | regressão linear (coeficientes, VIF, resíduos), regressão logística binária, correlação de Pearson ou Spearman com valores-p |
 | Poder e tamanho de amostra | uma média, duas médias e duas proporções, com a curva de poder |
 
 Cada análise abre um formulário com as colunas e os parâmetros. Os testes são bilaterais, com 95 % de confiança. Os grupos (ANOVA, Kruskal-Wallis, Mood, variâncias) vêm de uma coluna de rótulos ao lado da coluna de valores; se os grupos estiverem em colunas separadas, use Dados › Empilhar antes.
@@ -75,6 +75,23 @@ O intervalo de confiança fala da média; o de tolerância fala das peças. Ele 
 ### Transformação de Johnson
 
 Quando os dados não são normais e a conta pede a normal (capacidade, intervalo de tolerância normal, cartas), a transformação de Johnson leva os valores à normal. São três famílias: SU, sem limites; SB, limitada dos dois lados; e SL, a lognormal. O app escolhe a família e os parâmetros pelos quantis da amostra, testa cada candidata pelo Anderson-Darling e fica com a de maior p. O resultado mostra a fórmula com γ, η, ε e λ, o p antes e depois, os valores transformados e os gráficos de probabilidade normal antes e depois. Com p abaixo de 0,10 mesmo depois de transformar, use um método que não suponha a normal, como o intervalo de tolerância não paramétrico. São precisos ao menos 8 valores.
+
+Os valores transformados podem ir para a planilha: no resultado, **Gravar as colunas** cria a coluna "<nome> Johnson", pronta para outras análises.
+
+### Regressão logística binária
+
+Quando a resposta tem só dois valores (peça boa ou com defeito, entregue no prazo ou atrasada), a logística dá a probabilidade do evento em função dos preditores. O evento é o maior dos dois valores: 1 contra 0, "sim" contra "não". Para trocar, codifique a coluna (menu Dados › Codificar).
+
+Os preditores podem ser números ou texto. Um preditor de texto, como o turno, entra com o primeiro nível em ordem como referência, e cada outro nível ganha um coeficiente. A razão de chances diz quantas vezes as chances do evento crescem por unidade do preditor (ou de um nível contra a referência); acima de 1 aumenta o risco, abaixo de 1 diminui.
+
+O resultado mostra:
+- o teste G do modelo inteiro;
+- o teste de Wald de cada coeficiente;
+- o R² de McFadden e o AIC;
+- o Hosmer-Lemeshow (um p baixo diz que a curva não acompanha os dados);
+- a tabela de classificação com o corte escolhido (0,5 de partida).
+
+**Gravar as colunas** leva a probabilidade ajustada de cada linha para a planilha. Se um preditor separa por completo os eventos dos não eventos, a logística não tem estimativa finita e o app explica. Com menos de 10 casos da classe menor por termo, as estimativas podem ser instáveis, e o resultado avisa.
 
 ## Dados da simulação (menu Simulação)
 
@@ -160,4 +177,4 @@ O UTSim e o Seis Sigma podem pedir um experimento ao Estatística (pedido `plane
 
 ## O que vem depois
 
-O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, GLM, stepwise, regressão logística, confiabilidade com censura, assistente guiado e séries temporais.
+O plano (`docs/plano_estatistica.md`) prevê, nas próximas etapas: os pedidos `analisar` e `ajustar_distribuicao` de outros apps, GLM, stepwise, confiabilidade com censura, assistente guiado e séries temporais.

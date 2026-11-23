@@ -285,3 +285,553 @@ atalho-31-teclas = Ctrl + Shift + S
 atalho-31 = salva com outro nome (Salvar como)
 atalho-32-teclas = Ctrl + N
 atalho-32 = novo modelo
+
+# Parte 2: o painel de propriedades (properties/).
+
+## Propriedades: famílias de distribuição, regras e tipos
+
+dist-constante = Constante
+dist-uniforme = Uniforme
+dist-exponencial = Exponencial
+dist-triangular = Triangular
+dist-normal = Normal
+dist-lognormal = Lognormal
+dist-gama = Gama
+dist-erlang = Erlang
+dist-weibull = Weibull
+dist-beta = Beta
+dist-log-logistica = Log-logística
+dist-pearson-v = Pearson V
+dist-pearson-vi = Pearson VI
+dist-discreta = Discreta
+dist-empirica = Empírica
+dist-poisson = Poisson
+dist-geometrica = Geométrica
+dist-binomial = Binomial
+dist-binomial-negativa = Binomial negativa
+dist-deslocada = Deslocada
+prop-vaga-primeira-livre = Primeira livre
+prop-vaga-aleatoria = Aleatória
+prop-despacho-primeiro-livre = Primeiro livre
+prop-despacho-rodizio = Rodízio
+prop-despacho-mais-proximo = Mais próximo
+tipo-chegada = Chegada
+tipo-fila = Fila
+tipo-processo = Processo
+tipo-montagem = Montagem
+tipo-desmontagem = Desmontagem
+tipo-saida = Saída
+tipo-transportador = Transportador
+tipo-ponte-rolante = Ponte rolante
+tipo-despachante = Despachante
+tipo-esteira = Esteira
+tipo-porta-paletes = Porta-paletes
+prop-modo-igual-ao-padrao = igual ao padrão
+prop-modo-distribuicao = distribuição
+prop-modo-taxa = taxa
+prop-modo-sem-chegadas = sem chegadas
+prop-turno-pausar = Pausar
+prop-turno-terminar = Terminar
+prop-turno-pausar-dica = O trabalho em andamento congela no fim do turno e continua quando o turno volta
+prop-turno-terminar-dica = No fim do turno o objeto não aceita itens novos, termina o item em andamento (hora extra) e só então sai de turno; o turno seguinte começa na hora de sempre
+
+## properties/network.rs
+
+prop-network-o_nome_nao_pode_ficar = o nome não pode ficar vazio
+prop-network-ja_existe_um_no_chamado = já existe um nó chamado "{ $t }"
+prop-network-nome = Nome
+prop-network-no_da_rede_de_caminhos = Nó da rede de caminhos
+prop-network-arestas = Arestas
+prop-network-nenhuma_use_a_ferramenta_aresta = Nenhuma: use a ferramenta "Aresta" e clique em outro nó.
+prop-network-remover_aresta = Remover aresta
+prop-network-objetos_ligados_a_este_no = Objetos ligados a este nó
+prop-network-nenhum_cada_objeto_atendido_entra = Nenhum (cada objeto atendido entra pelo nó mais próximo).
+prop-network-aresta = Aresta { $edge }
+prop-network-comprimento_m_calculado_pelas_posicoes = Comprimento: { $len } m (calculado pelas posições dos nós)
+prop-network-mao_dupla = Mão dupla ({ $from } <-> { $to })
+prop-network-mao_unica = Mão única ({ $from } -> { $to })
+prop-network-mao_unica-2 = Mão única ({ $to } -> { $from })
+prop-network-sentido = Sentido
+prop-network-limitar_veiculos_agv = Limitar veículos (AGV)
+prop-network-quantos_agvs_podem_estar_na = Quantos AGVs podem estar na aresta ao mesmo tempo
+prop-network-sem_limite = sem limite
+prop-network-so_agvs_agv_true_respeitam = Só AGVs (agv: true) respeitam a capacidade; os demais passam livremente.
+prop-network-objeto_discreto = Objeto discreto
+prop-network-escolha = (escolha)
+prop-network-nao_e_um_objeto_discreto = "{ $current }" não é um objeto discreto do modelo
+prop-network-vazao = Vazão
+prop-network-capacidade = Capacidade
+prop-network-nivel_inicial = Nível inicial
+prop-network-entrada_maxima = Entrada máxima
+prop-network-saida_maxima = Saída máxima
+prop-network-vazao_maxima = Vazão máxima
+prop-network-cada_item_que_entra_no = Cada item que entra no objeto vira este volume, entregue de uma vez.
+prop-network-volume_por_item = Volume por item
+prop-network-a_cada_volume_completo_cria = A cada volume completo, cria um item dentro do objeto.
+prop-network-problema = Problema: { $message }
+prop-network-tipo = Tipo
+prop-network-ligacoes = Ligações
+prop-network-nenhuma_use_a_ferramenta_ligar = Nenhuma: use a ferramenta "Ligar" e clique no próximo nó.
+prop-network-remover_ligacao = Remover ligação
+
+## properties/panel.rs
+
+prop-panel-buscar = Buscar
+prop-panel-texto_invalido_nao_aplicado = Texto inválido, não aplicado: { $error }
+prop-panel-descartar_texto = descartar texto
+prop-panel-volta_ao_valor_que_esta = Volta ao valor que está no modelo
+prop-panel-nao_e_um_numero = "{ $s }" não é um número
+prop-panel-infinita = infinita
+prop-panel-valor = valor
+prop-panel-peso = peso
+prop-panel-remover = remover
+prop-panel-adicionar_valor = adicionar valor
+prop-panel-observacoes_em_ordem_crescente_separadas = Observações em ordem crescente, separadas por espaço:
+prop-panel-deslocamento = deslocamento
+prop-panel-min = mín.
+prop-panel-max = máx.
+prop-panel-media = média
+prop-panel-moda = moda
+prop-panel-desvio = desvio
+prop-panel-forma = forma
+prop-panel-escala = escala
+prop-panel-alfa = alfa
+prop-panel-beta = beta
+prop-panel-forma_1 = forma 1
+prop-panel-forma_2 = forma 2
+prop-panel-media-2 = média = { $mean }
+prop-panel-sem_limite = sem limite
+prop-panel-sem_limite_velocidade_constante = sem limite (velocidade constante)
+prop-panel-equipe_transportadores_do_modelo = Equipe (transportadores do modelo):
+prop-panel-nenhum_transportador_no_modelo_crie = Nenhum transportador no modelo. Crie um na paleta.
+prop-panel-nao_e_um_transportador = "{ $missing }" não é um transportador
+prop-panel-a_equipe_nao_pode_ficar = A equipe não pode ficar vazia.
+prop-panel-precisa_de_operadores = Precisa de operadores
+prop-panel-crie_um_transportador_ou_despachante = Crie um Transportador ou Despachante para usar como equipe.
+prop-panel-equipe = equipe
+prop-panel-nenhuma = (nenhuma)
+prop-panel-nao_e_um_transportador_nem = "{ $team }" não é um transportador nem despachante
+prop-panel-quantidade = quantidade
+prop-panel-durante_a_preparacao = durante a preparação
+prop-panel-durante_o_processamento = durante o processamento
+prop-panel-transporte_de_saida = Transporte de saída
+prop-panel-nenhum = nenhum
+prop-panel-os_itens_passam_direto_ao = Os itens passam direto ao próximo bloco.
+prop-panel-nao_e_um_transportador_nem-2 = "{ $t }" não é um transportador nem despachante
+prop-panel-sem_rede_de_caminhos_a = Sem rede de caminhos: a base é a posição do transportador.
+prop-panel-base_no_da_rede = Base (nó da rede)
+prop-panel-fora_da_rede = fora da rede
+prop-panel-escolher_um_no_poe_o = Escolher um nó põe o transportador nele e liga "Voltar à base".
+prop-panel-editar_como_texto = editar como texto
+prop-panel-quantidade_de_itens_exigida_em = Quantidade de itens exigida em cada entrada de componentes:
+prop-panel-entrada = entrada { $i }
+prop-panel-adicionar_entrada = adicionar entrada
+prop-panel-o_objeto_precisa_de_ligacoes = O objeto precisa de { $list } ligações de entrada (1 contêiner + { $list2 }).
+prop-panel-valor_do_rotulo = Valor do rótulo
+prop-panel-remover_rotulo = remover rótulo
+prop-panel-nome_do_rotulo = nome do rótulo
+prop-panel-adicionar_rotulo = adicionar rótulo
+prop-panel-lote_agrupar_itens = Lote (agrupar itens)
+prop-panel-tamanho_do_lote = tamanho do lote
+prop-panel-espera_maxima_0_esperar_sempre = espera máxima (0 = esperar sempre)
+prop-panel-fechar_a_entrada_ate_o = fechar a entrada até o lote sair
+prop-panel-primeira_livre = Primeira livre
+prop-panel-rodizio = Rodízio
+prop-panel-aleatoria = Aleatória
+prop-panel-pesos = Pesos
+prop-panel-por_rotulo = Por rótulo
+prop-panel-script = Script
+prop-panel-regra_de_saida = Regra de saída
+prop-panel-peso_de_cada_saida_na = Peso de cada saída (na ordem das ligações):
+prop-panel-saida = saída { $i } ({ $to })
+prop-panel-saida-2 = saída { $i }
+prop-panel-ha_pesos_mas_o_objeto = Há { $w } pesos, mas o objeto tem { $n_out } saídas.
+prop-panel-ajustar_ao_numero_de_saidas = ajustar ao número de saídas
+prop-panel-rotulo_com_o_numero_da = rótulo com o número da porta
+prop-panel-o_nome_do_rotulo_nao = o nome do rótulo não pode ficar vazio
+prop-panel-script_que_devolve_o_numero = Script que devolve o número da porta (1, 2, ...)
+prop-panel-script_ao_entrar_um_item = Script ao entrar um item (on_entry)
+prop-panel-roda_para_cada_item_que = Roda para cada item que entra, antes de qualquer outra regra.
+prop-panel-quebras_mtbf_mttr = Quebras (MTBF/MTTR)
+prop-panel-tempo_entre_falhas_mtbf = Tempo entre falhas (MTBF)
+prop-panel-tempo_de_reparo_mttr = Tempo de reparo (MTTR)
+prop-panel-transferencia_pela_distancia = Transferência pela distância
+prop-panel-os_itens_levam_atraso_distancia = Os itens levam atraso + distância / velocidade para chegar ao próximo bloco pelas ligações diretas (sem transportador)
+prop-panel-velocidade = Velocidade
+prop-panel-atraso = Atraso
+prop-panel-caminho = Caminho
+prop-panel-reta = reta
+prop-panel-pela_rede = pela rede
+prop-panel-tempo_entre_chegadas = Tempo entre chegadas
+prop-panel-primeira_chegada_em_t_0 = Primeira chegada em t = 0
+prop-panel-maximo_de_chegadas = Máximo de chegadas
+prop-panel-se_a_saida_estiver_bloqueada = Se a saída estiver bloqueada
+prop-panel-esperar = Esperar
+prop-panel-descartar_perda = Descartar (perda)
+prop-panel-rotulos = Rótulos
+prop-panel-capacidade_limitada = Capacidade limitada
+prop-panel-disciplina = Disciplina
+prop-panel-fifo_primeiro_a_entrar_primeiro = FIFO (primeiro a entrar, primeiro a sair)
+prop-panel-lifo_ultimo_a_entrar_primeiro = LIFO (último a entrar, primeiro a sair)
+prop-panel-capacidade = Capacidade
+prop-panel-preparacao_setup = Preparação (setup)
+prop-panel-tempo_de_processamento = Tempo de processamento
+prop-panel-operadores = Operadores
+prop-panel-modo = Modo
+prop-panel-embalar_so_o_conteiner_sai = Embalar (só o contêiner sai)
+prop-panel-juntar_componentes_destruidos = Juntar (componentes destruídos)
+prop-panel-lote_todos_saem = Lote (todos saem)
+prop-panel-desembalar = Desembalar
+prop-panel-dividir_em_copias = Dividir em cópias
+prop-panel-numero_de_itens_gerados = número de itens gerados
+prop-panel-a_saida_nao_tem_parametros = A saída não tem parâmetros.
+prop-panel-velocidade_maxima = Velocidade máxima
+prop-panel-aceleracao = Aceleração
+prop-panel-desaceleracao = Desaceleração
+prop-panel-capacidade_itens = Capacidade (itens)
+prop-panel-tempo_de_carga = Tempo de carga
+prop-panel-tempo_de_descarga = Tempo de descarga
+prop-panel-voltar_a_base_quando_ocioso = Voltar à base quando ocioso
+prop-panel-agv_controle_de_trafego_na = AGV (controle de tráfego na rede)
+prop-panel-comprimento = Comprimento
+prop-panel-comprimento_por_item = Comprimento por item
+prop-panel-acumula_itens_quando_a_saida = Acumula itens quando a saída bloqueia
+prop-panel-capacidade_itens-2 = Capacidade: { $item_length } itens
+prop-panel-colunas = Colunas
+prop-panel-niveis = Níveis
+prop-panel-permanencia_minima = Permanência mínima
+prop-panel-regra_de_ocupacao = Regra de ocupação
+prop-panel-largura_da_coluna = Largura da coluna
+prop-panel-altura_do_nivel = Altura do nível
+prop-panel-capacidade_posicoes = Capacidade: { $levels } posições
+prop-panel-regra_de_escolha = Regra de escolha
+prop-panel-o_nome_nao_pode_ficar = o nome não pode ficar vazio
+prop-panel-ja_existe_um_objeto_chamado = já existe um objeto chamado "{ $t }"
+prop-panel-nome = Nome
+prop-panel-problema = Problema: { $message }
+prop-panel-padrao_do_tipo = (padrão do tipo)
+prop-panel-aparencia = Aparência
+prop-panel-ativo = Ativo:
+prop-panel-clipes_de_animacao_ainda_nao = Clipes de animação ainda não são tocados: pose de repouso.
+prop-panel-biblioteca_do_utsim = Biblioteca do UTSim
+prop-panel-utsim_gerado_por_utsim_assets = UTSim (gerado por utsim-assets)
+prop-panel-terceiros_assets_terceiros = Terceiros (assets/terceiros)
+prop-panel-cor = Cor
+prop-panel-escala-2 = Escala
+prop-panel-giro_graus = Giro (graus)
+prop-panel-restaurar_padrao = Restaurar padrão
+prop-panel-volta_a_aparencia_padrao_do = Volta à aparência padrão do tipo de objeto
+prop-panel-simulacao = Simulação
+prop-panel-tempo_de_simulacao = Tempo de simulação
+prop-panel-aquecimento = Aquecimento
+prop-panel-semente = Semente
+prop-panel-replicacoes = Replicações
+
+## properties/position.rs
+
+prop-position-posicao_m = Posição (m)
+prop-position-giro_graus = Giro (graus)
+
+## properties/schedule.rs
+
+prop-schedule-segundos = segundos
+prop-schedule-minutos = minutos
+prop-schedule-horas = horas
+prop-schedule-use_dia_n_hh_mm = use "dia N hh:mm" (recebido "{ $t }")
+prop-schedule-dia_invalido_em_a_partir = dia inválido em "{ $t }" (a partir de 1)
+prop-schedule-use_um_numero = use um número
+prop-schedule-hh_mm_so_vale_com = hh:mm só vale com ciclo de dia ou semana (1440 min, 24 h, 86400 s); use um número
+prop-schedule-hora_invalida_em = hora inválida em "{ $t }"
+prop-schedule-minuto_invalido_em = minuto inválido em "{ $t }"
+prop-schedule-minuto_invalido_em_0_a = minuto inválido em "{ $t }" (0 a 59)
+prop-schedule-nao_e_um_horario_hh = "{ $t }" não é um horário (hh:mm) nem um número
+
+## properties/schedule_ui.rs
+
+prop-schedule-ui-media = { $family }, média { $mean }
+prop-schedule-ui-chegadas_por_periodo = Chegadas por período
+prop-schedule-ui-a_taxa_de_chegada_muda = a taxa de chegada muda com a hora
+prop-schedule-ui-uma_tabela_de_periodos_que = Uma tabela de períodos que se repete a cada ciclo (um dia, uma semana). Fora dos períodos não há chegadas.
+prop-schedule-ui-desligado_o_tempo_entre_chegadas = Desligado: o tempo entre chegadas acima vale o tempo todo.
+prop-schedule-ui-ciclo = ciclo
+prop-schedule-ui-dia = dia
+prop-schedule-ui-semana = semana
+prop-schedule-ui-ciclo_de_tempo_do_modelo = ciclo de { $v } (tempo do modelo em minutos)
+prop-schedule-ui-ciclo_de_tempo_do_modelo-2 = Ciclo de { $cycle }: tempo do modelo em { $name }. Horários em hh:mm, taxas por hora.
+prop-schedule-ui-horarios_e_taxas_em_unidades = Horários e taxas em unidades do modelo (com ciclo 1440, um dia em minutos, a tabela mostra hh:mm).
+prop-schedule-ui-taxa_por_hora = taxa por hora
+prop-schedule-ui-taxa = taxa
+prop-schedule-ui-inicio = início
+prop-schedule-ui-fim = fim
+prop-schedule-ui-modo = modo
+prop-schedule-ui-valor = valor
+prop-schedule-ui-esperado = esperado
+prop-schedule-ui-copiar_do_padrao = copiar do padrão
+prop-schedule-ui-usa_no_periodo_uma_copia = Usa no período uma cópia do tempo entre chegadas padrão, para ajustar só aqui
+prop-schedule-ui-remover_o_periodo = remover o período
+prop-schedule-ui-adicionar_periodo = adicionar período
+prop-schedule-ui-por_dia = {" "}(por dia)
+prop-schedule-ui-por_semana = {" "}(por semana)
+prop-schedule-ui-esperado_por_ciclo_chegadas = Esperado por ciclo{ $hint }: { $per_cycle } chegadas
+prop-schedule-ui-na_troca_de_periodo_a = Na troca de período a chegada pendente é sorteada de novo com o processo do novo período (períodos seguidos com o mesmo processo mantêm a chegada).
+prop-schedule-ui-distribuicoes_dos_periodos = Distribuições dos períodos
+prop-schedule-ui-periodo_tempo_entre_chegadas = Período { $i }: tempo entre chegadas
+prop-schedule-ui-rotulos_por_periodo = Rótulos por período
+prop-schedule-ui-os_rotulos_de_um_periodo = Os rótulos de um período substituem os rótulos padrão de mesmo nome (por exemplo, mais urgentes à noite); os outros continuam valendo.
+prop-schedule-ui-a_fonte_nao_tem_rotulos = A fonte não tem rótulos padrão.
+prop-schedule-ui-a = { $a } a { $b }
+prop-schedule-ui-a-2 = { $start } a { $end }
+prop-schedule-ui-periodo = Período { $i } ({ $span })
+
+## properties/shifts_ui.rs
+
+prop-shifts-ui-como_no_calendario = como no calendário ({ $to_lowercase })
+prop-shifts-ui-ao_fim_do_turno = Ao fim do turno
+prop-shifts-ui-periodo = período
+prop-shifts-ui-inicio = início
+prop-shifts-ui-duracao = duração
+prop-shifts-ui-remover = remover
+prop-shifts-ui-adicionar_janela = adicionar janela
+prop-shifts-ui-fora_de_turno_do_periodo = fora de turno: { $off_fraction }% do período
+prop-shifts-ui-turnos_janelas_fora_de_turno = Turnos (janelas fora de turno)
+prop-shifts-ui-usar_calendario = usar calendário
+prop-shifts-ui-crie_calendarios_na_secao_calendarios = Crie calendários na seção Calendários do painel Simulação (clique num ponto vazio da cena)
+prop-shifts-ui-personalizado = personalizado
+prop-shifts-ui-periodo_janela_s_fora_de = período { $period }, { $off } janela(s) fora de turno
+prop-shifts-ui-o_calendario_nao_existe = o calendário '{ $name }' não existe
+prop-shifts-ui-nome_do_calendario = nome do calendário
+prop-shifts-ui-salvar_como_calendario = salvar como calendário
+prop-shifts-ui-outros_objetos_podem_usar_o = Outros objetos podem usar o mesmo calendário
+prop-shifts-ui-calendarios = Calendários ({ $calendars })
+prop-shifts-ui-tabelas_de_turno_com_nome = Tabelas de turno com nome. Um objeto usa uma delas em Turnos > usar calendário; mudar o calendário muda todos os objetos que o usam.
+prop-shifts-ui-nenhum_objeto_usa_este_calendario = nenhum objeto usa este calendário
+prop-shifts-ui-usado_por = usado por: { $users }
+prop-shifts-ui-remover_calendario = remover calendário
+prop-shifts-ui-troque_os_objetos_para_outro = Troque os objetos para outro calendário ou para personalizado antes
+prop-shifts-ui-novo_calendario = novo calendário
+prop-shifts-ui-o_nome_nao_pode_ficar = o nome não pode ficar vazio
+prop-shifts-ui-ja_existe_um_calendario_chamado = já existe um calendário chamado "{ $t }"
+prop-shifts-ui-nome = Nome
+
+## properties/spec.rs
+
+prop-spec-continuas = Contínuas
+prop-spec-discretas_e_empirica = Discretas e empírica
+prop-spec-combinacao = Combinação
+
+# Parte 3: os resultados (results.rs, results_panel.rs)
+tipo-fluxo = Fluxo
+tipo-fluidos = Fluidos
+tipo-medicao-de-tempo = Medição de tempo
+tipo-outro = Outro
+res-status-replicacoes = { $n ->
+    [one] { $n } replicação concluída
+   *[other] { $n } replicações concluídas
+}
+res-status-replicacoes-gargalo = { $n ->
+    [one] { $n } replicação concluída
+   *[other] { $n } replicações concluídas
+}; gargalo: { $gargalo }
+res-status-pontos = { $n ->
+    [one] { $n } ponto avaliado
+   *[other] { $n } pontos avaliados
+}
+res-status-pontos-melhor = { $n ->
+    [one] { $n } ponto avaliado
+   *[other] { $n } pontos avaliados
+}; melhor: { $melhor }
+
+## results.rs
+
+res-replicacao_oes_de_t_0 = { $replications ->
+    [one] { $replications } replicação
+   *[other] { $replications } replicações
+}, de t = 0 a t = { $stop_time } com aquecimento até t = { $warmup }, semente { $seed }
+res-ocupacao = Ocupação
+res-incluindo_bloqueado = Incluindo bloqueado
+res-dentro_do_turno = Dentro do turno
+res-sem_o_tempo_bloqueado = Sem o tempo bloqueado
+res-fracao_do_tempo_trabalhando_em = Fração do tempo trabalhando (em processo ou preparação). Com capacidade maior que 1, é a média de servidores ocupados dividida pela capacidade.
+res-ocupacao_mais_o_tempo_em = Ocupação mais o tempo em que o recurso segura um item pronto que não pode sair.
+res-ocupacao_sobre_o_tempo_em = Ocupação sobre o tempo em turno: o tempo fora de turno sai do denominador.
+res-ocupacao_sobre_o_tempo_nao = Ocupação sobre o tempo não bloqueado: mostra a carga própria do recurso.
+res-objeto = Objeto
+res-tipo = Tipo
+res-entradas = Entradas
+res-saidas = Saídas
+res-conteudo_medio = Conteúdo médio
+res-permanencia_media = Permanência média
+res-c_bloqueio = c/ bloqueio
+res-no_turno = no turno
+res-s_bloqueio = s/ bloqueio
+res-velocidade_da_transferencia = { $name }: velocidade da transferência
+res-simulacao = Simulação: { $label }
+res-simulacao_velocidade_padrao_das_transferencias = Simulação: velocidade padrão das transferências
+res-cenario = cenário { $n }
+res-adicione_pelo_menos_um_cenario = adicione pelo menos um cenário
+res-cenario_de_um_nome = cenário { $i }: dê um nome
+res-cenario_nome_repetido = cenário '{ $name }': nome repetido
+res-cenario-2 = cenário '{ $name }': { $e }
+res-restricao_de_nao_e_um = restrição de '{ $metric }': { $what } '{ $text }' não é um número
+res-escolha_a_metrica_do_objetivo = escolha a métrica do objetivo
+res-minimo = mínimo
+res-maximo = máximo
+res-restricao_de_informe_minimo_ou = restrição de '{ $metric }': informe mínimo ou máximo
+
+## results_panel.rs
+
+res-painel-resumo = Resumo
+res-painel-graficos = Gráficos
+res-painel-cenarios = Cenários
+res-painel-otimizacao = Otimização
+res-painel-ocupacao = Ocupação
+res-painel-estados = Estados
+res-painel-serie_temporal = Série temporal
+res-painel-histograma = Histograma
+res-painel-a_execucao_terminou_sem_resultado = a execução terminou sem resultado
+res-painel-cenario_s_comparados = { $scenarios ->
+    [one] { $scenarios } cenário comparado
+   *[other] { $scenarios } cenários comparados
+}
+res-painel-cancelado = { $what }: cancelado
+res-painel-erro = { $what }: erro
+res-painel-rodando_replicacoes = Rodando replicações
+res-painel-comparando_cenarios = Comparando cenários
+res-painel-otimizando = Otimizando
+res-painel-resultados = Resultados
+res-painel-o_modelo_tem_problema_s = O modelo tem { $blocked ->
+    [one] { $blocked } problema
+   *[other] { $blocked } problemas
+}: corrija-os em Editar antes de rodar.
+res-painel-de = { $what }: { $done } de { $total }
+res-painel-cancelar = Cancelar
+res-painel-rodada = Rodada
+res-painel-replicacoes = Replicações
+res-painel-semente = Semente
+res-painel-tempo_de_parada = Tempo de parada
+res-painel-aquecimento = Aquecimento
+res-painel-series_temporais_a_cada = Séries temporais a cada
+res-painel-histogramas_com_classes = Histogramas com classes
+res-painel-rodar_replicacoes = Rodar replicações
+res-painel-gravar_no_modelo = Gravar no modelo
+res-painel-grava_replicacoes_tempos_e_semente = Grava replicações, tempos e semente no modelo (Ctrl+Z desfaz)
+res-painel-restaurar_do_modelo = Restaurar do modelo
+res-painel-rode_as_replicacoes_para_ver = Rode as replicações para ver o resumo por objeto, o gargalo e os gráficos.
+res-painel-cada_valor_media_entre_replicacoes = { $describe }. Cada valor: média entre replicações ± meia-amplitude do IC de 95%.
+res-painel-gargalo_geral = Gargalo (geral):
+res-painel-ocupacao_a_maior_entre_processos = (ocupação { $content }; a maior entre processos e recursos)
+res-painel-gargalo_dentro_do_turno = Gargalo (dentro do turno):
+res-painel-ocupacao_no_tempo_em_turno = (ocupação { $content } no tempo em turno)
+res-painel-tipo = Tipo:
+res-painel-todos = todos
+res-painel-clique_no_titulo_de_uma = Clique no título de uma coluna para ordenar.
+res-painel-decr = {" "}(decr.)
+res-painel-cresc = {" "}(cresc.)
+res-painel-metricas_proprias_tempo_no_sistema = Métricas próprias (tempo no sistema, fluxos, níveis de tanques...)
+res-painel-pasta_de_exportacao = Pasta de exportação:
+res-painel-exportar_csv = Exportar CSV
+res-painel-resumo_csv_objetos_csv_replicacoes = resumo.csv, objetos.csv, replicacoes.csv e, se houver, series.csv e histogramas.csv
+res-painel-exportar_html = Exportar HTML
+res-painel-relatorio_com_tabelas_e_graficos = Relatório com tabelas e gráficos (inclui a comparação de cenários, se houver)
+res-painel-a_exportacao_de_arquivos_existe = A exportação de arquivos existe só no aplicativo de mesa.
+res-painel-csv_gravado_em = CSV gravado em { $dir }: { $files }
+res-painel-nao_foi_possivel_gravar_em = não foi possível gravar em { $dir }: { $e }
+res-painel-relatorio_gravado_em = Relatório gravado em { $file }
+res-painel-nao_foi_possivel_gravar = não foi possível gravar { $file }: { $e }
+res-painel-rode_as_replicacoes_na_aba = Rode as replicações na aba Resumo para ver os gráficos.
+res-painel-o_modelo_nao_tem_processos = O modelo não tem processos nem recursos móveis.
+res-painel-de_cada_recurso_com_o = { $label } de cada recurso (%), com o intervalo de 95%, nunca acima de 100% por servidor. Em laranja, o gargalo (maior ocupação).
+res-painel-fracao_do_tempo_em_cada = Fração do tempo em cada estado (%), com as cores do 3D.
+res-painel-objeto = Objeto:
+res-painel-este_objeto_nao_tem_observacoes = Este objeto não tem observações de permanência.
+res-painel-a_rodada_foi_feita_sem = A rodada foi feita sem histogramas.
+res-painel-medida = Medida:
+res-painel-ativar_series_temporais_e_rodar = Ativar séries temporais e rodar de novo
+res-painel-ativar_histogramas_e_rodar_de = Ativar histogramas e rodar de novo
+res-painel-ic_95 = IC 95%
+res-painel-sem_estados_registrados = Sem estados registrados.
+res-painel-este_objeto_nao_tem_pontos = Este objeto não tem pontos amostrados.
+res-painel-a_rodada_foi_feita_sem-2 = A rodada foi feita sem séries temporais (run.sample_interval desligado).
+res-painel-conteudo_de_ao_longo_do = Conteúdo de { $object } ao longo do tempo: média das replicações (linha forte) e cada replicação.
+res-painel-observacoes_de_todas_as_replicacoes = { $total } observações de todas as replicações, de { $h } a { $h2 }.
+res-painel-parametro = Parâmetro:
+res-painel-atual = { $key } (atual: { $current })
+res-painel-ou_chave = ou chave:
+res-painel-objeto_campo = objeto.campo
+res-painel-adicionar_parametro = Adicionar parâmetro
+res-painel-cada_linha_e_um_cenario = Cada linha é um cenário; cada coluna, um parâmetro. Célula vazia mantém o valor do modelo. Valores em texto RON, como no campo set dos experimentos.
+res-painel-experimento = Experimento:
+res-painel-cenario = Cenário
+res-painel-remover_parametro = Remover parâmetro
+res-painel-remover_cenario = Remover cenário
+res-painel-adicionar_cenario = Adicionar cenário
+res-painel-metricas_separadas_por_virgula_vazio = Métricas (separadas por vírgula; vazio: todas):
+res-painel-rodar_cenarios = Rodar cenários
+res-painel-replicacao_oes_por_cenario_aba = { $reps ->
+    [one] { $reps } replicação
+   *[other] { $reps } replicações
+} por cenário (aba Resumo), mesmas sementes em todos
+res-painel-media_ic_de_95_e = { $name }: média ± IC de 95%. Δ é a diferença pareada (mesmas sementes) para '{ $name2 }'; ≈ indica diferença não significativa, em laranja as significativas.
+res-painel-filtrar_metricas = Filtrar métricas:
+res-painel-metrica = Métrica
+res-painel-vs = Δ vs { $name }
+res-painel-mostrar_no_grafico = Mostrar no gráfico
+res-painel-grafico_da_metrica = Gráfico da métrica:
+res-painel-arquivo_de_experimento = Arquivo de experimento:
+res-painel-abrir_experimento = Abrir experimento
+res-painel-experimento_aberto = Experimento '{ $name }' aberto
+res-painel-experimento_aberto_os_cenarios_valem = Experimento '{ $name }' aberto; os cenários valem para o modelo aberto (o arquivo aponta para { $model_path })
+res-painel-nao_foi_possivel_abrir = não foi possível abrir: { $e }
+res-painel-salvar_experimento = Salvar experimento
+res-painel-salve_o_modelo_antes_o = salve o modelo antes: o experimento aponta para o arquivo do modelo
+res-painel-experimento_salvo_em = Experimento salvo em { $target }
+res-painel-variaveis_de_decisao_mesmas_chaves = Variáveis de decisão (mesmas chaves dos cenários), objetivo e restrições. Todos os pontos usam as mesmas sementes; o melhor é comparado com os outros por teste pareado.
+res-painel-variavel = Variável
+res-painel-dominio = Domínio
+res-painel-minimo = Mínimo
+res-painel-maximo = Máximo
+res-painel-passo_valores = Passo / valores
+res-painel-custo_por_unidade = Custo por unidade
+res-painel-inteiro = inteiro
+res-painel-continuo = contínuo
+res-painel-lista = lista
+res-painel-objetivo = Objetivo:
+res-painel-minimizar = minimizar
+res-painel-maximizar = maximizar
+res-painel-peso_da_metrica = peso da métrica
+res-painel-custos_das_variaveis = + custos das variáveis
+res-painel-restricoes_sobre_a_media_da = Restrições (sobre a média da métrica)
+res-painel-minimo-2 = mínimo
+res-painel-maximo-2 = máximo
+res-painel-adicionar_restricao = Adicionar restrição
+res-painel-metodo = Método:
+res-painel-grade = grade
+res-painel-recozimento_simulado = recozimento simulado
+res-painel-genetico = genético
+res-painel-iteracoes = iterações
+res-painel-populacao = população
+res-painel-geracoes = gerações
+res-painel-replicacoes_por_ponto = Replicações por ponto
+res-painel-orcamento_pontos = Orçamento (pontos)
+res-painel-semente_da_busca = Semente da busca
+res-painel-refinar_os = Refinar os
+res-painel-melhores_com = melhores com
+res-painel-replicacoes-2 = replicações
+res-painel-otimizar = Otimizar
+res-painel-melhor_ponto = Melhor ponto:
+res-painel-objetivo-2 = objetivo { $objective }
+res-painel-aplicar_ao_modelo = Aplicar ao modelo
+res-painel-grava_estes_valores_no_modelo = Grava estes valores no modelo (Ctrl+Z desfaz)
+res-painel-nao_atende = não atende
+res-painel-media_observada = { $bound } (média observada: { $cell })
+res-painel-nenhum_ponto_avaliado_atende_as = Nenhum ponto avaliado atende às restrições.
+res-painel-convergencia_melhor_objetivo_viavel_por = Convergência: melhor objetivo viável por número de pontos avaliados
+res-painel-pontos_avaliados = pontos avaliados
+res-painel-melhor_ate_entao = melhor até então
+res-painel-comparacao_pareada_com_o_melhor = Comparação pareada com o melhor (≈: sem diferença significativa a 95%)
+res-painel-ponto = Ponto
+res-painel-objetivo-3 = Objetivo
+res-painel-viavel = Viável
+res-painel-vs_melhor = Δ vs melhor
+res-painel-equivalente = { $delta } equivalente
+res-painel-objeto_metrica = objeto.métrica
