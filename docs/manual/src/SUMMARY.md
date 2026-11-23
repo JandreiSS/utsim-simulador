@@ -10,7 +10,7 @@
 - [UTSim Qualidade](qualidade-app.md)
 - [UTSim Segurança do Trabalho](seguranca-app.md)
 - [UTSim Estatística](estatistica-app.md)
-- [UTSim Desenvolvimento de Produto](produto-app.md)
+- [UTSim Produto](produto-app.md)
 
 # Construindo modelos
 

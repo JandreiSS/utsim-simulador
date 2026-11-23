@@ -1,6 +1,6 @@
-# UTSim Desenvolvimento de Produto
+# UTSim Produto
 
-O UTSim Desenvolvimento de Produto é um aplicativo da família UTSim com janela própria. Ele
+O UTSim Produto (desenvolvimento de produto) é um aplicativo da família UTSim com janela própria. Ele
 organiza os requisitos do produto, as fases do desenvolvimento com os portões, a estrutura do
 produto com as variantes e os roteiros, e gera a partir disso um modelo que o UTSim simula.
 Funciona sem internet e sem servidor. Esta é a primeira versão (MVP).
