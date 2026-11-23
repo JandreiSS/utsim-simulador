@@ -441,6 +441,9 @@ vazia. O SIPOC gerado do modelo de simulação chega na etapa L4.
   do total, contando a que cruza os 80 %. No gráfico, as barras são o percentual de cada
   categoria (as vitais na cor de destaque), a linha é o acumulado e a linha horizontal marca
   os 80 %. O acumulado sempre termina em 100 %.
+- **Clicar numa barra** filtra as categorias e a tabela do resultado só com ela (a barra
+  "Outros" mostra as categorias que junta); clicar de novo mostra todas. O tracejado
+  vertical marca onde terminam as poucas vitais.
 
 ### Plano de coleta de dados
 
@@ -458,8 +461,15 @@ coluna "Falta" mostra o que ainda impede a coleta: nome, definição operacional
 - Cada causa tem o estado (aberta, provável, verificada ou descartada) e a evidência que o
   decidiu. "+ subcausa" desce um nível, sem limite de profundidade.
 - **Como ler o diagrama**: cada espinha é uma categoria (metade em cima, metade embaixo) com
-  as suas primeiras causas; as verificadas aparecem na cor de destaque, as prováveis em
-  laranja e as descartadas apagadas. As subcausas ficam na lista abaixo do desenho.
+  as suas primeiras causas em cartões; a borda das verificadas fica na cor de destaque, a das
+  prováveis em laranja e a das descartadas apagada. O selo "+n" diz quantas subcausas a causa
+  tem; elas ficam na lista abaixo do desenho.
+- **Editar no desenho**: clique num osso, fora dos cartões, para acrescentar uma causa
+  naquela categoria (Enter grava e abre a próxima). Duplo clique num cartão edita o texto, e
+  apagar o texto remove a causa. Arraste um cartão para outro osso para mudar a categoria (as
+  subcausas vão junto). O botão direito abre o menu, com "Começar um 5 porquês com esta
+  causa": a cadeia nasce no primeiro 5 porquês do projeto (criado se não houver), ligada à
+  causa, e a tela passa para ele.
 - Se duas pessoas moverem causas ao mesmo tempo e uma ficar embaixo da outra (um ciclo), o
   programa mostra a primeira como causa principal e avisa; nada some.
 
@@ -471,6 +481,10 @@ coluna "Falta" mostra o que ainda impede a coleta: nome, definição operacional
 - "+ por quê (novo ramo)" acrescenta um primeiro porquê; "+ por quê" ao lado de um porquê
   acrescenta o seguinte. Clicar duas vezes no mesmo porquê abre dois ramos.
 - Cada porquê tem a evidência. Marque "causa raiz" no porquê que a equipe concluiu.
+- **A árvore**: cada cadeia aparece também como árvore, da esquerda para a direita, com o
+  problema na raiz. O "+" à direita de um nó acrescenta um porquê abaixo dele (um ramo novo
+  quando ele já tem filhos), duplo clique edita e o botão direito marca a causa raiz (borda
+  grossa) ou remove o porquê e o que está abaixo.
 - **Como ler**: as causas raiz candidatas são os porquês marcados; sem marcação, o último
   porquê de cada ramo. Cinco níveis são a referência usual, não uma regra.
 
@@ -518,6 +532,11 @@ Cada linha é um modo de falha de uma etapa (ou função) do processo:
   "Característica crítica a partir de S") são marcadas com `◆`. Cada uma precisa de uma
   linha no plano de controle do projeto; o FMEA e o plano de controle avisam quantas
   faltam. Com S' preenchido, vale a severidade revista.
+- **Matriz severidade × ocorrência**: acima da grade, cada modo de falha com S e O é um ponto
+  na matriz, na cor da AP da linha (alta em vermelho, média em âmbar, baixa em verde); o
+  fundo das células mostra a faixa de S × O. A primeira coluna da grade traz a mesma cor.
+  Clique num ponto para ir à linha (ela fica marcada); clicar de novo na mesma célula passa
+  para a próxima linha dela.
 - **Como ler o RPN e a AP**: o RPN ordena, mas trata igual um 10 × 2 × 5 e um 2 × 10 × 5. A AP
   corrige isso dando peso maior à severidade: priorize as linhas de AP alta, depois as de
   AP média, e use o RPN só para desempatar.
