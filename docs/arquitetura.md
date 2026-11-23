@@ -1659,7 +1659,7 @@ foram feitos a fundação e a barra superior:
   de textura, cores, recortes e texturas da barra e do painel a 1600×900 e 1280×720.
 - **Tema** (`crates/utsim-ui-tema`, só egui): cores do tema Godot por papel, tamanhos,
   estilo dos widgets, fontes de interface do sistema com as do egui como reserva, botão
-  primário e controle segmentado. O launcher e o app UTSim Seis Sigma vão adotá-lo.
+  primário e controle segmentado. O launcher e o app UTSim LSS vão adotá-lo.
 - Um só egui no workspace (0.36.2, o mesmo do `eframe` do launcher e do `bevy_egui` do
   visualizador); a ponte passou a pedir Rust 1.95.
 
@@ -1855,10 +1855,10 @@ Item T6 de `docs/plano_gemeo_digital_e_painel.md` (seção 1.4, "Previsão"). Ma
   gravação com previsões agendadas e pedidas reproduzida com previsões idênticas; seção
   validada; rotas e `POST` do painel; `utsim prever` igual ao `utsim run --estado`.
 
-## 4v. UTSim Seis Sigma: fundação (`utsim-lss-*`)
+## 4v. UTSim LSS: fundação (`utsim-lss-*`)
 
 Gerenciador de projetos Lean Seis Sigma da família (`docs/plano_lean_seis_sigma.md`, etapa
-L0). Manual: "UTSim Seis Sigma". Janela própria em `eframe`/`egui` (`=0.36.2`, o mesmo egui
+L0). Manual: "UTSim LSS". Janela própria em `eframe`/`egui` (`=0.36.2`, o mesmo egui
 do launcher e do visualizador; um só egui no `Cargo.lock`), sem servidor HTTP nem navegador.
 Versão própria (`0.1.0`, tag `lss-v<versão>`), produto `lean-seis-sigma` no launcher
 (`scripts/publicar-seis-sigma.sh`).
@@ -1897,7 +1897,7 @@ Versão própria (`0.1.0`, tag `lss-v<versão>`), produto `lean-seis-sigma` no l
   tudo a partir dos arquivos. Instantâneo é só aceleração: o resultado é sempre o de
   `State::replay` sobre o conjunto inteiro.
 - **Formato.** Todo arquivo tem `"formato": N` (ausente vale 1; `FORMAT = 1`). Mais novo que o
-  suportado: erro "projeto no formato N; esta versão do UTSim Seis Sigma lê até M". Mais
+  suportado: erro "projeto no formato N; esta versão do UTSim LSS lê até M". Mais
   antigo: passos `MIGRATIONS` sobre o `serde_json::Value`, como no modelo
   (`docs/versionamento.md`).
 - **Pasta.** `fsio::write_new` grava num temporário oculto (`.<nome>.<sorteio>.tmp`), faz

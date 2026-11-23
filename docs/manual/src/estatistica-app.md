@@ -184,7 +184,7 @@ Essas ferramentas ficam no UTSim Qualidade, a tela única da família para elas.
 
 ### Pedido de outro app
 
-O UTSim e o Seis Sigma podem pedir um experimento ao Estatística (pedido `planejar_experimento`). O pedido traz o modelo, os fatores com o campo e os níveis baixo e alto, os indicadores de resposta e, se quiser, o número máximo de corridas e as replicações. O Estatística abre na unidade do pedido (ou na última usada) com o plano pronto: o composto central de face centrada quando cabe no orçamento, senão o Box-Behnken e, para muitos fatores, o Plackett-Burman. A janela "Rodar o plano no modelo" já vem preenchida; confira os campos e rode. Analise, aplique o melhor ponto e grave como de costume. Ao fechar o Estatística, a resposta volta para quem pediu com o plano, a rodada, o melhor ponto aplicado e o que foi gravado no modelo. O modelo só muda se você aplicar e gravar.
+O UTSim e o UTSim LSS podem pedir um experimento ao Estatística (pedido `planejar_experimento`). O pedido traz o modelo, os fatores com o campo e os níveis baixo e alto, os indicadores de resposta e, se quiser, o número máximo de corridas e as replicações. O Estatística abre na unidade do pedido (ou na última usada) com o plano pronto: o composto central de face centrada quando cabe no orçamento, senão o Box-Behnken e, para muitos fatores, o Plackett-Burman. A janela "Rodar o plano no modelo" já vem preenchida; confira os campos e rode. Analise, aplique o melhor ponto e grave como de costume. Ao fechar o Estatística, a resposta volta para quem pediu com o plano, a rodada, o melhor ponto aplicado e o que foi gravado no modelo. O modelo só muda se você aplicar e gravar.
 
 ## O que vem depois
 
