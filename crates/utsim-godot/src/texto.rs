@@ -94,4 +94,33 @@ mod tests {
         assert!(seen > 40, "only {seen} keys found");
         assert!(missing.is_empty(), "{missing:#?}");
     }
+
+    /// Every key the GDScript side asks for (`T("godot-gd-...")`) is in `godot.ftl`.
+    #[test]
+    fn every_key_of_the_scripts_exists() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../godot/scripts");
+        let mut missing = Vec::new();
+        let mut seen = 0;
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let p = e.path();
+            if p.extension().is_none_or(|x| x != "gd") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&p).unwrap();
+            for piece in text.split('"').skip(1).step_by(2) {
+                if piece.starts_with(&["godot", "gd-"].join("-"))
+                    && piece.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                    })
+                {
+                    seen += 1;
+                    if !TEXTOS.tem(piece) {
+                        missing.push(format!("{}: {piece}", p.display()));
+                    }
+                }
+            }
+        }
+        assert!(seen > 100, "only {seen} keys found");
+        assert!(missing.is_empty(), "{missing:#?}");
+    }
 }

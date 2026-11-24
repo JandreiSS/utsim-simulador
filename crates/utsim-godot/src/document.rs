@@ -10,6 +10,7 @@
 //! Positions are model coordinates here (`x`, `y` on the floor plan, `z` up); `lib.rs`
 //! converts from and to Godot coordinates with [`crate::coords`].
 
+use crate::texto::{fx, sx, tx, vx};
 use std::path::Path;
 
 use utsim_core::RunReport;
@@ -198,10 +199,9 @@ pub fn add_command(id: &str, name: &str, position: [f64; 3]) -> Option<Command> 
 /// connect one (`None` for ordinary blocks).
 pub fn connect_blocked(kind: &str) -> Option<&'static str> {
     match kind {
-        "Transporter" | "Dispatcher" => Some(
-            "Transportadores e despachantes não usam ligações de fluxo: arraste do nó laranja \
-             deles até a máquina que operam (ou até o objeto cujos itens levam).",
-        ),
+        "Transporter" | "Dispatcher" => {
+            Some(tx("godot-document-transportadores_e_despachantes_nao_usam"))
+        }
         _ => None,
     }
 }
@@ -337,11 +337,11 @@ impl Editor {
                 .objects
                 .iter()
                 .find(|o| o.name == n)
-                .ok_or_else(|| format!("objeto '{n}' não existe"))
+                .ok_or_else(|| fx("godot-document-objeto_nao_existe", &[("n", vx(&n))]))
         };
         let (a, b) = (find(from)?, find(to)?);
         if from == to {
-            return Err("arraste de um objeto até outro".into());
+            return Err(tx("godot-document-arraste_de_um_objeto_ate").into());
         }
         let (command, said) = match (&a.kind, &b.kind) {
             (ObjectKind::Dispatcher { team, .. }, ObjectKind::Transporter { .. }) => {
@@ -349,9 +349,15 @@ impl Editor {
                 (
                     teams::team_toggle(model, from, to)?,
                     if leaving {
-                        format!("{to} saiu da equipe de {from}.")
+                        fx(
+                            "godot-document-saiu_da_equipe_de",
+                            &[("to", vx(&to)), ("from", vx(&from))],
+                        )
                     } else {
-                        format!("{to} entrou na equipe de {from}.")
+                        fx(
+                            "godot-document-entrou_na_equipe_de",
+                            &[("to", vx(&to)), ("from", vx(&from))],
+                        )
                     },
                 )
             }
@@ -369,9 +375,15 @@ impl Editor {
                 (
                     teams::set_operators(model, from, new.as_ref())?,
                     if same {
-                        format!("{from} não pede mais operadores de {to}.")
+                        fx(
+                            "godot-document-nao_pede_mais_operadores_de",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        )
                     } else {
-                        format!("{from} pede operadores de {to}.")
+                        fx(
+                            "godot-document-pede_operadores_de",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        )
                     },
                 )
             }
@@ -380,14 +392,20 @@ impl Editor {
                 (
                     teams::set_transport(model, from, (!same).then_some(to))?,
                     if same {
-                        format!("{from} não pede mais transporte a {to}.")
+                        fx(
+                            "godot-document-nao_pede_mais_transporte_a",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        )
                     } else {
-                        format!("{from} pede transporte a {to}.")
+                        fx(
+                            "godot-document-pede_transporte_a",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        )
                     },
                 )
             }
             _ => {
-                return Err("arraste do despachante a um transportador, ou de um objeto ao transportador ou despachante que o atende".into());
+                return Err(tx("godot-document-arraste_do_despachante_a_um").into());
             }
         };
         self.apply(command)?;
@@ -422,7 +440,7 @@ impl Editor {
             });
         }
         if all.is_empty() {
-            return Err("a série e os histogramas já estão ligados no modelo".into());
+            return Err(tx("godot-document-a_serie_e_os_histogramas").into());
         }
         self.apply(Command::Batch(all))?;
         self.doc.end_gesture();
@@ -445,18 +463,22 @@ impl Editor {
             return Ok(name);
         }
         if crate::path_edit::tool_of(id).is_some() {
-            return Err("desenhe clicando os nós no chão (Enter termina)".into());
+            return Err(tx("godot-document-desenhe_clicando_os_nos_no").into());
         }
-        let entry = palette_entry(id).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        let entry = palette_entry(id)
+            .ok_or_else(|| fx("godot-document-tipo_desconhecido", &[("id", vx(&id))]))?;
         let name = self.doc.unique_name(entry.name_base);
-        let command =
-            add_command(id, &name, position).ok_or_else(|| format!("tipo desconhecido: {id}"))?;
+        let command = add_command(id, &name, position)
+            .ok_or_else(|| fx("godot-document-tipo_desconhecido", &[("id", vx(&id))]))?;
         self.apply(command)?;
         Ok(name)
     }
 
     pub fn remove(&mut self, names: &[String]) -> Result<(), String> {
-        self.apply_some(arrange::delete_command(names), "nada selecionado")
+        self.apply_some(
+            arrange::delete_command(names),
+            tx("godot-document-nada_selecionado"),
+        )
     }
 
     pub fn connect(&mut self, from: &str, to: &str) -> Result<(), String> {
@@ -507,7 +529,7 @@ impl Editor {
         let outs = self.outputs(from);
         let target = index as i64 + delta;
         if index >= outs.len() || target < 0 || target >= outs.len() as i64 {
-            return Err("não há para onde mover esta ligação".into());
+            return Err(tx("godot-document-nao_ha_para_onde_mover").into());
         }
         let target = target as usize;
         let mut order = outs.clone();
@@ -540,7 +562,7 @@ impl Editor {
     /// offsets to it).
     pub fn drag(&mut self, delta: [f64; 2], step: f64) -> Result<(), String> {
         let Some((_, first)) = self.drag.first() else {
-            return Err("nenhum arrasto começou".into());
+            return Err(tx("godot-document-nenhum_arrasto_comecou").into());
         };
         let delta = [
             snap_to(first[0] + delta[0], step) - first[0],
@@ -571,7 +593,7 @@ impl Editor {
     pub fn nudge(&mut self, names: &[String], delta: [f64; 2]) -> Result<(), String> {
         self.apply_some(
             arrange::move_command(self.model(), names, delta),
-            "nada selecionado",
+            tx("godot-document-nada_selecionado"),
         )
     }
 
@@ -589,10 +611,11 @@ impl Editor {
             .objects
             .iter()
             .find(|o| o.name == name)
-            .ok_or_else(|| format!("objeto '{name}' não existe"))?;
+            .ok_or_else(|| fx("godot-document-objeto_nao_existe-2", &[("name", vx(&name))]))?;
         if is_mobile(&obj.kind) {
-            return Err(format!(
-                "{name} é um recurso móvel: ele vira para onde anda"
+            return Err(fx(
+                "godot-document-e_um_recurso_movel_ele",
+                &[("name", vx(&name))],
             ));
         }
         if turned_visual(obj, degrees) == obj.visual {
@@ -615,9 +638,9 @@ impl Editor {
             .collect();
         if batch.is_empty() {
             return Err(if names.is_empty() {
-                "nada selecionado".into()
+                tx("godot-document-nada_selecionado").into()
             } else {
-                "recursos móveis não giram: eles viram para onde andam".into()
+                tx("godot-document-recursos_moveis_nao_giram_eles").into()
             });
         }
         let n = batch.len();
@@ -642,7 +665,7 @@ impl Editor {
     pub fn cut(&mut self, names: &[String]) -> Result<usize, String> {
         let n = self.copy(names);
         if n == 0 {
-            return Err("nada selecionado".into());
+            return Err(tx("godot-document-nada_selecionado").into());
         }
         self.remove(names)?;
         Ok(n)
@@ -668,7 +691,7 @@ impl Editor {
         let (command, names) = self
             .clipboard
             .paste(self.model(), offset)
-            .ok_or("a área de transferência está vazia (Ctrl+C copia)")?;
+            .ok_or(tx("godot-document-a_area_de_transferencia_esta"))?;
         self.apply(command)?;
         self.pastes += 1;
         Ok(names)
@@ -679,7 +702,7 @@ impl Editor {
         let clip = Clipboard::copy(self.model(), names);
         let (command, new) = clip
             .paste(self.model(), paste_offset(1))
-            .ok_or("nada selecionado")?;
+            .ok_or(tx("godot-document-nada_selecionado"))?;
         self.apply(command)?;
         Ok(new)
     }
@@ -693,11 +716,16 @@ impl Editor {
             "topo" => Align::Top,
             "centro_y" => Align::CenterY,
             "base" => Align::Bottom,
-            _ => return Err(format!("alinhamento desconhecido: {how}")),
+            _ => {
+                return Err(fx(
+                    "godot-document-alinhamento_desconhecido",
+                    &[("how", vx(&how))],
+                ));
+            }
         };
         self.apply_some(
             arrange::align_command(self.model(), names, how),
-            "selecione dois objetos ou mais para alinhar",
+            tx("godot-document-selecione_dois_objetos_ou_mais"),
         )
     }
 
@@ -706,11 +734,16 @@ impl Editor {
         let axis = match axis {
             "x" => Axis::X,
             "y" => Axis::Y,
-            _ => return Err(format!("eixo desconhecido: {axis}")),
+            _ => {
+                return Err(fx(
+                    "godot-document-eixo_desconhecido",
+                    &[("axis", vx(&axis))],
+                ));
+            }
         };
         self.apply_some(
             arrange::distribute_command(self.model(), names, axis),
-            "selecione três objetos ou mais para distribuir",
+            tx("godot-document-selecione_tres_objetos_ou_mais"),
         )
     }
 
@@ -728,8 +761,12 @@ impl Editor {
         // Editing (or switching off) a field fed by real data takes it back to a plain
         // distribution first, in the same undo step.
         if let Some(field) = self.data_field_of(object, path) {
-            let current = utsim_model::dados::get_dist(self.model(), &field)?
-                .ok_or_else(|| format!("'{field}' não tem distribuição"))?;
+            let current = utsim_model::dados::get_dist(self.model(), &field)?.ok_or_else(|| {
+                fx(
+                    "godot-document-nao_tem_distribuicao",
+                    &[("field", vx(&field))],
+                )
+            })?;
             command = Command::Batch(vec![
                 Command::SetFieldSource {
                     field,
@@ -872,7 +909,7 @@ impl Editor {
             return Properties {
                 name: "run".into(),
                 kind: "run",
-                kind_label: "Modelo",
+                kind_label: tx("godot-document-modelo"),
                 fields: schema::run_fields(model),
                 problems: general(&issues),
                 warnings: general(&warnings),
@@ -961,43 +998,61 @@ fn ron_of<T: serde::Serialize>(v: &T) -> String {
 pub fn model_differences(got: &Model, want: &Model) -> Vec<String> {
     let mut out = Vec::new();
     if got.name != want.name {
-        out.push(format!("nome: {:?} em vez de {:?}", got.name, want.name));
+        out.push(fx(
+            "godot-document-nome_em_vez_de",
+            &[
+                ("name", sx(format!("{:?}", got.name))),
+                ("name2", sx(format!("{:?}", want.name))),
+            ],
+        ));
     }
     if got.description != want.description {
-        out.push(format!(
-            "descrição: {:?} em vez de {:?}",
-            got.description, want.description
+        out.push(fx(
+            "godot-document-descricao_em_vez_de",
+            &[
+                ("description", sx(format!("{:?}", got.description))),
+                ("description2", sx(format!("{:?}", want.description))),
+            ],
         ));
     }
     if got.run != want.run {
-        out.push(format!(
-            "run: {} em vez de {}",
-            ron_of(&got.run),
-            ron_of(&want.run)
+        out.push(fx(
+            "godot-document-run_em_vez_de",
+            &[
+                ("run", vx(&ron_of(&got.run))),
+                ("run2", vx(&ron_of(&want.run))),
+            ],
         ));
     }
     for w in &want.objects {
         match got.objects.iter().find(|g| g.name == w.name) {
-            None => out.push(format!("falta o objeto {}", w.name)),
-            Some(g) if g != w => out.push(format!(
-                "objeto {}: {} em vez de {}",
-                w.name,
-                ron_of(g),
-                ron_of(w)
+            None => out.push(fx(
+                "godot-document-falta_o_objeto",
+                &[("name", vx(&w.name))],
+            )),
+            Some(g) if g != w => out.push(fx(
+                "godot-document-objeto_em_vez_de",
+                &[
+                    ("name", vx(&w.name)),
+                    ("g", vx(&ron_of(g))),
+                    ("w", vx(&ron_of(w))),
+                ],
             )),
             Some(_) => {}
         }
     }
     for g in &got.objects {
         if !want.objects.iter().any(|w| w.name == g.name) {
-            out.push(format!("objeto a mais: {}", g.name));
+            out.push(fx("godot-document-objeto_a_mais", &[("name", vx(&g.name))]));
         }
     }
     if got.connections != want.connections {
-        out.push(format!(
-            "ligações: {} em vez de {}",
-            ron_of(&got.connections),
-            ron_of(&want.connections)
+        out.push(fx(
+            "godot-document-ligacoes_em_vez_de",
+            &[
+                ("connections", vx(&ron_of(&got.connections))),
+                ("connections2", vx(&ron_of(&want.connections))),
+            ],
         ));
     }
     let rest = |m: &Model| {
@@ -1010,7 +1065,7 @@ pub fn model_differences(got: &Model, want: &Model) -> Vec<String> {
         ron_of(&m)
     };
     if rest(got) != rest(want) {
-        out.push("outras partes do modelo (calendários, rede, fluxos, fluidos) diferem".into());
+        out.push(tx("godot-document-outras_partes_do_modelo_calendarios").into());
     }
     out
 }
@@ -1062,94 +1117,114 @@ pub fn palette_model(id: &str) -> Option<Model> {
 
 /// The keyboard and mouse shortcuts of the Godot editor, as the "Atalhos" window shows
 /// them (shortcut, what it does).
-pub const SHORTCUTS: [(&str, &str); 41] = [
-    ("Clique", "seleciona o bloco ou a ligação"),
-    (
-        "Clique de novo no mesmo ponto",
-        "passa para o próximo bloco sobreposto",
-    ),
-    ("Shift + clique", "põe ou tira o bloco da seleção"),
-    (
-        "Shift + arrastar no chão",
-        "seleção por caixa (soma à seleção)",
-    ),
-    ("Arrastar no chão", "seleção por caixa (troca a seleção)"),
-    ("Arrastar um bloco", "move o bloco ou a seleção inteira"),
-    (
-        "Arrastar da porta de saída (verde)",
-        "liga ao bloco (ou à porta de entrada) onde soltar",
-    ),
-    ("Botão direito + arrastar", "gira a vista"),
-    ("Shift + botão direito + arrastar", "desloca a vista"),
-    ("Roda do mouse", "aproxima e afasta"),
-    (
-        "Biblioteca: clique e clique no chão",
-        "coloca um objeto (Shift mantém a ferramenta)",
-    ),
-    (
-        "Biblioteca: arrastar até o chão",
-        "coloca um objeto onde soltar",
-    ),
-    ("Setas", "move a seleção um passo da grade"),
-    ("R", "girar 90° (anti-horário visto de cima)"),
-    ("Shift + R", "girar −90° (horário)"),
-    ("Ctrl + R / Ctrl + Shift + R", "girar 15° / −15°"),
-    (
-        "Arrastar a alça de giro (roxa)",
-        "gira o objeto selecionado em passos de 15° (com Shift, 90°)",
-    ),
-    ("Del", "exclui a seleção (ou a ligação selecionada)"),
-    (
-        "L",
-        "ferramenta Ligar: arraste da origem ao destino, ou clique e clique",
-    ),
-    (
-        "C",
-        "ferramenta Corredor: clique pontos no chão, Enter ou duplo clique termina",
-    ),
-    (
-        "Z",
-        "ferramenta Zona: zonas de risco no piso; clique os cantos, Enter ou o primeiro ponto fecha",
-    ),
-    (
-        "E (ou Alt com Ligar)",
-        "ferramenta Equipe: arraste do despachante ao transportador, ou do objeto a quem leva os itens (Shift: operadores do processo)",
-    ),
-    (
-        "Esc",
-        "cancela a ferramenta, a ligação ou o corredor começado, ou a seleção",
-    ),
-    (
-        "Simular: clique num objeto",
-        "abre o painel de resultados ao vivo do objeto no canto da vista",
-    ),
-    (
-        "Simular: Esc",
-        "fecha o painel ao vivo mais recente (o não fixado primeiro)",
-    ),
-    ("F (Editar) ou Home", "enquadra o modelo"),
-    (
-        "Simular: F",
-        "anda pela fábrica em primeira pessoa: WASD anda, o mouse olha, Shift corre, E/Q sobe e desce, V voa, a roda muda a velocidade, o clique na mira abre o painel, Esc sai",
-    ),
-    ("G", "liga ou desliga o encaixe na grade"),
-    ("Tab", "alterna entre Editar e Simular"),
-    ("F1", "mostra ou esconde esta janela"),
-    ("Ctrl + A", "seleciona todos os objetos"),
-    ("Ctrl + C", "copia a seleção"),
-    ("Ctrl + X", "recorta a seleção"),
-    (
-        "Ctrl + V",
-        "cola (nomes únicos, ligações internas preservadas)",
-    ),
-    ("Ctrl + D", "duplica a seleção"),
-    ("Ctrl + Z", "desfaz"),
-    ("Ctrl + Y ou Ctrl + Shift + Z", "refaz"),
-    ("Ctrl + S", "salva"),
-    ("Ctrl + Shift + S", "salva como"),
-    ("Ctrl + O", "abre um modelo"),
-    ("Ctrl + N", "novo modelo"),
-];
+pub fn shortcuts() -> [(&'static str, &'static str); 41] {
+    [
+        (
+            tx("godot-document-clique"),
+            tx("godot-document-seleciona_o_bloco_ou_a"),
+        ),
+        (
+            tx("godot-document-clique_de_novo_no_mesmo"),
+            tx("godot-document-passa_para_o_proximo_bloco"),
+        ),
+        ("Shift + clique", tx("godot-document-poe_ou_tira_o_bloco")),
+        (
+            tx("godot-document-shift_arrastar_no_chao"),
+            tx("godot-document-selecao_por_caixa_soma_a"),
+        ),
+        (
+            tx("godot-document-arrastar_no_chao"),
+            tx("godot-document-selecao_por_caixa_troca_a"),
+        ),
+        (
+            tx("godot-document-arrastar_um_bloco"),
+            tx("godot-document-move_o_bloco_ou_a"),
+        ),
+        (
+            tx("godot-document-arrastar_da_porta_de_saida"),
+            tx("godot-document-liga_ao_bloco_ou_a"),
+        ),
+        (
+            tx("godot-document-botao_direito_arrastar"),
+            tx("godot-document-gira_a_vista"),
+        ),
+        (
+            tx("godot-document-shift_botao_direito_arrastar"),
+            tx("godot-document-desloca_a_vista"),
+        ),
+        (
+            tx("godot-document-roda_do_mouse"),
+            tx("godot-document-aproxima_e_afasta"),
+        ),
+        (
+            tx("godot-document-biblioteca_clique_e_clique_no"),
+            tx("godot-document-coloca_um_objeto_shift_mantem"),
+        ),
+        (
+            tx("godot-document-biblioteca_arrastar_ate_o_chao"),
+            tx("godot-document-coloca_um_objeto_onde_soltar"),
+        ),
+        (
+            tx("godot-document-setas"),
+            tx("godot-document-move_a_selecao_um_passo"),
+        ),
+        ("R", tx("godot-document-girar_90_anti_horario_visto")),
+        ("Shift + R", tx("godot-document-girar_90_horario")),
+        (
+            "Ctrl + R / Ctrl + Shift + R",
+            tx("godot-document-girar_15_15"),
+        ),
+        (
+            tx("godot-document-arrastar_a_alca_de_giro"),
+            tx("godot-document-gira_o_objeto_selecionado_em"),
+        ),
+        ("Del", tx("godot-document-exclui_a_selecao_ou_a")),
+        ("L", tx("godot-document-ferramenta_ligar_arraste_da_origem")),
+        (
+            "C",
+            tx("godot-document-ferramenta_corredor_clique_pontos_no"),
+        ),
+        ("Z", tx("godot-document-ferramenta_zona_zonas_de_risco")),
+        (
+            tx("godot-document-e_ou_alt_com_ligar"),
+            tx("godot-document-ferramenta_equipe_arraste_do_despachante"),
+        ),
+        ("Esc", tx("godot-document-cancela_a_ferramenta_a_ligacao")),
+        (
+            tx("godot-document-simular_clique_num_objeto"),
+            tx("godot-document-abre_o_painel_de_resultados"),
+        ),
+        (
+            tx("godot-document-simular_esc"),
+            tx("godot-document-fecha_o_painel_ao_vivo"),
+        ),
+        (
+            tx("godot-document-f_editar_ou_home"),
+            tx("godot-document-enquadra_o_modelo"),
+        ),
+        (
+            tx("godot-document-simular_f"),
+            tx("godot-document-anda_pela_fabrica_em_primeira"),
+        ),
+        ("G", tx("godot-document-liga_ou_desliga_o_encaixe")),
+        ("Tab", tx("godot-document-alterna_entre_editar_e_simular")),
+        ("F1", tx("godot-document-mostra_ou_esconde_esta_janela")),
+        ("Ctrl + A", tx("godot-document-seleciona_todos_os_objetos")),
+        ("Ctrl + C", tx("godot-document-copia_a_selecao")),
+        ("Ctrl + X", tx("godot-document-recorta_a_selecao")),
+        (
+            "Ctrl + V",
+            tx("godot-document-cola_nomes_unicos_ligacoes_internas"),
+        ),
+        ("Ctrl + D", tx("godot-document-duplica_a_selecao")),
+        ("Ctrl + Z", "desfaz"),
+        ("Ctrl + Y ou Ctrl + Shift + Z", "refaz"),
+        ("Ctrl + S", "salva"),
+        ("Ctrl + Shift + S", tx("godot-document-salva_como")),
+        ("Ctrl + O", tx("godot-document-abre_um_modelo")),
+        ("Ctrl + N", tx("godot-document-novo_modelo")),
+    ]
+}
 
 #[cfg(test)]
 mod tests {

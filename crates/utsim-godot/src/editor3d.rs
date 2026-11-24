@@ -6,6 +6,7 @@
 //!
 //! Coordinates are Godot's world (metres, `y` up) and the viewport's pixels.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::HashMap;
 
 pub type V2 = [f64; 2];
@@ -443,10 +444,26 @@ impl TeamLine {
     /// What it means, in words ("operador opera processo").
     pub fn said(&self) -> String {
         match self.kind.as_str() {
-            "operadores" => format!("{} opera {}", self.to, self.from),
-            "transporte" => format!("{} leva os itens de {}", self.to, self.from),
-            "equipe" => format!("{} está na equipe de {}", self.to, self.from),
-            k => format!("Ligação de {}: {} → {}", team_name(k), self.from, self.to),
+            "operadores" => fx(
+                "godot-editor3d-opera",
+                &[("to", vx(&self.to)), ("from", vx(&self.from))],
+            ),
+            "transporte" => fx(
+                "godot-editor3d-leva_os_itens_de",
+                &[("to", vx(&self.to)), ("from", vx(&self.from))],
+            ),
+            "equipe" => fx(
+                "godot-editor3d-esta_na_equipe_de",
+                &[("to", vx(&self.to)), ("from", vx(&self.from))],
+            ),
+            k => fx(
+                "godot-editor3d-ligacao_de",
+                &[
+                    ("k", vx(&team_name(k))),
+                    ("from", vx(&self.from)),
+                    ("to", vx(&self.to)),
+                ],
+            ),
         }
     }
 }
@@ -1020,8 +1037,9 @@ impl Editor3d {
 
     fn hint(&self, name: &str, out: &mut Vec<Effect>) {
         if SERVICE.contains(&self.kind_of(name)) {
-            out.push(Effect::Status(format!(
-                "{name}: arraste do nó laranja dele até uma máquina para que ele a opere (ou até um objeto, para levar os itens dele)."
+            out.push(Effect::Status(fx(
+                "godot-editor3d-arraste_do_no_laranja_dele",
+                &[("name", vx(&name))],
             )));
         }
     }
@@ -1078,16 +1096,16 @@ impl Editor3d {
         self.selected_link = Some((a.clone(), b.clone()));
         out.push(Effect::Selection);
         let extra = if links.len() > 1 {
-            format!(
-                " ({} de {}: clique no nó de novo para a próxima)",
-                next + 1,
-                links.len()
+            fx(
+                "godot-editor3d-de_clique_no_no_de",
+                &[("next", vx(&(next + 1))), ("links", vx(&links.len()))],
             )
         } else {
             String::new()
         };
-        out.push(Effect::Status(format!(
-            "Ligação {a} → {b} selecionada{extra}. Clique no × ou Del remove."
+        out.push(Effect::Status(fx(
+            "godot-editor3d-ligacao_selecionada_clique_no_ou",
+            &[("a", vx(&a)), ("b", vx(&b)), ("extra", vx(&extra))],
         )));
         true
     }
@@ -1096,10 +1114,9 @@ impl Editor3d {
     fn remove_selected(&mut self, out: &mut Vec<Effect>) {
         if let Some(t) = self.selected_team.clone() {
             if !["equipe", "transporte", "operadores"].contains(&t.kind.as_str()) {
-                out.push(Effect::Status(format!(
-                    "Esta ligação ({}) se muda no painel de propriedades de {}.",
-                    team_name(&t.kind),
-                    t.from
+                out.push(Effect::Status(fx(
+                    "godot-editor3d-esta_ligacao_se_muda_no",
+                    &[("kind", vx(&team_name(&t.kind))), ("from", vx(&t.from))],
                 )));
                 return;
             }
@@ -1115,7 +1132,10 @@ impl Editor3d {
         }
         if let Some((a, b)) = self.selected_link.take() {
             out.push(Effect::Disconnect {
-                ok: format!("Ligação {a} → {b} removida (Ctrl+Z desfaz)."),
+                ok: fx(
+                    "godot-editor3d-ligacao_removida_ctrl_z_desfaz",
+                    &[("a", vx(&a)), ("b", vx(&b))],
+                ),
                 from: a,
                 to: b,
             });
@@ -1128,7 +1148,7 @@ impl Editor3d {
         if self.tool == "zona" {
             if self.selected_zone.is_empty() {
                 out.push(Effect::Status(
-                    "Nenhuma zona selecionada para excluir.".into(),
+                    tx("godot-editor3d-nenhuma_zona_selecionada_para_excluir").into(),
                 ));
             } else {
                 out.push(Effect::ZoneRemove(std::mem::take(&mut self.selected_zone)));
@@ -1139,7 +1159,9 @@ impl Editor3d {
         if self.selected_link.is_some() || self.selected_team.is_some() {
             self.remove_selected(&mut out);
         } else if self.selected.is_empty() {
-            out.push(Effect::Status("Nada selecionado para excluir.".into()));
+            out.push(Effect::Status(
+                tx("godot-editor3d-nada_selecionado_para_excluir").into(),
+            ));
         } else {
             out.push(Effect::Remove(std::mem::take(&mut self.selected)));
         }
@@ -1153,7 +1175,7 @@ impl Editor3d {
         if self.tool == "zona" {
             if !self.zone_points.is_empty() {
                 self.zone_points.clear();
-                out.push(Effect::Status("Zona cancelada.".into()));
+                out.push(Effect::Status(tx("godot-editor3d-zona_cancelada").into()));
                 return (false, out);
             }
             if !self.selected_zone.is_empty() {
@@ -1171,7 +1193,9 @@ impl Editor3d {
             self.connect_to.clear();
             self.serve_from.clear();
             self.press = None;
-            out.push(Effect::Status("Ligação cancelada.".into()));
+            out.push(Effect::Status(
+                tx("godot-editor3d-ligacao_cancelada").into(),
+            ));
             return (false, out);
         }
         if self.tool == "ligar" {
@@ -1265,14 +1289,15 @@ impl Editor3d {
             self.press = Some(begin(PressKind::Rotate(name.clone())));
             out.push(Effect::RotateBegin(name));
             out.push(Effect::Status(
-                "Girar: arraste em volta do objeto (passos de 15°; com Shift, 90°).".into(),
+                tx("godot-editor3d-girar_arraste_em_volta_do").into(),
             ));
             return out;
         }
         if self.connect_from.is_empty() {
             if let Some(res) = self.node_of(p, Side::Service, "") {
-                out.push(Effect::Status(format!(
-                    "Solte sobre a máquina que {res} vai operar (ou sobre um objeto, para levar os itens dele). Esc cancela."
+                out.push(Effect::Status(fx(
+                    "godot-editor3d-solte_sobre_a_maquina_que",
+                    &[("res", vx(&res))],
                 )));
                 self.serve_from = res.clone();
                 self.press = Some(begin(PressKind::Serve(res)));
@@ -1282,7 +1307,7 @@ impl Editor3d {
                 self.connect_from = from.clone();
                 self.press = Some(begin(PressKind::Link { from, tool: false }));
                 out.push(Effect::Status(
-                    "Ligar: solte sobre o destino (ou clique nele). Esc cancela.".into(),
+                    tx("godot-editor3d-ligar_solte_sobre_o_destino").into(),
                 ));
                 return out;
             }
@@ -1290,7 +1315,7 @@ impl Editor3d {
                 self.connect_to = to.clone();
                 self.press = Some(begin(PressKind::LinkIn(to)));
                 out.push(Effect::Status(
-                    "Ligar: solte sobre a origem (ou o nó de saída dela). Esc cancela.".into(),
+                    tx("godot-editor3d-ligar_solte_sobre_a_origem").into(),
                 ));
                 return out;
             }
@@ -1301,20 +1326,27 @@ impl Editor3d {
                     self.connect_from = from.clone();
                     self.press = Some(begin(PressKind::Link { from, tool: true }));
                     out.push(Effect::Status(
-                        "Ligar: solte sobre o destino (ou clique nele). Esc cancela.".into(),
+                        tx("godot-editor3d-ligar_solte_sobre_o_destino").into(),
                     ));
                 } else {
-                    out.push(Effect::Status("Ligar: clique em um bloco.".into()));
+                    out.push(Effect::Status(
+                        tx("godot-editor3d-ligar_clique_em_um_bloco").into(),
+                    ));
                 }
             } else if let Some(to) = hits.first().cloned() {
                 let from = std::mem::take(&mut self.connect_from);
                 out.push(Effect::Connect {
-                    ok: format!("Ligado: {from} → {to}. Clique em outra origem ou Esc."),
+                    ok: fx(
+                        "godot-editor3d-ligado_clique_em_outra_origem",
+                        &[("from", vx(&from)), ("to", vx(&to))],
+                    ),
                     from,
                     to,
                 });
             } else {
-                out.push(Effect::Status("Ligar: clique em um bloco.".into()));
+                out.push(Effect::Status(
+                    tx("godot-editor3d-ligar_clique_em_um_bloco").into(),
+                ));
             }
             return out;
         }
@@ -1324,8 +1356,9 @@ impl Editor3d {
                 self.press = Some(begin(PressKind::Pick));
                 self.selected.clear();
                 self.selected_team = None;
-                out.push(Effect::Status(format!(
-                    "Ligação {a} → {b} selecionada. Clique no × ou Del remove."
+                out.push(Effect::Status(fx(
+                    "godot-editor3d-ligacao_selecionada_clique_no_ou-2",
+                    &[("a", vx(&a)), ("b", vx(&b))],
                 )));
                 self.selected_link = Some((a, b));
                 out.push(Effect::Selection);
@@ -1333,9 +1366,9 @@ impl Editor3d {
                 self.press = Some(begin(PressKind::Pick));
                 self.selected.clear();
                 self.selected_link = None;
-                out.push(Effect::Status(format!(
-                    "{}. Clique no × ou Del remove.",
-                    t.said()
+                out.push(Effect::Status(fx(
+                    "godot-editor3d-clique_no_ou_del_remove",
+                    &[("said", vx(&t.said()))],
                 )));
                 self.selected_team = Some(t);
                 out.push(Effect::Selection);
@@ -1354,10 +1387,13 @@ impl Editor3d {
         let name = hits[index].clone();
         self.press = Some(begin(PressKind::Block(name.clone())));
         if hits.len() > 1 {
-            out.push(Effect::Status(format!(
-                "{name} ({} de {} blocos neste ponto: clique de novo para o próximo).",
-                index + 1,
-                hits.len()
+            out.push(Effect::Status(fx(
+                "godot-editor3d-de_blocos_neste_ponto_clique",
+                &[
+                    ("name", vx(&name)),
+                    ("index", vx(&(index + 1))),
+                    ("hits", vx(&hits.len())),
+                ],
             )));
         }
         if !shift && (!self.selected.contains(&name) || index > 0) {
@@ -1465,13 +1501,15 @@ impl Editor3d {
                 if !press.moved {
                     if !tool {
                         self.connect_from.clear();
-                        out.push(Effect::Status(format!(
-                            "{from}: arraste deste nó verde até o destino para ligar."
+                        out.push(Effect::Status(fx(
+                            "godot-editor3d-arraste_deste_no_verde_ate",
+                            &[("from", vx(&from))],
                         )));
                     } else {
                         self.connect_from = from.clone();
-                        out.push(Effect::Status(format!(
-                            "Ligar: {from} → clique no destino (Esc cancela)."
+                        out.push(Effect::Status(fx(
+                            "godot-editor3d-ligar_clique_no_destino_esc",
+                            &[("from", vx(&from))],
                         )));
                     }
                     return out;
@@ -1482,12 +1520,15 @@ impl Editor3d {
                     .or_else(|| self.hits_at(p).into_iter().find(|n| *n != from));
                 match to {
                     Some(to) => out.push(Effect::Connect {
-                        ok: format!("Ligado: {from} → {to}."),
+                        ok: fx(
+                            "godot-editor3d-ligado",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        ),
                         from,
                         to,
                     }),
                     None => out.push(Effect::Status(
-                        "Ligação cancelada: solte sobre o bloco de destino.".into(),
+                        tx("godot-editor3d-ligacao_cancelada_solte_sobre_o").into(),
                     )),
                 }
             }
@@ -1495,8 +1536,9 @@ impl Editor3d {
                 self.connect_to.clear();
                 if !press.moved {
                     if !self.select_node_links(&to, Side::In, &mut out) {
-                        out.push(Effect::Status(format!(
-                            "{to} não recebe de ninguém: arraste do nó de saída da origem até aqui."
+                        out.push(Effect::Status(fx(
+                            "godot-editor3d-nao_recebe_de_ninguem_arraste",
+                            &[("to", vx(&to))],
                         )));
                     }
                     return out;
@@ -1506,12 +1548,15 @@ impl Editor3d {
                     .or_else(|| self.hits_at(p).into_iter().find(|n| *n != to));
                 match from {
                     Some(from) => out.push(Effect::Connect {
-                        ok: format!("Ligado: {from} → {to}."),
+                        ok: fx(
+                            "godot-editor3d-ligado",
+                            &[("from", vx(&from)), ("to", vx(&to))],
+                        ),
                         from,
                         to,
                     }),
                     None => out.push(Effect::Status(
-                        "Ligação cancelada: solte sobre o bloco de origem.".into(),
+                        tx("godot-editor3d-ligacao_cancelada_solte_sobre_o-2").into(),
                     )),
                 }
             }
@@ -1529,10 +1574,17 @@ impl Editor3d {
                 };
                 out.push(Effect::RotateEnd);
                 out.push(Effect::Status(if press.moved {
-                    format!("{name} girado para {}°.", show_degrees(t.degrees))
+                    fx(
+                        "godot-editor3d-girado_para",
+                        &[
+                            ("name", vx(&name)),
+                            ("degrees", vx(&show_degrees(t.degrees))),
+                        ],
+                    )
                 } else {
-                    format!(
-                        "{name}: arraste a alça em volta do objeto para girá-lo (R gira 90°, Ctrl+R 15°)."
+                    fx(
+                        "godot-editor3d-arraste_a_alca_em_volta",
+                        &[("name", vx(&name))],
                     )
                 }));
             }
@@ -1541,9 +1593,9 @@ impl Editor3d {
                 if self.dragging {
                     self.dragging = false;
                     out.push(Effect::MoveEnd);
-                    out.push(Effect::Status(format!(
-                        "{} objeto(s) movidos.",
-                        self.selected.len()
+                    out.push(Effect::Status(fx(
+                        "godot-editor3d-objeto_s_movidos",
+                        &[("selected", vx(&self.selected.len()))],
                     )));
                 } else if press.shift {
                     self.toggle(&name);
@@ -1568,9 +1620,9 @@ impl Editor3d {
                         .collect();
                     self.select_names(&inside, press.shift);
                     out.push(Effect::Selection);
-                    out.push(Effect::Status(format!(
-                        "{} objeto(s) na caixa.",
-                        inside.len()
+                    out.push(Effect::Status(fx(
+                        "godot-editor3d-objeto_s_na_caixa",
+                        &[("inside", vx(&inside.len()))],
                     )));
                 } else if !press.shift {
                     self.clear_selection();
@@ -1584,8 +1636,9 @@ impl Editor3d {
     /// The end of a drag from a service node: who the resource serves.
     fn finish_serve(&mut self, p: V2, res: &str, shift: bool, out: &mut Vec<Effect>) {
         let Some(to) = self.hits_at(p).into_iter().find(|n| n != res) else {
-            out.push(Effect::Status(format!(
-                "Nada mudou: solte sobre a máquina (ou o objeto) que {res} vai atender."
+            out.push(Effect::Status(fx(
+                "godot-editor3d-nada_mudou_solte_sobre_a",
+                &[("res", vx(&res))],
             )));
             return;
         };
@@ -1597,15 +1650,16 @@ impl Editor3d {
             ("equipe", false)
         } else if SERVICE.contains(&kind.as_str()) {
             out.push(Effect::Status(
-                "Solte sobre uma máquina ou um objeto (um transportador só entra na equipe de um despachante).".into(),
+                tx("godot-editor3d-solte_sobre_uma_maquina_ou").into(),
             ));
             return;
         } else {
             ("transporte", false)
         };
         if self.has_team_line(line, &to, res) {
-            out.push(Effect::Status(format!(
-                "Já está ligado: {to} → {res}. Para desfazer, clique na linha e no ×."
+            out.push(Effect::Status(fx(
+                "godot-editor3d-ja_esta_ligado_para_desfazer",
+                &[("to", vx(&to)), ("res", vx(&res))],
             )));
             return;
         }
@@ -1619,7 +1673,10 @@ impl Editor3d {
             from: to,
             to: res.to_owned(),
             operators,
-            ok: format!("Ligado: {said}. Ctrl+Z desfaz."),
+            ok: fx(
+                "godot-editor3d-ligado_ctrl_z_desfaz",
+                &[("said", vx(&said))],
+            ),
             removed: false,
         });
     }
@@ -1737,7 +1794,7 @@ impl Editor3d {
             }],
             Some(_) => Vec::new(),
             None => vec![Effect::Status(
-                "Aponte para o chão para colocar o objeto.".into(),
+                tx("godot-editor3d-aponte_para_o_chao_para").into(),
             )],
         }
     }
@@ -1750,13 +1807,13 @@ impl Editor3d {
             return match hits.first() {
                 Some(to) => self.team_effect(&from, to, shift),
                 None => vec![Effect::Status(
-                    "Equipe: clique no transportador ou despachante de destino.".into(),
+                    tx("godot-editor3d-equipe_clique_no_transportador_ou").into(),
                 )],
             };
         }
         let Some(from) = hits.first().cloned() else {
             return vec![Effect::Status(
-                "Equipe: comece num despachante ou num objeto.".into(),
+                tx("godot-editor3d-equipe_comece_num_despachante_ou").into(),
             )];
         };
         self.team_from = from.clone();
@@ -1775,16 +1832,16 @@ impl Editor3d {
         };
         if !t.moved {
             // A click: the next click is the destination.
-            return vec![Effect::Status(format!(
-                "Equipe: {} → clique no destino (Esc cancela).",
-                t.from
+            return vec![Effect::Status(fx(
+                "godot-editor3d-equipe_clique_no_destino_esc",
+                &[("from", vx(&t.from))],
             ))];
         }
         self.team_from.clear();
         match self.hits_at(p).first() {
             Some(to) => self.team_effect(&t.from, to, t.shift),
             None => vec![Effect::Status(
-                "Equipe: solte sobre o transportador ou despachante.".into(),
+                tx("godot-editor3d-equipe_solte_sobre_o_transportador").into(),
             )],
         }
     }
@@ -1792,7 +1849,9 @@ impl Editor3d {
     /// The `team_link` of the Equipe tool (the document says what changed).
     fn team_effect(&self, from: &str, to: &str, operators: bool) -> Vec<Effect> {
         if from == to {
-            return vec![Effect::Status("Equipe: solte sobre outro objeto.".into())];
+            return vec![Effect::Status(
+                tx("godot-editor3d-equipe_solte_sobre_outro_objeto").into(),
+            )];
         }
         vec![Effect::Team {
             from: from.to_owned(),
@@ -1926,7 +1985,7 @@ impl Editor3d {
             (_, _, Some(f)) => self.aisle_press = Some(AislePress::Floor(f)),
             (_, _, None) => {
                 return vec![Effect::Status(
-                    "Aponte para o chão para pôr um ponto do corredor.".into(),
+                    tx("godot-editor3d-aponte_para_o_chao_para-2").into(),
                 )];
             }
         }
@@ -1975,11 +2034,11 @@ impl Editor3d {
                 self.aisle_vertex = None;
                 self.aisle_points.push(at);
                 let msg = if self.aisle_points.len() == 1 {
-                    "Corredor: clique os próximos pontos; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela.".to_owned()
+                    tx("godot-editor3d-corredor_clique_os_proximos_pontos").to_owned()
                 } else {
-                    format!(
-                        "{} ponto(s). Enter ou duplo clique termina.",
-                        self.aisle_points.len()
+                    fx(
+                        "godot-editor3d-ponto_s_enter_ou_duplo",
+                        &[("aisle_points", vx(&self.aisle_points.len()))],
                     )
                 };
                 vec![Effect::Selection, Effect::Status(msg)]
@@ -1991,12 +2050,13 @@ impl Editor3d {
         self.aisle = name.to_owned();
         self.aisle_vertex = vertex;
         let msg = match vertex {
-            Some(k) => format!(
-                "Vértice {} de {name} selecionado (arraste para mover).",
-                k + 1
+            Some(k) => fx(
+                "godot-editor3d-vertice_de_selecionado_arraste_para",
+                &[("k", vx(&(k + 1))), ("name", vx(&name))],
             ),
-            None => format!(
-                "Corredor {name} selecionado (Del exclui; Shift + clique na linha acrescenta um vértice)."
+            None => fx(
+                "godot-editor3d-corredor_selecionado_del_exclui_shift",
+                &[("name", vx(&name))],
             ),
         };
         vec![Effect::Selection, Effect::Status(msg)]
@@ -2010,7 +2070,7 @@ impl Editor3d {
         let line = std::mem::take(&mut self.aisle_points);
         if line.len() < 2 {
             return vec![Effect::Status(
-                "Um corredor precisa de ao menos 2 pontos.".into(),
+                tx("godot-editor3d-um_corredor_precisa_de_ao").into(),
             )];
         }
         vec![Effect::AisleAdd(line)]
@@ -2036,7 +2096,10 @@ impl Editor3d {
         if self.aisle_points.pop().is_some() {
             return vec![
                 Effect::Selection,
-                Effect::Status(format!("Ponto removido ({}).", self.aisle_points.len())),
+                Effect::Status(fx(
+                    "godot-editor3d-ponto_removido",
+                    &[("aisle_points", vx(&self.aisle_points.len()))],
+                )),
             ];
         }
         if !self.aisle.is_empty() {
@@ -2126,8 +2189,9 @@ impl Editor3d {
         }
         if let Some((a, b)) = self.net_edge_at(p) {
             self.net_node.clear();
-            out.push(Effect::Status(format!(
-                "Trecho {a} → {b} selecionado (Del remove)."
+            out.push(Effect::Status(fx(
+                "godot-editor3d-trecho_selecionado_del_remove",
+                &[("a", vx(&a)), ("b", vx(&b))],
             )));
             self.net_edge = Some((a, b));
             out.push(Effect::Selection);
@@ -2145,7 +2209,7 @@ impl Editor3d {
             None => {
                 self.net_press = None;
                 out.push(Effect::Status(
-                    "Aponte para o chão para colocar um nó.".into(),
+                    tx("godot-editor3d-aponte_para_o_chao_para-3").into(),
                 ));
             }
         }
@@ -2292,9 +2356,9 @@ impl Editor3d {
             {
                 self.zone_points.push(f);
             }
-            out.push(Effect::Status(format!(
-                "Zona: {} ponto(s). Clique no primeiro ponto, Enter ou duplo clique fecha; Backspace volta; Esc cancela.",
-                self.zone_points.len()
+            out.push(Effect::Status(fx(
+                "godot-editor3d-zona_ponto_s_clique_no",
+                &[("zone_points", vx(&self.zone_points.len()))],
             )));
             return out;
         }
@@ -2306,8 +2370,9 @@ impl Editor3d {
             if name != self.selected_zone {
                 self.selected_zone = name.clone();
                 out.push(Effect::Selection);
-                out.push(Effect::Status(format!(
-                    "Zona {name}: arraste para mover, arraste um vértice para mudar a forma; Del exclui."
+                out.push(Effect::Status(fx(
+                    "godot-editor3d-zona_arraste_para_mover_arraste",
+                    &[("name", vx(&name))],
                 )));
             }
             self.begin_zone_drag(None, p, floor);
@@ -2320,7 +2385,7 @@ impl Editor3d {
         if let Some(f) = floor {
             self.zone_points.push(f);
             out.push(Effect::Status(
-                "Zona: clique para pôr os outros pontos; Enter, duplo clique ou o primeiro ponto fecha.".into(),
+                tx("godot-editor3d-zona_clique_para_por_os").into(),
             ));
         }
         out
@@ -2400,7 +2465,7 @@ impl Editor3d {
                 name: d.name,
                 points,
             },
-            Effect::Status("Zona alterada (Ctrl+Z desfaz).".into()),
+            Effect::Status(tx("godot-editor3d-zona_alterada_ctrl_z_desfaz").into()),
         ]
     }
 
@@ -2408,7 +2473,7 @@ impl Editor3d {
     pub fn zone_finish(&mut self) -> Vec<Effect> {
         if self.zone_points.len() < 3 {
             return vec![Effect::Status(
-                "Uma zona precisa de pelo menos 3 pontos.".into(),
+                tx("godot-editor3d-uma_zona_precisa_de_pelo").into(),
             )];
         }
         vec![Effect::ZoneAdd(std::mem::take(&mut self.zone_points))]
@@ -2612,7 +2677,7 @@ mod tests {
             [b[0] + 40.0, b[1] + 60.0],
         );
         assert_eq!(e.selected, vec!["espera".to_owned(), "processo".to_owned()]);
-        assert!(out.contains(&Effect::Status("2 objeto(s) na caixa.".into())));
+        assert!(out.contains(&Effect::Status("2 objetos na caixa.".into())));
         assert!(e.boxing.is_none());
     }
 

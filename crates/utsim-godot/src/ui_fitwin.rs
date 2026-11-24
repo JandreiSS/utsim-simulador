@@ -10,6 +10,7 @@
 //! Actions go to the bridge as text: `valores:usar\t<família>`, `valores:empirica`,
 //! `valores:csv`, `valores:relatorio`, `valores:fechar`.
 
+use crate::texto::{fx, tx, vx};
 use std::sync::{Arc, Mutex};
 
 use egui::{
@@ -88,7 +89,12 @@ impl FitWin {
             }
             match parse_number(t) {
                 Some(x) => out.push(x),
-                None => return Err(format!("linha {}: \"{t}\" não é um número", k + 1)),
+                None => {
+                    return Err(fx(
+                        "godot-ui-fitwin-linha_nao_e_um_numero",
+                        &[("k", vx(&(k + 1))), ("t", vx(&t))],
+                    ));
+                }
             }
         }
         Ok(out)
@@ -101,7 +107,7 @@ impl FitWin {
             return Ok(v);
         }
         if v.windows(2).any(|w| w[1] < w[0]) {
-            return Err("os instantes precisam ser crescentes".into());
+            return Err(tx("godot-ui-fitwin-os_instantes_precisam_ser_crescentes").into());
         }
         Ok(v.windows(2).map(|w| w[1] - w[0]).collect())
     }
@@ -124,7 +130,7 @@ impl FitWin {
         let data = match self.sample() {
             Ok(d) if d.len() >= 2 => d,
             Ok(_) => {
-                self.error = "digite ou cole pelo menos dois valores".into();
+                self.error = tx("godot-ui-fitwin-digite_ou_cole_pelo_menos").into();
                 return;
             }
             Err(e) => {
@@ -211,7 +217,10 @@ impl FitWin {
     /// Writes the HTML report of the comparison, with the chosen distribution, into `dir`.
     /// Returns the file written.
     pub fn write_report(&self, dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
-        let (data, _) = self.fit.as_ref().ok_or("compare as distribuições antes")?;
+        let (data, _) = self
+            .fit
+            .as_ref()
+            .ok_or(tx("godot-ui-fitwin-compare_as_distribuicoes_antes"))?;
         let choose = match (&self.fit, self.selected) {
             (Some((_, f)), Some(i)) => {
                 utsim_fit::auto::Choice::Family(f.report.ranking.candidates[i].family.clone())
@@ -228,8 +237,11 @@ impl FitWin {
             "ajuste_{}.html",
             self.field().replace(['.', '/', '\\'], "_")
         ));
-        std::fs::write(&file, fit.to_html("UTSim 3D, Valores reais"))
-            .map_err(|e| format!("{}: {e}", file.display()))?;
+        std::fs::write(
+            &file,
+            fit.to_html(tx("godot-ui-fitwin-utsim_3d_valores_reais")),
+        )
+        .map_err(|e| format!("{}: {e}", file.display()))?;
         Ok(file)
     }
 }
@@ -268,7 +280,7 @@ pub fn describe(v: &[f64]) -> Vec<(&'static str, String)> {
     vec![
         ("n", format!("{}", v.len())),
         ("média", num(mean)),
-        ("desvio padrão", num(sd)),
+        (tx("godot-ui-fitwin-desvio_padrao"), num(sd)),
         (
             "CV",
             if mean.abs() > 0.0 {
@@ -328,33 +340,36 @@ pub fn show(ctx: &egui::Context, w: &mut FitWin, reg: &mut Registry, out: &mut V
         (screen.height() - 60.0).clamp(420.0, 1000.0),
     );
     let mut open = true;
-    egui::Window::new(format!("Valores reais: {}", w.field()))
-        .id(Id::new("utsim_valores_janela"))
-        .order(Order::Foreground)
-        .collapsible(false)
-        .resizable(true)
-        .default_size(size)
-        .min_size(Vec2::new(600.0, 380.0))
-        .max_size(Vec2::new(screen.width() - 20.0, screen.height() - 20.0))
-        .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
-        .frame(
-            egui::Frame::window(&ctx.global_style())
-                .fill(colors::PANEL)
-                .inner_margin(egui::Margin::same(12)),
-        )
-        .open(&mut open)
-        .show(ctx, |ui| {
-            reg.put_info(
-                "Valores_Janela",
-                WidgetInfo {
-                    rect: ui.max_rect(),
-                    text: w.field(),
-                    enabled: true,
-                    ..Default::default()
-                },
-            );
-            body(ui, w, reg, out);
-        });
+    egui::Window::new(fx(
+        "godot-ui-fitwin-valores_reais",
+        &[("field", vx(&w.field()))],
+    ))
+    .id(Id::new("utsim_valores_janela"))
+    .order(Order::Foreground)
+    .collapsible(false)
+    .resizable(true)
+    .default_size(size)
+    .min_size(Vec2::new(600.0, 380.0))
+    .max_size(Vec2::new(screen.width() - 20.0, screen.height() - 20.0))
+    .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+    .frame(
+        egui::Frame::window(&ctx.global_style())
+            .fill(colors::PANEL)
+            .inner_margin(egui::Margin::same(12)),
+    )
+    .open(&mut open)
+    .show(ctx, |ui| {
+        reg.put_info(
+            "Valores_Janela",
+            WidgetInfo {
+                rect: ui.max_rect(),
+                text: w.field(),
+                enabled: true,
+                ..Default::default()
+            },
+        );
+        body(ui, w, reg, out);
+    });
     if !open {
         out.push("valores:fechar".into());
     }
@@ -422,7 +437,7 @@ fn info_button(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, key: &str) {
         c,
     );
     let title = compare::explain(key).map_or(key, |e| e.title);
-    let r = r.on_hover_text(format!("O que é: {title}"));
+    let r = r.on_hover_text(fx("godot-ui-fitwin-o_que_e", &[("title", vx(&title))]));
     named(
         ui,
         reg,
@@ -443,51 +458,52 @@ pub fn key_name(key: &str) -> String {
 }
 
 fn values_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec<String>) {
-    heading(ui, "Valores observados");
-    ui.label(small(
-        "Digite, cole da planilha (várias linhas, vírgula decimal) ou importe um CSV.",
-    ));
+    heading(ui, tx("godot-ui-fitwin-valores_observados"));
+    ui.label(small(tx("godot-ui-fitwin-digite_cole_da_planilha_varias")));
     let r = ui.add(
         TextEdit::multiline(&mut w.paste)
             .id(Id::new("utsim_valores_colar"))
             .desired_rows(3)
             .desired_width(f32::INFINITY)
-            .hint_text("cole aqui e clique Adicionar"),
+            .hint_text(tx("godot-ui-fitwin-cole_aqui_e_clique_adicionar")),
     );
     named(ui, reg, "Valores_Colar", &r, &w.paste);
     ui.horizontal_wrapped(|ui| {
-        let r = ui.add(widgets::primary("Adicionar"));
+        let r = ui.add(widgets::primary(tx("godot-ui-fitwin-adicionar")));
         named(ui, reg, "Valores_Adicionar", &r, "Adicionar");
         if r.clicked() {
             let text = std::mem::take(&mut w.paste);
             let n = w.add_text(&text);
-            w.note = format!("{n} valor(es) adicionados.");
+            w.note = fx("godot-ui-fitwin-valor_es_adicionados", &[("n", vx(&n))]);
         }
         let r = ui
-            .button("Importar CSV…")
-            .on_hover_text("Lê os valores de um arquivo CSV ou TXT");
+            .button(tx("godot-ui-fitwin-importar_csv"))
+            .on_hover_text(tx("godot-ui-fitwin-le_os_valores_de_um"));
         named(ui, reg, "Valores_Csv", &r, "Importar CSV…");
         if r.clicked() {
             out.push("valores:csv".into());
         }
         let r = ui
-            .button("Limpar")
-            .on_hover_text("Apaga todos os valores da tabela");
+            .button(tx("godot-ui-fitwin-limpar"))
+            .on_hover_text(tx("godot-ui-fitwin-apaga_todos_os_valores_da"));
         named(ui, reg, "Valores_Limpar", &r, "Limpar");
         if r.clicked() {
             w.rows.clear();
         }
     });
     let r = ui
-        .checkbox(&mut w.timestamps, "São instantes crescentes (usar os intervalos)")
-        .on_hover_text("Marque quando os valores são horários de chegada: o ajuste usa as diferenças entre eles.");
+        .checkbox(
+            &mut w.timestamps,
+            tx("godot-ui-fitwin-sao_instantes_crescentes_usar_os"),
+        )
+        .on_hover_text(tx("godot-ui-fitwin-marque_quando_os_valores_sao"));
     named_toggle(ui, reg, "Valores_Instantes", &r, "instantes", w.timestamps);
     if !w.note.is_empty() {
         ui.label(small(&w.note));
     }
     // The table of values: edit in place, × removes the row.
     let n = w.rows.len();
-    let r = ui.label(small(&format!("{n} valor(es)")));
+    let r = ui.label(small(&fx("godot-ui-fitwin-valor_es", &[("n", vx(&n))])));
     named(ui, reg, "Valores_Contagem", &r, &n.to_string());
     let mut remove = None;
     ScrollArea::vertical()
@@ -507,7 +523,9 @@ fn values_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec<
                     }
                     let r = ui.add(edit);
                     named(ui, reg, &format!("Valores_Linha_{k}"), &r, &w.rows[k]);
-                    let r = ui.small_button("×").on_hover_text("Apaga este valor");
+                    let r = ui
+                        .small_button("×")
+                        .on_hover_text(tx("godot-ui-fitwin-apaga_este_valor"));
                     named(ui, reg, &format!("Valores_Remover_{k}"), &r, "×");
                     if r.clicked() {
                         remove = Some(k);
@@ -524,9 +542,9 @@ fn values_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec<
             heading(
                 ui,
                 if w.timestamps {
-                    "Intervalos"
+                    tx("godot-ui-fitwin-intervalos")
                 } else {
-                    "Estatísticas"
+                    tx("godot-ui-fitwin-estatisticas")
                 },
             );
             let d = describe(&s);
@@ -560,25 +578,25 @@ fn values_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec<
 
 fn compare_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec<String>) {
     ui.horizontal(|ui| {
-        heading(ui, "Comparação das distribuições");
+        heading(ui, tx("godot-ui-fitwin-comparacao_das_distribuicoes"));
         let label = if w.fit.is_some() {
-            "Comparar de novo"
+            tx("godot-ui-fitwin-comparar_de_novo")
         } else {
-            "Comparar todas"
+            tx("godot-ui-fitwin-comparar_todas")
         };
         let enabled = !w.running() && !w.rows.is_empty();
         let r = ui
             .add_enabled(enabled, widgets::primary(label))
-            .on_hover_text(
-                "Ajusta todas as distribuições candidatas e calcula todas as medidas de uma vez",
-            );
+            .on_hover_text(tx(
+                "godot-ui-fitwin-ajusta_todas_as_distribuicoes_candidatas",
+            ));
         named(ui, reg, "Valores_Comparar", &r, label);
         if r.clicked() {
             w.start();
         }
         if w.running() {
             ui.spinner();
-            ui.label(small("ajustando todas as candidatas..."));
+            ui.label(small(tx("godot-ui-fitwin-ajustando_todas_as_candidatas")));
         }
     });
     if !w.error.is_empty() {
@@ -589,22 +607,28 @@ fn compare_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec
         explanation_box(ui, w, reg, &key);
     }
     let Some((data, fit)) = w.fit.clone() else {
-        ui.label(small(
-            "Depois de comparar, a tabela mostra todas as medidas de cada distribuição; clique numa linha para ver os gráficos e escolher.",
-        ));
+        ui.label(small(tx("godot-ui-fitwin-depois_de_comparar_a_tabela")));
         return;
     };
     if !w.current() {
-        ui.label(RichText::new("Os valores mudaram: compare de novo.").color(colors::WARNING));
+        ui.label(
+            RichText::new(tx("godot-ui-fitwin-os_valores_mudaram_compare_de"))
+                .color(colors::WARNING),
+        );
     }
     let cands = &fit.report.ranking.candidates;
     let cmp = Comparison::of(cands);
     let suggested = fit.chosen;
     ui.horizontal_wrapped(|ui| {
-        ui.label(small(&format!(
-            "Ordenada por {}. Sugestão inicial (AIC com a regra do UTSim): {}.",
-            w.sort.label(),
-            suggested.map_or(utsim_fit::auto::EMPIRICAL, |i| cands[i].family.as_str())
+        ui.label(small(&fx(
+            "godot-ui-fitwin-ordenada_por_sugestao_inicial_aic",
+            &[
+                ("label", vx(&w.sort.label())),
+                (
+                    "family",
+                    vx(&suggested.map_or(utsim_fit::auto::EMPIRICAL, |i| cands[i].family.as_str())),
+                ),
+            ],
         )));
     });
     let avail_h = finite(ui.available_height(), 600.0);
@@ -627,10 +651,13 @@ fn compare_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec
     });
     ui.horizontal(|ui| {
         let fam = w.selected_family();
-        let label = format!("Usar esta distribuição ({fam})");
-        let r = ui.add(widgets::primary(&label)).on_hover_text(
-            "Passa a usar esta distribuição neste campo, ajustada a estes valores (Ctrl+Z desfaz)",
+        let label = fx(
+            "godot-ui-fitwin-usar_esta_distribuicao",
+            &[("fam", vx(&fam))],
         );
+        let r = ui
+            .add(widgets::primary(&label))
+            .on_hover_text(tx("godot-ui-fitwin-passa_a_usar_esta_distribuicao"));
         named(ui, reg, "Valores_Usar", &r, &label);
         if r.clicked() {
             if w.selected.is_some() {
@@ -640,20 +667,20 @@ fn compare_column(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, out: &mut Vec
             }
         }
         let r = ui
-            .button("Usar a empírica")
-            .on_hover_text("Usa os próprios valores observados, sem família");
+            .button(tx("godot-ui-fitwin-usar_a_empirica"))
+            .on_hover_text(tx("godot-ui-fitwin-usa_os_proprios_valores_observados"));
         named(ui, reg, "Valores_Empirica", &r, "Usar a empírica");
         if r.clicked() {
             out.push("valores:empirica".into());
         }
-        let r = ui.button("Gerar relatório").on_hover_text(
-            "Grava o relatório HTML com os dados, a comparação completa, os gráficos e a escolha",
-        );
+        let r = ui
+            .button(tx("godot-ui-fitwin-gerar_relatorio"))
+            .on_hover_text(tx("godot-ui-fitwin-grava_o_relatorio_html_com"));
         named(ui, reg, "Valores_Relatorio", &r, "Gerar relatório");
         if r.clicked() {
             out.push("valores:relatorio".into());
         }
-        let r = ui.button("Fechar");
+        let r = ui.button(tx("godot-ui-fitwin-fechar"));
         named(ui, reg, "Valores_Fechar", &r, "Fechar");
         if r.clicked() {
             out.push("valores:fechar".into());
@@ -671,16 +698,23 @@ fn explanation_box(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, key: &str) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(e.title).strong().color(colors::ACCENT));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let r = ui.small_button("×").on_hover_text("Fecha a explicação");
+                    let r = ui
+                        .small_button("×")
+                        .on_hover_text(tx("godot-ui-fitwin-fecha_a_explicacao"));
                     named(ui, reg, "Valores_Explicacao_Fechar", &r, "×");
                     if r.clicked() {
                         w.info = None;
                     }
                 });
             });
-            let text = format!(
-                "{}\nComo ler: {}\nQuando usar: {}\nCuidados: {}",
-                e.what, e.read, e.when, e.care
+            let text = fx(
+                "godot-ui-fitwin-como_ler_quando_usar_cuidados",
+                &[
+                    ("what", vx(&e.what)),
+                    ("read", vx(&e.read)),
+                    ("when", vx(&e.when)),
+                    ("care", vx(&e.care)),
+                ],
             );
             for (k, line) in text.lines().enumerate() {
                 let rt = if k == 0 {
@@ -755,11 +789,11 @@ fn comparison_table(
                                         egui::Button::new(fam).frame(false),
                                     )
                                     .on_hover_text(if c.accepted() {
-                                        "Aceita pelos testes. Clique para ver os gráficos e escolher."
+                                        tx("godot-ui-fitwin-aceita_pelos_testes_clique_para")
                                     } else if c.fit_error.is_some() {
-                                        "Não se aplica a estes dados."
+                                        tx("godot-ui-fitwin-nao_se_aplica_a_estes")
                                     } else {
-                                        "Rejeitada por algum teste (valor-p abaixo de 0,05). Ainda pode ser escolhida."
+                                        tx("godot-ui-fitwin-rejeitada_por_algum_teste_valor")
                                     });
                                 named(ui, reg, &format!("Valores_Cand_{pos}"), &r, &c.family);
                                 if r.clicked() {
@@ -797,14 +831,19 @@ fn comparison_table(
                                         };
                                         let r = ui
                                             .add(egui::Button::new(text).frame(false))
-                                            .on_hover_text(format!(
-                                                "Ordena por {} ({})",
-                                                m.label(),
-                                                if m.lower_is_better() {
-                                                    "menor é melhor"
-                                                } else {
-                                                    "maior é melhor"
-                                                }
+                                            .on_hover_text(fx(
+                                                "godot-ui-fitwin-ordena_por",
+                                                &[
+                                                    ("label", vx(&m.label())),
+                                                    (
+                                                        "melhor",
+                                                        vx(&if m.lower_is_better() {
+                                                            "menor é melhor"
+                                                        } else {
+                                                            "maior é melhor"
+                                                        }),
+                                                    ),
+                                                ],
                                             ));
                                         named(
                                             ui,
@@ -822,7 +861,7 @@ fn comparison_table(
                                         ui.label(small(&format!("{} p", m.short())));
                                     }
                                 }
-                                ui.label(small("escolhida por"));
+                                ui.label(small(tx("godot-ui-fitwin-escolhida_por")));
                                 ui.end_row();
                                 for &i in &order {
                                     let c = &cands[i];
@@ -911,9 +950,9 @@ fn fit_histogram(
     fit: &AutoFit,
     h: f32,
 ) {
-    ui.label(small(&format!(
-        "Histograma e curvas ({} em destaque)",
-        w.selected_family()
+    ui.label(small(&fx(
+        "godot-ui-fitwin-histograma_e_curvas_em_destaque",
+        &[("selected_family", vx(&w.selected_family()))],
     )));
     let (lo, width, counts) = bins(data);
     let hi = lo + width * counts.len() as f64;
@@ -990,9 +1029,7 @@ fn prob_plot(ui: &mut Ui, w: &mut FitWin, reg: &mut Registry, data: &[f64], fit:
         }
     });
     let Some(i) = w.selected else {
-        ui.label(small(
-            "A empírica reproduz os próprios dados: não há curva para comparar.",
-        ));
+        ui.label(small(tx("godot-ui-fitwin-a_empirica_reproduz_os_proprios")));
         return;
     };
     let c = &fit.report.ranking.candidates[i];

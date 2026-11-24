@@ -275,17 +275,17 @@ func set_tool(name: String, id := "") -> void:
 	main.on_tool_changed()
 	match name:
 		"equipe":
-			main.set_status("Equipe: arraste do despachante a um transportador, ou de um objeto a quem leva os itens (Shift: de um processo a quem fornece os operadores); de novo desfaz. Mais fácil: arraste do nó laranja do operador até a máquina. Esc cancela.")
+			main.set_status(main.T("godot-gd-editor-equipe_arraste_do_despachante_a"))
 		"ligar":
-			main.set_status("Ligar: arraste do bloco de origem até o destino, ou clique em um e depois no outro (Esc cancela).")
+			main.set_status(main.T("godot-gd-editor-ligar_arraste_do_bloco_de"))
 		"colocar":
-			main.set_status("Clique no chão para colocar (Shift mantém a ferramenta, Esc cancela).")
+			main.set_status(main.T("godot-gd-editor-clique_no_chao_para_colocar"))
 		"corredor":
-			main.set_status("Corredor: clique no chão para pôr os pontos do eixo (Enter ou duplo clique termina), clique num corredor para editá-lo, arraste um vértice para movê-lo; Esc cancela.")
+			main.set_status(main.T("godot-gd-editor-corredor_clique_no_chao_para"))
 		"zona":
-			main.set_status("Zona: clique no chão para pôr os cantos da zona de risco; o primeiro ponto, Enter ou duplo clique fecha; clique numa zona para editá-la. Esc cancela.")
+			main.set_status(main.T("godot-gd-editor-zona_clique_no_chao_para"))
 		"rede":
-			main.set_status("Rede: clique no chão para pôr nós (cada clique continua o caminho), clique num trecho para editá-lo, arraste um nó para movê-lo; Esc encerra o caminho.")
+			main.set_status(main.T("godot-gd-editor-rede_clique_no_chao_para"))
 		_:
 			main.set_status("")
 
@@ -494,7 +494,7 @@ func set_zone_field(field: String, value: String) -> void:
 			ed.select_zone(value.strip_edges())
 		main.after_edit()
 	else:
-		main.set_status("Não mudou a zona: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-editor-nao_mudou_a_zona", [doc().last_error()]))
 
 
 ## Reads back what Rust keeps: the selection, the gesture under way and the node under the
@@ -525,23 +525,23 @@ func _apply(effects: Array) -> void:
 					main.after_edit()
 					main.set_status(String(e["ok"]))
 				else:
-					main.set_status("Não ligou: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_ligou", [doc().last_error()]))
 			"desligar":
 				if doc().disconnect_objects(e["from"], e["to"]):
 					main.after_edit()
 					main.set_status(String(e["ok"]))
 				else:
-					main.set_status("Não removeu: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_removeu", [doc().last_error()]))
 			"equipe":
 				var r: Dictionary = doc().team_link(e["from"], e["to"], bool(e["operators"]))
 				if r["ok"]:
 					main.after_edit()
 					if bool(e["removed"]):
-						main.set_status("Removida: " + String(r["message"]) + " (Ctrl+Z desfaz)")
+						main.set_status(main.T("godot-gd-removida-desfaz", [String(r["message"])]))
 					else:
 						main.set_status(String(e["ok"]) if String(e["ok"]) != "" else String(r["message"]))
 				else:
-					main.set_status(("Não removeu: " if bool(e["removed"]) else "Não ligou: ") + String(r["message"]))
+					main.set_status(main.T("godot-gd-nao-removeu-msg", [String(r["message"])]) if bool(e["removed"]) else main.T("godot-gd-nao-ligou-msg", [String(r["message"])]))
 			"mover_inicio":
 				_drag_names = Array(e["names"])
 				doc().begin_drag(PackedStringArray(_drag_names))
@@ -580,7 +580,7 @@ func _apply(effects: Array) -> void:
 					ed.set_yaw(name, deg_to_rad(deg))
 					main.on_dragging()
 				else:
-					main.set_status("Não girou: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_girou", [doc().last_error()]))
 			"girar_fim":
 				doc().end_drag()
 				main.after_edit()
@@ -589,27 +589,27 @@ func _apply(effects: Array) -> void:
 			"zona_nova":
 				var name: String = doc().add_zone(e["points"])
 				if name == "":
-					main.set_status("Não criou a zona: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_criou_a_zona", [doc().last_error()]))
 				else:
 					ed.select_zone(name)
 					main.after_edit()
-					main.set_status("Zona %s criada: escolha o tipo, o nível e o EPI no painel (Ctrl+Z desfaz)." % name)
+					main.set_status(main.T("godot-gd-editor-zona_criada_escolha_o_tipo", [name]))
 			"zona_forma":
 				if doc().set_zone_points(e["name"], e["points"]):
 					main.after_edit()
 				else:
-					main.set_status("Não mudou a zona: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_mudou_a_zona", [doc().last_error()]))
 			"zona_excluir":
 				if doc().remove_zone(e["name"]):
 					main.after_edit()
-					main.set_status("Zona %s excluída (Ctrl+Z desfaz)." % e["name"])
+					main.set_status(main.T("godot-gd-editor-zona_excluida_ctrl_z_desfaz", [e["name"]]))
 				else:
-					main.set_status("Não excluiu a zona: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-editor-nao_excluiu_a_zona", [doc().last_error()]))
 			"remover":
 				var names := PackedStringArray(e["names"])
 				if doc().remove(names):
 					main.after_edit()
-					main.set_status("%d objeto(s) excluídos." % names.size())
+					main.set_status(main.T("godot-gd-editor-objeto_s_excluidos", [names.size()]))
 	_pull()
 func team_line_at(p: Vector2) -> Dictionary:
 	_feed()
@@ -656,7 +656,7 @@ func _input(event: InputEvent) -> void:
 		_palette_drag = ""
 		if main.over_ui(mouse):
 			set_tool("selecionar")
-			main.set_status("Colocação cancelada: solte o objeto sobre o chão.")
+			main.set_status(main.T("godot-gd-editor-colocacao_cancelada_solte_o_objeto"))
 		else:
 			_place(id, mouse, mb.shift_pressed)
 		# The release still goes to the GUI: the library button that took the press keeps
@@ -751,7 +751,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _place(id: String, p: Vector2, keep: bool) -> void:
 	var at = floor_at(p)
 	if at == null:
-		main.set_status("Aponte para o chão para colocar o objeto.")
+		main.set_status(main.T("godot-gd-editor-aponte_para_o_chao_para"))
 		return
 	_place_at(id, at, keep)
 
@@ -759,14 +759,14 @@ func _place(id: String, p: Vector2, keep: bool) -> void:
 func _place_at(id: String, at: Vector3, keep: bool) -> void:
 	var name: String = doc().add(id, at, main.snap_step())
 	if name == "":
-		main.set_status("Não foi possível colocar: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-editor-nao_foi_possivel_colocar", [doc().last_error()]))
 		return
 	if not keep:
 		set_tool("selecionar")
 	selected = [name]
 	ed.set_selected(PackedStringArray(selected))
 	main.after_edit()
-	main.set_status("%s colocado." % name)
+	main.set_status(main.T("godot-gd-editor-colocado", [name]))
 	_feed()
 	_apply(ed.select_only(name).filter(func(x): return x["op"] == "status"))
 func _on_press(p: Vector2, shift: bool) -> void:
@@ -803,7 +803,7 @@ func cancel() -> void:
 		set_tool("selecionar")
 	elif ed.team_cancel():
 		team_from = ""
-		main.set_status("Equipe: cancelado.")
+		main.set_status(main.T("godot-gd-editor-equipe_cancelado"))
 	elif tool == "equipe":
 		set_tool("selecionar")
 	else:
@@ -825,18 +825,18 @@ func nudge(dx: int, dy: int) -> void:
 ## seen from above), each about its centre, in one undo step.
 func rotate_selection(degrees: int) -> void:
 	if selected.is_empty():
-		main.set_status("Nada selecionado para girar.")
+		main.set_status(main.T("godot-gd-editor-nada_selecionado_para_girar"))
 		return
 	var n: int = doc().rotate_by(selection(), float(degrees))
 	if n == 0:
-		main.set_status("Não girou: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-editor-nao_girou", [doc().last_error()]))
 		return
 	main.after_edit()
 	var said := "%d°" % degrees
 	if n == 1:
-		main.set_status("Girado %s (Ctrl+Z desfaz)." % said)
+		main.set_status(main.T("godot-gd-editor-girado_ctrl_z_desfaz", [said]))
 	else:
-		main.set_status("%d objetos girados %s, cada um em volta do próprio centro (Ctrl+Z desfaz)." % [n, said])
+		main.set_status(main.T("godot-gd-editor-objetos_girados_cada_um_em", [n, said]))
 
 
 ## The pointing hand over the rotate handle (and while turning it), the arrow elsewhere.
@@ -852,11 +852,11 @@ func delete_selected() -> void:
 		return
 	if tool == "corredor":
 		if not corredores.delete_selected():
-			main.set_status("Nenhum corredor selecionado para excluir.")
+			main.set_status(main.T("godot-gd-editor-nenhum_corredor_selecionado_para_excluir"))
 		return
 	if tool == "trajeto":
 		if not trajetos.delete_selected():
-			main.set_status("Nenhum nó selecionado para remover.")
+			main.set_status(main.T("godot-gd-editor-nenhum_no_selecionado_para_remover"))
 		return
 	if tool == "zona" and int(ed.zone_drawing_count()) > 0:
 		ed.zone_back()

@@ -1,7 +1,7 @@
 //! The left panel of the Godot interface, in egui (pure: no Godot types, unit tested).
 //!
 //! In Editar: the object library ("Biblioteca": a search over every entry, then a rail of
-//! [`GROUPS`] on the left, which joins the core categories and the lines' presets in a few
+//! [`groups`] on the left, which joins the core categories and the lines' presets in a few
 //! groups plus "Recentes", and the entries of the chosen group beside it; a click on the open
 //! group folds the library to a row of group icons), the list of the model's objects with a
 //! search field, and "Mostrar obstáculos e folgas". In Simular: the replications and "Simular de novo", the
@@ -26,6 +26,7 @@
 //! 3D view resolves the drop (the editor follows the mouse and places the object when the
 //! button is released over the free central area).
 
+use crate::texto::{fx, tx, vx};
 use egui::text::CCursorRange;
 use egui::{
     Align, Color32, ComboBox, FontSelection, Id, Label, Layout, Rect, RichText, ScrollArea, Sense,
@@ -43,13 +44,15 @@ pub const DRAG_START: f32 = 8.0;
 /// The bottleneck line of the summary (the orange of the Godot panel).
 pub const BOTTLENECK: Color32 = Color32::from_rgb(255, 154, 61);
 /// The cameras of Simular: id and label.
-pub const CAMERAS: [(&str, &str); 5] = [
-    ("orbita", "Órbita"),
-    ("planta", "Planta (2D)"),
-    ("seguir", "Seguir"),
-    ("primeira_pessoa", "Primeira pessoa"),
-    ("recurso", "Do recurso"),
-];
+pub fn cameras() -> [(&'static str, &'static str); 5] {
+    [
+        ("orbita", tx("godot-ui-left-orbita")),
+        ("planta", tx("godot-ui-left-planta_2d")),
+        ("seguir", tx("godot-ui-left-seguir")),
+        ("primeira_pessoa", tx("godot-ui-left-primeira_pessoa")),
+        ("recurso", tx("godot-ui-left-do_recurso")),
+    ]
+}
 
 /// One entry of the library.
 #[derive(Clone, Debug, PartialEq)]
@@ -103,7 +106,7 @@ pub struct SimView {
     pub blocks: Vec<String>,
     /// The block the camera follows (index into `blocks`).
     pub follow: Option<usize>,
-    /// The camera mode (an id of [`CAMERAS`]).
+    /// The camera mode (an id of [`cameras`]).
     pub camera: String,
     pub labels: bool,
     pub shadows: bool,
@@ -168,50 +171,52 @@ pub struct Group {
 
 /// The library groups, in rail order: "Recentes", then the core categories and the lines'
 /// categories joined in six (see [`group_of`]).
-pub const GROUPS: [Group; 7] = [
-    Group {
-        id: "recentes",
-        short: "Recentes",
-        title: "Usados por último",
-        icon_of: "",
-    },
-    Group {
-        id: "fluxo",
-        short: "Fluxo",
-        title: "Fluxo de itens e montagem",
-        icon_of: "Processor",
-    },
-    Group {
-        id: "movimento",
-        short: "Mover",
-        title: "Movimentação, recursos e logística",
-        icon_of: "Forklift",
-    },
-    Group {
-        id: "fabrica",
-        short: "Fábrica",
-        title: "Manufatura",
-        icon_of: "Combiner",
-    },
-    Group {
-        id: "servicos",
-        short: "Serviços",
-        title: "Serviços e saúde",
-        icon_of: "Operator",
-    },
-    Group {
-        id: "escritorio",
-        short: "Escritório",
-        title: "Escritório e processos",
-        icon_of: "Dispatcher",
-    },
-    Group {
-        id: "qs",
-        short: "Q e S",
-        title: "Qualidade e segurança",
-        icon_of: "Separator",
-    },
-];
+pub fn groups() -> [Group; 7] {
+    [
+        Group {
+            id: "recentes",
+            short: tx("godot-ui-left-recentes"),
+            title: tx("godot-ui-left-usados_por_ultimo"),
+            icon_of: "",
+        },
+        Group {
+            id: "fluxo",
+            short: tx("godot-ui-left-fluxo"),
+            title: tx("godot-ui-left-fluxo_de_itens_e_montagem"),
+            icon_of: "Processor",
+        },
+        Group {
+            id: "movimento",
+            short: tx("godot-ui-left-mover"),
+            title: tx("godot-ui-left-movimentacao_recursos_e_logistica"),
+            icon_of: "Forklift",
+        },
+        Group {
+            id: "fabrica",
+            short: tx("godot-ui-left-fabrica"),
+            title: tx("godot-ui-left-manufatura"),
+            icon_of: "Combiner",
+        },
+        Group {
+            id: "servicos",
+            short: tx("godot-ui-left-servicos"),
+            title: tx("godot-ui-left-servicos_e_saude"),
+            icon_of: "Operator",
+        },
+        Group {
+            id: "escritorio",
+            short: tx("godot-ui-left-escritorio"),
+            title: tx("godot-ui-left-escritorio_e_processos"),
+            icon_of: "Dispatcher",
+        },
+        Group {
+            id: "qs",
+            short: tx("godot-ui-left-q_e_s"),
+            title: tx("godot-ui-left-qualidade_e_seguranca"),
+            icon_of: "Separator",
+        },
+    ]
+}
 
 /// The group of a library entry: the core categories by name, the lines' presets by the
 /// line (the part of the id before `/`).
@@ -314,12 +319,12 @@ fn edit_panel(
     reg: &mut Registry,
     out: &mut Vec<String>,
 ) {
-    heading(ui, "Biblioteca");
+    heading(ui, tx("godot-ui-left-biblioteca"));
     let before = out.len();
     library(ui, v, mem, reg, out);
     remember_used(mem, &out[before..]);
     ui.separator();
-    heading(ui, "Objetos");
+    heading(ui, tx("godot-ui-left-objetos"));
     search(ui, mem, reg);
     let list_h = (ui.available_height() - 34.0).max(60.0);
     let wanted = mem.search.trim().to_lowercase();
@@ -340,9 +345,9 @@ fn edit_panel(
         });
     named_area(ui, reg, "Objetos_Lista", area.inner_rect);
     let mut on = v.obstacles;
-    let r = ui.checkbox(&mut on, "Mostrar obstáculos e folgas").on_hover_text(
-        "Mostra a área ocupada dos objetos, as paredes, a folga dos recursos e o ponto de acesso de cada objeto (arraste-o com a ferramenta Selecionar)",
-    );
+    let r = ui
+        .checkbox(&mut on, tx("godot-ui-left-mostrar_obstaculos_e_folgas"))
+        .on_hover_text(tx("godot-ui-left-mostra_a_area_ocupada_dos"));
     named_toggle(
         ui,
         reg,
@@ -384,6 +389,7 @@ fn library(
             .iter()
             .filter(|e| {
                 e.label.to_lowercase().contains(&wanted)
+                    || entry_label(e).to_lowercase().contains(&wanted)
                     || e.category.to_lowercase().contains(&wanted)
             })
             .collect();
@@ -394,7 +400,10 @@ fn library(
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 if found.is_empty() {
-                    ui.label(RichText::new("Nada com esse nome.").color(colors::TEXT_WEAK));
+                    ui.label(
+                        RichText::new(tx("godot-ui-left-nada_com_esse_nome"))
+                            .color(colors::TEXT_WEAK),
+                    );
                 }
                 let w = ui.available_width() - 4.0;
                 for e in found {
@@ -409,7 +418,7 @@ fn library(
         let (row, _) =
             ui.allocate_exact_size(Vec2::new(ui.available_width(), 34.0), Sense::hover());
         let mut x = row.left();
-        for g in &GROUPS {
+        for g in &groups() {
             let r = Rect::from_min_size(egui::pos2(x, row.top()), Vec2::splat(34.0));
             let resp = ui
                 .interact(r, Id::new(("utsim_grupo_dobrado", g.id)), Sense::click())
@@ -438,7 +447,7 @@ fn library(
         named_area(ui, reg, "Biblioteca", row);
         return;
     }
-    let h = GROUPS.len() as f32 * RAIL_ITEM;
+    let h = groups().len() as f32 * RAIL_ITEM;
     let (all, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), h), Sense::hover());
     let rail = Rect::from_min_size(all.min, Vec2::new(RAIL, h));
     let side = Rect::from_min_max(egui::pos2(rail.right() + 8.0, all.top()), all.max);
@@ -447,7 +456,7 @@ fn library(
         sizes::RADIUS as f32,
         colors::BUTTON.gamma_multiply(0.6),
     );
-    for (k, g) in GROUPS.iter().enumerate() {
+    for (k, g) in groups().iter().enumerate() {
         let r = Rect::from_min_size(
             egui::pos2(rail.left(), rail.top() + k as f32 * RAIL_ITEM),
             Vec2::new(RAIL, RAIL_ITEM),
@@ -457,7 +466,10 @@ fn library(
             .interact(r, Id::new(("utsim_grupo", g.id)), Sense::click())
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text(if on {
-                format!("{}. Clique de novo para recolher.", g.title)
+                fx(
+                    "godot-ui-left-clique_de_novo_para_recolher",
+                    &[("title", vx(&g.title))],
+                )
             } else {
                 g.title.to_string()
             });
@@ -499,10 +511,8 @@ fn library(
             }
         }
     }
-    let group = GROUPS
-        .iter()
-        .find(|g| g.id == current)
-        .unwrap_or(&GROUPS[1]);
+    let all = groups();
+    let group = all.iter().find(|g| g.id == current).unwrap_or(&all[1]);
     let entries: Vec<&Entry> = if group.id == "recentes" {
         mem.recent
             .iter()
@@ -532,7 +542,7 @@ fn library(
         .show(&mut child, |ui| {
             if entries.is_empty() {
                 ui.label(
-                    RichText::new("Os elementos que você usar aparecem aqui.")
+                    RichText::new(tx("godot-ui-left-os_elementos_que_voce_usar"))
                         .small()
                         .color(colors::TEXT_WEAK),
                 );
@@ -550,9 +560,11 @@ fn library(
                         ui.add_space(4.0);
                     }
                     ui.label(
-                        RichText::new(short_category(&e.category))
-                            .size(10.5)
-                            .color(colors::TEXT_WEAK),
+                        RichText::new(utsim_edit::texto::rotulo_categoria(short_category(
+                            &e.category,
+                        )))
+                        .size(10.5)
+                        .color(colors::TEXT_WEAK),
                     );
                     last = Some(e.category.as_str());
                 }
@@ -560,6 +572,15 @@ fn library(
             }
         });
     named_area(ui, reg, "Biblioteca", area.inner_rect);
+}
+
+/// The label of a library entry in the language of now: the core entries by id (the queue
+/// is "Espera" in this editor), the lines' presets as their file names them.
+fn entry_label(e: &Entry) -> String {
+    match e.id.as_str() {
+        "Queue" | "QueueLifo" => tx("godot-ui-left-espera").to_string(),
+        id => utsim_edit::texto::rotulo_de(id, &e.label).to_string(),
+    }
 }
 
 /// A line's category without the part in parentheses ("Lean Office (processos
@@ -626,12 +647,14 @@ fn library_search(ui: &mut Ui, mem: &mut LeftMemory, reg: &mut Registry) {
         let r = ui.add(
             TextEdit::singleline(&mut mem.library_search)
                 .id(Id::new("utsim_biblioteca_busca"))
-                .hint_text("Buscar elemento")
+                .hint_text(tx("godot-ui-left-buscar_elemento"))
                 .desired_width(ui.available_width() - clear_w),
         );
         named(ui, reg, "Biblioteca_Busca", &r, &mem.library_search.clone());
         if !mem.library_search.is_empty() {
-            let x = ui.button("×").on_hover_text("Limpa a busca");
+            let x = ui
+                .button("×")
+                .on_hover_text(tx("godot-ui-left-limpa_a_busca"));
             named(ui, reg, "Biblioteca_Limpar", &x, "×");
             if x.clicked() {
                 mem.library_search.clear();
@@ -696,7 +719,8 @@ fn entry_button(
         );
         x += 25.0;
     }
-    let galley = WidgetText::from(RichText::new(&e.label).color(colors::TEXT)).into_galley(
+    let label = entry_label(e);
+    let galley = WidgetText::from(RichText::new(&label).color(colors::TEXT)).into_galley(
         ui,
         Some(TextWrapMode::Truncate),
         rect.max.x - x - 3.0,
@@ -707,15 +731,15 @@ fn entry_button(
         galley,
         colors::TEXT,
     );
-    let tip = format!(
-        "{}: clique e depois clique no chão, ou arraste até o chão",
-        e.label
+    let tip = fx(
+        "godot-ui-left-clique_e_depois_clique_no",
+        &[("label", vx(&label))],
     );
     let r = r
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(tip);
     let name = format!("Biblioteca_{}", e.id);
-    named_toggle(ui, reg, &name, &r, &e.label, armed);
+    named_toggle(ui, reg, &name, &r, &label, armed);
     if r.dragged() && mem.dragging.is_none() {
         let moved = ui.input(
             |i| match (i.pointer.press_origin(), i.pointer.latest_pos()) {
@@ -740,12 +764,14 @@ fn search(ui: &mut Ui, mem: &mut LeftMemory, reg: &mut Registry) {
         let r = ui.add(
             TextEdit::singleline(&mut mem.search)
                 .id(Id::new("utsim_objetos_busca"))
-                .hint_text("Buscar por nome ou tipo")
+                .hint_text(tx("godot-ui-left-buscar_por_nome_ou_tipo"))
                 .desired_width(ui.available_width() - clear_w),
         );
         named(ui, reg, "Objetos_Busca", &r, &mem.search.clone());
         if !mem.search.is_empty() {
-            let x = ui.button("×").on_hover_text("Limpa a busca");
+            let x = ui
+                .button("×")
+                .on_hover_text(tx("godot-ui-left-limpa_a_busca"));
             named(ui, reg, "Objetos_Limpar", &x, "×");
             if x.clicked() {
                 mem.search.clear();
@@ -795,9 +821,9 @@ fn object_row(
         tip.push_str(text);
     }
     let count = if o.problems > 0 {
-        format!("{} problema(s)", o.problems)
+        fx("godot-ui-left-problema_s", &[("problems", vx(&o.problems))])
     } else if o.warnings > 0 {
-        format!("{} aviso(s)", o.warnings)
+        fx("godot-ui-left-aviso_s", &[("warnings", vx(&o.warnings))])
     } else {
         String::new()
     };
@@ -835,8 +861,11 @@ fn sim_panel(
     replications(ui, v, mem, reg, out);
     let w = ui.available_width();
     let r = ui
-        .add_sized([w, 32.0], widgets::primary("Simular de novo"))
-        .on_hover_text("Roda as replicações outra vez");
+        .add_sized(
+            [w, 32.0],
+            widgets::primary(tx("godot-ui-left-simular_de_novo")),
+        )
+        .on_hover_text(tx("godot-ui-left-roda_as_replicacoes_outra_vez"));
     named(ui, reg, "Botao_RodarDeNovo", &r, "Simular de novo");
     if r.clicked() {
         out.push("rodar_de_novo".into());
@@ -845,7 +874,7 @@ fn sim_panel(
         let r = ui.add(Label::new(RichText::new(&v.status).color(colors::TEXT_WEAK)).wrap());
         named(ui, reg, "Simular_Status", &r, &v.status);
     }
-    ui.label(RichText::new("Blocos (clique para focar)").color(colors::TEXT));
+    ui.label(RichText::new(tx("godot-ui-left-blocos_clique_para_focar")).color(colors::TEXT));
     // Below the list: the camera, the buttons, the switches and the summary.
     let summary_h = (ui.available_height() * 0.32).clamp(110.0, 220.0);
     let lista_quase = v.seguranca && !v.quase.is_empty();
@@ -866,15 +895,15 @@ fn sim_panel(
     camera(ui, v, reg, out);
     ui.horizontal(|ui| {
         let r = ui
-            .button("Fluxos")
-            .on_hover_text("Fluxos de tokens em 2D, com as contagens no tempo");
+            .button(tx("godot-ui-left-fluxos"))
+            .on_hover_text(tx("godot-ui-left-fluxos_de_tokens_em_2d"));
         named(ui, reg, "Botao_Fluxos", &r, "Fluxos");
         if r.clicked() {
             out.push("analisar:fluxos".into());
         }
         let r = ui
-            .button("Gravar replay")
-            .on_hover_text("Grava o replay desta replicação em .json (abre de novo com Abrir)");
+            .button(tx("godot-ui-left-gravar_replay"))
+            .on_hover_text(tx("godot-ui-left-grava_o_replay_desta_replicacao"));
         named(ui, reg, "Botao_GravarReplay", &r, "Gravar replay");
         if r.clicked() {
             out.push("gravar_replay".into());
@@ -884,17 +913,17 @@ fn sim_panel(
         for (name, text, on, what, tip) in [
             (
                 "Simular_Rotulos",
-                "Rótulos",
+                tx("godot-ui-left-rotulos"),
                 v.labels,
                 "rotulos",
-                "Os nomes dos blocos sobre a cena",
+                tx("godot-ui-left-os_nomes_dos_blocos_sobre"),
             ),
             (
                 "Simular_Sombras",
-                "Sombras",
+                tx("godot-ui-left-sombras"),
                 v.shadows,
                 "sombras",
-                "As sombras do sol (desligadas, a cena fica mais leve)",
+                tx("godot-ui-left-as_sombras_do_sol_desligadas"),
             ),
         ] {
             let mut now = on;
@@ -916,17 +945,17 @@ fn camadas(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) 
         for (name, text, on, what, tip) in [
             (
                 "Simular_Seguranca",
-                "Segurança",
+                tx("godot-ui-left-seguranca"),
                 v.seguranca,
                 "seguranca",
-                "Zonas de risco, EPI das pessoas, quase-conflitos simulados, itens com defeito e inspeções",
+                tx("godot-ui-left-zonas_de_risco_epi_das"),
             ),
             (
                 "Simular_Calor",
-                "Calor",
+                tx("godot-ui-left-calor"),
                 v.calor,
                 "calor",
-                "Mapa de calor da presença das pessoas e dos quase-conflitos no piso",
+                tx("godot-ui-left-mapa_de_calor_da_presenca"),
             ),
         ] {
             let mut now = on;
@@ -944,8 +973,11 @@ fn camadas(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) 
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new(format!("Quase-conflitos simulados ({})", v.quase.len()))
-                        .color(colors::TEXT_WEAK),
+                    RichText::new(fx(
+                        "godot-ui-left-quase_conflitos_simulados",
+                        &[("quase", vx(&v.quase.len()))],
+                    ))
+                    .color(colors::TEXT_WEAK),
                 );
                 for (k, (t, text)) in v.quase.iter().enumerate().take(200) {
                     let r = ui.small_button(text.as_str());
@@ -969,7 +1001,7 @@ fn replications(
     out: &mut Vec<String>,
 ) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Replicações").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-left-replicacoes")).color(colors::TEXT));
         let id = Id::new("utsim_simular_replicacoes");
         let current = v.reps.to_string();
         let mut buf = mem.reps.clone().unwrap_or_else(|| current.clone());
@@ -1002,8 +1034,18 @@ fn replications(
             mem.reps = None;
         }
         for (name, text, d, tip) in [
-            ("Simular_Menos", "−", -1, "Uma replicação a menos"),
-            ("Simular_Mais", "+", 1, "Uma replicação a mais"),
+            (
+                "Simular_Menos",
+                "−",
+                -1,
+                tx("godot-ui-left-uma_replicacao_a_menos"),
+            ),
+            (
+                "Simular_Mais",
+                "+",
+                1,
+                tx("godot-ui-left-uma_replicacao_a_mais"),
+            ),
         ] {
             let r = ui
                 .add_enabled(
@@ -1057,35 +1099,35 @@ fn block_row(
 
 fn camera(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Câmera").color(colors::TEXT));
-        let shown = CAMERAS
+        ui.label(RichText::new(tx("godot-ui-left-camera")).color(colors::TEXT));
+        let shown = cameras()
             .iter()
             .find(|c| c.0 == v.camera)
             .map(|c| c.1)
-            .unwrap_or("Órbita");
+            .unwrap_or(tx("godot-ui-left-orbita"));
         let mut pick = reg
             .take_request("Simular_Camera")
-            .and_then(|item| CAMERAS.iter().find(|c| c.1 == item).map(|c| c.0));
+            .and_then(|item| cameras().iter().find(|c| c.1 == item).map(|c| c.0));
         let r = ComboBox::from_id_salt("utsim_simular_camera")
             .selected_text(shown)
             .width(ui.available_width())
             .show_ui(ui, |ui| {
-                for (id, label) in CAMERAS {
+                for (id, label) in cameras() {
                     if ui.selectable_label(id == v.camera, label).clicked() {
                         pick = Some(id);
                     }
                 }
             });
-        let resp = r.response.on_hover_text(
-            "Seguir, Primeira pessoa e Do recurso acompanham o bloco escolhido na lista",
-        );
+        let resp = r
+            .response
+            .on_hover_text(tx("godot-ui-left-seguir_primeira_pessoa_e_do"));
         named_list(
             ui,
             reg,
             "Simular_Camera",
             &resp,
             shown,
-            CAMERAS.iter().map(|c| c.1.to_owned()).collect(),
+            cameras().iter().map(|c| c.1.to_owned()).collect(),
         );
         if let Some(id) = pick {
             out.push(format!("camera:{id}"));
@@ -1110,7 +1152,7 @@ fn summary(ui: &mut Ui, s: &Summary, height: f32, reg: &mut Registry) {
                 if s.title.is_empty() {
                     ui.add(
                         Label::new(
-                            RichText::new("Os resultados aparecem aqui depois da simulação.")
+                            RichText::new(tx("godot-ui-left-os_resultados_aparecem_aqui_depois"))
                                 .color(colors::TEXT_WEAK),
                         )
                         .wrap(),
@@ -1121,7 +1163,11 @@ fn summary(ui: &mut Ui, s: &Summary, height: f32, reg: &mut Registry) {
                 if !s.bottleneck.is_empty() {
                     ui.add(
                         Label::new(
-                            RichText::new(format!("Gargalo: {}", s.bottleneck)).color(BOTTLENECK),
+                            RichText::new(fx(
+                                "godot-ui-left-gargalo",
+                                &[("bottleneck", vx(&s.bottleneck))],
+                            ))
+                            .color(BOTTLENECK),
                         )
                         .wrap(),
                     );
@@ -1131,10 +1177,8 @@ fn summary(ui: &mut Ui, s: &Summary, height: f32, reg: &mut Registry) {
                 }
                 ui.add(
                     Label::new(
-                        RichText::new(
-                            "A tabela completa, os gráficos e as análises estão em Resultados.",
-                        )
-                        .color(colors::TEXT_WEAK),
+                        RichText::new(tx("godot-ui-left-a_tabela_completa_os_graficos"))
+                            .color(colors::TEXT_WEAK),
                     )
                     .wrap(),
                 );
@@ -1142,7 +1186,10 @@ fn summary(ui: &mut Ui, s: &Summary, height: f32, reg: &mut Registry) {
     });
     let mut text = s.title.clone();
     if !s.bottleneck.is_empty() {
-        text.push_str(&format!("\nGargalo: {}", s.bottleneck));
+        text.push_str(&fx(
+            "godot-ui-left-gargalo-2",
+            &[("bottleneck", vx(&s.bottleneck))],
+        ));
     }
     for l in &s.lines {
         text.push('\n');
@@ -1500,7 +1547,7 @@ mod tests {
         // The first group is Fluxo: its entries are there, the others are not.
         assert!(p.reg.knows("Biblioteca_Source"));
         assert!(!p.reg.knows("Biblioteca_Operator"));
-        for g in &GROUPS {
+        for g in &groups() {
             assert!(p.reg.knows(&format!("Biblioteca_Grupo_{}", g.id)));
         }
         let click = |p: &mut Panel, name: &str| {
@@ -1534,7 +1581,7 @@ mod tests {
         let e = full_view();
         for x in &e.library {
             let g = group_of(x);
-            assert!(GROUPS.iter().any(|k| k.id == g), "{}: {g}", x.id);
+            assert!(groups().iter().any(|k| k.id == g), "{}: {g}", x.id);
         }
     }
 }

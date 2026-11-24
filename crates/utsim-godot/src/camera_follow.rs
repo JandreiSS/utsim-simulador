@@ -89,7 +89,7 @@ pub fn restaura_vista(mode: &str) -> bool {
 
 /// What the status bar says when camera `mode` is chosen.
 pub fn aviso(mode: &str, seguido: &str) -> String {
-    let label = crate::ui_left::CAMERAS
+    let label = crate::ui_left::cameras()
         .iter()
         .find(|(id, _)| *id == mode)
         .map_or(mode, |(_, l)| *l);

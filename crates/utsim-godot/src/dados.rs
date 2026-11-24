@@ -8,6 +8,7 @@
 //! - [`data_fields`] lists every distribution field of a model with its source;
 //! - [`write_report`] writes the full HTML reports and the index of a model.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -56,7 +57,10 @@ fn criterion_of(text: &str) -> Result<Criterion, String> {
         "bic" => Ok(Criterion::Bic),
         "ks" => Ok(Criterion::Ks),
         "ad" => Ok(Criterion::Ad),
-        other => Err(format!("critério desconhecido: {other}")),
+        other => Err(fx(
+            "godot-dados-criterio_desconhecido",
+            &[("other", vx(&other))],
+        )),
     }
 }
 
@@ -89,10 +93,10 @@ pub fn input_from_config(field: &str, config: &Value) -> Result<DataInput, Strin
         .unwrap_or_default();
     let source = text("source");
     if source.is_some() && !values.is_empty() {
-        return Err("use um arquivo ou valores colados, não os dois".into());
+        return Err(tx("godot-dados-use_um_arquivo_ou_valores").into());
     }
     if source.is_none() && values.is_empty() {
-        return Err("escolha um arquivo de dados ou cole os valores".into());
+        return Err(tx("godot-dados-escolha_um_arquivo_de_dados").into());
     }
     let mut input = DataInput::with_values(field, values);
     input.source = source;
@@ -267,10 +271,10 @@ pub fn status_text(input: &DataInput) -> &'static str {
     match input.status {
         DataStatus::Pending => "pendente",
         DataStatus::Fitted => "ajustado",
-        DataStatus::Reused => "registro reaproveitado",
-        DataStatus::DataChanged { .. } => "dados mudaram",
-        DataStatus::SettingsChanged => "opções mudaram",
-        DataStatus::RecordOnly { .. } => "dados ilegíveis",
+        DataStatus::Reused => tx("godot-dados-registro_reaproveitado"),
+        DataStatus::DataChanged { .. } => tx("godot-dados-dados_mudaram"),
+        DataStatus::SettingsChanged => tx("godot-dados-opcoes_mudaram"),
+        DataStatus::RecordOnly { .. } => tx("godot-dados-dados_ilegiveis"),
     }
 }
 
@@ -295,7 +299,10 @@ pub fn entry_view(input: &DataInput, base: Option<&Path>, cache: &FitCache) -> V
         DataStatus::DataChanged {
             old_hash,
             old_family,
-        } => format!("os dados mudaram desde o último ajuste (era {old_family}, hash {old_hash})"),
+        } => fx(
+            "godot-dados-os_dados_mudaram_desde_o",
+            &[("old_family", vx(&old_family)), ("old_hash", vx(&old_hash))],
+        ),
         _ => String::new(),
     };
     json!({
@@ -352,8 +359,12 @@ pub fn columns_of_text(text: &str) -> Vec<String> {
 
 /// The columns of a file, or the error.
 pub fn columns_of(path: &Path) -> Result<Vec<String>, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("não foi possível ler {}: {e}", path.display()))?;
+    let text = std::fs::read_to_string(path).map_err(|e| {
+        fx(
+            "godot-dados-nao_foi_possivel_ler",
+            &[("path", vx(&path.display())), ("e", vx(&e))],
+        )
+    })?;
     Ok(columns_of_text(&text))
 }
 
@@ -377,10 +388,14 @@ pub fn relative_to(base: Option<&Path>, path: &str) -> String {
 /// returns `{index, files, failed}`.
 pub fn write_report(model: &Model, base: Option<&Path>, dir: &Path) -> Result<Value, String> {
     if model.data.is_empty() {
-        return Err("nenhum campo do modelo usa dados reais".into());
+        return Err(tx("godot-dados-nenhum_campo_do_modelo_usa").into());
     }
-    let (written, failed) = dados::write_reports(model, base, dir)
-        .map_err(|e| format!("não foi possível gravar em {}: {e}", dir.display()))?;
+    let (written, failed) = dados::write_reports(model, base, dir).map_err(|e| {
+        fx(
+            "godot-dados-nao_foi_possivel_gravar_em",
+            &[("dir", vx(&dir.display())), ("e", vx(&e))],
+        )
+    })?;
     Ok(json!({
         "index": written.first().map(|p| p.to_string_lossy().replace('\\', "/")),
         "files": written.len(),

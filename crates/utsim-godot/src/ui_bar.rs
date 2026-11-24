@@ -11,6 +11,7 @@
 //! runs as the old buttons did. Every widget keeps the name of the Godot node it replaced
 //! (`Modo_Editar`, `Botao_Novo`...), recorded in the [`Registry`].
 
+use crate::texto::tx;
 use egui::{Align, ComboBox, Frame, Layout, Margin, RichText, Stroke, Ui};
 use utsim_ui_tema::{colors, sizes, widgets};
 
@@ -42,14 +43,16 @@ pub struct BarState {
 }
 
 /// The team and request lines the "Ligações" menu shows or hides: kind and label.
-pub const LINK_KINDS: [(&str, &str); 6] = [
-    ("equipe", "Equipe (despachante → membro)"),
-    ("transporte", "Transporte pedido"),
-    ("operadores", "Operadores pedidos"),
-    ("manutencao", "Equipe de manutenção"),
-    ("casa", "Casa"),
-    ("pausa", "Local de pausa"),
-];
+pub fn link_kinds() -> [(&'static str, &'static str); 6] {
+    [
+        ("equipe", tx("godot-ui-bar-equipe_despachante_membro")),
+        ("transporte", tx("godot-ui-bar-transporte_pedido")),
+        ("operadores", tx("godot-ui-bar-operadores_pedidos")),
+        ("manutencao", tx("godot-ui-bar-equipe_de_manutencao")),
+        ("casa", tx("godot-ui-bar-casa")),
+        ("pausa", tx("godot-ui-bar-local_de_pausa")),
+    ]
+}
 
 impl Default for BarState {
     fn default() -> Self {
@@ -227,7 +230,7 @@ fn bar_contents(
         .collect();
     if !overflow.is_empty() {
         ui.separator();
-        let r = ui.menu_button(("Mais", widgets::down_arrow()), |ui| {
+        let r = ui.menu_button((tx("godot-ui-bar-mais"), widgets::down_arrow()), |ui| {
             ui.set_min_width(220.0);
             for (n, u) in overflow.iter().enumerate() {
                 if n > 0 {
@@ -242,7 +245,8 @@ fn bar_contents(
             }
         });
         reg.put("Menu_Mais", &r.response, "Mais");
-        r.response.on_hover_text("Os grupos que não cabem na barra");
+        r.response
+            .on_hover_text(tx("godot-ui-bar-os_grupos_que_nao_cabem"));
     }
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         let title = ui
@@ -263,12 +267,12 @@ fn bar_contents(
 
 fn unit_title(u: Unit) -> &'static str {
     match u {
-        Unit::Arquivo => "Arquivo",
-        Unit::Historico => "Editar",
-        Unit::Organizar => "Organizar",
-        Unit::Grade => "Grade",
-        Unit::Atalhos => "Ajuda",
-        Unit::Analise => "Análise",
+        Unit::Arquivo => tx("godot-ui-bar-arquivo"),
+        Unit::Historico => tx("godot-ui-bar-editar"),
+        Unit::Organizar => tx("godot-ui-bar-organizar"),
+        Unit::Grade => tx("godot-ui-bar-grade"),
+        Unit::Atalhos => tx("godot-ui-bar-ajuda"),
+        Unit::Analise => tx("godot-ui-bar-analise"),
     }
 }
 
@@ -294,18 +298,28 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
     match u {
         Unit::Arquivo => {
             for (name, text, tip, a) in [
-                ("Botao_Novo", "Novo", "Novo modelo (Ctrl+N)", "novo"),
+                (
+                    "Botao_Novo",
+                    tx("godot-ui-bar-novo"),
+                    tx("godot-ui-bar-novo_modelo_ctrl_n"),
+                    "novo",
+                ),
                 (
                     "Botao_Abrir",
-                    "Abrir…",
-                    "Abrir um modelo ou um replay (Ctrl+O)",
+                    tx("godot-ui-bar-abrir"),
+                    tx("godot-ui-bar-abrir_um_modelo_ou_um"),
                     "abrir",
                 ),
-                ("Botao_Salvar", "Salvar", "Salvar (Ctrl+S)", "salvar"),
+                (
+                    "Botao_Salvar",
+                    tx("godot-ui-bar-salvar"),
+                    tx("godot-ui-bar-salvar_ctrl_s"),
+                    "salvar",
+                ),
                 (
                     "Botao_SalvarComo",
-                    "Salvar como…",
-                    "Salvar com outro nome (Ctrl+Shift+S)",
+                    tx("godot-ui-bar-salvar_como"),
+                    tx("godot-ui-bar-salvar_com_outro_nome_ctrl"),
                     "salvar_como",
                 ),
             ] {
@@ -320,8 +334,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 ui,
                 reg,
                 "Botao_Desfazer",
-                "Desfazer",
-                "Desfazer (Ctrl+Z)",
+                tx("godot-ui-bar-desfazer"),
+                tx("godot-ui-bar-desfazer_ctrl_z"),
                 s.can_undo,
             ) {
                 act("desfazer");
@@ -330,8 +344,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 ui,
                 reg,
                 "Botao_Refazer",
-                "Refazer",
-                "Refazer (Ctrl+Y)",
+                tx("godot-ui-bar-refazer"),
+                tx("godot-ui-bar-refazer_ctrl_y"),
                 s.can_redo,
             ) {
                 act("refazer");
@@ -344,24 +358,24 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 ui.set_min_width(230.0);
                 let groups: [&[(&str, &str)]; 3] = [
                     &[
-                        ("Alinhar à esquerda", "alinhar:esquerda"),
-                        ("Alinhar ao centro (X)", "alinhar:centro_x"),
-                        ("Alinhar à direita", "alinhar:direita"),
-                        ("Alinhar ao topo", "alinhar:topo"),
-                        ("Alinhar ao centro (Y)", "alinhar:centro_y"),
-                        ("Alinhar à base", "alinhar:base"),
+                        (tx("godot-ui-bar-alinhar_a_esquerda"), "alinhar:esquerda"),
+                        (tx("godot-ui-bar-alinhar_ao_centro_x"), "alinhar:centro_x"),
+                        (tx("godot-ui-bar-alinhar_a_direita"), "alinhar:direita"),
+                        (tx("godot-ui-bar-alinhar_ao_topo"), "alinhar:topo"),
+                        (tx("godot-ui-bar-alinhar_ao_centro_y"), "alinhar:centro_y"),
+                        (tx("godot-ui-bar-alinhar_a_base"), "alinhar:base"),
                     ],
                     &[
-                        ("Distribuir em X", "distribuir:x"),
-                        ("Distribuir em Y", "distribuir:y"),
+                        (tx("godot-ui-bar-distribuir_em_x"), "distribuir:x"),
+                        (tx("godot-ui-bar-distribuir_em_y"), "distribuir:y"),
                     ],
                     &[
-                        ("Copiar (Ctrl+C)", "copiar"),
-                        ("Recortar (Ctrl+X)", "recortar"),
-                        ("Colar (Ctrl+V)", "colar"),
-                        ("Duplicar (Ctrl+D)", "duplicar"),
-                        ("Excluir (Del)", "excluir"),
-                        ("Selecionar tudo (Ctrl+A)", "tudo"),
+                        (tx("godot-ui-bar-copiar_ctrl_c"), "copiar"),
+                        (tx("godot-ui-bar-recortar_ctrl_x"), "recortar"),
+                        (tx("godot-ui-bar-colar_ctrl_v"), "colar"),
+                        (tx("godot-ui-bar-duplicar_ctrl_d"), "duplicar"),
+                        (tx("godot-ui-bar-excluir_del"), "excluir"),
+                        (tx("godot-ui-bar-selecionar_tudo_ctrl_a"), "tudo"),
                     ],
                 ];
                 for (g, items) in groups.iter().enumerate() {
@@ -380,19 +394,22 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 }
             };
             let r = if in_menu {
-                ui.menu_button("Organizar", contents)
+                ui.menu_button(tx("godot-ui-bar-organizar"), contents)
             } else {
-                ui.menu_button(("Organizar", widgets::down_arrow()), contents)
+                ui.menu_button(
+                    (tx("godot-ui-bar-organizar"), widgets::down_arrow()),
+                    contents,
+                )
             };
             reg.put("Menu_Organizar", &r.response, "Organizar");
             r.response
-                .on_hover_text("Alinhar, distribuir, copiar, colar e excluir a seleção");
+                .on_hover_text(tx("godot-ui-bar-alinhar_distribuir_copiar_colar_e"));
         }
         Unit::Grade => {
             let mut on = s.snap;
             let r = ui
-                .checkbox(&mut on, "Grade")
-                .on_hover_text("Encaixar na grade ao pôr e arrastar (G; passo ao lado)");
+                .checkbox(&mut on, tx("godot-ui-bar-grade"))
+                .on_hover_text(tx("godot-ui-bar-encaixar_na_grade_ao_por"));
             reg.put_toggle("Grade_Encaixe", &r, "Grade", s.snap);
             if r.changed() {
                 act(if on { "grade:ligar" } else { "grade:desligar" });
@@ -415,7 +432,7 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     }
                 });
             reg.put_list("Grade_Passo", &r.response, &label(s.step), choices);
-            r.response.on_hover_text("Passo da grade");
+            r.response.on_hover_text(tx("godot-ui-bar-passo_da_grade"));
             if let Some(v) = pick {
                 act(&format!("passo:{}", trim(v)));
             }
@@ -426,7 +443,7 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 reg,
                 "Botao_Atalhos",
                 "?",
-                "Atalhos (F1): a lista dos atalhos de teclado e mouse",
+                tx("godot-ui-bar-atalhos_f1_a_lista_dos"),
                 true,
             ) {
                 act("atalhos");
@@ -438,8 +455,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 ui,
                 reg,
                 "Botao_Resultados",
-                "Resultados",
-                "Tabela, gráficos, análises, cenários e otimização da última rodada",
+                tx("godot-ui-bar-resultados"),
+                tx("godot-ui-bar-tabela_graficos_analises_cenarios_e"),
                 true,
             ) {
                 act("analisar:resultados");
@@ -451,8 +468,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     ui,
                     reg,
                     "Botao_Pert",
-                    "PERT/CPM",
-                    "PERT/CPM da seleção (com dois objetos, de um até o outro)",
+                    tx("godot-ui-bar-pert_cpm"),
+                    tx("godot-ui-bar-pert_cpm_da_selecao_com"),
                     true,
                 ) {
                     act("analisar:pert_auto");
@@ -461,10 +478,10 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                 let r = ui.menu_button(widgets::down_arrow(), |ui| {
                     ui.set_min_width(300.0);
                     for (text, what) in [
-                        ("Resultados", "resultados"),
-                        ("PERT/CPM da seleção", "pert"),
-                        ("PERT/CPM de… até… (dois selecionados)", "pert_trecho"),
-                        ("Fluxos de tokens", "fluxos"),
+                        (tx("godot-ui-bar-resultados"), "resultados"),
+                        (tx("godot-ui-bar-pert_cpm_da_selecao"), "pert"),
+                        (tx("godot-ui-bar-pert_cpm_de_ate_dois"), "pert_trecho"),
+                        (tx("godot-ui-bar-fluxos_de_tokens"), "fluxos"),
                     ] {
                         let r = ui.button(text);
                         reg.put(&format!("Analisar_{what}"), &r, text);
@@ -477,8 +494,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     links_menu(ui, s, reg, &mut |a: String| act(&a));
                     ui.separator();
                     let r = ui
-                        .button("Modo missão (UTSim Ensino)")
-                        .on_hover_text("Abre as missões do UTSim Ensino neste mesmo programa");
+                        .button(tx("godot-ui-bar-modo_missao_utsim_ensino"))
+                        .on_hover_text(tx("godot-ui-bar-abre_as_missoes_do_utsim"));
                     reg.put("Ensino_Abrir", &r, "Modo missão (UTSim Ensino)");
                     if r.clicked() {
                         act("ensino:abrir");
@@ -486,9 +503,8 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
                     }
                 });
                 reg.put("Menu_Analisar", &r.response, "Analisar");
-                r.response.on_hover_text(
-                    "Outras análises: PERT/CPM de… até…, fluxos de tokens; as ligações de equipe e de pedido na vista 3D",
-                );
+                r.response
+                    .on_hover_text(tx("godot-ui-bar-outras_analises_pert_cpm_de"));
             });
         }
     }
@@ -498,19 +514,28 @@ fn unit(ui: &mut Ui, u: Unit, s: &BarState, reg: &mut Registry, out: &mut Vec<St
 fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
     let r = widgets::segmented(
         ui,
-        &["Editar", "Simular"],
+        &[tx("godot-ui-bar-editar"), tx("godot-ui-bar-simular")],
         Some(if s.editing { 0 } else { 1 }),
     );
     let tips = [
-        "Montar o modelo (Tab alterna)",
-        "Rodar as replicações e reproduzir (Tab alterna)",
+        tx("godot-ui-bar-montar_o_modelo_tab_alterna"),
+        tx("godot-ui-bar-rodar_as_replicacoes_e_reproduzir"),
     ];
     for (k, (name, mode)) in [("Modo_Editar", "editar"), ("Modo_Simular", "simular")]
         .iter()
         .enumerate()
     {
         let on = s.editing == (k == 0);
-        reg.put_toggle(name, &r[k], if k == 0 { "Editar" } else { "Simular" }, on);
+        reg.put_toggle(
+            name,
+            &r[k],
+            if k == 0 {
+                tx("godot-ui-bar-editar")
+            } else {
+                tx("godot-ui-bar-simular")
+            },
+            on,
+        );
         if r[k].clicked() {
             out.push(format!("modo:{mode}"));
         }
@@ -523,39 +548,39 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
     let tools = [
         (
             "Ferramenta_Selecionar",
-            "Selecionar",
+            tx("godot-ui-bar-selecionar"),
             "selecionar",
-            "Selecionar e mover (Esc)",
+            tx("godot-ui-bar-selecionar_e_mover_esc"),
         ),
         (
             "Ferramenta_Ligar",
-            "Ligar",
+            tx("godot-ui-bar-ligar"),
             "ligar",
-            "Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)",
+            tx("godot-ui-bar-ligar_arraste_da_origem_ao"),
         ),
         (
             "Ferramenta_Rede",
-            "Rede",
+            tx("godot-ui-bar-rede"),
             "rede",
-            "Rede de caminhos: nós e trechos (N)",
+            tx("godot-ui-bar-rede_de_caminhos_nos_e"),
         ),
         (
             "Ferramenta_Corredor",
-            "Corredor",
+            tx("godot-ui-bar-corredor"),
             "corredor",
-            "Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)",
+            tx("godot-ui-bar-corredores_de_circulacao_com_faixas"),
         ),
         (
             "Ferramenta_Zona",
-            "Zona",
+            tx("godot-ui-bar-zona"),
             "zona",
-            "Zonas de risco no piso: clique os cantos, o primeiro ponto ou Enter fecha; clique numa zona para editar (Z)",
+            tx("godot-ui-bar-zonas_de_risco_no_piso"),
         ),
         (
             "Ferramenta_Equipe",
-            "Equipe",
+            tx("godot-ui-bar-equipe"),
             "equipe",
-            "Equipe: arraste do despachante a um transportador (entra ou sai da equipe), ou de um objeto ao transportador ou despachante que leva os itens; com Shift, de um processo a quem fornece os operadores (E; Alt com Ligar)",
+            tx("godot-ui-bar-equipe_arraste_do_despachante_a"),
         ),
     ];
     let current = match s.tool.as_str() {
@@ -580,8 +605,8 @@ fn modes(ui: &mut Ui, s: &BarState, reg: &mut Registry, out: &mut Vec<String>) {
 /// The toggles of the team and request lines (ligações) the 3D view draws, inside the
 /// "Analisar" menu (present in both modes; the bar has no room for a menu of its own).
 fn links_menu(ui: &mut Ui, s: &BarState, reg: &mut Registry, act: &mut dyn FnMut(String)) {
-    ui.label(RichText::new("Ligações na vista 3D").strong());
-    for (kind, label) in LINK_KINDS {
+    ui.label(RichText::new(tx("godot-ui-bar-ligacoes_na_vista_3d")).strong());
+    for (kind, label) in link_kinds() {
         let mut on = !s.links_hidden.iter().any(|h| h == kind);
         let c = ui.checkbox(&mut on, label);
         reg.put_toggle(&format!("Ligacoes_{kind}"), &c, label, on);
@@ -594,10 +619,10 @@ fn links_menu(ui: &mut Ui, s: &BarState, reg: &mut Registry, act: &mut dyn FnMut
     }
     ui.separator();
     let mut on = !s.links_hidden.iter().any(|h| h == "simulacao");
-    let label = "Também durante a simulação";
-    let c = ui.checkbox(&mut on, label).on_hover_text(
-        "As linhas tracejadas entre operadores, veículos e máquinas no modo Simular",
-    );
+    let label = tx("godot-ui-bar-tambem_durante_a_simulacao");
+    let c = ui
+        .checkbox(&mut on, label)
+        .on_hover_text(tx("godot-ui-bar-as_linhas_tracejadas_entre_operadores"));
     reg.put_toggle("Ligacoes_simulacao", &c, label, on);
     if c.changed() {
         act(format!(

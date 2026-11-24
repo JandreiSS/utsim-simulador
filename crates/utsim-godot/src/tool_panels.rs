@@ -3,6 +3,7 @@
 //! `docs/plano_interface_rust.md`). The edits come back to the main scene as
 //! `form:<action>:<value>`, as before; the rows used to be built by `principal.gd`.
 
+use crate::texto::{fx, tx, vx};
 use serde_json::{Value, json};
 use utsim_edit::Issue;
 use utsim_model::Model;
@@ -34,9 +35,9 @@ fn issue_rows(rows: &mut Vec<Value>, issues: &[Issue], words: &[&str]) {
 /// The panel of a selected connection.
 pub fn link(from: &str, to: &str) -> Vec<Value> {
     vec![
-        json!({"kind": "title", "text": "Ligação"}),
+        json!({"kind": "title", "text": tx("godot-tool-panels-ligacao")}),
         json!({"kind": "info", "name": "Ligacao_Texto", "text": format!("{from} → {to}")}),
-        json!({"kind": "button", "name": "Ligacao_Remover", "text": "Remover ligação (Del)", "action": "ligacao_remover"}),
+        json!({"kind": "button", "name": "Ligacao_Remover", "text": tx("godot-tool-panels-remover_ligacao_del"), "action": "ligacao_remover"}),
     ]
 }
 
@@ -54,30 +55,30 @@ pub fn network(model: &Model, issues: &[Issue], sel: &NetSel) -> Vec<Value> {
     let edges = crate::network_edit::edges(model);
     let controlled = edges.iter().filter(|e| e.controlled()).count();
     let mut rows = vec![
-        json!({"kind": "title", "text": "Rede de caminhos"}),
-        json!({"kind": "info", "name": "Rede_Resumo", "text": format!("{} nó(s), {} trecho(s), {} pista(s) controlada(s).", nodes.len(), edges.len(), controlled)}),
-        json!({"kind": "help", "text": "Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado."}),
-        json!({"kind": "check", "name": "Rede_NovosMaoDupla", "text": "Novos trechos em mão dupla", "on": sel.two_way, "action": "rede_novos_mao_dupla"}),
+        json!({"kind": "title", "text": tx("godot-tool-panels-rede_de_caminhos")}),
+        json!({"kind": "info", "name": "Rede_Resumo", "text": fx("godot-tool-panels-no_s_trecho_s_pista", &[("nodes", vx(&nodes.len())), ("edges", vx(&edges.len())), ("controlled", vx(&controlled))])}),
+        json!({"kind": "help", "text": tx("godot-tool-panels-clique_no_chao_para_por")}),
+        json!({"kind": "check", "name": "Rede_NovosMaoDupla", "text": tx("godot-tool-panels-novos_trechos_em_mao_dupla"), "on": sel.two_way, "action": "rede_novos_mao_dupla"}),
     ];
     if let Some(n) = nodes.iter().find(|n| n.name == sel.node) {
-        rows.push(json!({"kind": "section", "text": format!("Nó {}", n.name)}));
-        rows.push(json!({"kind": "line", "name": "Rede_NoNome", "label": "Nome", "value": n.name, "action": "rede_no_nome"}));
-        rows.push(json!({"kind": "info", "text": format!("Posição ({}, {}) m", num(n.position[0]), num(n.position[1]))}));
-        rows.push(json!({"kind": "button", "name": "Rede_NoExcluir", "text": "Excluir nó (Del)", "action": "rede_excluir"}));
+        rows.push(json!({"kind": "section", "text": fx("godot-tool-panels-no", &[("name", vx(&n.name))])}));
+        rows.push(json!({"kind": "line", "name": "Rede_NoNome", "label": tx("godot-tool-panels-nome"), "value": n.name, "action": "rede_no_nome"}));
+        rows.push(json!({"kind": "info", "text": fx("godot-tool-panels-posicao_m", &[("position", vx(&num(n.position[0]))), ("position2", vx(&num(n.position[1])))])}));
+        rows.push(json!({"kind": "button", "name": "Rede_NoExcluir", "text": tx("godot-tool-panels-excluir_no_del"), "action": "rede_excluir"}));
     }
     if let Some((a, b)) = &sel.edge
         && let Some(e) = edges.iter().find(|e| &e.from == a && &e.to == b)
     {
         let cap = e.capacity.unwrap_or(0);
-        rows.push(json!({"kind": "section", "text": format!("Trecho {} → {}", e.from, e.to)}));
-        rows.push(json!({"kind": "info", "text": format!("Comprimento {} m", num(e.length))}));
-        rows.push(json!({"kind": "check", "name": "Rede_TrechoMaoDupla", "text": "Mão dupla", "on": e.two_way, "action": "rede_mao_dupla"}));
-        rows.push(json!({"kind": "number", "name": "Rede_TrechoCapacidade", "label": "Capacidade (veículos; 0 = sem controle)", "value": cap, "min": 0, "max": 100, "step": 1, "action": "rede_capacidade"}));
+        rows.push(json!({"kind": "section", "text": fx("godot-tool-panels-trecho", &[("from", vx(&e.from)), ("to", vx(&e.to))])}));
+        rows.push(json!({"kind": "info", "text": fx("godot-tool-panels-comprimento_m", &[("length", vx(&num(e.length)))])}));
+        rows.push(json!({"kind": "check", "name": "Rede_TrechoMaoDupla", "text": tx("godot-tool-panels-mao_dupla"), "on": e.two_way, "action": "rede_mao_dupla"}));
+        rows.push(json!({"kind": "number", "name": "Rede_TrechoCapacidade", "label": tx("godot-tool-panels-capacidade_veiculos_0_sem_controle"), "value": cap, "min": 0, "max": 100, "step": 1, "action": "rede_capacidade"}));
         if e.controlled() {
-            rows.push(json!({"kind": "error", "text": format!("Pista controlada: no máximo {cap} veículo(s) ao mesmo tempo.")}));
+            rows.push(json!({"kind": "error", "text": fx("godot-tool-panels-pista_controlada_no_maximo_veiculo", &[("cap", vx(&cap))])}));
         }
-        rows.push(json!({"kind": "button", "name": "Rede_TrechoInverter", "text": "Inverter sentido", "enabled": !e.two_way, "action": "rede_inverter"}));
-        rows.push(json!({"kind": "button", "name": "Rede_TrechoExcluir", "text": "Excluir trecho (Del)", "action": "rede_excluir"}));
+        rows.push(json!({"kind": "button", "name": "Rede_TrechoInverter", "text": tx("godot-tool-panels-inverter_sentido"), "enabled": !e.two_way, "action": "rede_inverter"}));
+        rows.push(json!({"kind": "button", "name": "Rede_TrechoExcluir", "text": tx("godot-tool-panels-excluir_trecho_del"), "action": "rede_excluir"}));
     }
     issue_rows(&mut rows, issues, &["network", "rede", "nó"]);
     rows
@@ -93,49 +94,49 @@ pub struct AisleSel {
     pub new_two_way: bool,
 }
 
-const AISLE_KINDS: [(&str, &str); 3] = [
-    ("Pedestres", "pedestrian"),
-    ("Empilhadeiras", "forklift"),
-    ("Misto", "mixed"),
-];
+fn aisle_kinds() -> [(&'static str, &'static str); 3] {
+    [
+        (tx("godot-tool-panels-pedestres"), "pedestrian"),
+        (tx("godot-tool-panels-empilhadeiras"), "forklift"),
+        (tx("godot-tool-panels-misto"), "mixed"),
+    ]
+}
 
 /// The panel of the Corredor tool.
 pub fn aisles(model: &Model, issues: &[Issue], warnings: &[Issue], sel: &AisleSel) -> Vec<Value> {
     let list = crate::aisle_edit::aisles(model);
     let crossings = crate::aisle_edit::crossings(model).len();
     let count = |k: &str| list.iter().filter(|a| a.kind == k).count();
-    let kinds: Vec<Value> = AISLE_KINDS.iter().map(|(l, k)| json!([l, k])).collect();
+    let kinds: Vec<Value> = aisle_kinds().iter().map(|(l, k)| json!([l, k])).collect();
     let mut rows = vec![
-        json!({"kind": "title", "text": "Corredores de circulação"}),
-        json!({"kind": "info", "name": "Corredor_Resumo", "text": format!(
-            "{} corredor(es): {} de pedestres, {} de empilhadeiras, {} mistos; {} cruzamento(s).",
-            list.len(), count("pedestrian"), count("forklift"), list.len() - count("pedestrian") - count("forklift"), crossings)}),
-        json!({"kind": "help", "text": "Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso."}),
+        json!({"kind": "title", "text": tx("godot-tool-panels-corredores_de_circulacao")}),
+        json!({"kind": "info", "name": "Corredor_Resumo", "text": fx("godot-tool-panels-corredor_es_de_pedestres_de", &[("list", vx(&list.len())), ("pedestrian", vx(&count("pedestrian"))), ("forklift", vx(&count("forklift"))), ("forklift2", vx(&(list.len() - count("pedestrian") - count("forklift")))), ("crossings", vx(&crossings))])}),
+        json!({"kind": "help", "text": tx("godot-tool-panels-clique_no_chao_para_por-2")}),
     ];
     match list.iter().find(|a| a.name == sel.selected) {
         None => {
-            rows.push(json!({"kind": "section", "text": "Novos corredores"}));
-            rows.push(json!({"kind": "choice", "name": "Corredor_NovoTipo", "label": "Tipo", "items": kinds, "value": sel.new_kind, "action": "corredor_tipo"}));
-            rows.push(json!({"kind": "number", "name": "Corredor_NovaLargura", "label": "Largura (m)", "value": sel.new_width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"}));
-            rows.push(json!({"kind": "check", "name": "Corredor_NovosMaoDupla", "text": "Mão dupla", "on": sel.new_two_way, "action": "corredor_mao_dupla"}));
+            rows.push(json!({"kind": "section", "text": tx("godot-tool-panels-novos_corredores")}));
+            rows.push(json!({"kind": "choice", "name": "Corredor_NovoTipo", "label": tx("godot-tool-panels-tipo"), "items": kinds, "value": sel.new_kind, "action": "corredor_tipo"}));
+            rows.push(json!({"kind": "number", "name": "Corredor_NovaLargura", "label": tx("godot-tool-panels-largura_m"), "value": sel.new_width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"}));
+            rows.push(json!({"kind": "check", "name": "Corredor_NovosMaoDupla", "text": tx("godot-tool-panels-mao_dupla"), "on": sel.new_two_way, "action": "corredor_mao_dupla"}));
         }
         Some(a) => {
-            rows.push(json!({"kind": "section", "text": format!("Corredor {}", a.name)}));
-            rows.push(json!({"kind": "line", "name": "Corredor_Nome", "label": "Nome", "value": a.name, "action": "corredor_nome"}));
-            rows.push(json!({"kind": "info", "name": "Corredor_Comprimento", "text": format!("{} ponto(s), {} m de comprimento", a.points.len(), num(a.length))}));
-            rows.push(json!({"kind": "choice", "name": "Corredor_Tipo", "label": "Tipo", "items": kinds, "value": a.kind, "action": "corredor_tipo"}));
-            rows.push(json!({"kind": "number", "name": "Corredor_Largura", "label": "Largura (m)", "value": a.width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"}));
-            rows.push(json!({"kind": "check", "name": "Corredor_MaoDupla", "text": "Mão dupla", "on": a.two_way, "action": "corredor_mao_dupla"}));
+            rows.push(json!({"kind": "section", "text": fx("godot-tool-panels-corredor", &[("name", vx(&a.name))])}));
+            rows.push(json!({"kind": "line", "name": "Corredor_Nome", "label": tx("godot-tool-panels-nome"), "value": a.name, "action": "corredor_nome"}));
+            rows.push(json!({"kind": "info", "name": "Corredor_Comprimento", "text": fx("godot-tool-panels-ponto_s_m_de_comprimento", &[("points", vx(&a.points.len())), ("length", vx(&num(a.length)))])}));
+            rows.push(json!({"kind": "choice", "name": "Corredor_Tipo", "label": tx("godot-tool-panels-tipo"), "items": kinds, "value": a.kind, "action": "corredor_tipo"}));
+            rows.push(json!({"kind": "number", "name": "Corredor_Largura", "label": tx("godot-tool-panels-largura_m"), "value": a.width, "min": 0.3, "max": 20.0, "step": 0.05, "action": "corredor_largura"}));
+            rows.push(json!({"kind": "check", "name": "Corredor_MaoDupla", "text": tx("godot-tool-panels-mao_dupla"), "on": a.two_way, "action": "corredor_mao_dupla"}));
             if a.kind != "forklift" {
-                rows.push(json!({"kind": "check", "name": "Corredor_Secundaria", "text": "Passagem secundária de pedestres (mínimo menor)", "on": a.secondary, "action": "corredor_secundaria"}));
+                rows.push(json!({"kind": "check", "name": "Corredor_Secundaria", "text": tx("godot-tool-panels-passagem_secundaria_de_pedestres_minimo"), "on": a.secondary, "action": "corredor_secundaria"}));
             }
-            rows.push(json!({"kind": "choice", "name": "Corredor_Perfil", "label": "Perfil", "items": [["Padrão do modelo", ""], ["Brasil (amarelo)", "Brasil"], ["Branco", "Branco"]], "value": a.profile, "action": "corredor_perfil"}));
+            rows.push(json!({"kind": "choice", "name": "Corredor_Perfil", "label": tx("godot-tool-panels-perfil"), "items": [[tx("godot-tool-panels-padrao_do_modelo"), ""], [tx("godot-tool-panels-brasil_amarelo"), tx("godot-tool-panels-brasil")], [tx("godot-tool-panels-branco"), tx("godot-tool-panels-branco")]], "value": a.profile, "action": "corredor_perfil"}));
             if let Some(v) = sel.vertex {
-                rows.push(json!({"kind": "info", "name": "Corredor_Vertice", "text": format!("Vértice {} selecionado", v + 1)}));
-                rows.push(json!({"kind": "button", "name": "Corredor_VerticeRemover", "text": "Remover vértice", "enabled": a.points.len() > 2, "action": "corredor_vertice_remover"}));
+                rows.push(json!({"kind": "info", "name": "Corredor_Vertice", "text": fx("godot-tool-panels-vertice_selecionado", &[("v", vx(&(v + 1)))])}));
+                rows.push(json!({"kind": "button", "name": "Corredor_VerticeRemover", "text": tx("godot-tool-panels-remover_vertice"), "enabled": a.points.len() > 2, "action": "corredor_vertice_remover"}));
             }
-            rows.push(json!({"kind": "button", "name": "Corredor_Inverter", "text": "Inverter sentido", "enabled": !a.two_way, "action": "corredor_inverter"}));
-            rows.push(json!({"kind": "button", "name": "Corredor_Excluir", "text": "Excluir corredor (Del)", "action": "corredor_excluir"}));
+            rows.push(json!({"kind": "button", "name": "Corredor_Inverter", "text": tx("godot-tool-panels-inverter_sentido"), "enabled": !a.two_way, "action": "corredor_inverter"}));
+            rows.push(json!({"kind": "button", "name": "Corredor_Excluir", "text": tx("godot-tool-panels-excluir_corredor_del"), "action": "corredor_excluir"}));
             let quoted = format!("'{}'", a.name);
             for w in warnings.iter().filter(|w| w.message.contains(&quoted)) {
                 rows.push(json!({"kind": "warning", "name": "Corredor_Aviso", "text": format!("• {}", w.message)}));
@@ -149,25 +150,27 @@ pub fn aisles(model: &Model, issues: &[Issue], warnings: &[Issue], sel: &AisleSe
 /// The panel of the Zona tool: what it does, and the zone selected.
 pub fn zones(model: &Model, issues: &[Issue], selected: &str) -> Vec<Value> {
     let mut rows = vec![
-        json!({"kind": "title", "text": "Zonas de risco"}),
-        json!({"kind": "info", "name": "Zona_Resumo", "text": format!("{} zona(s) de risco no piso.", model.zones.len())}),
-        json!({"kind": "help", "text": "Clique no chão para pôr os cantos; o primeiro ponto, Enter ou duplo clique fecha a zona, Backspace volta um ponto, Esc cancela. Clique numa zona para editá-la: arraste o meio para mover, arraste um vértice para mudar a forma; Del exclui. Os pontos encaixam na grade."}),
+        json!({"kind": "title", "text": tx("godot-tool-panels-zonas_de_risco")}),
+        json!({"kind": "info", "name": "Zona_Resumo", "text": fx("godot-tool-panels-zona_s_de_risco_no", &[("zones", vx(&model.zones.len()))])}),
+        json!({"kind": "help", "text": tx("godot-tool-panels-clique_no_chao_para_por-3")}),
     ];
     if let Some(z) = model.zones.iter().find(|z| z.name == selected) {
-        let kinds: Vec<Value> = crate::zone_edit::KINDS
+        let kinds: Vec<Value> = crate::zone_edit::kinds()
             .iter()
             .map(|(k, key, _)| json!([crate::zone_edit::kind_label(*k), key]))
             .collect();
-        rows.push(json!({"kind": "section", "text": format!("Zona {}", z.name)}));
-        rows.push(json!({"kind": "line", "name": "Zona_Nome", "label": "Nome", "value": z.name, "action": "zona_nome"}));
-        rows.push(json!({"kind": "info", "name": "Zona_Pontos", "text": format!("{} canto(s)", z.polygon.len())}));
-        rows.push(json!({"kind": "choice", "name": "Zona_Tipo", "label": "Tipo", "items": kinds, "value": crate::zone_edit::kind_key(z.kind), "action": "zona_tipo"}));
-        rows.push(json!({"kind": "number", "name": "Zona_Nivel", "label": "Nível de risco (1 a 5; 0 = sem nível)", "value": z.level.unwrap_or(0), "min": 0, "max": 5, "step": 1, "action": "zona_nivel"}));
-        rows.push(json!({"kind": "section", "text": "EPI exigido para entrar"}));
+        rows.push(json!({"kind": "section", "text": fx("godot-tool-panels-zona", &[("name", vx(&z.name))])}));
+        rows.push(json!({"kind": "line", "name": "Zona_Nome", "label": tx("godot-tool-panels-nome"), "value": z.name, "action": "zona_nome"}));
+        rows.push(json!({"kind": "info", "name": "Zona_Pontos", "text": fx("godot-tool-panels-canto_s", &[("polygon", vx(&z.polygon.len()))])}));
+        rows.push(json!({"kind": "choice", "name": "Zona_Tipo", "label": tx("godot-tool-panels-tipo"), "items": kinds, "value": crate::zone_edit::kind_key(z.kind), "action": "zona_tipo"}));
+        rows.push(json!({"kind": "number", "name": "Zona_Nivel", "label": tx("godot-tool-panels-nivel_de_risco_1_a"), "value": z.level.unwrap_or(0), "min": 0, "max": 5, "step": 1, "action": "zona_nivel"}));
+        rows.push(
+            json!({"kind": "section", "text": tx("godot-tool-panels-epi_exigido_para_entrar")}),
+        );
         for item in crate::zone_edit::ppe_choices(model) {
             rows.push(json!({"kind": "check", "name": format!("Zona_EPI_{item}"), "text": item.replace('_', " "), "on": z.ppe.contains(&item), "action": format!("zona_epi_{item}")}));
         }
-        rows.push(json!({"kind": "button", "name": "Zona_Excluir", "text": "Excluir zona (Del)", "action": "zona_excluir"}));
+        rows.push(json!({"kind": "button", "name": "Zona_Excluir", "text": tx("godot-tool-panels-excluir_zona_del"), "action": "zona_excluir"}));
     }
     issue_rows(&mut rows, issues, &["zona", "zone"]);
     rows
@@ -259,7 +262,7 @@ mod tests {
             empty[1]["text"]
                 .as_str()
                 .unwrap()
-                .starts_with("0 nó(s), 0 trecho(s)")
+                .starts_with("0 nó, 0 trecho")
         );
         let a = aisles(
             d.model(),

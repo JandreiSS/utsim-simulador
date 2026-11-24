@@ -2,26 +2,41 @@
 //! editor changes them: each change is one command of the document (one undo step). The
 //! polygons are in the model plan (metres, `y` forward); the bridge converts from Godot.
 
+use crate::texto::{fx, tx, vx};
 use utsim_edit::Command;
 use utsim_model::Model;
 use utsim_model::quality::{PPE_NAMES, ZoneDef, ZoneKind};
 
 /// The kinds of zone in panel order: the RON name and the Portuguese label.
-pub const KINDS: [(ZoneKind, &str, &str); 6] = [
-    (ZoneKind::Vehicle, "Vehicle", "Tráfego de veículos"),
-    (ZoneKind::Machine, "Machine", "Alcance de máquina"),
-    (ZoneKind::SuspendedLoad, "SuspendedLoad", "Carga suspensa"),
-    (ZoneKind::Noise, "Noise", "Ruído"),
-    (ZoneKind::Heat, "Heat", "Calor"),
-    (ZoneKind::Other, "Other", "Outro"),
-];
+pub fn kinds() -> [(ZoneKind, &'static str, &'static str); 6] {
+    [
+        (
+            ZoneKind::Vehicle,
+            "Vehicle",
+            tx("godot-zone-edit-trafego_de_veiculos"),
+        ),
+        (
+            ZoneKind::Machine,
+            "Machine",
+            tx("godot-zone-edit-alcance_de_maquina"),
+        ),
+        (
+            ZoneKind::SuspendedLoad,
+            "SuspendedLoad",
+            tx("godot-zone-edit-carga_suspensa"),
+        ),
+        (ZoneKind::Noise, "Noise", tx("godot-zone-edit-ruido")),
+        (ZoneKind::Heat, "Heat", tx("godot-zone-edit-calor")),
+        (ZoneKind::Other, "Other", tx("godot-zone-edit-outro")),
+    ]
+}
 
 pub fn kind_key(k: ZoneKind) -> &'static str {
-    KINDS.iter().find(|x| x.0 == k).map_or("Other", |x| x.1)
+    kinds().iter().find(|x| x.0 == k).map_or("Other", |x| x.1)
 }
 
 pub fn kind_of(key: &str) -> Option<ZoneKind> {
-    KINDS.iter().find(|x| x.1 == key).map(|x| x.0)
+    kinds().iter().find(|x| x.1 == key).map(|x| x.0)
 }
 
 /// The protective equipment the panel offers: the known names, then any other the model
@@ -43,13 +58,13 @@ fn zone<'a>(model: &'a Model, name: &str) -> Result<&'a ZoneDef, String> {
         .zones
         .iter()
         .find(|z| z.name == name)
-        .ok_or_else(|| format!("a zona '{name}' não existe"))
+        .ok_or_else(|| fx("godot-zone-edit-a_zona_nao_existe", &[("name", vx(&name))]))
 }
 
 /// A new zone along `polygon`: the first free name `zona_N`, traffic of vehicles, level 3.
 pub fn add(model: &Model, polygon: Vec<[f64; 2]>) -> Result<(String, Command), String> {
     if polygon.len() < 3 {
-        return Err("uma zona precisa de pelo menos 3 pontos".into());
+        return Err(tx("godot-zone-edit-uma_zona_precisa_de_pelo").into());
     }
     let name = (1..)
         .map(|k| format!("zona_{k}"))
@@ -83,19 +98,24 @@ pub fn set_field(model: &Model, name: &str, field: &str, value: &str) -> Result<
         "name" => {
             let v = value.trim();
             if v.is_empty() {
-                return Err("a zona precisa de um nome".into());
+                return Err(tx("godot-zone-edit-a_zona_precisa_de_um").into());
             }
             z.name = v.to_owned();
         }
         "kind" => {
-            z.kind = kind_of(value).ok_or_else(|| format!("tipo de zona desconhecido: {value}"))?
+            z.kind = kind_of(value).ok_or_else(|| {
+                fx(
+                    "godot-zone-edit-tipo_de_zona_desconhecido",
+                    &[("value", vx(&value))],
+                )
+            })?
         }
         "level" => {
             let l: f64 = value
                 .trim()
                 .replace(',', ".")
                 .parse()
-                .map_err(|_| "nível: um número de 1 a 5")?;
+                .map_err(|_| tx("godot-zone-edit-nivel_um_numero_de_1"))?;
             z.level = (l >= 1.0).then(|| l.round().clamp(1.0, 5.0) as u8);
         }
         "ppe" => {
@@ -106,7 +126,12 @@ pub fn set_field(model: &Model, name: &str, field: &str, value: &str) -> Result<
                 z.ppe.push(v);
             }
         }
-        _ => return Err(format!("campo de zona desconhecido: {field}")),
+        _ => {
+            return Err(fx(
+                "godot-zone-edit-campo_de_zona_desconhecido",
+                &[("field", vx(&field))],
+            ));
+        }
     }
     Ok(Command::SetZone {
         name: name.to_owned(),

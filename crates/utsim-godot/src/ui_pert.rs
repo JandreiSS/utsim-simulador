@@ -19,6 +19,7 @@
 //! `Pert_DistribuicaoTexto`, `Pert_Histograma`, `Pert_Tabela`, `Pert_Texto`); the tabs are
 //! `Pert_Abas_<título>`.
 
+use crate::texto::{fx, tx, vx};
 use egui::{
     Align, Align2, Color32, FontId, Id, Label, Layout, Rect, RichText, ScrollArea, Sense, Shape,
     Stroke, StrokeKind, TextEdit, TextStyle, Ui, UiBuilder, Vec2, pos2, vec2,
@@ -34,25 +35,35 @@ use crate::ui_results::{
 };
 
 /// The tabs, in order.
-pub const TABS: [&str; 5] = ["Rede", "Gantt", "Distribuição", "Tabela", "Texto"];
+pub fn tabs() -> [&'static str; 5] {
+    [
+        tx("godot-ui-pert-rede"),
+        tx("godot-ui-pert-gantt"),
+        tx("godot-ui-pert-distribuicao"),
+        tx("godot-ui-pert-tabela"),
+        tx("godot-ui-pert-texto"),
+    ]
+}
 /// The modes: id (as the bridge names it), label and tip.
-pub const MODES: [(&str, &str, &str); 3] = [
-    (
-        "simulado",
-        "Simulado",
-        "Caminho crítico observado na simulação: filas, transportes e recursos incluídos",
-    ),
-    (
-        "classico",
-        "Clássico",
-        "PERT clássico: estimativas (a, m, b), CPM nas médias e P(prazo) pela normal",
-    ),
-    (
-        "montecarlo",
-        "Monte Carlo",
-        "Sorteios das durações sobre a rede: criticidade e distribuição do tempo total",
-    ),
-];
+pub fn modes() -> [(&'static str, &'static str, &'static str); 3] {
+    [
+        (
+            "simulado",
+            tx("godot-ui-pert-simulado"),
+            tx("godot-ui-pert-caminho_critico_observado_na_simulacao"),
+        ),
+        (
+            "classico",
+            tx("godot-ui-pert-classico"),
+            tx("godot-ui-pert-pert_classico_estimativas_a_m"),
+        ),
+        (
+            "montecarlo",
+            tx("godot-ui-pert-monte_carlo"),
+            tx("godot-ui-pert-sorteios_das_duracoes_sobre_a"),
+        ),
+    ]
+}
 /// The critical path and the boxes on it.
 const HOT: Color32 = Color32::from_rgb(255, 107, 77);
 const LINE: Color32 = Color32::from_rgb(140, 153, 173);
@@ -140,17 +151,26 @@ pub fn summary(d: &Value) -> Vec<(String, Color32)> {
         format!("{} ({}).", text(&d["mode_label"]), text(&d["selection"])),
         colors::TEXT_STRONG,
     )];
-    let spread = f(&t["sd"]).map_or(String::new(), |sd| format!(", desvio {}", num(sd)));
+    let spread = f(&t["sd"]).map_or(String::new(), |sd| {
+        fx("godot-ui-pert-desvio", &[("sd", vx(&num(sd)))])
+    });
     let units = if t["units"].is_null() {
         String::new()
     } else {
-        format!(" ({} unidades/sorteios)", text(&t["units"]))
+        fx(
+            "godot-ui-pert-unidades_sorteios",
+            &[("units", vx(&text(&t["units"])))],
+        )
     };
     lines.push((
-        format!(
-            "Tempo total: {}{spread}{units}. CPM nas médias: {}.",
-            mh(t),
-            num(f(&d["project"]).unwrap_or(f64::NAN))
+        fx(
+            "godot-ui-pert-tempo_total_cpm_nas_medias",
+            &[
+                ("t", vx(&mh(t))),
+                ("spread", vx(&spread)),
+                ("units", vx(&units)),
+                ("project", vx(&num(f(&d["project"]).unwrap_or(f64::NAN)))),
+            ],
         ),
         colors::TEXT,
     ));
@@ -161,16 +181,18 @@ pub fn summary(d: &Value) -> Vec<(String, Color32)> {
             num(f(&dl["probability"]).unwrap_or(f64::NAN) * 100.0)
         );
         if let (Some(lo), Some(hi)) = (f(&dl["low"]), f(&dl["high"])) {
-            p.push_str(&format!(
-                " (IC {}% a {}%)",
-                num(lo * 100.0),
-                num(hi * 100.0)
+            p.push_str(&fx(
+                "godot-ui-pert-ic_a",
+                &[("lo", vx(&num(lo * 100.0))), ("hi", vx(&num(hi * 100.0)))],
             ));
         }
         lines.push((
-            format!(
-                "P(T ≤ {}) = {p}",
-                num(f(&dl["deadline"]).unwrap_or(f64::NAN))
+            fx(
+                "godot-ui-pert-p_t",
+                &[
+                    ("deadline", vx(&num(f(&dl["deadline"]).unwrap_or(f64::NAN)))),
+                    ("p", vx(&p)),
+                ],
             ),
             colors::TEXT,
         ));
@@ -183,16 +205,24 @@ pub fn summary(d: &Value) -> Vec<(String, Color32)> {
             .map(text)
             .collect();
         lines.push((
-            format!(
-                "Caminho crítico: {} ({}%)",
-                names.join(" → "),
-                num(f(&path["index"]).unwrap_or(f64::NAN) * 100.0)
+            fx(
+                "godot-ui-pert-caminho_critico",
+                &[
+                    ("names", vx(&names.join(" → "))),
+                    (
+                        "index",
+                        vx(&num(f(&path["index"]).unwrap_or(f64::NAN) * 100.0)),
+                    ),
+                ],
             ),
             HOT,
         ));
     }
     for w in d["warnings"].as_array().into_iter().flatten() {
-        lines.push((format!("aviso: {}", text(w)), colors::WARNING));
+        lines.push((
+            fx("godot-ui-pert-aviso", &[("w", vx(&text(w)))]),
+            colors::WARNING,
+        ));
     }
     lines
 }
@@ -200,24 +230,29 @@ pub fn summary(d: &Value) -> Vec<(String, Color32)> {
 /// The line under the "Distribuição" tab's title.
 pub fn distribution_text(d: &Value) -> String {
     let source = match d["mode"].as_str() {
-        Some("classico") => "aproximação normal do PERT clássico",
+        Some("classico") => tx("godot-ui-pert-aproximacao_normal_do_pert_classico"),
         Some("montecarlo") => "sorteios",
-        _ => "unidades observadas",
+        _ => tx("godot-ui-pert-unidades_observadas"),
     };
     let marker = if d["total"]["deadline"].is_object() {
-        "; a linha amarela é o prazo"
+        tx("godot-ui-pert-a_linha_amarela_e_o")
     } else {
         ""
     };
-    format!("Distribuição do tempo total ({source}){marker}.")
+    fx(
+        "godot-ui-pert-distribuicao_do_tempo_total",
+        &[("source", vx(&source)), ("marker", vx(&marker))],
+    )
 }
 
 /// The status line after a calculation.
 pub fn status_line(d: &Value) -> String {
-    format!(
-        "PERT/CPM ({}): tempo total {}.",
-        text(&d["mode"]),
-        mh(&d["total"])
+    fx(
+        "godot-ui-pert-pert_cpm_tempo_total",
+        &[
+            ("mode", vx(&text(&d["mode"]))),
+            ("total", vx(&mh(&d["total"]))),
+        ],
     )
 }
 
@@ -256,15 +291,15 @@ pub fn activity_table(d: &Value) -> Table {
         .collect();
     Table {
         header: [
-            "Atividade",
-            "Duração",
+            tx("godot-ui-pert-atividade"),
+            tx("godot-ui-pert-duracao"),
             "ES",
             "EF",
             "LS",
             "LF",
-            "Folga total",
-            "Folga livre",
-            "Criticidade",
+            tx("godot-ui-pert-folga_total"),
+            tx("godot-ui-pert-folga_livre"),
+            tx("godot-ui-pert-criticidade"),
         ]
         .iter()
         .map(|s| s.to_string())
@@ -342,7 +377,7 @@ pub fn show(
         lines.join("\n")
     };
     named(ui, reg, "Pert_Resumo", &block.response, shown.trim());
-    tab_row(ui, reg, "Pert_Abas", &TABS, &mut mem.tab);
+    tab_row(ui, reg, "Pert_Abas", &tabs(), &mut mem.tab);
     let Some(v) = view else {
         // The diagram is there, empty, until the first result.
         record(reg, "Pert_Diagrama", Rect::NOTHING, String::new(), Some(0));
@@ -382,9 +417,10 @@ pub fn show(
                         .filter_map(Value::as_f64)
                         .collect();
                     let deadline = f(&d["total"]["deadline"]["deadline"]);
-                    let label = deadline.map(|x| format!("prazo {}", num(x)));
+                    let label =
+                        deadline.map(|x| fx("godot-ui-pert-prazo", &[("num", vx(&num(x)))]));
                     let r = if counts.is_empty() {
-                        explain(ui, "sem distribuição para este modo")
+                        explain(ui, tx("godot-ui-pert-sem_distribuicao_para_este_modo"))
                     } else {
                         histogram_with(
                             ui,
@@ -412,7 +448,7 @@ pub fn show(
                 .show(ui, |ui| {
                     draw_table(ui, reg, "Pert_Tabela", &activity_table(d));
                     for h in d["assumptions"].as_array().into_iter().flatten() {
-                        explain(ui, &format!("hipótese: {}", text(h)));
+                        explain(ui, &fx("godot-ui-pert-hipotese", &[("h", vx(&text(h)))]));
                     }
                 });
         }
@@ -455,15 +491,15 @@ fn header(ui: &mut Ui, mem: &mut PertMemory, reg: &mut Registry, out: &mut Vec<S
                 ui,
                 reg,
                 "Pert_Fechar",
-                "Fechar",
-                "Fechar a janela PERT/CPM",
+                tx("godot-ui-pert-fechar"),
+                tx("godot-ui-pert-fechar_a_janela_pert_cpm"),
                 true,
             ) {
                 out.push("pert:fechar".into());
             }
             ui.add_space(8.0);
             // Right to left: the last mode first.
-            for (id, label, tip) in MODES.iter().rev() {
+            for (id, label, tip) in modes().iter().rev() {
                 let on = mem.mode == *id;
                 let r = ui
                     .add(egui::Button::selectable(on, *label))
@@ -486,33 +522,47 @@ fn options(
     out: &mut Vec<String>,
 ) {
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Prazo").color(colors::TEXT));
-        let r = field_response(ui, reg, "Pert_Prazo", &mut mem.deadline, 90.0, "sem prazo");
+        ui.label(RichText::new(tx("godot-ui-pert-prazo-2")).color(colors::TEXT));
+        let r = field_response(
+            ui,
+            reg,
+            "Pert_Prazo",
+            &mut mem.deadline,
+            90.0,
+            tx("godot-ui-pert-sem_prazo"),
+        );
         if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
             out.push(format!("pert:calcular:{}", mem.mode));
         }
-        ui.label(RichText::new("Sorteios (Monte Carlo)").color(colors::TEXT));
+        ui.label(RichText::new(tx("godot-ui-pert-sorteios_monte_carlo")).color(colors::TEXT));
         field(ui, reg, "Pert_Sorteios", &mut mem.samples, 80.0, "10000");
         if button(
             ui,
             reg,
             "Pert_Recalcular",
-            "Recalcular",
-            "Calcula de novo no modo atual",
+            tx("godot-ui-pert-recalcular"),
+            tx("godot-ui-pert-calcula_de_novo_no_modo"),
             true,
         ) {
             out.push(format!("pert:calcular:{}", mem.mode));
         }
         ui.add_space(16.0);
         let w = (ui.available_width() - 190.0).clamp(160.0, 420.0);
-        field(ui, reg, "Pert_Arquivo", &mut mem.file, w, "relatório .html");
+        field(
+            ui,
+            reg,
+            "Pert_Arquivo",
+            &mut mem.file,
+            w,
+            tx("godot-ui-pert-relatorio_html"),
+        );
         let ready = view.is_some();
         if button(
             ui,
             reg,
             "Pert_ExportarHTML",
-            "Exportar HTML",
-            "Grava o relatório HTML do PERT/CPM",
+            tx("godot-ui-pert-exportar_html"),
+            tx("godot-ui-pert-grava_o_relatorio_html_do"),
             ready,
         ) {
             out.push("pert:exportar_html".into());
@@ -521,8 +571,8 @@ fn options(
             ui,
             reg,
             "Pert_ExportarCSV",
-            "CSV",
-            "Grava as tabelas em CSV na pasta do arquivo",
+            tx("godot-ui-pert-csv"),
+            tx("godot-ui-pert-grava_as_tabelas_em_csv"),
             ready,
         ) {
             out.push("pert:exportar_csv".into());

@@ -15,6 +15,7 @@
 //! The quality and safety numbers need the per-item log and the trace, so they come from
 //! one more run per replication ([`replica`]), done off the main thread by the bridge.
 
+use crate::texto::tx;
 use std::collections::BTreeMap;
 
 use utsim_core::{ItemRecord, RunReport};
@@ -229,9 +230,9 @@ fn qualidade(model: &Model, name: &str, reports: &[RunReport], reps: &[Replica])
             .filter_map(|r| r.block(name).map(|b| b.input as f64))
             .collect();
         out.push(linha(
-            "Itens refugados",
+            tx("godot-indicadores-itens_refugados"),
             mh(&v, false),
-            "Itens que terminaram neste refugo, por replicação.",
+            tx("godot-indicadores-itens_que_terminaram_neste_refugo"),
         ));
     }
     let qs: Vec<&Qualidade> = reps.iter().filter_map(|r| r.qualidade.as_ref()).collect();
@@ -244,33 +245,33 @@ fn qualidade(model: &Model, name: &str, reports: &[RunReport], reps: &[Replica])
     if o.quality.is_some() {
         let g = col(&|q| Some(q.defeitos.get(name).copied().unwrap_or(0.0)));
         out.push(linha(
-            "Defeitos gerados",
+            tx("godot-indicadores-defeitos_gerados"),
             mh(&g, false),
-            "Defeitos que este posto gerou, por replicação.",
+            tx("godot-indicadores-defeitos_que_este_posto_gerou"),
         ));
         let e = col(&|q| Some(q.escapes.get(name).copied().unwrap_or(0.0)));
         out.push(linha(
-            "Defeitos que escaparam",
+            tx("godot-indicadores-defeitos_que_escaparam"),
             mh(&e, false),
-            "Defeitos deste posto que chegaram ao cliente (falha externa), por replicação.",
+            tx("godot-indicadores-defeitos_deste_posto_que_chegaram"),
         ));
     }
     if o.inspection.is_some() {
         let r = col(&|q| q.rendimento.get(name).copied());
         if !r.is_empty() {
             out.push(linha(
-                "Rendimento de primeira",
+                tx("godot-indicadores-rendimento_de_primeira"),
                 mh(&r, true),
-                "Itens inspecionados uma só vez e entregues, sobre os inspecionados.",
+                tx("godot-indicadores-itens_inspecionados_uma_so_vez"),
             ));
         }
     }
     let c = col(&|q| Some(q.custo.get(name).copied().unwrap_or(0.0)));
     if c.iter().any(|x| *x != 0.0) {
         out.push(linha(
-            "Custo da qualidade",
+            tx("godot-indicadores-custo_da_qualidade"),
             mh(&c, false),
-            "Avaliação, falha interna e falha externa atribuídas a este posto, por replicação.",
+            tx("godot-indicadores-avaliacao_falha_interna_e_falha"),
         ));
     }
     out
@@ -322,27 +323,27 @@ fn seguranca(model: &Model, name: &str, reps: &[Replica]) -> Vec<Linha> {
             .collect();
         let (rot, ajuda) = if movel {
             (
-                "Tempo em zonas",
-                "Tempo desta pessoa dentro das zonas de risco, por replicação.",
+                tx("godot-indicadores-tempo_em_zonas"),
+                tx("godot-indicadores-tempo_desta_pessoa_dentro_das"),
             )
         } else {
             (
-                "Exposição nas zonas",
-                "Tempo de pessoas dentro das zonas onde este posto está, somado, por replicação.",
+                tx("godot-indicadores-exposicao_nas_zonas"),
+                tx("godot-indicadores-tempo_de_pessoas_dentro_das"),
             )
         };
         if !zonas.is_empty() {
             out.push(linha(
-                "Zonas",
+                tx("godot-indicadores-zonas"),
                 zonas.join(", "),
-                "Zonas de risco onde o posto está.",
+                tx("godot-indicadores-zonas_de_risco_onde_o"),
             ));
         }
         out.push(linha(rot, mh(&tempo, false), ajuda));
         out.push(linha(
-            "Entradas sem EPI",
+            tx("godot-indicadores-entradas_sem_epi"),
             mh(&sem, false),
-            "Entradas na zona sem o equipamento de proteção que ela pede, por replicação.",
+            tx("godot-indicadores-entradas_na_zona_sem_o"),
         ));
     }
     let perto = |n: &exposure::NearMiss| {
@@ -361,12 +362,12 @@ fn seguranca(model: &Model, name: &str, reps: &[Replica]) -> Vec<Linha> {
         .any(|e| !e.zones.is_empty() || !e.near_misses.is_empty());
     if movel || q.iter().any(|x| *x > 0.0) || (ha_pessoas && !zonas.is_empty()) {
         out.push(linha(
-            "Quase-conflitos",
+            tx("godot-indicadores-quase_conflitos"),
             mh(&q, false),
             if movel {
-                "Pessoa e veículo mais perto que o limiar, envolvendo este recurso, por replicação. Simulado: serve para comparar layouts, não estima acidentes reais."
+                tx("godot-indicadores-pessoa_e_veiculo_mais_perto")
             } else {
-                "Pessoa e veículo mais perto que o limiar a até 3 m deste posto, por replicação. Simulado: serve para comparar layouts, não estima acidentes reais."
+                tx("godot-indicadores-pessoa_e_veiculo_mais_perto-2")
             },
         ));
     }
@@ -388,43 +389,43 @@ fn manutencao(name: &str, reports: &[RunReport]) -> Vec<Linha> {
     let mut out = Vec::new();
     if let Some(f) = custom("maintenance.failures") {
         out.push(linha(
-            "Quebras",
+            tx("godot-indicadores-quebras"),
             mh(&f, false),
-            "Falhas do posto, por replicação.",
+            tx("godot-indicadores-falhas_do_posto_por_replicacao"),
         ));
         if let Some(v) = custom("maintenance.mtbf") {
             out.push(linha(
                 "MTBF",
                 mh(&v, false),
-                "Tempo médio entre falhas (tempo em pé sobre o número de falhas).",
+                tx("godot-indicadores-tempo_medio_entre_falhas_tempo"),
             ));
         }
         if let Some(v) = custom("maintenance.mttr") {
             out.push(linha(
                 "MTTR",
                 mh(&v, false),
-                "Tempo médio de reparo, da quebra até voltar a produzir.",
+                tx("godot-indicadores-tempo_medio_de_reparo_da"),
             ));
         }
         if let Some(v) = custom("maintenance.down_time") {
             out.push(linha(
-                "Tempo parado",
+                tx("godot-indicadores-tempo_parado"),
                 mh(&v, false),
-                "Tempo em manutenção corretiva, por replicação.",
+                tx("godot-indicadores-tempo_em_manutencao_corretiva_por"),
             ));
         }
         if let Some(v) = custom("oee.availability") {
             out.push(linha(
-                "Disponibilidade",
+                tx("godot-indicadores-disponibilidade"),
                 mh(&v, true),
-                "Tempo produzindo sobre o tempo planejado (sem turno e preventivas).",
+                tx("godot-indicadores-tempo_produzindo_sobre_o_tempo"),
             ));
         }
         if let Some(v) = custom("maintenance.cost").filter(|v| v.iter().any(|x| *x != 0.0)) {
             out.push(linha(
-                "Custo de manutenção",
+                tx("godot-indicadores-custo_de_manutencao"),
                 mh(&v, false),
-                "Tempo parado, reparos e preventivas pelos custos do bloco, por replicação.",
+                tx("godot-indicadores-tempo_parado_reparos_e_preventivas"),
             ));
         }
         return out;
@@ -440,14 +441,14 @@ fn manutencao(name: &str, reports: &[RunReport]) -> Vec<Linha> {
             })
             .collect();
         out.push(linha(
-            "Tempo parado",
+            tx("godot-indicadores-tempo_parado"),
             mh(&down, true),
-            "Parcela do tempo em quebra, por replicação.",
+            tx("godot-indicadores-parcela_do_tempo_em_quebra"),
         ));
         out.push(linha(
-            "Disponibilidade",
+            tx("godot-indicadores-disponibilidade"),
             mh(&disp, true),
-            "Tempo fora de quebra sobre o tempo planejado (sem turno).",
+            tx("godot-indicadores-tempo_fora_de_quebra_sobre"),
         ));
     }
     out

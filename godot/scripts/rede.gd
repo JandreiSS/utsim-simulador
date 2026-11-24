@@ -160,7 +160,7 @@ func release(p: Vector2) -> void:
 func cancel() -> bool:
 	if editor.ed.net_cancel():
 		_pull()
-		main.set_status("Caminho encerrado. Clique no chão para começar outro, ou Esc para sair da ferramenta.")
+		main.set_status(main.T("godot-gd-rede-caminho_encerrado_clique_no_chao"))
 		return true
 	return false
 
@@ -186,35 +186,35 @@ func _apply(effects: Array) -> void:
 				var from := armed
 				var name: String = doc().add_node(e["at"], main.snap_step(), from, two_way)
 				if name == "":
-					main.set_status("Não colocou o nó: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-rede-nao_colocou_o_no", [doc().last_error()]))
 					continue
 				editor.ed.net_placed(name)
 				main.after_edit()
 				main.on_network_selection()
 				if from != "":
-					main.set_status("Nó %s ligado a %s. Clique de novo para continuar o caminho (Esc para)." % [name, from])
+					main.set_status(main.T("godot-gd-rede-no_ligado_a_clique_de", [name, from]))
 				else:
-					main.set_status("Nó %s colocado. Clique em outro ponto para traçar um trecho (Esc para)." % name)
+					main.set_status(main.T("godot-gd-rede-no_colocado_clique_em_outro", [name]))
 			"rede_mover":
 				if doc().move_node(e["name"], e["at"], main.snap_step()):
 					main.after_edit()
-					main.set_status("Nó %s movido." % e["name"])
+					main.set_status(main.T("godot-gd-rede-no_movido", [e["name"]]))
 				else:
-					main.set_status("Não moveu: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-rede-nao_moveu", [doc().last_error()]))
 			"rede_trecho":
 				if doc().add_edge(e["from"], e["to"], two_way):
 					main.after_edit()
-					main.set_status("Trecho %s → %s criado (%s)." % [e["from"], e["to"], "mão dupla" if two_way else "mão única"])
+					main.set_status(main.T("godot-gd-rede-trecho_criado", [e["from"], e["to"], main.T("godot-gd-mao-dupla") if two_way else main.T("godot-gd-mao-unica")]))
 				else:
-					main.set_status("Não ligou: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-rede-nao_ligou", [doc().last_error()]))
 			"rede_trecho_excluir":
 				if doc().remove_edge(e["from"], e["to"]):
 					main.after_edit()
-					main.set_status("Trecho %s → %s removido." % [e["from"], e["to"]])
+					main.set_status(main.T("godot-gd-rede-trecho_removido", [e["from"], e["to"]]))
 			"rede_no_excluir":
 				if doc().remove_nodes(PackedStringArray([e["name"]])):
 					main.after_edit()
-					main.set_status("Nó %s removido com os trechos dele." % e["name"])
+					main.set_status(main.T("godot-gd-rede-no_removido_com_os_trechos", [e["name"]]))
 	_pull()
 
 
@@ -229,7 +229,7 @@ func set_two_way(on: bool) -> void:
 	var e := _edge(selected_edge[0], selected_edge[1])
 	if doc().set_edge(selected_edge[0], selected_edge[1], on, int(e.get("capacity", 0))):
 		main.after_edit()
-		main.set_status("Trecho %s → %s em %s." % [selected_edge[0], selected_edge[1], "mão dupla" if on else "mão única"])
+		main.set_status(main.T("godot-gd-rede-trecho_em", [selected_edge[0], selected_edge[1], "mão dupla" if on else "mão única"]))
 
 
 func set_capacity(capacity: int) -> void:
@@ -239,9 +239,9 @@ func set_capacity(capacity: int) -> void:
 	if doc().set_edge(selected_edge[0], selected_edge[1], bool(e.get("two_way", true)), capacity):
 		main.after_edit()
 		if capacity > 0:
-			main.set_status("Pista controlada: até %d veículo(s) ao mesmo tempo no trecho." % capacity)
+			main.set_status(main.T("godot-gd-rede-pista_controlada_ate_veiculo_s", [capacity]))
 		else:
-			main.set_status("Trecho sem controle de tráfego.")
+			main.set_status(main.T("godot-gd-rede-trecho_sem_controle_de_trafego"))
 
 
 func reverse() -> void:
@@ -252,7 +252,7 @@ func reverse() -> void:
 		selected_edge = [e[1], e[0]]
 		_push()
 		main.after_edit()
-		main.set_status("Trecho invertido: %s → %s." % [e[1], e[0]])
+		main.set_status(main.T("godot-gd-rede-trecho_invertido", [e[1], e[0]]))
 
 
 func rename(to: String) -> void:
@@ -265,9 +265,9 @@ func rename(to: String) -> void:
 			armed = selected_node
 		_push()
 		main.after_edit()
-		main.set_status("Nó %s agora se chama %s." % [from, selected_node])
+		main.set_status(main.T("godot-gd-rede-no_agora_se_chama", [from, selected_node]))
 	else:
-		main.set_status("Não renomeou: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-rede-nao_renomeou", [doc().last_error()]))
 
 
 # ---------------------------------------------------------------------------
