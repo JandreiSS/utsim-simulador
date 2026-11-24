@@ -51,6 +51,11 @@ done
 
 cp -r examples "$DESTINO/examples"
 cp -r assets "$DESTINO/assets"
+if [ -n "$GODOT_EXPORT" ]; then
+    # O boneco animado (quaternius_ual*, 15,7 MB) só servia ao utsim-view, que não vai junto
+    # do 3D: as pessoas do 3D usam os corpos e os clipes de assets/modelos3d.
+    rm -rf "$DESTINO/assets/terceiros/quaternius_ual" "$DESTINO/assets/terceiros/quaternius_ual2"
+fi
 
 if [ -f docs/manual/book/index.html ]; then
     mkdir -p "$DESTINO/manual"

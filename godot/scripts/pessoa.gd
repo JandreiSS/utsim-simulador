@@ -1,15 +1,13 @@
-## Skeletal person: the CC0 mannequin of the Universal Animation Library, driven by the
-## clip index and clip time that the bridge computes from `Pose.motion` (the mapping and
-## the strides of `crates/utsim-viewer/src/people.rs`, ported to `utsim-godot/looks.rs`).
-##
-## The clips of the second file (`pessoa_operador_carga`: walking with a box) are added
-## as the animation library "ual2"; both files share the skeleton and the node paths, so
-## its tracks drive this mannequin as they are.
+## Skeletal person, driven by the clip index and clip time that the bridge computes from
+## `Pose.motion` (the mapping and the strides of `crates/utsim-viewer/src/people.rs`,
+## ported to `utsim-godot/looks.rs`).
 ##
 ## The bodies made in Blender (`pessoa_homem.glb`, `pessoa_mulher.glb`,
-## `docs/elementos_3d_blender.md`) have the UAL1 skeleton and no clips: [method bind] takes
-## the UAL1 clips too and names the skeleton's path as the tracks expect, and
-## [method vestir] shows the person's protective equipment and puts its colours on.
+## `docs/elementos_3d_blender.md`) have the mannequin skeleton and no clips: [method bind]
+## takes the base clips (`pessoa_clipes_base.glb`) and names the skeleton's path as the
+## tracks expect, and [method vestir] shows the person's protective equipment and puts its
+## colours on. The clip of walking with a box (`pessoa_clipes.glb`) is added as the
+## animation library "ual2"; both files share the skeleton and the node paths.
 ##
 ## An AnimationTree in manual mode, every clip seeked to the time the scene gives, so
 ## jumping to `t` gives the pose of `t`:
@@ -47,10 +45,10 @@ var _time_b := 0.0
 static var _materials := {}
 
 
-## Binds the mannequin instance `asset` (the imported scene of UAL1); `clips2` is the
-## AnimationLibrary of UAL2; `names` the clip names in index order. `clips1`: the
-## AnimationLibrary of UAL1, for a body without clips of its own (a Blender body); then
-## the mannequin is not dressed (the body has its own clothes and equipment). Returns
+## Binds the person instance `asset`; `clips2` is the AnimationLibrary "ual2" (walking
+## with a box); `names` the clip names in index order. `clips1`: the base clips, for a body
+## without clips of its own (a Blender body); then it is not dressed (the body has its own
+## clothes and equipment); a file with clips of its own is dressed as the mannequin. Returns
 ## false when the scene is not the expected one (no skeleton, or no clips).
 func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray, clips1: AnimationLibrary = null) -> bool:
 	_names = names
@@ -110,7 +108,7 @@ func bind(asset: Node3D, clips2: AnimationLibrary, names: PackedStringArray, cli
 
 
 ## A body without clips: names the skeleton and its parents as the bone tracks of `clips`
-## address them (`Armature/Skeleton3D:pelvis` in the UAL files) and returns the node they
+## address them (`Armature/Skeleton3D:pelvis` in the clip files) and returns the node they
 ## are relative to, or null when the path does not fit inside `asset`.
 func _align(asset: Node3D, clips: AnimationLibrary) -> Node:
 	var prefix := ""

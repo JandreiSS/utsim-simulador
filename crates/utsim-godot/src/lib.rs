@@ -686,25 +686,20 @@ impl UtsimPlayback {
                 put(&mut e, "carry", l.carry.name());
                 put(&mut e, "skeletal", l.skeletal);
                 if let Some(p) = &v.pessoa {
-                    let mut body = VarDictionary::new();
-                    put(&mut body, "arquivo", GString::from(p.arquivo.as_str()));
-                    put(&mut body, "epis", strings(&p.epis));
-                    let mut cores = VarDictionary::new();
-                    for (material, hex) in &p.cores {
-                        put(&mut cores, material, GString::from(hex.as_str()));
-                    }
-                    put(&mut body, "cores", cores);
-                    put(&mut body, "altura", p.altura);
-                    put(&mut body, "escala", p.escala);
-                    put(&mut body, "largura", p.largura);
-                    put(&mut e, "pessoa", body);
+                    put(&mut e, "pessoa", body_dict(p));
                 }
             }
             if let Some(m) = &v.driver {
                 let mut driver = VarDictionary::new();
                 put(&mut driver, "position", v3(m.position));
                 put(&mut driver, "yaw", m.yaw);
-                put(&mut driver, "scale", m.scale);
+                // The mount is sized for the library mannequin; the Blender body has the same
+                // skeleton at real size (the mannequin's catalogue scale).
+                let mannequin = catalogue::by_name(looks::PERSON).map_or(1.0, |e| e.escala_real);
+                put(&mut driver, "scale", m.scale / mannequin.max(1e-6));
+                if let Some(p) = &v.driver_pessoa {
+                    put(&mut driver, "pessoa", body_dict(p));
+                }
                 put(&mut driver, "eye", v3(m.eye));
                 put(&mut driver, "hip", v3(m.hip));
                 put(&mut driver, "lean", v.driver_lean);
@@ -1013,6 +1008,25 @@ fn asset_dict(a: &AssetInfo) -> VarDictionary {
     put(&mut d, "key", GString::from(a.key.as_str()));
     put(&mut d, "path", GString::from(a.path.as_str()));
     d
+}
+
+/// A Blender body as the scene's dictionary: `{arquivo, path, epis, cores, altura, escala,
+/// largura}` (`Pessoa.vestir` in `pessoa.gd`).
+fn body_dict(p: &modelos3d::Pessoa) -> VarDictionary {
+    let mut body = VarDictionary::new();
+    put(&mut body, "arquivo", GString::from(p.arquivo.as_str()));
+    let path = p.path.to_string_lossy().replace('\\', "/");
+    put(&mut body, "path", GString::from(path.as_str()));
+    put(&mut body, "epis", strings(&p.epis));
+    let mut cores = VarDictionary::new();
+    for (material, hex) in &p.cores {
+        put(&mut cores, material, GString::from(hex.as_str()));
+    }
+    put(&mut body, "cores", cores);
+    put(&mut body, "altura", p.altura);
+    put(&mut body, "escala", p.escala);
+    put(&mut body, "largura", p.largura);
+    body
 }
 
 fn vectors(list: &[[f32; 3]]) -> PackedVector3Array {

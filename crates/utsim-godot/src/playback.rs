@@ -60,8 +60,10 @@ pub struct BlockView {
     pub role: Option<MobileRole>,
     pub look: Option<Look>,
     /// The seated driver of a forklift (presentation only), when the interface has the
-    /// mannequin files.
+    /// clips of the people and the catalogue a body for it.
     pub driver: Option<DriverMount>,
+    /// The Blender body of that driver.
+    pub driver_pessoa: Option<modelos3d::Pessoa>,
     /// How far the seated driver leans forward, radians (`sentado_inclinar` of the
     /// catalogue; its root and eyes are already turned about the hip).
     pub driver_lean: f32,
@@ -848,6 +850,14 @@ impl Playback {
                 .as_ref()
                 .filter(|_| skeletal_people)
                 .and_then(|l| driver::driver_mount(role, l));
+            // The driver is a Blender body (the mannequin files are not shipped): without a
+            // body, no driver.
+            let driver_pessoa = driver.as_ref().and(catalogo.as_ref()).and_then(|cat| {
+                modelos3d::pessoa(cat, &format!("{name} motorista"), None, &[], None, None)
+            });
+            if driver_pessoa.is_none() {
+                driver = None;
+            }
             let lean = catalogo.as_ref().map_or(0.0, modelos3d::sentado_inclinar);
             let driver_lean = driver
                 .as_mut()
@@ -882,6 +892,7 @@ impl Playback {
                 role,
                 look,
                 driver,
+                driver_pessoa,
                 driver_lean,
                 position: e.position,
                 size: e.size,
@@ -2035,11 +2046,9 @@ fn blender_look(
         return (None, None);
     };
     let word = asset.map(|a| a.trim().to_lowercase());
-    let default_body = match word.as_deref() {
-        None | Some("pessoa" | "operador" | "person") => true,
-        Some(w) => modelos3d::PESSOAS.contains(&w),
-    };
-    if l.skeletal && default_body {
+    // Every skeletal person gets a Blender body, also one that names a mannequin of the
+    // library (`pessoa_operador_carga`): the mannequin files are not shipped.
+    if l.skeletal {
         // What the person wears, as the exposure analysis counts it: its own `ppe` and
         // that of the objects it serves.
         let ppe: Vec<String> = model

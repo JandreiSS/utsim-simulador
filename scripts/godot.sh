@@ -2,8 +2,9 @@
 # Prepara a interface Godot (pasta godot/):
 #   1. compila a ponte em Rust (crates/utsim-godot) e copia a biblioteca para godot/bin/;
 #   2. copia os modelos .glb do repositório para godot/importados/ (a biblioteca de
-#      assets/modelos, os elementos do Blender de assets/modelos3d e o boneco animado de
-#      assets/terceiros/quaternius_ual*);
+#      assets/modelos e os elementos do Blender de assets/modelos3d, com os corpos e os
+#      clipes das pessoas); o boneco de assets/terceiros/quaternius_ual* não vai mais
+#      (só o Blender o usa para gerar os clipes);
 #   3. roda a importação do Godot (gera o cache em godot/.godot/).
 # As cópias e o cache ficam fora do git (godot/.gitignore): os originais continuam só em
 # assets/, e o Godot pode escrever seus arquivos .import sem tocar neles.
@@ -69,11 +70,9 @@ mkdir -p godot/importados/modelos
 cp -u assets/modelos/*.glb godot/importados/modelos/ || falha "cópia de assets/modelos"
 mkdir -p godot/importados/modelos3d
 cp -u assets/modelos3d/*.glb godot/importados/modelos3d/ || falha "cópia de assets/modelos3d"
-for pacote in quaternius_ual quaternius_ual2; do
-    mkdir -p "godot/importados/terceiros/$pacote"
-    cp -u "assets/terceiros/$pacote/"*.glb "assets/terceiros/$pacote/"LICENCA*.txt \
-        "godot/importados/terceiros/$pacote/" || falha "cópia de assets/terceiros/$pacote"
-done
+# O boneco antigo (cópia de quaternius_ual*), de quem preparou o projeto antes: fora, para
+# não entrar na exportação.
+rm -rf godot/importados/terceiros
 
 GODOT_BIN="$(acha_godot 1)"
 if [ "$IMPORTAR" = 1 ]; then

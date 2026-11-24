@@ -1317,6 +1317,26 @@ func _check(c: Dictionary, k: int) -> void:
 				var fixed: PackedStringArray = _main.cena.clips_fixed
 				for name in want:
 					report.call("clipe corrigido %s" % name, fixed.has(String(name)), str(fixed))
+			"sem_boneco_antigo":
+				# true: the people and the drivers are Blender bodies animated by the clips of
+				# assets/modelos3d, and the old mannequin (quaternius_ual*) is not in the
+				# project (it would go into the export).
+				var cena: CenaUtsim = _main.cena
+				report.call("sem importados/terceiros", not DirAccess.dir_exists_absolute("res://importados/terceiros"), "")
+				report.call("clipes das pessoas importados", CenaUtsim.skeletal_available(), "")
+				var people := 0
+				var drivers := 0
+				for i in cena.blocks.size():
+					var b: Dictionary = cena.blocks[i]
+					var rig: Dictionary = cena.rigs[i]
+					if b.get("skeletal", false):
+						people += 1
+						report.call("%s com corpo do Blender animado" % b["name"], rig.has("person") and rig.has("pessoa"), str(rig.keys()))
+					if b.has("driver"):
+						drivers += 1
+						var ok: bool = rig.has("driver") and (b["driver"] as Dictionary).has("pessoa")
+						report.call("motorista de %s com corpo do Blender" % b["name"], ok, str(rig.keys()))
+				report.call("pessoas e motoristas na cena", people > 0 and drivers > 0, "%d pessoas, %d motoristas" % [people, drivers])
 			"itens_no_bloco":
 				# {"objeto", "t", "quantos", "dentro": [meia x, meia z], "altura_entre": [a, b],
 				# "rotulo"}: the items drawn over the block's footprint (its root, the half

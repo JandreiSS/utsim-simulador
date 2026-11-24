@@ -1,0 +1,10 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Pessoas sem o boneco antigo: o operador e o motorista da empilhadeira são corpos do Blender, animados pelos clipes de assets/modelos3d (pessoa_clipes_base.glb e pessoa_clipes.glb); a pasta importados/terceiros (quaternius_ual*, 15,7 MB) não existe mais no projeto, para não entrar no pacote."},
+		{"abrir": "g4_pegar_no_lugar.ron"},
+		{"modo": "simular"},
+		{"conferir": {"modo": "simular", "sem_boneco_antigo": true, "clipes_corrigidos": ["Walk_Carry_Loop"]}},
+		{"conferir": {"motorista": {"objeto": "empilhadeira_1", "existe": true, "visivel": true}}}
+	]
+}
