@@ -356,11 +356,7 @@ fn estados(ui: &mut Ui, reg: &mut Registry, name: &str, l: &Leitura) {
             cor,
         );
         x += w;
-        tip.push((
-            utsim_scene::style::state_label(Some(*s)).to_string(),
-            *f,
-            cor,
-        ));
+        tip.push((utsim_edit::texto::estado(Some(*s)).to_string(), *f, cor));
     }
     let resp = resp.on_hover_text(
         tip.iter()

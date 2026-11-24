@@ -966,30 +966,3 @@ models-visual = Aspetto:
 models-simples = semplice
 models-realista = realistico
 models-modelos_3d_articulados_da_biblioteca = Modelli 3D articolati della libreria (carrello elevatore, AGV, operatore...)
-
-## Estados dos blocos (painel do bloco e gráficos de estados)
-
-estado-sem-estado = nessuno stato
-estado-ocioso = inattivo
-estado-vazio = vuoto
-estado-gerando = genera
-estado-liberando = rilascia
-estado-coletando = raccoglie
-estado-preparacao = attrezzaggio
-estado-processando = in lavorazione
-estado-bloqueado = bloccato
-estado-aguardando-operador = attende l’operatore
-estado-aguardando-transporte = attende il trasporto
-estado-em-falha = guasto
-estado-fora-do-turno = fuori turno
-estado-viajando-vazio = viaggia vuoto
-estado-viajando-carregado = viaggia carico
-estado-carregando = carico
-estado-descarregando = scarico
-estado-trabalhando-no-posto = lavora alla postazione
-estado-parado = fermo (comando esterno)
-estado-aguardando-tecnico = attende il tecnico
-estado-em-manutencao = in manutenzione preventiva
-estado-em-pausa = in pausa (fatica)
-estado-operador-entrando = operatore in entrata
-estado-operador-saindo = operatore in uscita
