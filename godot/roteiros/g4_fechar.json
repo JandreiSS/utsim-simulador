@@ -1,0 +1,33 @@
+{
+	"saida": "../capturas",
+	"passos": [
+		{"nota": "Fechar a janela com mudanças não salvas pergunta antes (Descartar ou Voltar), como Novo e Abrir; sem mudanças, fecha."},
+		{"novo": true},
+		{"conferir": {"sujo": false}},
+		{"fechar_janela": true},
+		{"conferir": {"fechou": true, "pergunta_aberta": false}},
+		{"novo": true},
+		{"camera": {"alvo": [0, 0], "distancia": 14.0, "giro": 0.0, "inclinacao": 0.85}},
+		{"arrastar": {"de": {"controle": "Biblioteca_Processor"}, "para": {"chao": [0.0, 0.0]}}},
+		{"conferir": {"objetos": 1, "sujo": true}},
+		{"fechar_janela": true},
+		{"conferir": {"fechou": false, "pergunta_aberta": true}},
+		{"capturar": "g4_fechar_pergunta"},
+		{"clicar": {"controle": "Dialogo_Descartar_Voltar"}},
+		{"conferir": {"fechou": false, "pergunta_aberta": false, "objetos": 1, "sujo": true}},
+		{"nota": "Salvo, fecha sem perguntar."},
+		{"tecla": "ctrl+s"},
+		{"dialogo": "{saida}/g4_fechar.ron"},
+		{"conferir": {"sujo": false}},
+		{"fechar_janela": true},
+		{"conferir": {"fechou": true, "pergunta_aberta": false}},
+		{"nota": "Com mudança de novo, Descartar fecha."},
+		{"clicar": {"objeto": "processo"}},
+		{"tecla": "delete"},
+		{"conferir": {"objetos": 0, "sujo": true}},
+		{"fechar_janela": true},
+		{"conferir": {"fechou": false, "pergunta_aberta": true}},
+		{"clicar": {"controle": "Dialogo_Descartar_Ok"}},
+		{"conferir": {"fechou": true}}
+	]
+}

@@ -47,6 +47,8 @@
 ##    - `{"focar": {"objeto": "empilhadeira_1", "distancia": 4.0, "giro": 0.5, "inclinacao": 0.3}}`:
 ##      the orbit camera on a block (as the `focar` of the model captures)
 ##    - `{"abrir": "../../examples/agvs.ron"}`, `{"novo": true}`, `{"modo": "simular"}`
+##    - `{"fechar_janela": true}`: the X of the window (the close request); the window does
+##      not close in the roteiro, the check `fechou` says whether it would have
 ##    - `{"conferir": {...}}`: assertions on the document and the interface (see `_check`).
 ##    - `{"nota": "texto"}`: written to the log.
 ##    - `{"esperar_valores": true}`: waits for the comparison of the "Valores reais…" window
@@ -446,6 +448,11 @@ func _step(s: Dictionary, k: int) -> void:
 		await _frames(5)
 	elif s.has("novo"):
 		_main.new_document(true)
+		await _frames(3)
+	elif s.has("fechar_janela"):
+		_main.set_meta("fechou", false)
+		_main.close_hook = func(): _main.set_meta("fechou", true)
+		_main.notification(Node.NOTIFICATION_WM_CLOSE_REQUEST)
 		await _frames(3)
 	elif s.has("modo"):
 		if not _main.set_mode(String(s["modo"])):
@@ -888,6 +895,12 @@ func _check(c: Dictionary, k: int) -> void:
 				report.call("problemas", n == int(want), "há %d: %s" % [n, doc.issues()])
 			"sujo":
 				report.call("sujo", doc.is_dirty() == bool(want), str(doc.is_dirty()))
+			"fechou":
+				var closed := bool(_main.get_meta("fechou", false))
+				report.call("fechou", closed == bool(want), str(closed))
+			"pergunta_aberta":
+				var asking: bool = _main._pending.is_valid()
+				report.call("pergunta aberta", asking == bool(want), str(asking))
 			"selecao":
 				report.call("seleção", _main.editor.selected == want, str(_main.editor.selected))
 			"modo":

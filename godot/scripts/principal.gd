@@ -107,6 +107,9 @@ var _grid_color := Color(0.22, 0.24, 0.28)
 var _perf_on := false
 var _revision := -1
 var _pending := Callable()
+## What closing the window does once it may close (the roteiros put a check here instead
+## of quitting); empty: quit.
+var close_hook := Callable()
 ## The replications of Simular (the field of the Simular panel).
 var _run_reps := 5
 ## The run shown in Resultados (`UtsimResults`), and the job running now (`UtsimJob`).
@@ -147,6 +150,8 @@ var links_hidden: Array = ["simulacao"]
 
 
 func _ready() -> void:
+	# The X of the window asks first when the model has unsaved changes (`request_close`).
+	get_tree().set_auto_accept_quit(false)
 	_build_world()
 	_build_ui()
 	for cls in [&"UtsimModel", &"UtsimDocument"]:
@@ -758,6 +763,16 @@ func _confirm_discard(then: Callable) -> void:
 		then.call()
 
 
+## Closing the window: with unsaved changes, the same question as New and Open
+## (Descartar or Voltar); otherwise it closes.
+func request_close() -> void:
+	_confirm_discard(func():
+		if close_hook.is_valid():
+			close_hook.call()
+		else:
+			get_tree().quit())
+
+
 func new_document(force := false) -> void:
 	var go := func():
 		doc.new_model("novo_modelo")
@@ -825,7 +840,9 @@ func _renew_lock() -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		request_close()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_check_disk()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and walking() and not scripted:
 		# The cursor is let go when the window loses the focus: the walk ends with it.

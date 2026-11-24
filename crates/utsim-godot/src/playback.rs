@@ -2694,11 +2694,17 @@ mod tests {
             );
             let cena = t0.elapsed();
             let t0 = std::time::Instant::now();
-            let _ = utsim_scene::timeline::Timeline::build(
+            let tl = utsim_scene::timeline::Timeline::build(
                 &replay,
                 utsim_scene::timeline::TransitSetting::Auto,
             );
             let linha = t0.elapsed();
+            eprintln!(
+                "  linha do tempo: {:.1} MB ({:.1} bytes por registro)",
+                tl.heap_bytes() as f64 / 1e6,
+                tl.heap_bytes() as f64 / replay.records.len().max(1) as f64
+            );
+            drop(tl);
             let t0 = std::time::Instant::now();
             let _ = utsim_model::exposure::load_tracks(&model, &replay.records, replay.stop_time);
             let cargas = t0.elapsed();
