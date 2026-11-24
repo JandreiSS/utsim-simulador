@@ -418,8 +418,30 @@ impl UtsimModel {
         }
     }
 
+    /// [`Self::playback`] on a thread of the bridge (`UtsimJob` of kind `reproducao`;
+    /// take the result with its `playback()`); `null` with nothing loaded.
+    #[func]
+    fn start_playback(&mut self, replication: i64, skeletal_people: bool) -> Option<Gd<UtsimJob>> {
+        let dir = self
+            .path
+            .as_ref()
+            .and_then(|p| p.parent())
+            .map(std::path::Path::to_path_buf);
+        let (model, replay) = match &self.replay {
+            Some(r) => (None, Some(Box::new(r.clone()))),
+            None => (Some(Box::new(self.model.clone()?)), None),
+        };
+        Some(job_object(Task::Playback {
+            model,
+            replay,
+            replication: replication.max(0) as u32,
+            dir,
+            skeletal: skeletal_people,
+        }))
+    }
+
     /// Records replication `replication` and builds its scene; `null` on error (see
-    /// [`Self::last_error`]). `skeletal_people`: the interface has the mannequin files.
+    /// [`Self::last_error`]). `skeletal_people`: the interface has the clips of the people.
     #[func]
     fn playback(&mut self, replication: i64, skeletal_people: bool) -> Option<Gd<UtsimPlayback>> {
         if let Some(replay) = &self.replay {

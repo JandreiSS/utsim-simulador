@@ -1350,12 +1350,18 @@ func _on_run(j: Object) -> void:
 		set_status("A simulação %s: %s" % ["foi cancelada" if j.cancelled() else "falhou", j.error()])
 		return
 	on_results(j.results())
-	playback = model.playback(0, CenaUtsim.skeletal_available())
-	if playback == null:
-		set_status("Não foi possível gravar a replicação 0: %s" % model.last_error())
-		return
-	_show_playback()
-	set_status("%d replicações concluídas. Reproduzindo a replicação 0." % results.replications())
+	# Replication 0 is recorded again and its scene built on a thread of the bridge: the
+	# window keeps drawing ("Carregando a reprodução...").
+	var reps: int = results.replications()
+	start_job(model.start_playback(0, CenaUtsim.skeletal_available()), func(pj):
+		if mode != "simular":
+			return  # back to Editar while it loaded
+		playback = pj.playback()
+		if playback == null:
+			set_status("Não foi possível gravar a replicação 0: %s" % pj.error())
+			return
+		_show_playback()
+		set_status("%d replicações concluídas. Reproduzindo a replicação 0." % reps))
 
 
 ## Liga ou desliga as camadas de segurança e de calor da cena.
@@ -1930,11 +1936,10 @@ func open_replay(path: String) -> bool:
 		return false
 	if ui != null:
 		ui.live_close_all()
-	model = m
-	playback = model.playback(0, CenaUtsim.skeletal_available())
-	if playback == null:
-		set_status("Não foi possível reproduzir %s: %s" % [path.get_file(), model.last_error()])
+	if job != null:
+		set_status("Aguarde: %s." % job.what())
 		return false
+	model = m
 	playing_replay = true
 	mode = "simular"
 	_set_right(false)
@@ -1942,9 +1947,20 @@ func open_replay(path: String) -> bool:
 	_sync_panels()
 	_sync_bar()
 	on_results(model.replay_results())
-	_show_playback()
-	camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
-	set_status("Replay %s aberto (%d blocos): só reprodução; Editar volta ao modelo em edição." % [path.get_file(), int(r["objects"])])
+	cena.clear(true)
+	playback = null
+	# The scene is built on a thread of the bridge ("Carregando a reprodução...").
+	var objects := int(r["objects"])
+	start_job(model.start_playback(0, CenaUtsim.skeletal_available()), func(pj):
+		if mode != "simular":
+			return  # back to Editar while it loaded
+		playback = pj.playback()
+		if playback == null:
+			set_status("Não foi possível reproduzir %s: %s" % [path.get_file(), pj.error()])
+			return
+		_show_playback()
+		camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
+		set_status("Replay %s aberto (%d blocos): só reprodução; Editar volta ao modelo em edição." % [path.get_file(), objects]))
 	return true
 
 

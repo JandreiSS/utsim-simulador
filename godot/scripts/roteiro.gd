@@ -445,6 +445,9 @@ func _step(s: Dictionary, k: int) -> void:
 		var path := _resolve(_base, String(s["abrir"]))
 		if not _main.open_model(path):
 			_fail("passo %d: não abriu %s" % [k, path])
+		# A replay builds its scene on a thread of the bridge.
+		if not await _wait_idle(300.0):
+			_fail("passo %d: a reprodução de %s não carregou" % [k, path])
 		await _frames(5)
 	elif s.has("novo"):
 		_main.new_document(true)

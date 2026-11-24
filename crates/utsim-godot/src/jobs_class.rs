@@ -54,6 +54,7 @@ pub(crate) fn job_object(task: Task) -> Gd<UtsimJob> {
         Task::Pert { .. } => "pert",
         Task::DataFit { .. } => "ajuste",
         Task::DataReport { .. } => "relatorio_dados",
+        Task::Playback { .. } => "reproducao",
     };
     let job = Job::start(task);
     Gd::from_init_fn(|base| UtsimJob {
@@ -186,6 +187,24 @@ impl UtsimJob {
         match &self.outcome {
             Some(Ok(Outcome::Data(v))) => variant_of_json(v),
             _ => Variant::nil(),
+        }
+    }
+
+    /// The playback of a finished `reproducao` job (takes it: later calls give `null`).
+    #[func]
+    fn playback(&mut self) -> Option<Gd<crate::UtsimPlayback>> {
+        match self.outcome.take() {
+            Some(Ok(Outcome::Playback(p))) => {
+                self.outcome = Some(Ok(Outcome::Data(Value::Null)));
+                Some(Gd::from_init_fn(|base| crate::UtsimPlayback {
+                    core: Some(*p),
+                    base,
+                }))
+            }
+            other => {
+                self.outcome = other;
+                None
+            }
         }
     }
 

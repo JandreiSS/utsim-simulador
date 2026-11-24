@@ -26,7 +26,9 @@ use utsim_stats::little::DEFAULT_TOLERANCE;
 
 use crate::dados::{self, FitCache};
 use crate::pert_view::{self, PertOutput, PertRequest};
+use crate::playback::Playback;
 use crate::results::{self, RunOutput};
+use utsim_model::replay::Replay;
 
 /// The error text of a cancelled job.
 pub const CANCELLED: &str = "cancelado";
@@ -73,6 +75,16 @@ pub enum Task {
         base: Option<PathBuf>,
         dir: PathBuf,
     },
+    /// The playback of one replication: recorded again from `model` (replication
+    /// `replication`) or read from `replay` (a replay file), then its scene, out of the
+    /// main thread so the window keeps drawing ("Carregando a reprodução").
+    Playback {
+        model: Option<Box<Model>>,
+        replay: Option<Box<Replay>>,
+        replication: u32,
+        dir: Option<PathBuf>,
+        skeletal: bool,
+    },
 }
 
 impl Task {
@@ -88,6 +100,7 @@ impl Task {
             Task::Pert { .. } => "Calculando o PERT/CPM",
             Task::DataFit { .. } => "Ajustando a distribuição aos dados",
             Task::DataReport { .. } => "Gravando o relatório dos dados",
+            Task::Playback { .. } => "Carregando a reprodução",
         }
     }
 
@@ -106,7 +119,10 @@ impl Task {
                 WarmupSeries::Wip => model.run.replications as usize,
                 WarmupSeries::Measure { .. } => 0,
             },
-            Task::Pert { .. } | Task::DataFit { .. } | Task::DataReport { .. } => 0,
+            Task::Pert { .. }
+            | Task::DataFit { .. }
+            | Task::DataReport { .. }
+            | Task::Playback { .. } => 0,
         }
     }
 }
@@ -118,6 +134,8 @@ pub enum Outcome {
     /// Scenarios, optimisation and the output analyses, as JSON for the panel.
     Data(Value),
     Pert(Box<PertOutput>),
+    /// The scene of a replication, ready to draw.
+    Playback(Box<Playback>),
 }
 
 type Shared = Arc<Mutex<Option<Result<Outcome, String>>>>;
@@ -324,6 +342,21 @@ fn run_traced(
 
 fn execute(task: Task, p: &Progress) -> Result<Outcome, String> {
     match task {
+        Task::Playback {
+            model,
+            replay,
+            replication,
+            dir,
+            skeletal,
+        } => {
+            let replay = match (replay, &model) {
+                (Some(r), _) => *r,
+                (None, Some(m)) => m.replay(replication).map_err(text)?,
+                (None, None) => return Err("nada para reproduzir".into()),
+            };
+            let pb = Playback::new(&replay, model.as_deref(), dir.as_deref(), skeletal);
+            Ok(Outcome::Playback(Box::new(pb.com_rastro(replay))))
+        }
         Task::Run(model) => {
             let total = model.run.replications as usize;
             let reports = model
@@ -491,6 +524,36 @@ mod tests {
             Err(e) => assert_eq!(e, CANCELLED),
             Ok(_) => panic!("devia cancelar"),
         }
+    }
+
+    /// The playback built on the job's thread is the one built here.
+    #[test]
+    fn a_playback_job_builds_the_scene_of_the_replication() {
+        let m = example("mm1.ron");
+        let mut job = Job::start(Task::Playback {
+            model: Some(Box::new(m.clone())),
+            replay: None,
+            replication: 0,
+            dir: None,
+            skeletal: false,
+        });
+        assert_eq!(job.what, "Carregando a reprodução");
+        let Ok(Outcome::Playback(pb)) = job.wait() else {
+            panic!("sem reprodução");
+        };
+        let here = Playback::new(&m.replay(0).unwrap(), Some(&m), None, false);
+        assert_eq!(pb.blocks.len(), here.blocks.len());
+        let t = m.run.stop_time / 2.0;
+        assert_eq!(pb.frame(t).item_id, here.frame(t).item_id);
+        assert!(pb.vivo().is_some(), "o rastro fica com a reprodução");
+        let mut none = Job::start(Task::Playback {
+            model: None,
+            replay: None,
+            replication: 0,
+            dir: None,
+            skeletal: false,
+        });
+        assert!(none.wait().is_err());
     }
 
     #[test]
