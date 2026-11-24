@@ -45,7 +45,8 @@ de andar com caixa, corrigido para o corpo humano.
 
 | O quê | Autor | Fonte oficial | Licença |
 |---|---|---|---|
-| Universal Animation Library e Universal Animation Library 2 | Quaternius | https://quaternius.itch.io/universal-animation-library | CC0 1.0 (conferido em 2026-10-25; ver `assets/terceiros/quaternius_ual*/LICENCA.txt`) |
+| Universal Animation Library (os sete clipes base) | Quaternius | https://quaternius.itch.io/universal-animation-library | CC0 1.0 (conferido em 2026-10-25; ver `assets/terceiros/quaternius_ual/LICENCA.txt`) |
+| Universal Animation Library 2 (o clipe de andar com caixa) | Quaternius | https://quaternius.itch.io/universal-animation-library-2 | CC0 1.0 (conferido em 2026-10-25; ver `assets/terceiros/quaternius_ual2/LICENCA.txt`) |
 
 Os arquivos de origem (`UAL1_Standard.glb` e `UAL2_Standard.glb`) ficam em `assets/terceiros`
 e são lidos na hora de gerar: `bash scripts/blender.sh --so pessoa_clipes,pessoa_clipes_base`.
