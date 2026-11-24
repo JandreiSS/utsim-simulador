@@ -490,3 +490,22 @@ azul e o desenho do ventilador nas duas faces largas. Cada arquivo tem também o
 
 O teste `os_ventiladores_tem_escala_real_e_cabem_na_caixa` confere as alturas, o eixo da
 hélice e o tamanho das caixas.
+
+## Peças e cargas de fábrica
+
+Modelos para o campo "Modelo da peça" das origens (`tools/blender/elementos/pecas.py`), além
+da `peca`, da `caixa` e do `palete`. Todos em escala real, com um nó só (`corpo`), a origem no
+chão e no centro da base, e `dados.tamanho` com as medidas nominais `[x, y, z]`. Quem desenha a
+peça ajusta o tamanho pelo lado maior. Cada arquivo tem também o `_medio`.
+
+| Arquivo | O que é | Tamanho |
+|---|---|---|
+| `engradado` | engradado plástico empilhável, aberto em cima, com alças | 0,60 × 0,40 × 0,30 m |
+| `tambor` | tambor de aço de 200 litros, com dois aros e os bujões | 0,58 m de diâmetro, 0,88 m de altura |
+| `bobina` | bobina de aço deitada (eixo em y), sobre calços, com cintas; `dados.olho` = 0,50 | 1,20 m de diâmetro, 0,80 m de largura |
+| `saco` | saco de 50 kg deitado, de papel kraft | 0,70 × 0,45 × 0,16 m |
+| `palete_caixas` | palete carregado: duas camadas de quatro caixas, com cintas | 1,20 × 1,00 × 0,96 m |
+| `engrenagem` | engrenagem usinada deitada, com cubo e furo | 0,30 m de diâmetro, 0,06 m de espessura |
+
+São leves, porque a cena desenha muitas ao mesmo tempo: até 450 triângulos no detalhe baixo.
+O teste `as_pecas_de_fabrica_tem_escala_real_e_ficam_no_chao` confere as medidas.

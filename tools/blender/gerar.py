@@ -24,6 +24,7 @@ import ponte  # noqa: E402
 import trajeto  # noqa: E402
 import produtos  # noqa: E402
 import logistica  # noqa: E402
+import pecas  # noqa: E402
 import pessoas  # noqa: E402
 import clipes  # noqa: E402
 
@@ -52,6 +53,12 @@ ELEMENTOS = {
     "peca": armazenagem.peca,
     "palete": armazenagem.palete,
     "caixa": armazenagem.caixa,
+    "engradado": pecas.engradado,
+    "tambor": pecas.tambor,
+    "bobina": pecas.bobina,
+    "saco": pecas.saco,
+    "palete_caixas": pecas.palete_caixas,
+    "engrenagem": pecas.engrenagem,
     "ventilador_mesa": produtos.ventilador_mesa,
     "ventilador_coluna": produtos.ventilador_coluna,
     "ventilador_mesa_caixa": produtos.ventilador_mesa_caixa,
