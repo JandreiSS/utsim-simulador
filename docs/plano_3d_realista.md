@@ -235,7 +235,7 @@ Como personalizar:
 
 ### Sessão 2: gerador de modelos articulados (A3D-2; pode rodar depois que A3D-1 estiver integrada)
 
-> No repositório UTSim (`C:\Users\Jandrei\Documents\Codes\UTSim`, branch `feat/fase-1`),
+> No repositório UTSim (branch `feat/fase-1`),
 > crie a crate `crates/utsim-assets` (binário `utsim-assets`), que gera arquivos `.glb`
 > por código, sem programas externos, para a biblioteca embutida de aparências:
 > - `empilhadeira`: chassi, torre, carro dos garfos e garfos como nós separados, com nomes

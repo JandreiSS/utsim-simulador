@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Publica o editor UTSim pelo launcher: monta a pasta do programa (a mesma do instalador),
-# cifra, assina e grava o pacote e o manifesto na pasta de publicação (a pasta do Google Drive).
-# Não envia nada à internet: o Google Drive para computador sincroniza a pasta.
+# cifra, assina e grava o pacote e o manifesto na pasta de publicação (local).
+# Não envia nada à internet: depois, 'utsim-publicar github' sobe o pacote e o
+# manifesto para o GitHub.
 #
 # Uso: bash scripts/publicar-utsim.sh <pasta_de_publicação> [canal] [versão]
 #   canal   padrão: testes (ou estavel)
