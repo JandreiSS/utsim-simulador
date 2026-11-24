@@ -35,3 +35,17 @@ do usuário. As pastas de trabalho do MPFB (cache e logs) ficam em `<UTSIM_MPFB>
 pasta do MPFB, a geração das pessoas para com uma mensagem que aponta para este arquivo; os
 outros elementos não dependem dela. O mesmo vale para `UTSIM_BLENDER=1 bash scripts/verificar.sh`,
 que gera tudo de novo.
+
+## Clipes das pessoas: Universal Animation Library
+
+`pessoa_clipes_base.glb` e `pessoa_clipes.glb` trazem só o esqueleto e os clipes de animação
+que o UTSim usa, tirados da Universal Animation Library (versões Standard, gratuitas) por
+`tools/blender/clipes.py`. O primeiro copia sete clipes sem alteração; o segundo tem o clipe
+de andar com caixa, corrigido para o corpo humano.
+
+| O quê | Autor | Fonte oficial | Licença |
+|---|---|---|---|
+| Universal Animation Library e Universal Animation Library 2 | Quaternius | https://quaternius.itch.io/universal-animation-library | CC0 1.0 (conferido em 2026-10-25; ver `assets/terceiros/quaternius_ual*/LICENCA.txt`) |
+
+Os arquivos de origem (`UAL1_Standard.glb` e `UAL2_Standard.glb`) ficam em `assets/terceiros`
+e são lidos na hora de gerar: `bash scripts/blender.sh --so pessoa_clipes,pessoa_clipes_base`.
