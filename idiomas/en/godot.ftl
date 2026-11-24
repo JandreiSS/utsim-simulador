@@ -1561,3 +1561,332 @@ godot-schema-giro_um_numero_de_graus = rotation: a number of degrees
 godot-schema-campo_desconhecido_visual = unknown field: visual.{ $rest }
 
 godot-ui-bar-casa = Home
+
+## Round 14: GDScript messages and panels (`UtsimDocument.texto`)
+
+godot-gd-obstaculos-visiveis = Obstacles and clearances shown.
+godot-gd-obstaculos-ocultos = Obstacles and clearances hidden.
+godot-gd-desempenho-visiveis = Performance measures shown (F3).
+godot-gd-desempenho-ocultas = Performance measures hidden (F3).
+godot-gd-mao-dupla = two-way
+godot-gd-mao-unica = one-way
+godot-gd-mao-unica-setas = one-way (arrows on the floor)
+godot-gd-do-modelo = the model's
+godot-gd-foi-cancelada = was canceled
+godot-gd-falhou = failed
+godot-gd-ligada = on
+godot-gd-desligada = off
+godot-gd-ligado = on
+godot-gd-desligado = off
+godot-gd-abrindo-leituras = Opening the readings of { $p1 } in UTSim Statistics.
+godot-gd-valores-lidos-de = Values read from { $p1 }.
+godot-gd-nao-leu = Could not read { $p1 }: { $p2 }
+godot-gd-objetos-copiados =
+    { $p1 } { $p1 ->
+        [one] object copied
+       *[other] objects copied
+    }.
+godot-gd-nada-para-copiar = Nothing selected to copy.
+godot-gd-removida-desfaz = Removed: { $p1 } (Ctrl+Z undoes)
+godot-gd-nao-removeu-msg = Could not remove: { $p1 }
+godot-gd-nao-ligou-msg = Could not link: { $p1 }
+godot-gd-passagem-cabem = , { $p1 } s of passage, { $p2 } fit
+godot-gd-esteira-desenhada = Drawn conveyor
+godot-gd-esteira-com-canaletas = Conveyor with chutes
+godot-gd-caminho-no-piso = Floor path
+godot-gd-pedestres = Pedestrians
+godot-gd-empilhadeiras = Forklifts
+godot-gd-misto = Mixed
+godot-gd-trajeto-inclinacao-pct = Slope (%; negative goes down)
+godot-gd-trajeto-acima-maximo = • Above the maximum: the part slides or tips over.
+godot-gd-trajeto-rampa-ingreme = • Ramp steeper than 1:12 (8.33 %).
+godot-gd-esteira-simples = Simple conveyor
+godot-gd-motorizada = Motorized
+godot-gd-roletes-gravidade = Gravity rollers
+godot-gd-calha = Chute (slide)
+godot-gd-trajeto-caminho-n = Path { $p1 }
+godot-gd-trajeto-esteira-n = Conveyor { $p1 }
+godot-gd-trajeto-no-n = Node { $p1 }
+
+godot-gd-corredores-corredor_cancelado_clique_no_chao = Aisle canceled. Click the floor to start another, or Esc to leave the tool.
+godot-gd-corredores-nao_criou_o_corredor = Could not create the aisle: { $p1 }
+godot-gd-corredores-corredor_criado_m = Aisle { $p1 } created ({ $p2 }, { $p3 } m).
+godot-gd-corredores-vertice_de_movido = Vertex { $p1 } of { $p2 } moved.
+godot-gd-corredores-nao_moveu = Could not move: { $p1 }
+godot-gd-corredores-vertice_acrescentado_a = Vertex added to { $p1 }.
+godot-gd-corredores-nao_acrescentou = Could not add: { $p1 }
+godot-gd-corredores-corredor_excluido = Aisle { $p1 } deleted.
+godot-gd-corredores-nao_excluiu = Could not delete: { $p1 }
+godot-gd-corredores-ponto_de_acesso_de_movido = Access point of { $p1 } moved (turn off "Own access point" in the panel to go back to the default).
+godot-gd-corredores-nao_moveu_o_ponto_de = Could not move the access point: { $p1 }
+godot-gd-corredores-corredor_agora_e_de = Aisle { $p1 } is now { $p2 }.
+godot-gd-corredores-corredor_com_m_de_largura = Aisle { $p1 } is { $p2 } m wide.
+godot-gd-corredores-nao_mudou_a_largura = Could not change the width: { $p1 }
+godot-gd-corredores-corredor_em = Aisle { $p1 } at { $p2 }.
+godot-gd-corredores-perfil_do_corredor = Profile of aisle { $p1 }: { $p2 }.
+godot-gd-corredores-sentido_do_corredor_invertido = Direction of aisle { $p1 } reversed.
+godot-gd-corredores-corredor_agora_se_chama = Aisle { $p1 } is now named { $p2 }.
+godot-gd-corredores-nao_renomeou = Could not rename: { $p1 }
+godot-gd-corredores-vertice_removido = Vertex removed.
+godot-gd-corredores-nao_removeu = Could not remove: { $p1 }
+godot-gd-corredores-esse_aviso_nao_aponta_para = This warning does not point to any aisle or object in the scene.
+godot-gd-corredores-destacado_na_cena = Highlighted in the scene: { $p1 }.
+godot-gd-editor-equipe_arraste_do_despachante_a = Team: drag from the dispatcher to a transporter, or from an object to whoever carries its items (Shift: from a process to whoever supplies the operators); do it again to undo. Easier: drag from the operator's orange node to the machine. Esc cancels.
+godot-gd-editor-ligar_arraste_do_bloco_de = Link: drag from the source block to the destination, or click one and then the other (Esc cancels).
+godot-gd-editor-clique_no_chao_para_colocar = Click the floor to place (Shift keeps the tool, Esc cancels).
+godot-gd-editor-corredor_clique_no_chao_para = Aisle: click the floor to place the axis points (Enter or double-click finishes), click an aisle to edit it, drag a vertex to move it; Esc cancels.
+godot-gd-editor-zona_clique_no_chao_para = Zone: click the floor to place the corners of the risk zone; the first point, Enter or double-click closes it; click a zone to edit it. Esc cancels.
+godot-gd-editor-rede_clique_no_chao_para = Network: click the floor to place nodes (each click continues the path), click a segment to edit it, drag a node to move it; Esc ends the path.
+godot-gd-editor-nao_mudou_a_zona = Could not change the zone: { $p1 }
+godot-gd-editor-nao_ligou = Could not link: { $p1 }
+godot-gd-editor-nao_removeu = Could not remove: { $p1 }
+godot-gd-editor-nao_girou = Could not rotate: { $p1 }
+godot-gd-editor-nao_criou_a_zona = Could not create the zone: { $p1 }
+godot-gd-editor-zona_criada_escolha_o_tipo = Zone { $p1 } created: choose the type, the level and the PPE in the panel (Ctrl+Z undoes).
+godot-gd-editor-zona_excluida_ctrl_z_desfaz = Zone { $p1 } deleted (Ctrl+Z undoes).
+godot-gd-editor-nao_excluiu_a_zona = Could not delete the zone: { $p1 }
+godot-gd-editor-objeto_s_excluidos =
+    { $p1 } { $p1 ->
+        [one] object deleted
+       *[other] objects deleted
+    }.
+godot-gd-editor-colocacao_cancelada_solte_o_objeto = Placement canceled: drop the object onto the floor.
+godot-gd-editor-aponte_para_o_chao_para = Point at the floor to place the object.
+godot-gd-editor-nao_foi_possivel_colocar = Could not place: { $p1 }
+godot-gd-editor-colocado = { $p1 } placed.
+godot-gd-editor-equipe_cancelado = Team: canceled.
+godot-gd-editor-nada_selecionado_para_girar = Nothing selected to rotate.
+godot-gd-editor-girado_ctrl_z_desfaz = Rotated { $p1 } (Ctrl+Z undoes).
+godot-gd-editor-objetos_girados_cada_um_em = { $p1 } objects rotated { $p2 }, each around its own center (Ctrl+Z undoes).
+godot-gd-editor-nenhum_corredor_selecionado_para_excluir = No aisle selected to delete.
+godot-gd-editor-nenhum_no_selecionado_para_remover = No node selected to remove.
+godot-gd-principal-arraste_um_objeto_da_biblioteca = Drag an object from the Library onto the floor, or open a model (Ctrl+O).
+godot-gd-principal-encaixe_na_grade_passo_m = Grid snap { $p1 } (step { $p2 } m).
+godot-gd-principal-o_modo_missao_do_utsim = The mission mode of UTSim Teaching is not in this version.
+godot-gd-principal-para_andar_pela_fabrica_simule = To walk through the factory, simulate first (F in Simulate, after the run).
+godot-gd-principal-alterado = { $p1 }: { $p2 } changed.
+godot-gd-principal-nao_alterou = Could not change { $p1 }: { $p2 }
+godot-gd-principal-novo_modelo = New model.
+godot-gd-principal-nao_abriu = Could not open { $p1 }: { $p2 }
+godot-gd-principal-aberto_mas_salvar_fica_para = { $p1 } opened, but { $p2 }: Save is left for when the person closes (or use Save as).
+godot-gd-principal-aberto_objetos_simular_roda_as = { $p1 } opened: { $p2 } objects. Simulate runs the replications.
+godot-gd-principal-aberto_com_problema_s_veja =
+    { $p1 } opened with { $p2 } { $p2 ->
+        [one] problem
+       *[other] problems
+    }: see the properties panel.
+godot-gd-principal-o_outro_app_fechou_o = The other app closed the model: the Quality, Safety and Maintenance tabs went back to editing.
+godot-gd-principal-outro_app_gravou_e_ha = Another app saved { $p1 } and you have unsaved changes: use Save as so you do not erase its work.
+godot-gd-principal-nao_releu = Could not reread { $p1 }: { $p2 }
+godot-gd-principal-foi_gravado_por_outro_app = { $p1 } was saved by another app: reloaded from disk.
+godot-gd-principal-salve_o_modelo_antes_de = Save the model before opening it in { $p1 }.
+godot-gd-principal-abrindo_no_ele_edita_o = Opening { $p1 } in { $p2 }: it edits the model; UTSim 3D rereads whatever it saves.
+godot-gd-principal-salvo_em = Saved to { $p1 }.
+godot-gd-principal-nao_salvou = Could not save: { $p1 }
+godot-gd-principal-desfeito = Undone.
+godot-gd-principal-nada_para_desfazer = Nothing to undo.
+godot-gd-principal-refeito = Redone.
+godot-gd-principal-nada_para_refazer = Nothing to redo.
+godot-gd-principal-nao_foi_possivel_desenhar_o = Could not draw the model: { $p1 }
+godot-gd-principal-escolha_o_arquivo_de_dados = Choose the data file.
+godot-gd-principal-valores_colados = Values pasted: { $p1 }
+godot-gd-principal-aguarde = Wait: { $p1 }.
+godot-gd-principal-nao_ajustou = Could not fit: { $p1 }
+godot-gd-principal-agora_usa_dados_reais_ctrl = { $p1 } now uses real data (Ctrl+Z undoes).
+godot-gd-principal-nao_aplicou_os_dados = Could not apply the data: { $p1 }
+godot-gd-principal-volta_a_usar_uma_distribuicao = { $p1 } goes back to using a distribution (Ctrl+Z undoes).
+godot-gd-principal-nao_voltou_para_a_distribuicao = Could not go back to the distribution: { $p1 }
+godot-gd-principal-sem_relatorio = No report: { $p1 }
+godot-gd-principal-relatorio_gravado_em = Report saved to { $p1 }.
+godot-gd-principal-relatorio_gravado_em_arquivos = Report saved to { $p1 } ({ $p2 } files).
+godot-gd-principal-objetos_alinhados = { $p1 } objects aligned.
+godot-gd-principal-objetos_distribuidos = { $p1 } objects distributed.
+godot-gd-principal-objeto_s_recortados_ctrl_v =
+    { $p1 } { $p1 ->
+        [one] object cut
+       *[other] objects cut
+    } (Ctrl+V pastes).
+godot-gd-principal-nada_selecionado_para_recortar = Nothing selected to cut.
+godot-gd-principal-objeto_s_colados =
+    { $p1 } { $p1 ->
+        [one] object pasted
+       *[other] objects pasted
+    }: { $p2 }.
+godot-gd-principal-o_modelo_tem_problema_s =
+    The model has { $p1 } { $p1 ->
+        [one] problem and
+       *[other] problems and
+    } does not run: { $p2 }
+godot-gd-principal-a_simulacao_nao_comecou = The simulation did not start: { $p1 }
+godot-gd-principal-a_simulacao = The simulation { $p1 }: { $p2 }
+godot-gd-principal-nao_foi_possivel_gravar_a = Could not save replication 0: { $p1 }
+godot-gd-principal-replicacoes_concluidas_reproduzindo_a_replicacao = { $p1 } replications completed. Playing replication 0.
+godot-gd-principal-texto = { $p1 }...
+godot-gd-principal-cancelando = Canceling: { $p1 }...
+godot-gd-principal-simule_o_modelo_para_ver = Simulate the model to see the results (Tab or the Simulate button).
+godot-gd-principal-os_fluxos_de_tokens_aparecem = Token flows appear in Simulate.
+godot-gd-principal-selecione_os_objetos_da_parte = Select the objects of the part of the process (or two: the start and the end) and ask for the PERT/CPM.
+godot-gd-principal-pert_cpm_de_ate_selecione = PERT/CPM from... to...: select exactly two objects.
+godot-gd-principal-o_modelo_tem_problemas_e = The model has problems and does not run: the PERT/CPM needs a valid model.
+godot-gd-principal-nao_comecou = Did not start: { $p1 }
+godot-gd-principal-um_replay_gravado_nao_roda = A recorded replay does not run again: open the model.
+godot-gd-principal-nao_ligou_a_serie_e = Could not link the series and the histograms: { $p1 }
+godot-gd-principal-ligado_no_modelo_ctrl_z = Linked in the model ({ $p1 }; Ctrl+Z undoes). Simulating again...
+godot-gd-principal-aquecimento_aplicado_ao_modelo_run = Warm-up { $p1 } applied to the model (run.warmup). Simulate again for the numbers with it.
+godot-gd-principal-nao_aplicou_o_aquecimento = Could not apply the warm-up: { $p1 }
+godot-gd-principal-nao_abriu_pedido_na_linha = Could not open { $p1 } (requested on the command line).
+godot-gd-principal-nao_foi_possivel_reproduzir = Could not play { $p1 }: { $p2 }
+godot-gd-principal-replay_aberto_blocos_so_reproducao = Replay { $p1 } opened ({ $p2 } blocks): playback only; Edit goes back to the model being edited.
+godot-gd-principal-simule_um_modelo_antes_de = Simulate a model before saving the replay.
+godot-gd-principal-replay_da_replicacao_0_gravado = Replay of replication 0 saved to { $p1 }.
+godot-gd-principal-nao_gravou_o_replay = Could not save the replay: { $p1 }
+godot-gd-principal-camera_de_volta = Camera back.
+godot-gd-rede-caminho_encerrado_clique_no_chao = Path ended. Click the floor to start another, or Esc to leave the tool.
+godot-gd-rede-nao_colocou_o_no = Could not place the node: { $p1 }
+godot-gd-rede-no_ligado_a_clique_de = Node { $p1 } linked to { $p2 }. Click again to continue the path (Esc to stop).
+godot-gd-rede-no_colocado_clique_em_outro = Node { $p1 } placed. Click another point to draw a segment (Esc to stop).
+godot-gd-rede-no_movido = Node { $p1 } moved.
+godot-gd-rede-nao_moveu = Could not move: { $p1 }
+godot-gd-rede-trecho_criado = Segment { $p1 } → { $p2 } created ({ $p3 }).
+godot-gd-rede-nao_ligou = Could not link: { $p1 }
+godot-gd-rede-trecho_removido = Segment { $p1 } → { $p2 } removed.
+godot-gd-rede-no_removido_com_os_trechos = Node { $p1 } removed along with its segments.
+godot-gd-rede-trecho_em = Segment { $p1 } → { $p2 } at { $p3 }.
+godot-gd-rede-pista_controlada_ate_veiculo_s =
+    Controlled lane: up to { $p1 } { $p1 ->
+        [one] vehicle
+       *[other] vehicles
+    } at a time on the segment.
+godot-gd-rede-trecho_sem_controle_de_trafego = Segment without traffic control.
+godot-gd-rede-trecho_invertido = Segment reversed: { $p1 } → { $p2 }.
+godot-gd-rede-no_agora_se_chama = Node { $p1 } is now named { $p2 }.
+godot-gd-rede-nao_renomeou = Could not rename: { $p1 }
+godot-gd-trajeto-clique_no_chao_para_por = { $p1 }: click the floor to place nodes (Enter or double-click finishes). PageUp/PageDown raises and lowers the next node, [ and ] round the curve. Click a node to edit it; Esc cancels.
+godot-gd-trajeto-arraste_em_volta_do_meio = Drag around the middle to rotate { $p1 } (in 15° steps; Shift: in 1° steps).
+godot-gd-trajeto-arraste_para_mover_inteiro_r = Drag to move all of { $p1 }; R and Shift+R rotate 15°.
+godot-gd-trajeto-arraste_para_curvar_o_trecho = Drag to curve segment { $p1 } of { $p2 }.
+godot-gd-trajeto-no_acrescentado_em_o_trecho = Node added to { $p1 } (the segment was split).
+godot-gd-trajeto-nao_acrescentou = Could not add: { $p1 }
+godot-gd-trajeto-aponte_para_o_chao_para = Point at the floor to place the node.
+godot-gd-trajeto-no_em_m_altura_m = { $p1 }: node { $p2 } at ({ $p3 }; { $p4 }) m, height { $p5 } m ({ $p6 }).
+godot-gd-trajeto-comeca_em_m_altura_m = { $p1 }: starts at ({ $p2 }; { $p3 }) m, height { $p4 } m. Click the next nodes; Enter finishes.
+godot-gd-trajeto-trecho_de_selecionado_apagar_o = Segment { $p1 } of { $p2 } selected: "Delete the segment between nodes" in the panel; drag the diamond to curve it.
+godot-gd-trajeto-movido_m_em_x_e = { $p1 } moved { $p2 } m in X and { $p3 } m in Y (Ctrl+Z undoes).
+godot-gd-trajeto-nao_moveu = Could not move: { $p1 }
+godot-gd-trajeto-trecho_curvado_no_com_raio = Segment curved: node { $p1 } with a radius of { $p2 } m (Ctrl+Z undoes).
+godot-gd-trajeto-nao_curvou = Could not curve: { $p1 }
+godot-gd-trajeto-comprimento_do_trecho_m_enter = Segment length: { $p1 } m (Enter places the node in the cursor direction, Backspace deletes).
+godot-gd-trajeto-proximo_no_a_m_de = Next node at { $p1 } m height.
+godot-gd-trajeto-raio_das_proximas_curvas_m = Radius of the next curves: { $p1 } m.
+godot-gd-trajeto-descendo_por_m_o_no = Going down { $p1 } % for { $p2 } m, the node would end up below the floor.
+godot-gd-trajeto-o_trecho_de_m_nao = The { $p1 } m segment does not reach the height of { $p2 } m.
+godot-gd-trajeto-no_a_m_do_anterior = { $p1 }: node { $p2 } is { $p3 } m from the previous one.
+godot-gd-trajeto-girado_r_gira_de_novo = { $p1 } rotated { $p2 }° (R rotates again; Shift+R the other way).
+godot-gd-trajeto-nao_girou = Could not rotate: { $p1 }
+godot-gd-trajeto-ultimo_no_desfeito = Last node undone.
+godot-gd-trajeto-nao_criou = Could not create: { $p1 }
+godot-gd-trajeto-criado_m = { $p1 } { $p2 } created: { $p3 } m{ $p4 }.
+godot-gd-trajeto-desenho_cancelado_clique_no_chao = Drawing canceled. Click the floor to start another, or Esc to leave the tool.
+godot-gd-trajeto-no_s_removido_s =
+    { $p1 } { $p1 ->
+        [one] node removed
+       *[other] nodes removed
+    }.
+godot-gd-trajeto-nao_removeu = Could not remove: { $p1 }
+godot-gd-trajeto-no_x_y_altura_m = { $p1 }, node { $p2 }: X { $p3 }, Y { $p4 }, height { $p5 } m. Arrows and PageUp/PageDown adjust (Shift: 1 cm).
+godot-gd-trajeto-nao_e_uma_esteira_desenhada = { $p1 } is not a drawn conveyor.
+godot-gd-trajeto-esteira_clique_num_no_para = Conveyor { $p1 }: click a node to edit it; arrows and PageUp/PageDown move the selected nodes.
+godot-gd-trajeto-inclinacao_fixa = Fixed slope { $p1 } ({ $p2 } %).
+godot-gd-trajeto-esteira_dividida = Conveyor split: { $p1 } → { $p2 }.
+godot-gd-trajeto-trecho_apagado_de = Segment deleted from { $p1 }.
+godot-gd-trajeto-e_viraram_um_trajeto_so = { $p1 } and { $p2 } became a single route (Ctrl+Z undoes).
+godot-gd-trajeto-agora_corre_no_sentido_contrario = { $p1 } now runs in the opposite direction (and so do the links).
+godot-gd-trajeto-desenhado_a_m_de = { $p1 } drawn { $p2 } m from { $p3 }.
+godot-gd-trajeto-rampa_s_de_acesso_de =
+    { $p1 } { $p1 ->
+        [one] 1:12 access ramp added
+       *[other] 1:12 access ramps added
+    } to { $p2 }.
+godot-gd-trajeto-nao_mudou = Could not change: { $p1 }
+godot-gd-trajeto-no_a_m_de_altura = { $p1 }, node { $p2 } at { $p3 } m height (profile; Ctrl+Z undoes).
+godot-gd-trajeto-nao_mudou_a_altura = Could not change the height: { $p1 }
+
+godot-gd-trajeto-clique_no_chao_para_por-2 = Click the floor to place nodes; the segment shows the length and the slope. Nodes snap to doors (conveyor ends and objects), to nodes of other routes, in 15° steps and to the grid. PageUp/PageDown: height of the next node; [ and ]: curve radius; Enter finishes; Backspace goes back one node; Esc cancels.
+godot-gd-trajeto-altura_do_proximo_no_m = Height of the next node (m)
+godot-gd-trajeto-inclinacao_fixa_no_proximo_trecho = Fixed slope on the next segment
+godot-gd-trajeto-raio_das_curvas_m_0 = Curve radius (m; 0 = corner)
+godot-gd-trajeto-largura_do_caminho_m = Path width (m)
+godot-gd-trajeto-esteira_s_desenhada_s_caminho =
+    { $p1 } { $p1 ->
+        [one] drawn conveyor
+       *[other] drawn conveyors
+    }, { $p2 } { $p2 ->
+        [one] path
+       *[other] paths
+    }.
+godot-gd-trajeto-maior_inclinacao_maximo = Steepest slope { $p1 }° (maximum { $p2 }°).
+godot-gd-trajeto-girar_graus_anti_horario = Rotate (degrees; + counterclockwise)
+godot-gd-trajeto-girar_o_trajeto = Rotate the route
+godot-gd-trajeto-girar_15_anti_horario_r = Rotate 15° (counterclockwise, R)
+godot-gd-trajeto-girar_15_horario_shift_r = Rotate 15° (clockwise, Shift+R)
+godot-gd-trajeto-juntar_com_num_trajeto_so = Join with { $p1 } into a single route
+godot-gd-trajeto-paralelo_a_m_a_esquerda = Parallel at (m; + to the left)
+godot-gd-trajeto-desenhar_paralelo = Draw parallel
+godot-gd-trajeto-escada_degraus_so_pedestres = Stairs (steps; pedestrians only)
+godot-gd-trajeto-rampas_de_acesso_nas_pontas = Access ramps at the ends (1:12)
+godot-gd-trajeto-tipo = Type
+godot-gd-trajeto-acionamento = Drive
+godot-gd-trajeto-inverter_o_sentido = Reverse the direction
+godot-gd-trajeto-largura_m = Width (m)
+godot-gd-trajeto-altura_m = Height (m)
+godot-gd-trajeto-raio_da_curva_m_0 = Curve radius (m; 0 = corner)
+godot-gd-trajeto-dividir_a_esteira_neste_no = Split the conveyor at this node
+godot-gd-trajeto-nos_selecionados = { $p1 } nodes selected
+godot-gd-trajeto-nivelar_na_altura_m = Level at height (m)
+godot-gd-trajeto-inclinacao_constante_entre_as_pontas = Constant slope between the ends
+godot-gd-trajeto-remover_no_s_del = Remove node(s) (Del)
+godot-gd-trajeto-apagar_o_trecho_entre_os = Delete the segment between nodes
+godot-gd-trajeto-arraste_o_losango_do_no = Drag the node's diamond on the floor to move it and the top of the stem to change the height. Arrows move (Shift: 1 cm), PageUp/PageDown raise and lower, [ and ] change the radius. Shift + click on the line adds a node; a click on the orange diamond (or two neighboring nodes with Shift + click) selects the segment, which can be deleted. Drag the orange diamond in the middle of a segment to curve it, the green square in the middle of the route to move all of it, and the orange ring next to it to rotate it; with no node selected, the arrows move and R rotates the route.
+godot-gd-principal-o_modelo_tem_mudancas_que = The model has unsaved changes. Discard?
+
+## Round 14: remaining windows and errors
+
+godot-ui-class-sem_replicacao = no replication
+godot-ui-class-sem_rastro_da_replicacao = no trace of the replication
+godot-ui-class-a_janela_de_valores_nao = the values window is not open
+godot-ui-class-valor_es_lidos_de_coluna =
+    { $n } { $n ->
+        [one] value read
+       *[other] values read
+    } from { $file } (column { $column }).
+godot-ui-class-nao_leu_o_arquivo = Could not read the file: { $e }
+godot-ui-class-relatorio_gravado_em = Report saved to { $f }.
+godot-ui-class-escreva_o_arquivo_do_relatorio = Enter the report file.
+godot-ui-class-relatorio_pert_cpm_gravado_em = PERT/CPM report saved to { $path }.
+godot-ui-class-nao_gravou = Could not save { $path }: { $e }
+godot-ui-class-tabela_s_csv_em =
+    { $files } CSV { $files ->
+        [one] table
+       *[other] tables
+    } in { $dir }.
+godot-ui-class-nao_gravou_os_csv_em = Could not save the CSVs to { $dir }: { $e }
+godot-ui-class-escreva_a_pasta_da_exportacao = Enter the export folder.
+godot-ui-class-arquivo_s_csv_em =
+    { $files } CSV { $files ->
+        [one] file
+       *[other] files
+    } in { $dir }.
+godot-ui-class-nao_exportou = Could not export: { $e }
+godot-ui-class-so_leitura = { $quem }: read-only
+godot-ui-class-na_ultima_simulacao_media_semiamplitude =
+    In the last simulation ({ $replicacoes } { $replicacoes ->
+        [one] replication
+       *[other] replications
+    }), mean ± half-width of the 95 % CI:
+godot-schema-inteiro_maior_ou_igual_a_zero = { $key } must be an integer >= 0
+godot-schema-numero_maior_ou_igual_a_zero = { $w }: number greater than or equal to zero
+godot-schema-nao_tem_o_campo = { $name } does not have the field "{ $field }"
+godot-schema-campo_maior_que_zero = { $field }: must be greater than zero
+godot-schema-inteiro_minimo = { $what } must be an integer >= { $min }
+godot-schema-numero_esperado_de = { $what }: number expected
+godot-schema-verdadeiro_ou_falso_esperado = { $what }: true or false expected

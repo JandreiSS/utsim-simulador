@@ -1564,3 +1564,332 @@ godot-schema-giro_um_numero_de_graus = rotation : un nombre de degrés
 godot-schema-campo_desconhecido_visual = champ inconnu : visual.{ $rest }
 
 godot-ui-bar-casa = Maison
+
+## Lot 14: messages et panneaux du GDScript (`UtsimDocument.texto`)
+
+godot-gd-obstaculos-visiveis = Obstacles et dégagements visibles.
+godot-gd-obstaculos-ocultos = Obstacles et dégagements masqués.
+godot-gd-desempenho-visiveis = Mesures de performance visibles (F3).
+godot-gd-desempenho-ocultas = Mesures de performance masquées (F3).
+godot-gd-mao-dupla = double sens
+godot-gd-mao-unica = sens unique
+godot-gd-mao-unica-setas = sens unique (flèches au sol)
+godot-gd-do-modelo = celui du modèle
+godot-gd-foi-cancelada = a été annulée
+godot-gd-falhou = a échoué
+godot-gd-ligada = activée
+godot-gd-desligada = désactivée
+godot-gd-ligado = activé
+godot-gd-desligado = désactivé
+godot-gd-abrindo-leituras = Ouverture des lectures de { $p1 } dans UTSim Statistiques.
+godot-gd-valores-lidos-de = Valeurs lues depuis { $p1 }.
+godot-gd-nao-leu = Lecture impossible de { $p1 } : { $p2 }
+godot-gd-objetos-copiados =
+    { $p1 } { $p1 ->
+        [one] objet copié
+       *[other] objets copiés
+    }.
+godot-gd-nada-para-copiar = Rien de sélectionné à copier.
+godot-gd-removida-desfaz = Supprimée : { $p1 } (Ctrl+Z annule)
+godot-gd-nao-removeu-msg = Suppression impossible : { $p1 }
+godot-gd-nao-ligou-msg = Liaison impossible : { $p1 }
+godot-gd-passagem-cabem = , { $p1 } s de passage, { $p2 } peuvent tenir
+godot-gd-esteira-desenhada = Convoyeur dessiné
+godot-gd-esteira-com-canaletas = Convoyeur avec goulottes
+godot-gd-caminho-no-piso = Chemin au sol
+godot-gd-pedestres = Piétons
+godot-gd-empilhadeiras = Chariots élévateurs
+godot-gd-misto = Mixte
+godot-gd-trajeto-inclinacao-pct = Pente (% ; négative = descente)
+godot-gd-trajeto-acima-maximo = • Au-dessus du maximum : la pièce glisse ou bascule.
+godot-gd-trajeto-rampa-ingreme = • Rampe plus raide que 1:12 (8,33 %).
+godot-gd-esteira-simples = Convoyeur simple
+godot-gd-motorizada = Motorisé
+godot-gd-roletes-gravidade = Rouleaux par gravité
+godot-gd-calha = Goulotte (glissement)
+godot-gd-trajeto-caminho-n = Chemin { $p1 }
+godot-gd-trajeto-esteira-n = Convoyeur { $p1 }
+godot-gd-trajeto-no-n = Nœud { $p1 }
+
+godot-gd-corredores-corredor_cancelado_clique_no_chao = Allée annulée. Cliquez sur le sol pour en commencer une autre, ou Esc pour quitter l'outil.
+godot-gd-corredores-nao_criou_o_corredor = Allée non créée : { $p1 }
+godot-gd-corredores-corredor_criado_m = Allée { $p1 } créée ({ $p2 }, { $p3 } m).
+godot-gd-corredores-vertice_de_movido = Sommet { $p1 } de { $p2 } déplacé.
+godot-gd-corredores-nao_moveu = Déplacement impossible : { $p1 }
+godot-gd-corredores-vertice_acrescentado_a = Sommet ajouté à { $p1 }.
+godot-gd-corredores-nao_acrescentou = Ajout impossible : { $p1 }
+godot-gd-corredores-corredor_excluido = Allée { $p1 } supprimée.
+godot-gd-corredores-nao_excluiu = Suppression impossible : { $p1 }
+godot-gd-corredores-ponto_de_acesso_de_movido = Point d'accès de { $p1 } déplacé (désactivez "Point d'accès propre" dans le panneau pour revenir au réglage par défaut).
+godot-gd-corredores-nao_moveu_o_ponto_de = Déplacement du point d'accès impossible : { $p1 }
+godot-gd-corredores-corredor_agora_e_de = L'allée { $p1 } est maintenant { $p2 }.
+godot-gd-corredores-corredor_com_m_de_largura = Allée { $p1 } de { $p2 } m de largeur.
+godot-gd-corredores-nao_mudou_a_largura = Modification de la largeur impossible : { $p1 }
+godot-gd-corredores-corredor_em = Allée { $p1 } en { $p2 }.
+godot-gd-corredores-perfil_do_corredor = Profil de l'allée { $p1 } : { $p2 }.
+godot-gd-corredores-sentido_do_corredor_invertido = Sens de l'allée { $p1 } inversé.
+godot-gd-corredores-corredor_agora_se_chama = L'allée { $p1 } s'appelle maintenant { $p2 }.
+godot-gd-corredores-nao_renomeou = Renommage impossible : { $p1 }
+godot-gd-corredores-vertice_removido = Sommet supprimé.
+godot-gd-corredores-nao_removeu = Suppression impossible : { $p1 }
+godot-gd-corredores-esse_aviso_nao_aponta_para = Cet avertissement ne pointe vers aucune allée ni aucun objet de la scène.
+godot-gd-corredores-destacado_na_cena = Mis en évidence dans la scène : { $p1 }.
+godot-gd-editor-equipe_arraste_do_despachante_a = Équipe : faites glisser du répartiteur vers un transporteur, ou d'un objet vers ce qui lui apporte les articles (Shift : d'un processus vers ce qui fournit les opérateurs) ; recommencer annule. Plus simple : faites glisser du nœud orange de l'opérateur jusqu'à la machine. Esc annule.
+godot-gd-editor-ligar_arraste_do_bloco_de = Relier : faites glisser du bloc d'origine jusqu'à la destination, ou cliquez sur l'un puis sur l'autre (Esc annule).
+godot-gd-editor-clique_no_chao_para_colocar = Cliquez sur le sol pour placer (Shift garde l'outil, Esc annule).
+godot-gd-editor-corredor_clique_no_chao_para = Allée : cliquez sur le sol pour poser les points de l'axe (Enter ou double-clic termine), cliquez sur une allée pour la modifier, faites glisser un sommet pour le déplacer ; Esc annule.
+godot-gd-editor-zona_clique_no_chao_para = Zone : cliquez sur le sol pour poser les coins de la zone de risque ; le premier point, Enter ou double-clic la ferme ; cliquez sur une zone pour la modifier. Esc annule.
+godot-gd-editor-rede_clique_no_chao_para = Réseau : cliquez sur le sol pour poser des nœuds (chaque clic prolonge le chemin), cliquez sur un tronçon pour le modifier, faites glisser un nœud pour le déplacer ; Esc termine le chemin.
+godot-gd-editor-nao_mudou_a_zona = Modification de la zone impossible : { $p1 }
+godot-gd-editor-nao_ligou = Liaison impossible : { $p1 }
+godot-gd-editor-nao_removeu = Suppression impossible : { $p1 }
+godot-gd-editor-nao_girou = Rotation impossible : { $p1 }
+godot-gd-editor-nao_criou_a_zona = Création de la zone impossible : { $p1 }
+godot-gd-editor-zona_criada_escolha_o_tipo = Zone { $p1 } créée : choisissez le type, le niveau et l'EPI dans le panneau (Ctrl+Z annule).
+godot-gd-editor-zona_excluida_ctrl_z_desfaz = Zone { $p1 } supprimée (Ctrl+Z annule).
+godot-gd-editor-nao_excluiu_a_zona = Suppression de la zone impossible : { $p1 }
+godot-gd-editor-objeto_s_excluidos =
+    { $p1 } { $p1 ->
+        [one] objet supprimé
+       *[other] objets supprimés
+    }.
+godot-gd-editor-colocacao_cancelada_solte_o_objeto = Placement annulé : déposez l'objet sur le sol.
+godot-gd-editor-aponte_para_o_chao_para = Pointez vers le sol pour placer l'objet.
+godot-gd-editor-nao_foi_possivel_colocar = Placement impossible : { $p1 }
+godot-gd-editor-colocado = { $p1 } placé.
+godot-gd-editor-equipe_cancelado = Équipe : annulé.
+godot-gd-editor-nada_selecionado_para_girar = Rien de sélectionné à faire pivoter.
+godot-gd-editor-girado_ctrl_z_desfaz = { $p1 } pivoté (Ctrl+Z annule).
+godot-gd-editor-objetos_girados_cada_um_em = { $p1 } objets pivotés de { $p2 }, chacun autour de son propre centre (Ctrl+Z annule).
+godot-gd-editor-nenhum_corredor_selecionado_para_excluir = Aucune allée sélectionnée à supprimer.
+godot-gd-editor-nenhum_no_selecionado_para_remover = Aucun nœud sélectionné à supprimer.
+godot-gd-principal-arraste_um_objeto_da_biblioteca = Faites glisser un objet de la Bibliothèque vers le sol, ou ouvrez un modèle (Ctrl+O).
+godot-gd-principal-encaixe_na_grade_passo_m = Accrochage à la grille { $p1 } (pas { $p2 } m).
+godot-gd-principal-o_modo_missao_do_utsim = Le mode mission d'UTSim Ensino n'est pas dans cette version.
+godot-gd-principal-para_andar_pela_fabrica_simule = Pour parcourir l'usine, simulez d'abord (F dans Simuler, après la série).
+godot-gd-principal-alterado = { $p1 } : { $p2 } modifié.
+godot-gd-principal-nao_alterou = Modification impossible de { $p1 } : { $p2 }
+godot-gd-principal-novo_modelo = Nouveau modèle.
+godot-gd-principal-nao_abriu = Ouverture impossible de { $p1 } : { $p2 }
+godot-gd-principal-aberto_mas_salvar_fica_para = { $p1 } ouvert, mais { $p2 } : l'enregistrement est reporté à la fermeture (ou utilisez Enregistrer sous).
+godot-gd-principal-aberto_objetos_simular_roda_as = { $p1 } ouvert : { $p2 } objets. Simuler lance les réplications.
+godot-gd-principal-aberto_com_problema_s_veja =
+    { $p1 } ouvert avec { $p2 } { $p2 ->
+        [one] problème
+       *[other] problèmes
+    } : voir le panneau des propriétés.
+godot-gd-principal-o_outro_app_fechou_o = L'autre application a fermé le modèle : les onglets Qualité, Sécurité et Maintenance peuvent de nouveau modifier.
+godot-gd-principal-outro_app_gravou_e_ha = Une autre application a enregistré { $p1 } et vous avez des modifications non enregistrées : utilisez Enregistrer sous pour ne pas effacer son travail.
+godot-gd-principal-nao_releu = Relecture impossible de { $p1 } : { $p2 }
+godot-gd-principal-foi_gravado_por_outro_app = { $p1 } a été enregistré par une autre application : rechargé depuis le disque.
+godot-gd-principal-salve_o_modelo_antes_de = Enregistrez le modèle avant d'ouvrir dans { $p1 }.
+godot-gd-principal-abrindo_no_ele_edita_o = Ouverture de { $p1 } dans { $p2 } : il modifie le modèle ; UTSim 3D relit ce qu'il enregistre.
+godot-gd-principal-salvo_em = Enregistré dans { $p1 }.
+godot-gd-principal-nao_salvou = Enregistrement impossible : { $p1 }
+godot-gd-principal-desfeito = Annulé.
+godot-gd-principal-nada_para_desfazer = Rien à annuler.
+godot-gd-principal-refeito = Rétabli.
+godot-gd-principal-nada_para_refazer = Rien à rétablir.
+godot-gd-principal-nao_foi_possivel_desenhar_o = Impossible de dessiner le modèle : { $p1 }
+godot-gd-principal-escolha_o_arquivo_de_dados = Choisissez le fichier de données.
+godot-gd-principal-valores_colados = Valeurs collées : { $p1 }
+godot-gd-principal-aguarde = Patientez : { $p1 }.
+godot-gd-principal-nao_ajustou = Ajustement impossible : { $p1 }
+godot-gd-principal-agora_usa_dados_reais_ctrl = { $p1 } utilise maintenant des données réelles (Ctrl+Z annule).
+godot-gd-principal-nao_aplicou_os_dados = Application des données impossible : { $p1 }
+godot-gd-principal-volta_a_usar_uma_distribuicao = { $p1 } utilise de nouveau une distribution (Ctrl+Z annule).
+godot-gd-principal-nao_voltou_para_a_distribuicao = Retour à la distribution impossible : { $p1 }
+godot-gd-principal-sem_relatorio = Pas de rapport : { $p1 }
+godot-gd-principal-relatorio_gravado_em = Rapport enregistré dans { $p1 }.
+godot-gd-principal-relatorio_gravado_em_arquivos = Rapport enregistré dans { $p1 } ({ $p2 } fichiers).
+godot-gd-principal-objetos_alinhados = { $p1 } objets alignés.
+godot-gd-principal-objetos_distribuidos = { $p1 } objets répartis.
+godot-gd-principal-objeto_s_recortados_ctrl_v =
+    { $p1 } { $p1 ->
+        [one] objet coupé
+       *[other] objets coupés
+    } (Ctrl+V colle).
+godot-gd-principal-nada_selecionado_para_recortar = Rien de sélectionné à couper.
+godot-gd-principal-objeto_s_colados =
+    { $p1 } { $p1 ->
+        [one] objet collé
+       *[other] objets collés
+    } : { $p2 }.
+godot-gd-principal-o_modelo_tem_problema_s =
+    Le modèle a { $p1 } { $p1 ->
+        [one] problème et
+       *[other] problèmes et
+    } ne tourne pas : { $p2 }
+godot-gd-principal-a_simulacao_nao_comecou = La simulation n'a pas démarré : { $p1 }
+godot-gd-principal-a_simulacao = La simulation { $p1 } : { $p2 }
+godot-gd-principal-nao_foi_possivel_gravar_a = Impossible d'enregistrer la réplication 0 : { $p1 }
+godot-gd-principal-replicacoes_concluidas_reproduzindo_a_replicacao = { $p1 } réplications terminées. Lecture de la réplication 0.
+godot-gd-principal-texto = { $p1 }...
+godot-gd-principal-cancelando = Annulation : { $p1 }...
+godot-gd-principal-simule_o_modelo_para_ver = Simulez le modèle pour voir les résultats (Tab ou le bouton Simuler).
+godot-gd-principal-os_fluxos_de_tokens_aparecem = Les flux de jetons apparaissent dans Simuler.
+godot-gd-principal-selecione_os_objetos_da_parte = Sélectionnez les objets de la partie du processus (ou deux : le début et la fin) et demandez le PERT/CPM.
+godot-gd-principal-pert_cpm_de_ate_selecione = PERT/CPM de... à... : sélectionnez exactement deux objets.
+godot-gd-principal-o_modelo_tem_problemas_e = Le modèle a des problèmes et ne tourne pas : le PERT/CPM exige un modèle valide.
+godot-gd-principal-nao_comecou = Démarrage impossible : { $p1 }
+godot-gd-principal-um_replay_gravado_nao_roda = Un replay enregistré ne se relance pas : ouvrez le modèle.
+godot-gd-principal-nao_ligou_a_serie_e = Liaison impossible de la série et des histogrammes : { $p1 }
+godot-gd-principal-ligado_no_modelo_ctrl_z = Lié au modèle ({ $p1 } ; Ctrl+Z annule). Nouvelle simulation...
+godot-gd-principal-aquecimento_aplicado_ao_modelo_run = Échauffement { $p1 } appliqué au modèle (run.warmup). Simulez de nouveau pour obtenir les chiffres avec lui.
+godot-gd-principal-nao_aplicou_o_aquecimento = Application de l'échauffement impossible : { $p1 }
+godot-gd-principal-nao_abriu_pedido_na_linha = Ouverture impossible de { $p1 } (demandé en ligne de commande).
+godot-gd-principal-nao_foi_possivel_reproduzir = Impossible de lire { $p1 } : { $p2 }
+godot-gd-principal-replay_aberto_blocos_so_reproducao = Replay { $p1 } ouvert ({ $p2 } blocs) : lecture seule ; Éditer revient au modèle en édition.
+godot-gd-principal-simule_um_modelo_antes_de = Simulez un modèle avant d'enregistrer le replay.
+godot-gd-principal-replay_da_replicacao_0_gravado = Replay de la réplication 0 enregistré dans { $p1 }.
+godot-gd-principal-nao_gravou_o_replay = Enregistrement du replay impossible : { $p1 }
+godot-gd-principal-camera_de_volta = Caméra rétablie.
+godot-gd-rede-caminho_encerrado_clique_no_chao = Chemin terminé. Cliquez sur le sol pour en commencer un autre, ou Esc pour quitter l'outil.
+godot-gd-rede-nao_colocou_o_no = Placement du nœud impossible : { $p1 }
+godot-gd-rede-no_ligado_a_clique_de = Nœud { $p1 } relié à { $p2 }. Cliquez de nouveau pour continuer le chemin (Esc pour arrêter).
+godot-gd-rede-no_colocado_clique_em_outro = Nœud { $p1 } placé. Cliquez sur un autre point pour tracer un tronçon (Esc pour arrêter).
+godot-gd-rede-no_movido = Nœud { $p1 } déplacé.
+godot-gd-rede-nao_moveu = Déplacement impossible : { $p1 }
+godot-gd-rede-trecho_criado = Tronçon { $p1 } → { $p2 } créé ({ $p3 }).
+godot-gd-rede-nao_ligou = Liaison impossible : { $p1 }
+godot-gd-rede-trecho_removido = Tronçon { $p1 } → { $p2 } supprimé.
+godot-gd-rede-no_removido_com_os_trechos = Nœud { $p1 } supprimé avec ses tronçons.
+godot-gd-rede-trecho_em = Tronçon { $p1 } → { $p2 } en { $p3 }.
+godot-gd-rede-pista_controlada_ate_veiculo_s =
+    Voie contrôlée : jusqu’à { $p1 } { $p1 ->
+        [one] véhicule
+       *[other] véhicules
+    } en même temps sur le tronçon.
+godot-gd-rede-trecho_sem_controle_de_trafego = Tronçon sans contrôle de trafic.
+godot-gd-rede-trecho_invertido = Tronçon inversé : { $p1 } → { $p2 }.
+godot-gd-rede-no_agora_se_chama = Le nœud { $p1 } s'appelle maintenant { $p2 }.
+godot-gd-rede-nao_renomeou = Renommage impossible : { $p1 }
+godot-gd-trajeto-clique_no_chao_para_por = { $p1 } : cliquez sur le sol pour poser les nœuds (Enter ou double-clic termine). PageUp/PageDown monte et descend le prochain nœud, [ et ] arrondissent la courbe. Cliquez sur un nœud pour le modifier ; Esc annule.
+godot-gd-trajeto-arraste_em_volta_do_meio = Faites glisser autour du milieu pour faire pivoter { $p1 } (de 15 en 15° ; Shift : de 1 en 1°).
+godot-gd-trajeto-arraste_para_mover_inteiro_r = Faites glisser pour déplacer { $p1 } entier ; R et Shift+R pivotent de 15°.
+godot-gd-trajeto-arraste_para_curvar_o_trecho = Faites glisser pour courber le tronçon { $p1 } de { $p2 }.
+godot-gd-trajeto-no_acrescentado_em_o_trecho = Nœud ajouté à { $p1 } (le tronçon a été divisé).
+godot-gd-trajeto-nao_acrescentou = Ajout impossible : { $p1 }
+godot-gd-trajeto-aponte_para_o_chao_para = Pointez vers le sol pour poser le nœud.
+godot-gd-trajeto-no_em_m_altura_m = { $p1 } : nœud { $p2 } en ({ $p3 } ; { $p4 }) m, hauteur { $p5 } m ({ $p6 }).
+godot-gd-trajeto-comeca_em_m_altura_m = { $p1 } : commence en ({ $p2 } ; { $p3 }) m, hauteur { $p4 } m. Cliquez les nœuds suivants ; Enter termine.
+godot-gd-trajeto-trecho_de_selecionado_apagar_o = Tronçon { $p1 } de { $p2 } sélectionné : "Supprimer le tronçon entre les nœuds" dans le panneau ; faites glisser le losange pour le courber.
+godot-gd-trajeto-movido_m_em_x_e = { $p1 } déplacé de { $p2 } m en X et de { $p3 } m en Y (Ctrl+Z annule).
+godot-gd-trajeto-nao_moveu = Déplacement impossible : { $p1 }
+godot-gd-trajeto-trecho_curvado_no_com_raio = Tronçon courbé : nœud { $p1 } avec un rayon de { $p2 } m (Ctrl+Z annule).
+godot-gd-trajeto-nao_curvou = Courbure impossible : { $p1 }
+godot-gd-trajeto-comprimento_do_trecho_m_enter = Longueur du tronçon : { $p1 } m (Enter pose le nœud dans la direction du curseur, Backspace efface).
+godot-gd-trajeto-proximo_no_a_m_de = Prochain nœud à { $p1 } m de hauteur.
+godot-gd-trajeto-raio_das_proximas_curvas_m = Rayon des prochaines courbes : { $p1 } m.
+godot-gd-trajeto-descendo_por_m_o_no = En descendant de { $p1 } % sur { $p2 } m, le nœud serait sous le sol.
+godot-gd-trajeto-o_trecho_de_m_nao = Le tronçon de { $p1 } m n'atteint pas la hauteur de { $p2 } m.
+godot-gd-trajeto-no_a_m_do_anterior = { $p1 } : nœud { $p2 } à { $p3 } m du précédent.
+godot-gd-trajeto-girado_r_gira_de_novo = { $p1 } pivoté de { $p2 }° (R pivote de nouveau ; Shift+R dans l'autre sens).
+godot-gd-trajeto-nao_girou = Rotation impossible : { $p1 }
+godot-gd-trajeto-ultimo_no_desfeito = Dernier nœud annulé.
+godot-gd-trajeto-nao_criou = Création impossible : { $p1 }
+godot-gd-trajeto-criado_m = { $p1 } { $p2 } créé : { $p3 } m{ $p4 }.
+godot-gd-trajeto-desenho_cancelado_clique_no_chao = Dessin annulé. Cliquez sur le sol pour en commencer un autre, ou Esc pour quitter l'outil.
+godot-gd-trajeto-no_s_removido_s =
+    { $p1 } { $p1 ->
+        [one] nœud supprimé
+       *[other] nœuds supprimés
+    }.
+godot-gd-trajeto-nao_removeu = Suppression impossible : { $p1 }
+godot-gd-trajeto-no_x_y_altura_m = { $p1 }, nœud { $p2 } : X { $p3 }, Y { $p4 }, hauteur { $p5 } m. Les flèches et PageUp/PageDown ajustent (Shift : 1 cm).
+godot-gd-trajeto-nao_e_uma_esteira_desenhada = { $p1 } n'est pas un convoyeur dessiné.
+godot-gd-trajeto-esteira_clique_num_no_para = Convoyeur { $p1 } : cliquez sur un nœud pour le modifier ; les flèches et PageUp/PageDown déplacent les nœuds sélectionnés.
+godot-gd-trajeto-inclinacao_fixa = Pente fixe { $p1 } ({ $p2 } %).
+godot-gd-trajeto-esteira_dividida = Convoyeur divisé : { $p1 } → { $p2 }.
+godot-gd-trajeto-trecho_apagado_de = Tronçon supprimé de { $p1 }.
+godot-gd-trajeto-e_viraram_um_trajeto_so = { $p1 } et { $p2 } ne forment plus qu'un seul trajet (Ctrl+Z annule).
+godot-gd-trajeto-agora_corre_no_sentido_contrario = { $p1 } circule maintenant en sens inverse (les liaisons aussi).
+godot-gd-trajeto-desenhado_a_m_de = { $p1 } dessiné à { $p2 } m de { $p3 }.
+godot-gd-trajeto-rampa_s_de_acesso_de =
+    { $p1 } { $p1 ->
+        [one] rampe d’accès 1:12 ajoutée
+       *[other] rampes d’accès 1:12 ajoutées
+    } à { $p2 }.
+godot-gd-trajeto-nao_mudou = Modification impossible : { $p1 }
+godot-gd-trajeto-no_a_m_de_altura = { $p1 }, nœud { $p2 } à { $p3 } m de hauteur (profil ; Ctrl+Z annule).
+godot-gd-trajeto-nao_mudou_a_altura = Modification de la hauteur impossible : { $p1 }
+
+godot-gd-trajeto-clique_no_chao_para_por-2 = Cliquez sur le sol pour poser les nœuds ; le tronçon affiche la longueur et la pente. Les nœuds s'accrochent aux portes (extrémités des convoyeurs et objets), aux nœuds d'autres trajets, de 15 en 15° et à la grille. PageUp/PageDown : hauteur du prochain nœud ; [ et ] : rayon de la courbe ; Enter termine ; Backspace revient d'un nœud ; Esc annule.
+godot-gd-trajeto-altura_do_proximo_no_m = Hauteur du prochain nœud (m)
+godot-gd-trajeto-inclinacao_fixa_no_proximo_trecho = Pente fixe sur le prochain tronçon
+godot-gd-trajeto-raio_das_curvas_m_0 = Rayon des courbes (m ; 0 = angle vif)
+godot-gd-trajeto-largura_do_caminho_m = Largeur du chemin (m)
+godot-gd-trajeto-esteira_s_desenhada_s_caminho =
+    { $p1 } { $p1 ->
+        [one] convoyeur dessiné
+       *[other] convoyeurs dessinés
+    }, { $p2 } { $p2 ->
+        [one] chemin
+       *[other] chemins
+    }.
+godot-gd-trajeto-maior_inclinacao_maximo = Pente maximale { $p1 }° (maximum { $p2 }°).
+godot-gd-trajeto-girar_graus_anti_horario = Pivoter (degrés ; + sens antihoraire)
+godot-gd-trajeto-girar_o_trajeto = Faire pivoter le trajet
+godot-gd-trajeto-girar_15_anti_horario_r = Pivoter de 15° (antihoraire, R)
+godot-gd-trajeto-girar_15_horario_shift_r = Pivoter de 15° (horaire, Shift+R)
+godot-gd-trajeto-juntar_com_num_trajeto_so = Fusionner avec { $p1 } en un seul trajet
+godot-gd-trajeto-paralelo_a_m_a_esquerda = Parallèle à (m ; + à gauche)
+godot-gd-trajeto-desenhar_paralelo = Dessiner un parallèle
+godot-gd-trajeto-escada_degraus_so_pedestres = Escalier (marches ; piétons seulement)
+godot-gd-trajeto-rampas_de_acesso_nas_pontas = Rampes d'accès aux extrémités (1:12)
+godot-gd-trajeto-tipo = Type
+godot-gd-trajeto-acionamento = Actionnement
+godot-gd-trajeto-inverter_o_sentido = Inverser le sens
+godot-gd-trajeto-largura_m = Largeur (m)
+godot-gd-trajeto-altura_m = Hauteur (m)
+godot-gd-trajeto-raio_da_curva_m_0 = Rayon de la courbe (m ; 0 = angle vif)
+godot-gd-trajeto-dividir_a_esteira_neste_no = Diviser le convoyeur à ce nœud
+godot-gd-trajeto-nos_selecionados = { $p1 } nœuds sélectionnés
+godot-gd-trajeto-nivelar_na_altura_m = Mettre à niveau à la hauteur (m)
+godot-gd-trajeto-inclinacao_constante_entre_as_pontas = Pente constante entre les extrémités
+godot-gd-trajeto-remover_no_s_del = Supprimer le(s) nœud(s) (Del)
+godot-gd-trajeto-apagar_o_trecho_entre_os = Supprimer le tronçon entre les nœuds
+godot-gd-trajeto-arraste_o_losango_do_no = Faites glisser le losange du nœud au sol pour le déplacer et le haut de la tige pour changer la hauteur. Les flèches déplacent (Shift : 1 cm), PageUp/PageDown montent et descendent, [ et ] changent le rayon. Shift + clic sur la ligne ajoute un nœud ; un clic sur le losange orange (ou sur deux nœuds voisins avec Shift + clic) sélectionne le tronçon, qui peut être supprimé. Faites glisser le losange orange au milieu d'un tronçon pour le courber, le carré vert au milieu du trajet pour le déplacer entier et l'anneau orange à côté pour le faire pivoter ; sans nœud sélectionné, les flèches déplacent et R fait pivoter le trajet.
+godot-gd-principal-o_modelo_tem_mudancas_que = Le modèle a des modifications non enregistrées. Abandonner ?
+
+## Lot 14: fenêtres et erreurs restantes
+
+godot-ui-class-sem_replicacao = sans réplication
+godot-ui-class-sem_rastro_da_replicacao = sans trace de la réplication
+godot-ui-class-a_janela_de_valores_nao = la fenêtre des valeurs n'est pas ouverte
+godot-ui-class-valor_es_lidos_de_coluna =
+    { $n } { $n ->
+        [one] valeur lue
+       *[other] valeurs lues
+    } depuis { $file } (colonne { $column }).
+godot-ui-class-nao_leu_o_arquivo = Lecture du fichier impossible : { $e }
+godot-ui-class-relatorio_gravado_em = Rapport enregistré dans { $f }.
+godot-ui-class-escreva_o_arquivo_do_relatorio = Saisissez le fichier du rapport.
+godot-ui-class-relatorio_pert_cpm_gravado_em = Rapport PERT/CPM enregistré dans { $path }.
+godot-ui-class-nao_gravou = Enregistrement impossible de { $path } : { $e }
+godot-ui-class-tabela_s_csv_em =
+    { $files } { $files ->
+        [one] table
+       *[other] tables
+    } CSV dans { $dir }.
+godot-ui-class-nao_gravou_os_csv_em = Enregistrement impossible des CSV dans { $dir } : { $e }
+godot-ui-class-escreva_a_pasta_da_exportacao = Saisissez le dossier d'exportation.
+godot-ui-class-arquivo_s_csv_em =
+    { $files } { $files ->
+        [one] fichier
+       *[other] fichiers
+    } CSV dans { $dir }.
+godot-ui-class-nao_exportou = Exportation impossible : { $e }
+godot-ui-class-so_leitura = { $quem } : lecture seule
+godot-ui-class-na_ultima_simulacao_media_semiamplitude =
+    Dans la dernière simulation ({ $replicacoes } { $replicacoes ->
+        [one] réplication
+       *[other] réplications
+    }), moyenne ± demi-amplitude de l'IC à 95 % :
+godot-schema-inteiro_maior_ou_igual_a_zero = { $key } doit être un entier >= 0
+godot-schema-numero_maior_ou_igual_a_zero = { $w } : nombre supérieur ou égal à zéro
+godot-schema-nao_tem_o_campo = { $name } n'a pas le champ "{ $field }"
+godot-schema-campo_maior_que_zero = { $field } : doit être supérieur à zéro
+godot-schema-inteiro_minimo = { $what } doit être un entier >= { $min }
+godot-schema-numero_esperado_de = { $what } : nombre attendu
+godot-schema-verdadeiro_ou_falso_esperado = { $what } : vrai ou faux attendu

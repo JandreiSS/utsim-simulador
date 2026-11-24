@@ -31,8 +31,6 @@ const BELT_SIMPLE := "EsteiraDesenhada"
 const BELT_CHANNELED := "EsteiraCanaletas"
 const FLOOR_PATH := "CaminhoPiso"
 const IDS := [BELT_SIMPLE, BELT_CHANNELED, FLOOR_PATH]
-const LABELS := {BELT_SIMPLE: "Esteira desenhada", BELT_CHANNELED: "Esteira com canaletas",
-	FLOOR_PATH: "Caminho no piso"}
 const BELT_HEIGHT := 0.8
 const PICK_PIXELS := 12.0
 const DRAG_PIXELS := 4.0
@@ -150,7 +148,7 @@ func start(id: String) -> void:
 	_clear_drawing()
 	draw_z = 0.0 if is_path() else BELT_HEIGHT
 	sync()
-	main.set_status("%s: clique no chão para pôr os nós (Enter ou duplo clique termina). PageUp/PageDown sobe e desce o próximo nó, [ e ] arredondam a curva. Clique num nó para editá-lo; Esc cancela." % LABELS[mode])
+	main.set_status(main.T("godot-gd-trajeto-clique_no_chao_para_por", [_label(mode)]))
 
 
 ## After every change of the document.
@@ -298,14 +296,14 @@ func press(p: Vector2, shift: bool) -> void:
 		_press["from"] = _middle(_route(h["name"], h["path"]))
 		_press["angle"] = 0.0
 		_dragging = false
-		main.set_status("Arraste em volta do meio para girar %s (de 15 em 15°; Shift: de 1 em 1°)." % sel_name)
+		main.set_status(main.T("godot-gd-trajeto-arraste_em_volta_do_meio", [sel_name]))
 		return
 	if not h.is_empty() and h["handle"] == "mover":
 		_press = h.duplicate()
 		_press["pos"] = p
 		_press["from"] = _middle(_route(h["name"], h["path"]))
 		_dragging = false
-		main.set_status("Arraste para mover %s inteiro; R e Shift+R giram 15°." % sel_name)
+		main.set_status(main.T("godot-gd-trajeto-arraste_para_mover_inteiro_r", [sel_name]))
 		return
 	if not h.is_empty() and h["handle"] == "curva":
 		var rc := _route(h["name"], h["path"])
@@ -314,7 +312,7 @@ func press(p: Vector2, shift: bool) -> void:
 		_press["pos"] = p
 		_press["from"] = ns[int(h["index"])].lerp(ns[int(h["index"]) + 1], 0.5)
 		_dragging = false
-		main.set_status("Arraste para curvar o trecho %d de %s." % [int(h["index"]) + 1, sel_name])
+		main.set_status(main.T("godot-gd-trajeto-arraste_para_curvar_o_trecho", [int(h["index"]) + 1, sel_name]))
 		return
 	if not h.is_empty():
 		var same: bool = h["name"] == sel_name and h["path"] == sel_path
@@ -354,9 +352,9 @@ func press(p: Vector2, shift: bool) -> void:
 			if tr.inserir_no(sel_name, sel_path, i, q):
 				main.after_edit()
 				_select(sel_name, sel_path, PackedInt32Array([i + 1]))
-				main.set_status("Nó acrescentado em %s (o trecho foi dividido)." % sel_name)
+				main.set_status(main.T("godot-gd-trajeto-no_acrescentado_em_o_trecho", [sel_name]))
 			else:
-				main.set_status("Não acrescentou: %s" % tr.last_error())
+				main.set_status(main.T("godot-gd-trajeto-nao_acrescentou", [tr.last_error()]))
 			return
 	# A new route.
 	_select("", false, PackedInt32Array())
@@ -366,7 +364,7 @@ func press(p: Vector2, shift: bool) -> void:
 func _add_point(p: Vector2) -> void:
 	var at = _aim(p)
 	if at == null:
-		main.set_status("Aponte para o chão para pôr o nó.")
+		main.set_status(main.T("godot-gd-trajeto-aponte_para_o_chao_para"))
 		return
 	var prev: Variant = points[points.size() - 1] if not points.is_empty() else null
 	var s := _snap(at, prev)
@@ -395,8 +393,7 @@ func _add_point(p: Vector2) -> void:
 	radii.append(0.0)
 	if points.size() >= 2 and new_radius > 0.0:
 		radii[points.size() - 2] = new_radius
-	main.set_status("%s: nó %d em (%s; %s) m, altura %s m (%s)." % [LABELS[mode], points.size(),
-		_num(q.x), _num(-q.z), _num(q.y), _what(s["what"])])
+	main.set_status(main.T("godot-gd-trajeto-no_em_m_altura_m", [_label(mode), points.size(), _num(q.x), _num(-q.z), _num(q.y), _what(s["what"])]))
 
 
 ## Starts a new route at `at` (the end of another one), snapped like a click there.
@@ -410,8 +407,7 @@ func _start_at(at: Vector3) -> void:
 		start_port = {"object": s["object"], "output": int(s["output"])}
 	points.append(q)
 	radii.append(0.0)
-	main.set_status("%s: começa em (%s; %s) m, altura %s m. Clique os próximos nós; Enter termina." % [
-		LABELS[mode], _num(q.x), _num(-q.z), _num(q.y)])
+	main.set_status(main.T("godot-gd-trajeto-comeca_em_m_altura_m", [_label(mode), _num(q.x), _num(-q.z), _num(q.y)]))
 
 
 func _what(w: String) -> String:
@@ -540,7 +536,7 @@ func release(_p: Vector2) -> void:
 		if pr["handle"] == "curva":
 			var k := int(pr["index"])
 			_select(pr["name"], pr["path"], PackedInt32Array([k, k + 1]))
-			main.set_status("Trecho %d de %s selecionado: \"Apagar o trecho entre os nós\" no painel; arraste o losango para curvá-lo." % [k + 1, pr["name"]])
+			main.set_status(main.T("godot-gd-trajeto-trecho_de_selecionado_apagar_o", [k + 1, pr["name"]]))
 			return
 		if pr["handle"] in ["mover", "girar"]:
 			return
@@ -569,19 +565,18 @@ func release(_p: Vector2) -> void:
 		var d: Vector3 = _drag_at - from
 		if tr.mover_trajeto(name, path, Vector3(d.x, 0.0, d.z)):
 			main.after_edit()
-			main.set_status("%s movido %s m em X e %s m em Y (Ctrl+Z desfaz)." % [name, _num(d.x), _num(-d.z)])
+			main.set_status(main.T("godot-gd-trajeto-movido_m_em_x_e", [name, _num(d.x), _num(-d.z)]))
 		else:
-			main.set_status("Não moveu: %s" % tr.last_error())
+			main.set_status(main.T("godot-gd-trajeto-nao_moveu", [tr.last_error()]))
 		return
 	if pr["handle"] == "curva":
 		ok = tr.curvar(name, path, int(pr["index"]), _drag_at)
 		if ok:
 			main.after_edit()
 			_select(name, path, PackedInt32Array([int(pr["index"]) + 1]))
-			main.set_status("Trecho curvado: nó %d com raio de %s m (Ctrl+Z desfaz)." % [int(pr["index"]) + 2,
-				_num((_route(name, path)["radii"] as PackedFloat64Array)[int(pr["index"]) + 1])])
+			main.set_status(main.T("godot-gd-trajeto-trecho_curvado_no_com_raio", [int(pr["index"]) + 2, _num((_route(name, path)["radii"] as PackedFloat64Array)[int(pr["index"]) + 1])]))
 		else:
-			main.set_status("Não curvou: %s" % tr.last_error())
+			main.set_status(main.T("godot-gd-trajeto-nao_curvou", [tr.last_error()]))
 		return
 	if sel_nodes.size() > 1 and int(pr["index"]) in sel_nodes:
 		ok = tr.deslocar(name, path, sel_nodes, _drag_at - from)
@@ -591,7 +586,7 @@ func release(_p: Vector2) -> void:
 		main.after_edit()
 		_status_node()
 	else:
-		main.set_status("Não moveu: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_moveu", [tr.last_error()]))
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +614,7 @@ func key(code: int, shift: bool) -> bool:
 		if ch != "":
 			if ch != "," or not typed.contains(","):
 				typed += ch
-			main.set_status("Comprimento do trecho: %s m (Enter põe o nó na direção do cursor, Backspace apaga)." % typed)
+			main.set_status(main.T("godot-gd-trajeto-comprimento_do_trecho_m_enter", [typed]))
 			return true
 	match code:
 		KEY_ENTER, KEY_KP_ENTER:
@@ -637,14 +632,14 @@ func key(code: int, shift: bool) -> bool:
 			var dz := fine if code == KEY_PAGEUP else -fine
 			if drawing or sel_nodes.is_empty():
 				draw_z = maxf(snappedf(draw_z + dz, FINE_STEP), 0.0)
-				main.set_status("Próximo nó a %s m de altura." % _num(draw_z))
+				main.set_status(main.T("godot-gd-trajeto-proximo_no_a_m_de", [_num(draw_z)]))
 				return true
 			return nudge(Vector3(0, dz, 0))
 		KEY_BRACKETLEFT, KEY_BRACKETRIGHT:
 			var dr := (0.05 if shift else RADIUS_STEP) * (1.0 if code == KEY_BRACKETRIGHT else -1.0)
 			if drawing or sel_nodes.is_empty():
 				new_radius = maxf(snappedf(new_radius + dr, 0.05), 0.0)
-				main.set_status("Raio das próximas curvas: %s m." % _num(new_radius))
+				main.set_status(main.T("godot-gd-trajeto-raio_das_proximas_curvas_m", [_num(new_radius)]))
 				return true
 			return _radius_step(dr)
 		KEY_R:
@@ -725,11 +720,11 @@ func _place_typed() -> bool:
 		run = length / sqrt(1.0 + pow(grade_pct / 100.0, 2.0))
 		dz = grade_pct / 100.0 * run
 		if last.y + dz < 0.0:
-			main.set_status("Descendo %s %% por %s m, o nó ficaria abaixo do piso." % [_num(grade_pct, 1), _num(length)])
+			main.set_status(main.T("godot-gd-trajeto-descendo_por_m_o_no", [_num(grade_pct, 1), _num(length)]))
 			return true
 		draw_z = last.y + dz
 	elif length <= absf(dz):
-		main.set_status("O trecho de %s m não alcança a altura de %s m." % [_num(length), _num(draw_z)])
+		main.set_status(main.T("godot-gd-trajeto-o_trecho_de_m_nao", [_num(length), _num(draw_z)]))
 		return true
 	else:
 		run = sqrt(length * length - dz * dz)
@@ -740,7 +735,7 @@ func _place_typed() -> bool:
 	if points.size() >= 2 and new_radius > 0.0:
 		radii[points.size() - 2] = new_radius
 	end_port = {}
-	main.set_status("%s: nó %d a %s m do anterior." % [LABELS[mode], points.size(), _num(length)])
+	main.set_status(main.T("godot-gd-trajeto-no_a_m_do_anterior", [_label(mode), points.size(), _num(length)]))
 	return true
 
 
@@ -748,9 +743,9 @@ func _place_typed() -> bool:
 func turn_route(degrees: float) -> bool:
 	if tr.girar_trajeto(sel_name, sel_path, degrees):
 		main.after_edit()
-		main.set_status("%s girado %s° (R gira de novo; Shift+R para o outro lado)." % [sel_name, _num(degrees, 0)])
+		main.set_status(main.T("godot-gd-trajeto-girado_r_gira_de_novo", [sel_name, _num(degrees, 0)]))
 	else:
-		main.set_status("Não girou: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_girou", [tr.last_error()]))
 	return true
 
 
@@ -804,7 +799,7 @@ func nudge(d: Vector3) -> bool:
 		main.after_edit()
 		_status_node()
 	else:
-		main.set_status("Não moveu: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_moveu", [tr.last_error()]))
 	return true
 
 
@@ -825,7 +820,7 @@ func _back() -> void:
 	radii.remove_at(radii.size() - 1)
 	if points.is_empty():
 		_clear_drawing()
-	main.set_status("Último nó desfeito.")
+	main.set_status(main.T("godot-gd-trajeto-ultimo_no_desfeito"))
 
 
 ## Ends the route being drawn (Enter, or a second click on the last node).
@@ -854,14 +849,13 @@ func finish() -> bool:
 		name = tr.nova_esteira_t(mode, pts, rs, from, to, from_line, to_line)
 	_clear_drawing()
 	if name == "":
-		main.set_status("Não criou: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_criou", [tr.last_error()]))
 		return true
 	main.after_edit()
 	_select(name, is_path(), PackedInt32Array())
 	var r := _route(name, is_path())
 	if not r.is_empty():
-		main.set_status("%s %s criado: %s m%s." % [LABELS[mode], name, _num(float(r["length"])),
-			"" if is_path() else ", %s s de passagem, cabem %d" % [_num(float(r["transit"]), 1), int(r["capacity"])]])
+		main.set_status(main.T("godot-gd-trajeto-criado_m", [_label(mode), name, _num(float(r["length"])), "" if is_path() else main.T("godot-gd-passagem-cabem", [_num(float(r["transit"]), 1), int(r["capacity"])])]))
 	return true
 
 
@@ -869,7 +863,7 @@ func finish() -> bool:
 func cancel() -> bool:
 	if not points.is_empty():
 		_clear_drawing()
-		main.set_status("Desenho cancelado. Clique no chão para começar outro, ou Esc para sair da ferramenta.")
+		main.set_status(main.T("godot-gd-trajeto-desenho_cancelado_clique_no_chao"))
 		return true
 	if sel_name != "":
 		_select("", false, PackedInt32Array())
@@ -894,9 +888,9 @@ func delete_selected() -> bool:
 	if done > 0:
 		main.after_edit()
 		_select(sel_name, sel_path, PackedInt32Array())
-		main.set_status("%d nó(s) removido(s)." % done)
+		main.set_status(main.T("godot-gd-trajeto-no_s_removido_s", [done]))
 	else:
-		main.set_status("Não removeu: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_removeu", [tr.last_error()]))
 	return true
 
 
@@ -905,8 +899,7 @@ func _status_node() -> void:
 	if r.is_empty() or sel_nodes.is_empty():
 		return
 	var n: Vector3 = (r["nodes"] as PackedVector3Array)[sel_nodes[0]]
-	main.set_status("%s, nó %d: X %s, Y %s, altura %s m. Setas e PageUp/PageDown ajustam (Shift: 1 cm)." % [
-		sel_name, sel_nodes[0] + 1, _num(n.x), _num(-n.z), _num(n.y)])
+	main.set_status(main.T("godot-gd-trajeto-no_x_y_altura_m", [sel_name, sel_nodes[0] + 1, _num(n.x), _num(-n.z), _num(n.y)]))
 
 
 # ---------------------------------------------------------------------------
@@ -914,18 +907,28 @@ func _status_node() -> void:
 # ---------------------------------------------------------------------------
 
 
+## The name of the drawing tool `kind`, in the language of now.
+func _label(kind: String) -> String:
+	match kind:
+		BELT_SIMPLE:
+			return main.T("godot-gd-esteira-desenhada")
+		BELT_CHANNELED:
+			return main.T("godot-gd-esteira-com-canaletas")
+	return main.T("godot-gd-caminho-no-piso")
+
+
 func panel() -> Array:
-	var rows := [{"kind": "title", "text": LABELS[mode] if sel_name == "" else ("Caminho " if sel_path else "Esteira ") + sel_name}]
+	var rows := [{"kind": "title", "text": _label(mode) if sel_name == "" else main.T("godot-gd-trajeto-caminho-n", [sel_name]) if sel_path else main.T("godot-gd-trajeto-esteira-n", [sel_name])}]
 	var r := _route(sel_name, sel_path)
 	if r.is_empty():
-		rows.append({"kind": "help", "text": "Clique no chão para pôr os nós; o trecho mostra o comprimento e a inclinação. Os nós encaixam nas portas (pontas das esteiras e objetos), nos nós de outros trajetos, de 15 em 15° e na grade. PageUp/PageDown: altura do próximo nó; [ e ]: raio da curva; Enter termina; Backspace volta um nó; Esc cancela."})
-		rows.append({"kind": "number", "name": "Trajeto_AlturaDesenho", "label": "Altura do próximo nó (m)", "value": draw_z, "min": 0.0, "max": 30.0, "step": 0.01, "action": "trajeto_altura_desenho"})
-		rows.append({"kind": "check", "name": "Trajeto_InclinacaoFixa", "text": "Inclinação fixa no próximo trecho", "on": grade_on, "action": "trajeto_inclinacao_fixa"})
-		rows.append({"kind": "number", "name": "Trajeto_Inclinacao", "label": "Inclinação (%; negativa desce)", "value": grade_pct, "min": -100.0, "max": 100.0, "step": 0.5, "action": "trajeto_inclinacao"})
-		rows.append({"kind": "number", "name": "Trajeto_RaioDesenho", "label": "Raio das curvas (m; 0 = quina)", "value": new_radius, "min": 0.0, "max": 50.0, "step": 0.05, "action": "trajeto_raio_desenho"})
+		rows.append({"kind": "help", "text": main.T("godot-gd-trajeto-clique_no_chao_para_por-2")})
+		rows.append({"kind": "number", "name": "Trajeto_AlturaDesenho", "label": main.T("godot-gd-trajeto-altura_do_proximo_no_m"), "value": draw_z, "min": 0.0, "max": 30.0, "step": 0.01, "action": "trajeto_altura_desenho"})
+		rows.append({"kind": "check", "name": "Trajeto_InclinacaoFixa", "text": main.T("godot-gd-trajeto-inclinacao_fixa_no_proximo_trecho"), "on": grade_on, "action": "trajeto_inclinacao_fixa"})
+		rows.append({"kind": "number", "name": "Trajeto_Inclinacao", "label": main.T("godot-gd-trajeto-inclinacao-pct"), "value": grade_pct, "min": -100.0, "max": 100.0, "step": 0.5, "action": "trajeto_inclinacao"})
+		rows.append({"kind": "number", "name": "Trajeto_RaioDesenho", "label": main.T("godot-gd-trajeto-raio_das_curvas_m_0"), "value": new_radius, "min": 0.0, "max": 50.0, "step": 0.05, "action": "trajeto_raio_desenho"})
 		if is_path():
-			rows.append({"kind": "number", "name": "Trajeto_LarguraCaminho", "label": "Largura do caminho (m)", "value": path_width, "min": 0.6, "max": 10.0, "step": 0.05, "action": "trajeto_largura_caminho"})
-		rows.append({"kind": "info", "name": "Trajeto_Resumo", "text": "%d esteira(s) desenhada(s), %d caminho(s)." % [belts.size(), paths.size()]})
+			rows.append({"kind": "number", "name": "Trajeto_LarguraCaminho", "label": main.T("godot-gd-trajeto-largura_do_caminho_m"), "value": path_width, "min": 0.6, "max": 10.0, "step": 0.05, "action": "trajeto_largura_caminho"})
+		rows.append({"kind": "info", "name": "Trajeto_Resumo", "text": main.T("godot-gd-trajeto-esteira_s_desenhada_s_caminho", [belts.size(), paths.size()])})
 		return rows
 	var nodes: PackedVector3Array = r["nodes"]
 	var rs: PackedFloat64Array = r["radii"]
@@ -933,48 +936,48 @@ func panel() -> Array:
 	if not sel_path:
 		info += ", %s s de passagem a %s m/s, cabem %d" % [_num(float(r["transit"]), 1), _num(float(r["speed"])), int(r["capacity"])]
 	rows.append({"kind": "info", "name": "Trajeto_Resumo", "text": info + "."})
-	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": "Maior inclinação %s° (máximo %s°)." % [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)]})
+	rows.append({"kind": "info", "name": "Trajeto_Inclinacao", "text": main.T("godot-gd-trajeto-maior_inclinacao_maximo", [_num(float(r["max_degrees"]), 1), _num(float(r["limit"]), 1)])})
 	if r["too_steep"]:
-		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": "• Acima do máximo: a peça escorrega ou tomba." if not sel_path else "• Rampa mais íngreme que 1:12 (8,33 %)."})
-	rows.append({"kind": "number", "name": "Trajeto_GiroGraus", "label": "Girar (graus; + anti-horário)", "value": turn_deg, "min": -360.0, "max": 360.0, "step": 1.0, "action": "trajeto_giro_graus"})
-	rows.append({"kind": "button", "name": "Trajeto_Girar", "text": "Girar o trajeto", "action": "trajeto_girar"})
-	rows.append({"kind": "button", "name": "Trajeto_GirarEsq", "text": "Girar 15° (anti-horário, R)", "action": "trajeto_girar_esq"})
-	rows.append({"kind": "button", "name": "Trajeto_GirarDir", "text": "Girar 15° (horário, Shift+R)", "action": "trajeto_girar_dir"})
+		rows.append({"kind": "warning", "name": "Trajeto_Ingreme", "text": main.T("godot-gd-trajeto-acima-maximo") if not sel_path else main.T("godot-gd-trajeto-rampa-ingreme")})
+	rows.append({"kind": "number", "name": "Trajeto_GiroGraus", "label": main.T("godot-gd-trajeto-girar_graus_anti_horario"), "value": turn_deg, "min": -360.0, "max": 360.0, "step": 1.0, "action": "trajeto_giro_graus"})
+	rows.append({"kind": "button", "name": "Trajeto_Girar", "text": main.T("godot-gd-trajeto-girar_o_trajeto"), "action": "trajeto_girar"})
+	rows.append({"kind": "button", "name": "Trajeto_GirarEsq", "text": main.T("godot-gd-trajeto-girar_15_anti_horario_r"), "action": "trajeto_girar_esq"})
+	rows.append({"kind": "button", "name": "Trajeto_GirarDir", "text": main.T("godot-gd-trajeto-girar_15_horario_shift_r"), "action": "trajeto_girar_dir"})
 	var partner: String = tr.par_para_juntar(sel_name, sel_path)
 	if partner != "":
-		rows.append({"kind": "button", "name": "Trajeto_Juntar", "text": "Juntar com %s num trajeto só" % partner, "action": "trajeto_juntar"})
-	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": "Paralelo a (m; + à esquerda)", "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
-	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": "Desenhar paralelo", "action": "trajeto_paralelo"})
+		rows.append({"kind": "button", "name": "Trajeto_Juntar", "text": main.T("godot-gd-trajeto-juntar_com_num_trajeto_so", [partner]), "action": "trajeto_juntar"})
+	rows.append({"kind": "number", "name": "Trajeto_ParaleloDist", "label": main.T("godot-gd-trajeto-paralelo_a_m_a_esquerda"), "value": parallel_dist, "min": -50.0, "max": 50.0, "step": 0.05, "action": "trajeto_paralelo_dist"})
+	rows.append({"kind": "button", "name": "Trajeto_Paralelo", "text": main.T("godot-gd-trajeto-desenhar_paralelo"), "action": "trajeto_paralelo"})
 	if sel_path:
-		rows.append({"kind": "check", "name": "Trajeto_Escada", "text": "Escada (degraus; só pedestres)", "on": bool(r.get("stair", false)), "action": "trajeto_escada"})
+		rows.append({"kind": "check", "name": "Trajeto_Escada", "text": main.T("godot-gd-trajeto-escada_degraus_so_pedestres"), "on": bool(r.get("stair", false)), "action": "trajeto_escada"})
 	if sel_path and (nodes[0].y > 0.001 or nodes[nodes.size() - 1].y > 0.001):
-		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": "Rampas de acesso nas pontas (1:12)", "action": "trajeto_rampas"})
+		rows.append({"kind": "button", "name": "Trajeto_Rampas", "text": main.T("godot-gd-trajeto-rampas_de_acesso_nas_pontas"), "action": "trajeto_rampas"})
 	if not sel_path:
-		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": "Tipo", "items": [["Esteira simples", "simples"], ["Esteira com canaletas", "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
-		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": "Acionamento", "items": [["Motorizada", "motorizada"], ["Roletes por gravidade", "gravidade"], ["Calha (escorrega)", "calha"]], "value": r["drive"], "action": "trajeto_acionamento"})
-		rows.append({"kind": "button", "name": "Trajeto_Inverter", "text": "Inverter o sentido", "action": "trajeto_inverter"})
-		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": "Largura (m)", "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
+		rows.append({"kind": "choice", "name": "Trajeto_Tipo", "label": main.T("godot-gd-trajeto-tipo"), "items": [[main.T("godot-gd-esteira-simples"), "simples"], [main.T("godot-gd-esteira-com-canaletas"), "canaletas"]], "value": r["style"], "action": "trajeto_tipo"})
+		rows.append({"kind": "choice", "name": "Trajeto_Acionamento", "label": main.T("godot-gd-trajeto-acionamento"), "items": [[main.T("godot-gd-motorizada"), "motorizada"], [main.T("godot-gd-roletes-gravidade"), "gravidade"], [main.T("godot-gd-calha"), "calha"]], "value": r["drive"], "action": "trajeto_acionamento"})
+		rows.append({"kind": "button", "name": "Trajeto_Inverter", "text": main.T("godot-gd-trajeto-inverter_o_sentido"), "action": "trajeto_inverter"})
+		rows.append({"kind": "number", "name": "Trajeto_Largura", "label": main.T("godot-gd-trajeto-largura_m"), "value": snappedf(float(r["width"]), 0.001), "min": 0.1, "max": 3.0, "step": 0.05, "action": "trajeto_largura"})
 	if sel_nodes.size() == 1:
 		var i := sel_nodes[0]
 		var n := nodes[i]
-		rows.append({"kind": "section", "text": "Nó %d" % (i + 1)})
+		rows.append({"kind": "section", "text": main.T("godot-gd-trajeto-no-n", [i + 1])})
 		rows.append({"kind": "number", "name": "Trajeto_X", "label": "X (m)", "value": snappedf(n.x, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_x"})
 		rows.append({"kind": "number", "name": "Trajeto_Y", "label": "Y (m)", "value": snappedf(-n.z, 0.001), "min": -10000.0, "max": 10000.0, "step": 0.01, "action": "trajeto_y"})
-		rows.append({"kind": "number", "name": "Trajeto_Z", "label": "Altura (m)", "value": snappedf(n.y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
+		rows.append({"kind": "number", "name": "Trajeto_Z", "label": main.T("godot-gd-trajeto-altura_m"), "value": snappedf(n.y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_z"})
 		if i > 0 and i < nodes.size() - 1:
-			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": "Raio da curva (m; 0 = quina)", "value": snappedf(rs[i], 0.001), "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
+			rows.append({"kind": "number", "name": "Trajeto_Raio", "label": main.T("godot-gd-trajeto-raio_da_curva_m_0"), "value": snappedf(rs[i], 0.001), "min": 0.0, "max": 100.0, "step": 0.05, "action": "trajeto_raio"})
 			if not sel_path:
-				rows.append({"kind": "button", "name": "Trajeto_Dividir", "text": "Dividir a esteira neste nó", "action": "trajeto_dividir"})
+				rows.append({"kind": "button", "name": "Trajeto_Dividir", "text": main.T("godot-gd-trajeto-dividir_a_esteira_neste_no"), "action": "trajeto_dividir"})
 	elif sel_nodes.size() > 1:
-		rows.append({"kind": "section", "text": "%d nós selecionados" % sel_nodes.size()})
+		rows.append({"kind": "section", "text": main.T("godot-gd-trajeto-nos_selecionados", [sel_nodes.size()])})
 	if sel_nodes.size() > 1 or sel_nodes.is_empty():
-		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": "Nivelar na altura (m)", "value": snappedf(nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
-		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": "Inclinação constante entre as pontas", "action": "trajeto_constante"})
+		rows.append({"kind": "number", "name": "Trajeto_Nivel", "label": main.T("godot-gd-trajeto-nivelar_na_altura_m"), "value": snappedf(nodes[sel_nodes[0]].y if not sel_nodes.is_empty() else nodes[0].y, 0.001), "min": 0.0, "max": 100.0, "step": 0.01, "action": "trajeto_nivelar"})
+		rows.append({"kind": "button", "name": "Trajeto_Constante", "text": main.T("godot-gd-trajeto-inclinacao_constante_entre_as_pontas"), "action": "trajeto_constante"})
 	if not sel_nodes.is_empty():
-		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": "Remover nó(s) (Del)", "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
+		rows.append({"kind": "button", "name": "Trajeto_ExcluirNo", "text": main.T("godot-gd-trajeto-remover_no_s_del"), "enabled": nodes.size() - sel_nodes.size() >= 2, "action": "trajeto_excluir_no"})
 	if sel_nodes.size() == 2 and absi(sel_nodes[0] - sel_nodes[1]) == 1:
-		rows.append({"kind": "button", "name": "Trajeto_ApagarTrecho", "text": "Apagar o trecho entre os nós", "enabled": nodes.size() > 2, "action": "trajeto_apagar_trecho"})
-	rows.append({"kind": "help", "text": "Arraste o losango do nó no chão para movê-lo e o topo da haste para mudar a altura. Setas movem (Shift: 1 cm), PageUp/PageDown sobem e descem, [ e ] mudam o raio. Shift + clique na linha acrescenta um nó; um clique no losango laranja (ou dois nós vizinhos com Shift + clique) seleciona o trecho, que pode ser apagado. Arraste o losango laranja no meio de um trecho para curvá-lo e o quadrado verde no meio do trajeto para movê-lo inteiro e o anel laranja ao lado dele para girá-lo; sem nó selecionado, as setas movem e R gira o trajeto."})
+		rows.append({"kind": "button", "name": "Trajeto_ApagarTrecho", "text": main.T("godot-gd-trajeto-apagar_o_trecho_entre_os"), "enabled": nodes.size() > 2, "action": "trajeto_apagar_trecho"})
+	rows.append({"kind": "help", "text": main.T("godot-gd-trajeto-arraste_o_losango_do_no")})
 	return rows
 
 
@@ -996,14 +999,14 @@ func edit_belt(name: String) -> void:
 	sync()
 	var r := _route(name, false)
 	if r.is_empty():
-		main.set_status("%s não é uma esteira desenhada." % name)
+		main.set_status(main.T("godot-gd-trajeto-nao_e_uma_esteira_desenhada", [name]))
 		return
 	editor.set_tool("colocar", BELT_CHANNELED if r["style"] == "canaletas" else BELT_SIMPLE)
 	var all := PackedInt32Array()
 	for i in (r["nodes"] as PackedVector3Array).size():
 		all.append(i)
 	_select(name, false, all)
-	main.set_status("Esteira %s: clique num nó para editá-lo; setas e PageUp/PageDown movem os nós selecionados." % name)
+	main.set_status(main.T("godot-gd-trajeto-esteira_clique_num_no_para", [name]))
 
 
 ## An edit from the panel (`form:trajeto_<what>:<value>`).
@@ -1028,7 +1031,7 @@ func form(what: String, value: String) -> void:
 			return
 		"trajeto_inclinacao_fixa":
 			grade_on = value == "1" or value == "true"
-			main.set_status("Inclinação fixa %s (%s %%)." % ["ligada" if grade_on else "desligada", _num(grade_pct, 1)])
+			main.set_status(main.T("godot-gd-trajeto-inclinacao_fixa", [main.T("godot-gd-ligada") if grade_on else main.T("godot-gd-desligada"), _num(grade_pct, 1)]))
 			return
 		"trajeto_inclinacao":
 			grade_pct = v
@@ -1069,7 +1072,7 @@ func form(what: String, value: String) -> void:
 				var other: String = tr.dividir(sel_name, sel_nodes[0])
 				ok = other != ""
 				if ok:
-					main.set_status("Esteira dividida: %s → %s." % [sel_name, other])
+					main.set_status(main.T("godot-gd-trajeto-esteira_dividida", [sel_name, other]))
 		"trajeto_excluir_no":
 			delete_selected()
 			return
@@ -1080,7 +1083,7 @@ func form(what: String, value: String) -> void:
 			if ok:
 				main.after_edit()
 				_select(sel_name, sel_path, PackedInt32Array())
-				main.set_status("Trecho apagado de %s." % sel_name)
+				main.set_status(main.T("godot-gd-trajeto-trecho_apagado_de", [sel_name]))
 				return
 		"trajeto_juntar":
 			var gone: String = tr.juntar(sel_name, sel_path)
@@ -1088,7 +1091,7 @@ func form(what: String, value: String) -> void:
 			if ok:
 				main.after_edit()
 				_select(sel_name, sel_path, PackedInt32Array())
-				main.set_status("%s e %s viraram um trajeto só (Ctrl+Z desfaz)." % [sel_name, gone])
+				main.set_status(main.T("godot-gd-trajeto-e_viraram_um_trajeto_so", [sel_name, gone]))
 				return
 		"trajeto_inverter":
 			ok = tr.inverter(sel_name, sel_path)
@@ -1099,7 +1102,7 @@ func form(what: String, value: String) -> void:
 					flipped.append(n - 1 - i)
 				main.after_edit()
 				_select(sel_name, sel_path, flipped)
-				main.set_status("%s agora corre no sentido contrário (as ligações também)." % sel_name)
+				main.set_status(main.T("godot-gd-trajeto-agora_corre_no_sentido_contrario", [sel_name]))
 				return
 		"trajeto_giro_graus":
 			turn_deg = v
@@ -1119,7 +1122,7 @@ func form(what: String, value: String) -> void:
 			if ok:
 				main.after_edit()
 				_select(other, sel_path, PackedInt32Array())
-				main.set_status("%s desenhado a %s m de %s." % [other, _num(parallel_dist), r["name"]])
+				main.set_status(main.T("godot-gd-trajeto-desenhado_a_m_de", [other, _num(parallel_dist), r["name"]]))
 				return
 		"trajeto_escada":
 			ok = tr.por_escada(sel_name, value == "1" or value == "true")
@@ -1127,13 +1130,13 @@ func form(what: String, value: String) -> void:
 			var k: int = tr.rampas_de_acesso(sel_name)
 			ok = k > 0
 			if ok:
-				main.set_status("%d rampa(s) de acesso de 1:12 acrescentada(s) a %s." % [k, sel_name])
+				main.set_status(main.T("godot-gd-trajeto-rampa_s_de_acesso_de", [k, sel_name]))
 		_:
 			return
 	if ok:
 		main.after_edit()
 	else:
-		main.set_status("Não mudou: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_mudou", [tr.last_error()]))
 
 
 # ---------------------------------------------------------------------------
@@ -1151,9 +1154,9 @@ func _on_profile_height(index: int, height: float) -> void:
 	if tr.por_no(sel_name, sel_path, index, n):
 		main.after_edit()
 		_select(sel_name, sel_path, PackedInt32Array([index]))
-		main.set_status("%s, nó %d a %s m de altura (perfil; Ctrl+Z desfaz)." % [sel_name, index + 1, _num(height)])
+		main.set_status(main.T("godot-gd-trajeto-no_a_m_de_altura", [sel_name, index + 1, _num(height)]))
 	else:
-		main.set_status("Não mudou a altura: %s" % tr.last_error())
+		main.set_status(main.T("godot-gd-trajeto-nao_mudou_a_altura", [tr.last_error()]))
 
 
 ## Shows the profile of the selected route at the bottom of the view.

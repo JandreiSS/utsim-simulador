@@ -614,7 +614,10 @@ fn edit_dist(d: &mut Dist, sub: &str, v: &Value) -> Result<(), String> {
                         ParamRef::F(p) => *p = x,
                         ParamRef::U(p) => {
                             if !(0.0..=f64::from(u32::MAX)).contains(&x.round()) {
-                                return Err(format!("{key} precisa ser um inteiro >= 0"));
+                                return Err(fx(
+                                    "godot-schema-inteiro_maior_ou_igual_a_zero",
+                                    &[("key", vx(&key))],
+                                ));
                             }
                             *p = x.round() as u32;
                         }
@@ -2108,7 +2111,10 @@ fn edit_crane(
             ("hook_height" | "capacity_t" | "load_zone" | "bridge_gap", "") => {
                 let v = f64_of(value, w)?;
                 if !v.is_finite() || v < 0.0 || (head == "capacity_t" && v <= 0.0) {
-                    return Err(format!("{w}: número maior ou igual a zero"));
+                    return Err(fx(
+                        "godot-schema-numero_maior_ou_igual_a_zero",
+                        &[("w", vx(&w))],
+                    ));
                 }
                 Ok(set(name, head, ron::float(v)))
             }
@@ -2168,7 +2174,10 @@ fn edit_crane(
                     format!("{kind}(team: {})", ron::string(team)),
                 ))
             }
-            _ => Err(format!("{name} não tem o campo \"{w}\"")),
+            _ => Err(fx(
+                "godot-schema-nao_tem_o_campo",
+                &[("name", vx(&name)), ("field", vx(&w))],
+            )),
         }
     })())
 }
@@ -2915,7 +2924,10 @@ fn edit_person(
                 v => {
                     let x = f64_of(v, field)?;
                     if !(x.is_finite() && x > 0.0) {
-                        return Err(format!("{field}: precisa ser maior que zero"));
+                        return Err(fx(
+                            "godot-schema-campo_maior_que_zero",
+                            &[("field", vx(&field))],
+                        ));
                     }
                     Ok(Some(x))
                 }
@@ -3262,16 +3274,26 @@ fn usize_of(v: &Value, what: &str, min: i64) -> Result<usize, String> {
     v.as_int()
         .filter(|i| *i >= min)
         .map(|i| i as usize)
-        .ok_or_else(|| format!("{what} precisa ser um inteiro >= {min}"))
+        .ok_or_else(|| {
+            fx(
+                "godot-schema-inteiro_minimo",
+                &[("what", vx(&what)), ("min", vx(&min))],
+            )
+        })
 }
 
 fn f64_of(v: &Value, what: &str) -> Result<f64, String> {
-    v.as_f64().ok_or_else(|| format!("{what}: número esperado"))
+    v.as_f64()
+        .ok_or_else(|| fx("godot-schema-numero_esperado_de", &[("what", vx(&what))]))
 }
 
 fn bool_of(v: &Value, what: &str) -> Result<bool, String> {
-    v.as_bool()
-        .ok_or_else(|| format!("{what}: verdadeiro ou falso esperado"))
+    v.as_bool().ok_or_else(|| {
+        fx(
+            "godot-schema-verdadeiro_ou_falso_esperado",
+            &[("what", vx(&what))],
+        )
+    })
 }
 
 /// A number, or `Null` for "off".
@@ -3456,7 +3478,12 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
                 team.push(rest.to_string());
             }
         }
-        _ => return Err(format!("{} não tem o campo \"{w}\"", o.name)),
+        _ => {
+            return Err(fx(
+                "godot-schema-nao_tem_o_campo",
+                &[("name", vx(&o.name)), ("field", vx(&w))],
+            ));
+        }
     }
     Ok(())
 }
@@ -3686,8 +3713,12 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     }
     let mut copy = obj.clone();
     mutate(&mut copy, head, rest, value)?;
-    let text = read_field(&copy, head)
-        .ok_or_else(|| format!("{} não tem o campo \"{head}\"", obj.name))?;
+    let text = read_field(&copy, head).ok_or_else(|| {
+        fx(
+            "godot-schema-nao_tem_o_campo",
+            &[("name", vx(&obj.name)), ("field", vx(&head))],
+        )
+    })?;
     Ok(set(&obj.name, head, text))
 }
 

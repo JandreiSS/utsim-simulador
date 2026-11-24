@@ -450,6 +450,26 @@ impl UtsimDocument {
         GString::from(self.last_error.as_str())
     }
 
+    /// A text of the interface in the language of now, for the GDScript side:
+    /// `texto("godot-gd-…", [valores])`, the values being `{ $p1 }`, `{ $p2 }`… of the
+    /// message (a number counts for the plural).
+    #[func]
+    fn texto(&self, chave: GString, valores: Array<Variant>) -> GString {
+        use crate::texto::{dx, fx, sx, vx};
+        let nomes: Vec<String> = (1..=valores.len()).map(|k| format!("p{k}")).collect();
+        let valores: Vec<utsim_idiomas::Valor<'static>> = valores
+            .iter_shared()
+            .map(|v| match v.get_type() {
+                VariantType::INT => vx(&v.to::<i64>()),
+                VariantType::FLOAT => dx(format!("{}", v.to::<f64>())),
+                _ => sx(v.stringify().to_string()),
+            })
+            .collect();
+        let pares: Vec<(&str, utsim_idiomas::Valor<'static>)> =
+            nomes.iter().map(String::as_str).zip(valores).collect();
+        GString::from(fx(&chave.to_string(), &pares).as_str())
+    }
+
     #[func]
     fn is_dirty(&self) -> bool {
         self.editor.doc.is_dirty()

@@ -12,6 +12,7 @@
 //! the input events, `Image` and `DisplayServer` are reached through dynamic calls
 //! (`get`, `call`): a handful per event or per texture change.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -673,15 +674,15 @@ impl UtsimUi {
     #[func]
     fn live_check(&self, name: GString) -> GString {
         let Some(pb) = self.clock_pb.as_ref() else {
-            return "sem replicação".into();
+            return tx("godot-ui-class-sem_replicacao").into();
         };
         let b = pb.bind();
         let Some(c) = b.core.as_ref() else {
-            return "sem replicação".into();
+            return tx("godot-ui-class-sem_replicacao").into();
         };
         match c.vivo() {
             Some(v) => v.confere(&name.to_string()).join("; ").as_str().into(),
-            None => "sem rastro da replicação".into(),
+            None => tx("godot-ui-class-sem_rastro_da_replicacao").into(),
         }
     }
 
@@ -1138,7 +1139,7 @@ impl UtsimUi {
     #[func]
     fn fitwin_csv(&mut self, file: GString) -> GString {
         let Some(w) = self.host.fitwin.as_mut() else {
-            return "a janela de valores não está aberta".into();
+            return tx("godot-ui-class-a_janela_de_valores_nao").into();
         };
         let r = utsim_fit::data::load(
             std::path::Path::new(&file.to_string()),
@@ -1149,11 +1150,18 @@ impl UtsimUi {
                 let n = l.values.len();
                 w.rows
                     .extend(l.values.iter().map(|x| crate::ui_props::num_text(*x)));
-                w.note = format!("{n} valor(es) lidos de {} (coluna {}).", file, l.column);
+                w.note = fx(
+                    "godot-ui-class-valor_es_lidos_de_coluna",
+                    &[
+                        ("n", vx(&n)),
+                        ("file", vx(&file)),
+                        ("column", vx(&l.column)),
+                    ],
+                );
                 String::new()
             }
             Err(e) => {
-                w.note = format!("Não leu o arquivo: {e}");
+                w.note = fx("godot-ui-class-nao_leu_o_arquivo", &[("e", vx(&e))]);
                 e
             }
         };
@@ -1167,14 +1175,17 @@ impl UtsimUi {
         let mut d = VarDictionary::new();
         let r = match self.host.fitwin.as_ref() {
             Some(w) => w.write_report(std::path::Path::new(&dir.to_string())),
-            None => Err("a janela de valores não está aberta".into()),
+            None => Err(tx("godot-ui-class-a_janela_de_valores_nao").into()),
         };
         match r {
             Ok(f) => {
                 d.set("ok", true);
                 d.set("file", &GString::from(f.to_string_lossy().as_ref()));
                 if let Some(w) = self.host.fitwin.as_mut() {
-                    w.note = format!("Relatório gravado em {}.", f.display());
+                    w.note = fx(
+                        "godot-ui-class-relatorio_gravado_em",
+                        &[("f", vx(&f.display()))],
+                    );
                 }
             }
             Err(e) => {
@@ -1331,11 +1342,17 @@ impl UtsimUi {
             return GString::new();
         };
         let line = if path.is_empty() {
-            "Escreva o arquivo do relatório.".to_owned()
+            tx("godot-ui-class-escreva_o_arquivo_do_relatorio").to_owned()
         } else if html {
             match std::fs::write(&path, out.html()) {
-                Ok(()) => format!("Relatório PERT/CPM gravado em {path}."),
-                Err(e) => format!("Não gravou {path}: {e}"),
+                Ok(()) => fx(
+                    "godot-ui-class-relatorio_pert_cpm_gravado_em",
+                    &[("path", vx(&path))],
+                ),
+                Err(e) => fx(
+                    "godot-ui-class-nao_gravou",
+                    &[("path", vx(&path)), ("e", vx(&e))],
+                ),
             }
         } else {
             let dir = std::path::Path::new(&path)
@@ -1343,8 +1360,14 @@ impl UtsimUi {
                 .map(std::path::Path::to_path_buf)
                 .unwrap_or_default();
             match out.write_csv(&dir) {
-                Ok(files) => format!("{} tabela(s) CSV em {}.", files.len(), dir.display()),
-                Err(e) => format!("Não gravou os CSV em {}: {e}", dir.display()),
+                Ok(files) => fx(
+                    "godot-ui-class-tabela_s_csv_em",
+                    &[("files", vx(&files.len())), ("dir", vx(&dir.display()))],
+                ),
+                Err(e) => fx(
+                    "godot-ui-class-nao_gravou_os_csv_em",
+                    &[("dir", vx(&dir.display())), ("e", vx(&e))],
+                ),
             }
         };
         GString::from(line.as_str())
@@ -1356,11 +1379,14 @@ impl UtsimUi {
         let dir = self.host.results_mem.export_dir.trim().to_owned();
         let line = match &self.host.results {
             None => String::new(),
-            Some(_) if dir.is_empty() => "Escreva a pasta da exportação.".into(),
+            Some(_) if dir.is_empty() => tx("godot-ui-class-escreva_a_pasta_da_exportacao").into(),
             Some(v) => {
                 match utsim_model::csv::export(&std::path::PathBuf::from(&dir), &v.run.reports) {
-                    Ok(files) => format!("{} arquivo(s) CSV em {dir}.", files.len()),
-                    Err(e) => format!("Não exportou: {e}"),
+                    Ok(files) => fx(
+                        "godot-ui-class-arquivo_s_csv_em",
+                        &[("files", vx(&files.len())), ("dir", vx(&dir))],
+                    ),
+                    Err(e) => fx("godot-ui-class-nao_exportou", &[("e", vx(&e))]),
                 }
             }
         };
@@ -1850,7 +1876,7 @@ impl UtsimUi {
                 (
                     String::new(),
                     String::new(),
-                    Err(format!("{quem}: só leitura")),
+                    Err(fx("godot-ui-class-so_leitura", &[("quem", vx(&quem))])),
                 )
             } else {
                 match acao {
@@ -1969,14 +1995,9 @@ fn simulated_view(
         return None;
     }
     Some(crate::ui_abas::Simulado {
-        nota: format!(
-            "Na última simulação ({} {}), média ± semiamplitude do IC de 95 %:",
-            ind.replicacoes,
-            if ind.replicacoes == 1 {
-                "replicação"
-            } else {
-                "replicações"
-            }
+        nota: fx(
+            "godot-ui-class-na_ultima_simulacao_media_semiamplitude",
+            &[("replicacoes", vx(&ind.replicacoes))],
         ),
         linhas: abas
             .iter()

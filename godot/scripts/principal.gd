@@ -177,7 +177,7 @@ func _ready() -> void:
 	lock_timer.timeout.connect(_renew_lock)
 	add_child(lock_timer)
 	camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
-	set_status("Arraste um objeto da Biblioteca para o chão, ou abra um modelo (Ctrl+O).")
+	set_status(T("godot-gd-principal-arraste_um_objeto_da_biblioteca"))
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ func toggle_performance() -> void:
 	_perf_on = not _perf_on
 	if ui != null and not _perf_on:
 		ui.set_performance("")
-	set_status("Medidas de desempenho %s (F3)." % ("visíveis" if _perf_on else "ocultas"))
+	set_status(T("godot-gd-desempenho-visiveis") if _perf_on else T("godot-gd-desempenho-ocultas"))
 
 
 ## The shortcuts window (F1): an egui dialog with the list of the bridge.
@@ -393,7 +393,15 @@ func set_snap(on: bool, step: float) -> void:
 	grid_step = step
 	_sync_bar()
 	_draw_edit_grid()
-	set_status("Encaixe na grade %s (passo %s m)." % ["ligado" if on else "desligado", str(step)])
+	set_status(T("godot-gd-principal-encaixe_na_grade_passo_m", [T("godot-gd-ligado") if on else T("godot-gd-desligado"), str(step)]))
+
+
+## A text of the interface in the language of now (`UtsimDocument.texto`); the key itself
+## while the bridge is not loaded.
+func T(key: String, args: Array = []) -> String:
+	if doc == null:
+		return key
+	return doc.texto(key, args)
 
 
 func set_status(text: String) -> void:
@@ -554,7 +562,7 @@ func _run_step(p: Dictionary) -> bool:
 			if ResourceLoader.exists("res://cenas/ensino.tscn"):
 				get_tree().change_scene_to_file.call_deferred("res://cenas/ensino.tscn")
 			else:
-				set_status("O modo missão do UTSim Ensino não está nesta versão.")
+				set_status(T("godot-gd-principal-o_modo_missao_do_utsim"))
 		"analisar":
 			analysis_action(s)
 		"abrir_app":
@@ -589,7 +597,7 @@ func _run_step(p: Dictionary) -> bool:
 			if walking():
 				stop_walk()
 			elif not start_walk():
-				set_status("Para andar pela fábrica, simule primeiro (F no Simular, depois da rodada).")
+				set_status(T("godot-gd-principal-para_andar_pela_fabrica_simule"))
 		"enquadrar":
 			stop_walk()
 			if mode == "simular" and cena.playback != null:
@@ -660,9 +668,9 @@ func _run_step(p: Dictionary) -> bool:
 			if p["s2"] == "name" and not editor.selected.is_empty():
 				editor.selected[0] = String(p["s3"]).strip_edges()
 			after_edit.call_deferred()
-			set_status("%s: %s alterado." % [s, p["s2"]])
+			set_status(T("godot-gd-principal-alterado", [s, p["s2"]]))
 		"prop_erro":
-			set_status("Não alterou %s: %s" % [s, p["s2"]])
+			set_status(T("godot-gd-principal-nao_alterou", [s, p["s2"]]))
 			_show_properties.call_deferred()
 		"prop_fim":
 			after_edit.call_deferred()
@@ -757,7 +765,7 @@ func _confirm_discard(then: Callable) -> void:
 		_pending = then
 		if ui != null:
 			ui.show_dialog(JSON.stringify({"name": "Dialogo_Descartar", "title": "Descartar mudanças?",
-				"text": "O modelo tem mudanças que não foram salvas. Descartar?",
+				"text": T("godot-gd-principal-o_modelo_tem_mudancas_que"),
 				"buttons": [["Dialogo_Descartar_Ok", "Descartar", "descartar"], ["Dialogo_Descartar_Voltar", "Voltar", "voltar"]]}))
 	else:
 		then.call()
@@ -785,7 +793,7 @@ func new_document(force := false) -> void:
 		set_mode("editar")
 		after_edit(true)
 		camera.frame_box(Vector3(-8, 0, -8), Vector3(8, 0, 8))
-		set_status("Novo modelo.")
+		set_status(T("godot-gd-principal-novo_modelo"))
 	if force:
 		go.call()
 	else:
@@ -802,7 +810,7 @@ func open_model(path: String) -> bool:
 	playing_replay = false
 	var r: Dictionary = doc.open(path)
 	if not r["ok"]:
-		set_status("Não abriu %s: %s" % [path.get_file(), r["error"]])
+		set_status(T("godot-gd-principal-nao_abriu", [path.get_file(), r["error"]]))
 		return false
 	model_path = path
 	_disk_warned = false
@@ -819,11 +827,11 @@ func open_model(path: String) -> bool:
 	var issues: Array = doc.issues()
 	var lock: String = doc.lock_notice()
 	if lock != "":
-		set_status("%s aberto, mas %s: Salvar fica para quando a pessoa fechar (ou use Salvar como)." % [path.get_file(), lock])
+		set_status(T("godot-gd-principal-aberto_mas_salvar_fica_para", [path.get_file(), lock]))
 	elif issues.is_empty():
-		set_status("%s aberto: %d objetos. Simular roda as replicações." % [path.get_file(), doc.objects().size()])
+		set_status(T("godot-gd-principal-aberto_objetos_simular_roda_as", [path.get_file(), doc.objects().size()]))
 	else:
-		set_status("%s aberto com %d problema(s): veja o painel de propriedades." % [path.get_file(), issues.size()])
+		set_status(T("godot-gd-principal-aberto_com_problema_s_veja", [path.get_file(), issues.size()]))
 	return true
 
 
@@ -833,7 +841,7 @@ func _renew_lock() -> void:
 	var before: String = doc.lock_notice()
 	doc.renew_lock()
 	if before != "" and doc.lock_notice() == "":
-		set_status("O outro app fechou o modelo: as abas Qualidade, Segurança e Manutenção voltaram a editar.")
+		set_status(T("godot-gd-principal-o_outro_app_fechou_o"))
 		if ui != null:
 			ui.repaint()
 	_check_disk()
@@ -861,7 +869,7 @@ func _check_disk() -> void:
 		"conflito":
 			if not _disk_warned:
 				_disk_warned = true
-				set_status("Outro app gravou %s e há mudanças suas não salvas: use Salvar como para não apagar o trabalho dele." % model_path.get_file())
+				set_status(T("godot-gd-principal-outro_app_gravou_e_ha", [model_path.get_file()]))
 
 
 ## Reads the model again from its file, keeping the mode, the camera and the selection.
@@ -869,7 +877,7 @@ func _reload_from_disk() -> void:
 	var keep: Array = editor.selected.duplicate()
 	var r: Dictionary = doc.reload()
 	if not r["ok"]:
-		set_status("Não releu %s: %s" % [model_path.get_file(), r["error"]])
+		set_status(T("godot-gd-principal-nao_releu", [model_path.get_file(), r["error"]]))
 		return
 	_disk_warned = false
 	after_edit(true)
@@ -878,7 +886,7 @@ func _reload_from_disk() -> void:
 		if o["name"] in keep:
 			names.append(o["name"])
 	editor.select_names(names, false)
-	set_status("%s foi gravado por outro app: recarregado do disco." % model_path.get_file())
+	set_status(T("godot-gd-principal-foi_gravado_por_outro_app", [model_path.get_file()]))
 
 
 ## "Abrir no UTSim Qualidade / Segurança" of a node: the other app reads the file, so the
@@ -889,13 +897,13 @@ func _open_in_app(app: String, node: String) -> void:
 		# Only the readings of the person's time study go, as a spreadsheet: no save and
 		# no lock handed over (the UTSim Estatística does not edit the model).
 		var err: String = doc.open_in_app(app, node)
-		set_status(err if err != "" else "Abrindo as leituras de %s no UTSim Estatística." % node)
+		set_status(err if err != "" else T("godot-gd-abrindo-leituras", [node]))
 		if ui != null:
 			ui.repaint()
 		return
 	var nome := "UTSim Qualidade" if app == "qualidade" else "UTSim Segurança do Trabalho"
 	if doc.path() == "":
-		set_status("Salve o modelo antes de abrir no %s." % nome)
+		set_status(T("godot-gd-principal-salve_o_modelo_antes_de", [nome]))
 		save_as_dialog()
 		return
 	if doc.is_dirty() and not save():
@@ -904,7 +912,7 @@ func _open_in_app(app: String, node: String) -> void:
 	if e != "":
 		set_status(e)
 	else:
-		set_status("Abrindo %s no %s: ele edita o modelo; o UTSim 3D relê o que ele gravar." % [node, nome])
+		set_status(T("godot-gd-principal-abrindo_no_ele_edita_o", [node, nome]))
 	if ui != null:
 		ui.repaint()
 
@@ -938,26 +946,26 @@ func _report_save(r: Dictionary) -> void:
 	if r["ok"]:
 		model_path = doc.path()
 		_disk_warned = false
-		set_status("Salvo em %s." % doc.path())
+		set_status(T("godot-gd-principal-salvo_em", [doc.path()]))
 	else:
-		set_status("Não salvou: %s" % r["error"])
+		set_status(T("godot-gd-principal-nao_salvou", [r["error"]]))
 	_update_title()
 
 
 func undo() -> void:
 	if doc.undo():
 		after_edit()
-		set_status("Desfeito.")
+		set_status(T("godot-gd-principal-desfeito"))
 	else:
-		set_status("Nada para desfazer.")
+		set_status(T("godot-gd-principal-nada_para_desfazer"))
 
 
 func redo() -> void:
 	if doc.redo():
 		after_edit()
-		set_status("Refeito.")
+		set_status(T("godot-gd-principal-refeito"))
 	else:
-		set_status("Nada para refazer.")
+		set_status(T("godot-gd-principal-nada_para_refazer"))
 
 
 ## Refreshes everything drawn from the document after a change (scene, overlay, lists,
@@ -986,7 +994,7 @@ func _build_edit_scene() -> void:
 	var pb: Object = doc.edit_scene(CenaUtsim.skeletal_available())
 	cena.show_connections = false
 	if pb == null:
-		set_status("Não foi possível desenhar o modelo: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-nao_foi_possivel_desenhar_o", [doc.last_error()]))
 		return
 	playback = null
 	cena.build(pb, true)
@@ -1111,14 +1119,14 @@ func _data_config(draft: Dictionary) -> Dictionary:
 	if draft.get("origem", "arquivo") == "arquivo":
 		var file := String(draft.get("source", "")).strip_edges()
 		if file == "":
-			set_status("Escolha o arquivo de dados.")
+			set_status(T("godot-gd-principal-escolha_o_arquivo_de_dados"))
 			return {}
 		config["source"] = doc.data_relative(file)
 		config["column"] = String(draft.get("column", ""))
 	else:
 		var r: Dictionary = doc.data_parse_values(String(draft.get("text", "")))
 		if not r["ok"]:
-			set_status("Valores colados: %s" % r["error"])
+			set_status(T("godot-gd-principal-valores_colados", [r["error"]]))
 			return {}
 		config["values"] = r["values"]
 	return config
@@ -1135,19 +1143,19 @@ func _on_data_apply(path: String, draft: Dictionary) -> void:
 	if field == "" or config.is_empty():
 		return
 	if busy():
-		set_status("Aguarde: %s." % job.what())
+		set_status(T("godot-gd-principal-aguarde", [job.what()]))
 		return
 	var j: Object = doc.data_fit(field, config)
 	if j == null:
-		set_status("Não ajustou: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-nao_ajustou", [doc.last_error()]))
 		return
 	start_job(j, func(_j):
 		if doc.data_apply(field, config):
 			doc.end_gesture()
 			after_edit.call_deferred()
-			set_status("%s agora usa dados reais (Ctrl+Z desfaz)." % field)
+			set_status(T("godot-gd-principal-agora_usa_dados_reais_ctrl", [field]))
 		else:
-			set_status("Não aplicou os dados: %s" % doc.last_error()))
+			set_status(T("godot-gd-principal-nao_aplicou_os_dados", [doc.last_error()])))
 
 
 ## The analysis of an applied entry that has none yet (the panel asks once).
@@ -1170,16 +1178,16 @@ func _on_data_to_dist(path: String) -> void:
 	if doc.data_to_dist(field):
 		doc.end_gesture()
 		after_edit.call_deferred()
-		set_status("%s volta a usar uma distribuição (Ctrl+Z desfaz)." % field)
+		set_status(T("godot-gd-principal-volta_a_usar_uma_distribuicao", [field]))
 	else:
-		set_status("Não voltou para a distribuição: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-nao_voltou_para_a_distribuicao", [doc.last_error()]))
 		_show_properties.call_deferred()
 
 
 func _on_data_file(file: String) -> void:
 	if ui != null and _data_target == "janela":
 		var err := String(ui.fitwin_csv(file))
-		set_status("Valores lidos de %s." % file.get_file() if err == "" else "Não leu %s: %s" % [file.get_file(), err])
+		set_status(T("godot-gd-valores-lidos-de", [file.get_file()]) if err == "" else T("godot-gd-nao-leu", [file.get_file(), err]))
 		return
 	if ui != null:
 		ui.set_data_file(_data_pick_path, doc.data_relative(file))
@@ -1190,10 +1198,10 @@ func _on_data_file(file: String) -> void:
 func write_fit_report(dir: String) -> void:
 	var r: Dictionary = ui.fitwin_report(dir)
 	if not r["ok"]:
-		set_status("Sem relatório: %s" % r["error"])
+		set_status(T("godot-gd-principal-sem_relatorio", [r["error"]]))
 		return
 	last_report = {"index": r["file"], "files": 1}
-	set_status("Relatório gravado em %s." % r["file"])
+	set_status(T("godot-gd-principal-relatorio_gravado_em", [r["file"]]))
 	if DisplayServer.get_name() != "headless" and not scripted:
 		OS.shell_open(String(r["file"]))
 
@@ -1203,12 +1211,12 @@ func write_fit_report(dir: String) -> void:
 func write_data_report(dir: String) -> void:
 	var j: Object = doc.data_report(dir)
 	if j == null:
-		set_status("Sem relatório: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-sem_relatorio", [doc.last_error()]))
 		return
 	start_job(j, func(done):
 		last_report = done.data()
 		var index := String(last_report.get("index", ""))
-		set_status("Relatório gravado em %s (%d arquivos)." % [dir, int(last_report.get("files", 0))])
+		set_status(T("godot-gd-principal-relatorio_gravado_em_arquivos", [dir, int(last_report.get("files", 0))]))
 		# A scripted run checks the files; it does not open the browser.
 		if index != "" and DisplayServer.get_name() != "headless" and not scripted:
 			OS.shell_open(index))
@@ -1220,29 +1228,29 @@ func arrange_action(what: String) -> void:
 	if what.begins_with("alinhar:"):
 		if doc.align(sel, what.substr(8)):
 			after_edit()
-			set_status("%d objetos alinhados." % sel.size())
+			set_status(T("godot-gd-principal-objetos_alinhados", [sel.size()]))
 		else:
 			set_status(doc.last_error())
 		return
 	if what.begins_with("distribuir:"):
 		if doc.distribute(sel, what.substr(11)):
 			after_edit()
-			set_status("%d objetos distribuídos." % sel.size())
+			set_status(T("godot-gd-principal-objetos_distribuidos", [sel.size()]))
 		else:
 			set_status(doc.last_error())
 		return
 	match what:
 		"copiar":
 			var n: int = doc.copy(sel)
-			set_status("%d objeto(s) copiados." % n if n > 0 else "Nada selecionado para copiar.")
+			set_status(T("godot-gd-objetos-copiados", [n]) if n > 0 else T("godot-gd-nada-para-copiar"))
 		"recortar":
 			var n: int = doc.cut(sel)
 			if n > 0:
 				editor.clear_selection()
 				after_edit()
-				set_status("%d objeto(s) recortados (Ctrl+V cola)." % n)
+				set_status(T("godot-gd-principal-objeto_s_recortados_ctrl_v", [n]))
 			else:
-				set_status("Nada selecionado para recortar.")
+				set_status(T("godot-gd-principal-nada_selecionado_para_recortar"))
 		"colar", "duplicar":
 			var names: PackedStringArray = doc.paste() if what == "colar" else doc.duplicate(sel)
 			if names.is_empty():
@@ -1250,7 +1258,7 @@ func arrange_action(what: String) -> void:
 			else:
 				editor.select_names(Array(names), false)
 				after_edit()
-				set_status("%d objeto(s) colados: %s." % [names.size(), ", ".join(names)])
+				set_status(T("godot-gd-principal-objeto_s_colados", [names.size(), ", ".join(names)]))
 		"excluir":
 			editor.delete_selected()
 		"tudo":
@@ -1320,7 +1328,7 @@ func simulate(reps: int) -> bool:
 	if not model.is_loaded():
 		var issues: Array = doc.issues()
 		var first: String = issues[0]["message"] if not issues.is_empty() else ""
-		set_status("O modelo tem %d problema(s) e não roda: %s" % [issues.size(), first])
+		set_status(T("godot-gd-principal-o_modelo_tem_problema_s", [issues.size(), first]))
 		_sync_bar()
 		return false
 	mode = "simular"
@@ -1330,11 +1338,11 @@ func simulate(reps: int) -> bool:
 	_sync_bar()
 	playing_replay = false
 	if job != null:
-		set_status("Aguarde: %s." % job.what())
+		set_status(T("godot-gd-principal-aguarde", [job.what()]))
 		return false
 	var j: Object = model.start_run(reps)
 	if j == null:
-		set_status("A simulação não começou: %s" % model.last_error())
+		set_status(T("godot-gd-principal-a_simulacao_nao_comecou", [model.last_error()]))
 		return false
 	_sim_status = "Simulando %d replicações..." % reps
 	_sync_sim()
@@ -1347,15 +1355,15 @@ func simulate(reps: int) -> bool:
 func _on_run(j: Object) -> void:
 	if not j.ok():
 		set_mode("editar")
-		set_status("A simulação %s: %s" % ["foi cancelada" if j.cancelled() else "falhou", j.error()])
+		set_status(T("godot-gd-principal-a_simulacao", [T("godot-gd-foi-cancelada") if j.cancelled() else T("godot-gd-falhou"), j.error()]))
 		return
 	on_results(j.results())
 	playback = model.playback(0, CenaUtsim.skeletal_available())
 	if playback == null:
-		set_status("Não foi possível gravar a replicação 0: %s" % model.last_error())
+		set_status(T("godot-gd-principal-nao_foi_possivel_gravar_a", [model.last_error()]))
 		return
 	_show_playback()
-	set_status("%d replicações concluídas. Reproduzindo a replicação 0." % results.replications())
+	set_status(T("godot-gd-principal-replicacoes_concluidas_reproduzindo_a_replicacao", [results.replications()]))
 
 
 ## Liga ou desliga as camadas de segurança e de calor da cena.
@@ -1639,19 +1647,19 @@ func start_job(j: Object, done: Callable) -> void:
 	if j == null:
 		return
 	if job != null:
-		set_status("Aguarde: %s." % job.what())
+		set_status(T("godot-gd-principal-aguarde", [job.what()]))
 		return
 	job = j
 	_job_done = done
 	if ui != null:
 		ui.set_status_bar({"progress": 0.0, "percent": true})
-	set_status("%s..." % j.what())
+	set_status(T("godot-gd-principal-texto", [j.what()]))
 
 
 func cancel_job() -> void:
 	if job != null:
 		job.cancel()
-		set_status("Cancelando: %s..." % job.what())
+		set_status(T("godot-gd-principal-cancelando", [job.what()]))
 
 
 ## The job's progress and how it ended are the bridge's (`andamento.rs`).
@@ -1739,12 +1747,12 @@ func analysis_action(what: String) -> void:
 	match what:
 		"resultados":
 			if results == null:
-				set_status("Simule o modelo para ver os resultados (Tab ou o botão Simular).")
+				set_status(T("godot-gd-principal-simule_o_modelo_para_ver"))
 				return
 			show_results(not ui.results_open())
 		"fluxos":
 			if mode != "simular" or playback == null:
-				set_status("Os fluxos de tokens aparecem no Simular.")
+				set_status(T("godot-gd-principal-os_fluxos_de_tokens_aparecem"))
 				return
 			ui.set_flows_open(not ui.flows_open())
 			ui.flows_time(t)
@@ -1757,18 +1765,18 @@ func analysis_action(what: String) -> void:
 func open_pert(between: bool) -> void:
 	var sel: Array = editor.selected
 	if sel.is_empty():
-		set_status("Selecione os objetos da parte do processo (ou dois: o início e o fim) e peça o PERT/CPM.")
+		set_status(T("godot-gd-principal-selecione_os_objetos_da_parte"))
 		return
 	var names := PackedStringArray()
 	if between:
 		if sel.size() != 2:
-			set_status("PERT/CPM de... até...: selecione exatamente dois objetos.")
+			set_status(T("godot-gd-principal-pert_cpm_de_ate_selecione"))
 			return
 		names = PackedStringArray([sel[1], sel[0]])
 	else:
 		names = PackedStringArray(sel)
 	if document_model() == null:
-		set_status("O modelo tem problemas e não roda: o PERT/CPM precisa de um modelo válido.")
+		set_status(T("godot-gd-principal-o_modelo_tem_problemas_e"))
 		return
 	show_results(false)
 	_pert_names = names
@@ -1792,7 +1800,7 @@ func pert_calculate(mode_id: String) -> void:
 		ui.set_pert_info(m.last_error(), true)
 		return
 	if job != null:
-		set_status("Aguarde: %s." % job.what())
+		set_status(T("godot-gd-principal-aguarde", [job.what()]))
 		return
 	ui.set_pert_info("Calculando (%s)..." % mode_id, false)
 	start_job(j, func(done):
@@ -1845,11 +1853,11 @@ func results_action(what: String) -> void:
 			apply_warmup(float(arg))
 		"trabalho":
 			if job != null:
-				set_status("Aguarde: %s." % job.what())
+				set_status(T("godot-gd-principal-aguarde", [job.what()]))
 				return
 			var j: Object = ui.results_job(arg)
 			if j == null:
-				set_status("Não começou: %s" % ui.results_error())
+				set_status(T("godot-gd-principal-nao_comecou", [ui.results_error()]))
 				return
 			start_job(j, func(done):
 				if done.kind() == "replicacoes":
@@ -1864,11 +1872,11 @@ func results_action(what: String) -> void:
 ## the Resultados charts) and runs the replications again, so the charts have data.
 func enable_samples_and_rerun() -> void:
 	if playing_replay:
-		set_status("Um replay gravado não roda de novo: abra o modelo.")
+		set_status(T("godot-gd-principal-um_replay_gravado_nao_roda"))
 		return
 	var r: Dictionary = doc.enable_samples()
 	if not r["ok"]:
-		set_status("Não ligou a série e os histogramas: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-nao_ligou_a_serie_e", [doc.last_error()]))
 		return
 	after_edit()
 	var parts := PackedStringArray()
@@ -1877,16 +1885,16 @@ func enable_samples_and_rerun() -> void:
 	if int(r["histogram_bins"]) > 0:
 		parts.append("run.histogram_bins = %d" % int(r["histogram_bins"]))
 	simulate(_run_reps)
-	set_status("Ligado no modelo (%s; Ctrl+Z desfaz). Simulando de novo..." % ", ".join(parts))
+	set_status(T("godot-gd-principal-ligado_no_modelo_ctrl_z", [", ".join(parts)]))
 
 
 func apply_warmup(warmup: float) -> void:
 	if doc.set_property("run", "warmup", warmup, PackedStringArray()):
 		doc.end_gesture()
 		after_edit()
-		set_status("Aquecimento %s aplicado ao modelo (run.warmup). Simule de novo para os números com ele." % _num(warmup))
+		set_status(T("godot-gd-principal-aquecimento_aplicado_ao_modelo_run", [_num(warmup)]))
 	else:
-		set_status("Não aplicou o aquecimento: %s" % doc.last_error())
+		set_status(T("godot-gd-principal-nao_aplicou_o_aquecimento", [doc.last_error()]))
 
 
 # ---------------------------------------------------------------------------
@@ -1917,7 +1925,7 @@ func _open_from_args() -> void:
 		if arg.begins_with("--utsim-abrir="):
 			var path := arg.trim_prefix("--utsim-abrir=")
 			if not open_model(path):
-				set_status("Não abriu %s (pedido na linha de comando)." % path.get_file())
+				set_status(T("godot-gd-principal-nao_abriu_pedido_na_linha", [path.get_file()]))
 			return
 
 
@@ -1926,14 +1934,14 @@ func open_replay(path: String) -> bool:
 	var m: Object = ClassDB.instantiate(&"UtsimModel")
 	var r: Dictionary = m.load(path)
 	if not r["ok"]:
-		set_status("Não abriu %s: %s" % [path.get_file(), ", ".join(r["errors"])])
+		set_status(T("godot-gd-principal-nao_abriu", [path.get_file(), ", ".join(r["errors"])]))
 		return false
 	if ui != null:
 		ui.live_close_all()
 	model = m
 	playback = model.playback(0, CenaUtsim.skeletal_available())
 	if playback == null:
-		set_status("Não foi possível reproduzir %s: %s" % [path.get_file(), model.last_error()])
+		set_status(T("godot-gd-principal-nao_foi_possivel_reproduzir", [path.get_file(), model.last_error()]))
 		return false
 	playing_replay = true
 	mode = "simular"
@@ -1944,21 +1952,21 @@ func open_replay(path: String) -> bool:
 	on_results(model.replay_results())
 	_show_playback()
 	camera.frame_box(cena.info["bounds_min"], cena.info["bounds_max"])
-	set_status("Replay %s aberto (%d blocos): só reprodução; Editar volta ao modelo em edição." % [path.get_file(), int(r["objects"])])
+	set_status(T("godot-gd-principal-replay_aberto_blocos_so_reproducao", [path.get_file(), int(r["objects"])]))
 	return true
 
 
 ## Writes the replay of replication 0 of the last run as `.json`.
 func save_replay(path: String) -> bool:
 	if model == null or not model.is_loaded():
-		set_status("Simule um modelo antes de gravar o replay.")
+		set_status(T("godot-gd-principal-simule_um_modelo_antes_de"))
 		return false
 	if not path.ends_with(".json"):
 		path += ".json"
 	if model.save_replay(0, path):
-		set_status("Replay da replicação 0 gravado em %s." % path)
+		set_status(T("godot-gd-principal-replay_da_replicacao_0_gravado", [path]))
 		return true
-	set_status("Não gravou o replay: %s" % model.last_error())
+	set_status(T("godot-gd-principal-nao_gravou_o_replay", [model.last_error()]))
 	return false
 
 
@@ -2049,7 +2057,7 @@ func stop_walk() -> void:
 	_walk_hud(false)
 	camera.set_plan(camera.plan)
 	camera.update()
-	set_status("Câmera de volta.")
+	set_status(T("godot-gd-principal-camera_de_volta"))
 
 
 ## One frame of the walk: the keys held move the eye (W/S, A/D, E/Q or Space/C, Shift).

@@ -38,7 +38,6 @@ const HALO := Color(1.0, 0.75, 0.30)
 const ACCESS := Color(0.35, 0.90, 0.95)
 const ACCESS_OWN := Color(1.0, 0.45, 0.95)
 const KINDS := ["pedestrian", "forklift", "mixed"]
-const KIND_LABELS := ["Pedestres", "Empilhadeiras", "Misto"]
 ## Width a new aisle of each kind starts with (the minimums of the Brasil profile).
 const KIND_WIDTHS := {"pedestrian": 1.2, "forklift": 3.6, "mixed": 4.8}
 
@@ -69,6 +68,16 @@ var _adrag_at := Vector3.ZERO
 func setup(owner_main: Node, owner_editor: EditorUtsim) -> void:
 	main = owner_main
 	editor = owner_editor
+
+
+## The name of the aisle kind number `i` of [constant KINDS], in the language of now.
+func _kind_label(i: int) -> String:
+	match i:
+		0:
+			return main.T("godot-gd-pedestres")
+		1:
+			return main.T("godot-gd-empilhadeiras")
+	return main.T("godot-gd-misto")
 
 
 func doc() -> Object:
@@ -137,7 +146,7 @@ func clear() -> void:
 
 func set_obstacles_visible(on: bool) -> void:
 	show_obstacles = on
-	main.set_status("Obstáculos e folgas %s." % ("visíveis" if on else "ocultos"))
+	main.set_status(main.T("godot-gd-obstaculos-visiveis") if on else main.T("godot-gd-obstaculos-ocultos"))
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +247,7 @@ func cancel() -> bool:
 	_pull()
 	main.on_aisle_selection()
 	if drawing:
-		main.set_status("Corredor cancelado. Clique no chão para começar outro, ou Esc para sair da ferramenta.")
+		main.set_status(main.T("godot-gd-corredores-corredor_cancelado_clique_no_chao"))
 	return true
 
 
@@ -264,33 +273,33 @@ func _apply(effects: Array) -> void:
 			"corredor_novo":
 				var name: String = doc().add_aisle(e["points"], new_kind, new_width, new_two_way)
 				if name == "":
-					main.set_status("Não criou o corredor: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-corredores-nao_criou_o_corredor", [doc().last_error()]))
 					continue
 				editor.ed.aisle_select(name, -1)
 				main.after_edit()
 				main.on_aisle_selection()
-				main.set_status("Corredor %s criado (%s, %s m)." % [name, KIND_LABELS[KINDS.find(new_kind)].to_lower(), _num(new_width)])
+				main.set_status(main.T("godot-gd-corredores-corredor_criado_m", [name, _kind_label(KINDS.find(new_kind)).to_lower(), _num(new_width)]))
 			"corredor_vertice":
 				if doc().move_aisle_point(e["name"], e["index"], e["at"]):
 					main.after_edit()
 					main.on_aisle_selection()
-					main.set_status("Vértice %d de %s movido." % [int(e["index"]) + 1, e["name"]])
+					main.set_status(main.T("godot-gd-corredores-vertice_de_movido", [int(e["index"]) + 1, e["name"]]))
 				else:
-					main.set_status("Não moveu: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-corredores-nao_moveu", [doc().last_error()]))
 			"corredor_dobra":
 				if doc().insert_aisle_point(e["name"], e["segment"], e["at"]):
 					main.after_edit()
 					main.on_aisle_selection()
-					main.set_status("Vértice acrescentado a %s." % e["name"])
+					main.set_status(main.T("godot-gd-corredores-vertice_acrescentado_a", [e["name"]]))
 				else:
-					main.set_status("Não acrescentou: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-corredores-nao_acrescentou", [doc().last_error()]))
 			"corredor_excluir":
 				if doc().remove_aisle(e["name"]):
 					main.after_edit()
 					main.on_aisle_selection()
-					main.set_status("Corredor %s excluído." % e["name"])
+					main.set_status(main.T("godot-gd-corredores-corredor_excluido", [e["name"]]))
 				else:
-					main.set_status("Não excluiu: %s" % doc().last_error())
+					main.set_status(main.T("godot-gd-corredores-nao_excluiu", [doc().last_error()]))
 	_pull()
 
 
@@ -355,9 +364,9 @@ func access_release(_p: Vector2) -> void:
 	_adragging = false
 	if doc().set_access_at(object, _adrag_at, main.snap_step()):
 		main.after_edit()
-		main.set_status("Ponto de acesso de %s movido (desligue \"Ponto de acesso próprio\" no painel para voltar ao padrão)." % object)
+		main.set_status(main.T("godot-gd-corredores-ponto_de_acesso_de_movido", [object]))
 	else:
-		main.set_status("Não moveu o ponto de acesso: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-corredores-nao_moveu_o_ponto_de", [doc().last_error()]))
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +381,7 @@ func set_kind(kind: String) -> void:
 		return
 	if doc().set_aisle_kind(selected, kind):
 		main.after_edit()
-		main.set_status("Corredor %s agora é de %s." % [selected, KIND_LABELS[KINDS.find(kind)].to_lower()])
+		main.set_status(main.T("godot-gd-corredores-corredor_agora_e_de", [selected, _kind_label(KINDS.find(kind)).to_lower()]))
 
 
 func set_width(width: float) -> void:
@@ -381,9 +390,9 @@ func set_width(width: float) -> void:
 		return
 	if doc().set_aisle_width(selected, width):
 		main.after_edit()
-		main.set_status("Corredor %s com %s m de largura." % [selected, _num(width)])
+		main.set_status(main.T("godot-gd-corredores-corredor_com_m_de_largura", [selected, _num(width)]))
 	else:
-		main.set_status("Não mudou a largura: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-corredores-nao_mudou_a_largura", [doc().last_error()]))
 
 
 func set_two_way(on: bool) -> void:
@@ -392,7 +401,7 @@ func set_two_way(on: bool) -> void:
 		return
 	if doc().set_aisle_two_way(selected, on):
 		main.after_edit()
-		main.set_status("Corredor %s em %s." % [selected, "mão dupla" if on else "mão única (setas no piso)"])
+		main.set_status(main.T("godot-gd-corredores-corredor_em", [selected, main.T("godot-gd-mao-dupla") if on else main.T("godot-gd-mao-unica-setas")]))
 
 
 func set_secondary(on: bool) -> void:
@@ -403,13 +412,13 @@ func set_secondary(on: bool) -> void:
 func set_profile(profile: String) -> void:
 	if selected != "" and doc().set_aisle_profile(selected, profile):
 		main.after_edit()
-		main.set_status("Perfil do corredor %s: %s." % [selected, profile if profile != "" else "o do modelo"])
+		main.set_status(main.T("godot-gd-corredores-perfil_do_corredor", [selected, profile if profile != "" else main.T("godot-gd-do-modelo")]))
 
 
 func reverse() -> void:
 	if selected != "" and doc().reverse_aisle(selected):
 		main.after_edit()
-		main.set_status("Sentido do corredor %s invertido." % selected)
+		main.set_status(main.T("godot-gd-corredores-sentido_do_corredor_invertido", [selected]))
 
 
 func rename(to: String) -> void:
@@ -420,9 +429,9 @@ func rename(to: String) -> void:
 		selected = to.strip_edges()
 		_push()
 		main.after_edit()
-		main.set_status("Corredor %s agora se chama %s." % [from, selected])
+		main.set_status(main.T("godot-gd-corredores-corredor_agora_se_chama", [from, selected]))
 	else:
-		main.set_status("Não renomeou: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-corredores-nao_renomeou", [doc().last_error()]))
 
 
 func remove_vertex() -> void:
@@ -433,9 +442,9 @@ func remove_vertex() -> void:
 		_push()
 		main.after_edit()
 		main.on_aisle_selection()
-		main.set_status("Vértice removido.")
+		main.set_status(main.T("godot-gd-corredores-vertice_removido"))
 	else:
-		main.set_status("Não removeu: %s" % doc().last_error())
+		main.set_status(main.T("godot-gd-corredores-nao_removeu", [doc().last_error()]))
 
 
 ## Outlines in the scene what a warning talks about: the aisles and the objects named
@@ -451,9 +460,9 @@ func highlight_issue(message: String) -> Array:
 			found.append(n)
 	highlight = found
 	if found.is_empty():
-		main.set_status("Esse aviso não aponta para nenhum corredor ou objeto da cena.")
+		main.set_status(main.T("godot-gd-corredores-esse_aviso_nao_aponta_para"))
 	else:
-		main.set_status("Destacado na cena: %s." % ", ".join(found))
+		main.set_status(main.T("godot-gd-corredores-destacado_na_cena", [", ".join(found)]))
 	return found
 
 
