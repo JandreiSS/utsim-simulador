@@ -1713,7 +1713,7 @@ impl UtsimUi {
             .map(|p| p.to_path_buf());
         self.host.props = Some(PropsView {
             props,
-            families: schema::FAMILIES.iter().map(|s| s.to_string()).collect(),
+            families: schema::family_names(),
             data,
             data_families: utsim_fit::auto::family_names()
                 .iter()

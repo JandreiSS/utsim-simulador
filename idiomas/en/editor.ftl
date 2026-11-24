@@ -964,30 +964,3 @@ models-visual = Look:
 models-simples = simple
 models-realista = realistic
 models-modelos_3d_articulados_da_biblioteca = Articulated 3D models from the library (forklift, AGV, operator...)
-
-## Estados dos blocos (painel do bloco e gráficos de estados)
-
-estado-sem-estado = no state
-estado-ocioso = idle
-estado-vazio = empty
-estado-gerando = generating
-estado-liberando = releasing
-estado-coletando = collecting
-estado-preparacao = setup
-estado-processando = processing
-estado-bloqueado = blocked
-estado-aguardando-operador = waiting for operator
-estado-aguardando-transporte = waiting for transport
-estado-em-falha = down
-estado-fora-do-turno = off shift
-estado-viajando-vazio = travelling empty
-estado-viajando-carregado = travelling loaded
-estado-carregando = loading
-estado-descarregando = unloading
-estado-trabalhando-no-posto = working at the station
-estado-parado = stopped (external command)
-estado-aguardando-tecnico = waiting for a technician
-estado-em-manutencao = in preventive maintenance
-estado-em-pausa = on a break (fatigue)
-estado-operador-entrando = operator entering
-estado-operador-saindo = operator leaving

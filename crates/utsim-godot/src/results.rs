@@ -13,6 +13,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::texto::tx;
 use serde_json::{Map, Value, json};
 use utsim_core::RunReport;
 use utsim_core::State;
@@ -79,27 +80,27 @@ pub fn state_named(name: &str) -> Option<State> {
 /// Portuguese label of a report state name.
 pub fn state_label(name: &str) -> String {
     match state_named(name) {
-        Some(s) => style::state_label(Some(s)).to_string(),
+        Some(s) => utsim_edit::texto::estado(Some(s)).to_string(),
         None => name.to_string(),
     }
 }
 
-/// Portuguese label of a report kind (`"processor"`...).
+/// Label of a report kind (`"processor"`...) in the language of the interface.
 pub fn kind_label(kind: &str) -> &str {
     match kind {
-        "source" => "chegada",
-        "queue" => "fila",
-        "processor" => "processo",
-        "combiner" => "montagem",
-        "separator" => "desmontagem",
-        "sink" => "saída",
-        "transporter" => "transportador",
-        "dispatcher" => "despachante",
-        "conveyor" => "esteira",
-        "rack" => "porta-paletes",
-        "span" => "medida de tempo",
-        "flow" => "fluxo",
-        "fluid" => "fluidos",
+        "source" => tx("godot-tipo-source"),
+        "queue" => tx("godot-tipo-queue"),
+        "processor" => tx("godot-tipo-processor"),
+        "combiner" => tx("godot-tipo-combiner"),
+        "separator" => tx("godot-tipo-separator"),
+        "sink" => tx("godot-tipo-sink"),
+        "transporter" => tx("godot-tipo-transporter"),
+        "dispatcher" => tx("godot-tipo-dispatcher"),
+        "conveyor" => tx("godot-tipo-conveyor"),
+        "rack" => tx("godot-tipo-rack"),
+        "span" => tx("godot-tipo-span"),
+        "flow" => tx("godot-tipo-flow"),
+        "fluid" => tx("godot-tipo-fluid"),
         other => other,
     }
 }

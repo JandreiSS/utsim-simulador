@@ -495,12 +495,14 @@ pub fn fluid_node_panel(ui: &mut Ui, doc: &Document, name: &str) -> Vec<Command>
     let current = fluid_kind_id(&node.kind);
     ui.horizontal(|ui| {
         ui.label(tx("prop-network-tipo"));
-        let shown = fluid_entry(current).map_or(current, |e| e.label);
+        let shown = fluid_entry(current).map_or(current, utsim_edit::texto::rotulo_fluido);
         egui::ComboBox::from_id_salt(id(("fluido", name, "#tipo")))
             .selected_text(shown)
             .show_ui(ui, |ui| {
                 for e in FLUID_PALETTE {
-                    if ui.selectable_label(e.id == current, e.label).clicked()
+                    if ui
+                        .selectable_label(e.id == current, utsim_edit::texto::rotulo_fluido(&e))
+                        .clicked()
                         && e.id != current
                         && let Some(kind) = fluid_template(e.id, converter_object(&node.kind))
                     {
