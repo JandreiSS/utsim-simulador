@@ -49,6 +49,10 @@ const STEEP := Color(1.0, 0.35, 0.25)
 const STICK := Color(0.85, 0.88, 0.95, 0.8)
 ## The curve handles in the middle of the segments of the selected route.
 const CURVE := Color(1.0, 0.62, 0.20)
+## Chevrons of a belt's direction: every so many metres, this big, at most so many.
+const ARROW_STEP := 1.5
+const ARROW_SIZE := 0.16
+const MAX_ARROWS := 80
 
 var main: Node
 var editor: EditorUtsim
@@ -156,6 +160,12 @@ func sync() -> void:
 	tr.ligar(doc())
 	belts = tr.esteiras()
 	paths = tr.caminhos()
+	# What the drawing needs of each route, once per change and not on every frame: the
+	# point at half its length (handles) and, on a belt, the arrows of its direction.
+	for b in belts:
+		_measure(b, true)
+	for c in paths:
+		_measure(c, false)
 	var r := _route(sel_name, sel_path)
 	if r.is_empty():
 		_select("", false, PackedInt32Array())
@@ -747,6 +757,8 @@ func turn_route(degrees: float) -> bool:
 ## The middle of a route: its position for a belt (the middle of the line), the mean of
 ## the points for a path.
 func _middle(r: Dictionary) -> Vector3:
+	if r.has("middle"):
+		return r["middle"]
 	var line: PackedVector3Array = r["line"]
 	if line.is_empty():
 		return Vector3.ZERO
@@ -761,6 +773,27 @@ func _middle(r: Dictionary) -> Vector3:
 			return line[k - 1].lerp(line[k], left / d)
 		left -= d
 	return line[line.size() - 1]
+
+
+## Caches on `r` its middle and, on a belt (`arrows`), a chevron every [ARROW_STEP] m
+## along its line: `[point, direction]` pairs (the way the items ride).
+func _measure(r: Dictionary, arrows: bool) -> void:
+	r.erase("middle")
+	r["middle"] = _middle(r)
+	var out := []
+	if arrows:
+		var line: PackedVector3Array = r["line"]
+		var next := ARROW_STEP * 0.5
+		var run := 0.0
+		for k in range(1, line.size()):
+			var a := line[k - 1]
+			var b := line[k]
+			var d := a.distance_to(b)
+			while d > 0.0 and run + d >= next and out.size() < MAX_ARROWS:
+				out.append([a.lerp(b, (next - run) / d), (b - a) / d])
+				next += ARROW_STEP
+			run += d
+	r["arrows"] = out
 
 
 ## Moves the selected nodes by `d` (Godot), one undo step.
@@ -1156,6 +1189,14 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 	var lift := Vector3(0, 0.03, 0)
 	for i in line.size() - 1:
 		e._ribbon(line[i] + lift, line[i + 1] + lift, 0.10 if sel else 0.06, color)
+	# Which way the belt runs: chevrons along it, pointing to the exit.
+	for a in r.get("arrows", []):
+		var at: Vector3 = a[0] + Vector3(0, 0.05, 0)
+		var dir: Vector3 = a[1]
+		var side := Vector3(-dir.z, 0.0, dir.x).normalized() * ARROW_SIZE
+		var tip := at + dir * ARROW_SIZE
+		e._ribbon(at - dir * ARROW_SIZE * 0.6 + side, tip, 0.04, color)
+		e._ribbon(at - dir * ARROW_SIZE * 0.6 - side, tip, 0.04, color)
 	var nodes: PackedVector3Array = r["nodes"]
 	var bending: bool = sel and _dragging and _press.get("handle", "") == "curva"
 	if sel:
@@ -1167,14 +1208,14 @@ func _draw_route(e: EditorUtsim, r: Dictionary, path: bool) -> void:
 				e._ribbon(_drag_at + lift, nodes[i + 1] + lift, 0.08, CURVE)
 				mid = _drag_at
 			_diamond(e, mid + Vector3(0, 0.02, 0), 0.16, CURVE)
-		var c := _middle(r)
+		var mc := _middle(r)
+		var c := mc
 		if _dragging and _press.get("handle", "") == "mover":
 			var d := _drag_at - c
 			for i in line.size() - 1:
 				e._ribbon(line[i] + d + lift, line[i + 1] + d + lift, 0.08, DRAWING)
 			c = _drag_at
 		_square(e, c + Vector3(0, 0.05, 0), 0.28, DRAWING)
-		var mc := _middle(r)
 		var ring := mc + Vector3(TURN_ARM, 0.05, 0)
 		if _dragging and _press.get("handle", "") == "girar":
 			ring = _drag_at + Vector3(0, 0.05, 0)

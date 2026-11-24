@@ -1207,6 +1207,25 @@ mod tests {
     }
 
     #[test]
+    fn the_drawing_tools_have_their_names_in_every_language() {
+        use utsim_idiomas::{Idioma, definir_nesta_thread};
+        let tools: Vec<_> = palette()
+            .into_iter()
+            .filter(|e| crate::path_edit::tool_of(e.id).is_some())
+            .collect();
+        assert_eq!(tools.len(), 3);
+        definir_nesta_thread(Some(Idioma::PtBr));
+        for e in &tools {
+            assert_eq!(utsim_edit::texto::rotulo_paleta(e), e.label);
+        }
+        definir_nesta_thread(Some(Idioma::En));
+        for e in &tools {
+            assert_ne!(utsim_edit::texto::rotulo_paleta(e), e.label, "{}", e.id);
+        }
+        definir_nesta_thread(None);
+    }
+
+    #[test]
     fn the_wait_is_one_entry_and_its_policy_chooses_lifo_or_a_priority() {
         let p = palette();
         assert!(p.iter().all(|e| e.id != STACK_ID), "no second entry");
