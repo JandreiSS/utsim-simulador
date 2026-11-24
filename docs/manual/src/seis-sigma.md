@@ -233,6 +233,17 @@ os conflitos e a pasta).
   descritas nos capítulos de mesmo nome.
 - **Dados** (etapa L3) mostra o que vai trazer; já está lá a exportação `.lssz`.
 
+**Desfazer e Refazer** ficam no começo da barra de baixo, e também em Ctrl+Z e Ctrl+Y (ou
+Ctrl+Shift+Z) quando nada está sendo digitado; num campo de texto, o Ctrl+Z é o do campo.
+Desfazer volta o seu último passo nesta sessão: um campo volta ao valor de antes, o que foi
+criado é apagado e o que foi apagado volta. Como o diário não apaga nada, a volta é uma edição
+nova, registrada e assinada como as outras, e os colegas a recebem pela pasta compartilhada.
+Refazer traz de novo o passo desfeito; um passo novo depois de desfazer esvazia o Refazer. Os
+passos valem só para esta sessão: fechar o projeto os esquece.
+
+A língua da interface fica no pé da barra lateral, como nos outros apps da família (na tela
+inicial, sem barra lateral, ela fica no alto). O título do projeto aparece só na barra lateral.
+
 Em todas as telas, cada campo é gravado quando você sai dele, datas são `DD/MM/AAAA` e números
 aceitam vírgula decimal (`1.234,5`). Tudo vai para o diário como qualquer alteração: chega aos
 colegas pela pasta compartilhada, entra no histórico e, se duas pessoas mudarem o mesmo campo
