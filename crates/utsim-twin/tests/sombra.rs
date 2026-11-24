@@ -309,3 +309,50 @@ fn mapping_is_validated_against_the_model() {
         30
     );
 }
+
+/// A reading that arrives before the clock tag's first value has no time yet: it waits for
+/// the clock instead of being put at 0. A twin that joined a running line used to take
+/// the queue's first value as the content since time 0, and the windows before the
+/// clock's first value showed an empty queue (false alerts).
+#[test]
+fn readings_before_the_first_clock_value_wait_for_it() {
+    let (model, cfg, sim) = setup();
+    let shared = Shared {
+        twin: std::sync::Mutex::new(Twin::new(model, cfg, sim)),
+        health: Vec::new(),
+    };
+    let (tx, rx) = channel();
+    let producer = std::thread::spawn(move || {
+        // The subscription's first values: the queue before the clock, which is at 1500.
+        let send = |tag: &str, v: f64| {
+            tx.send((tag.to_string(), Value::Num(v), Quality::Good))
+                .unwrap()
+        };
+        send("UTSim/linha/fila/Conteudo", 0.0);
+        std::thread::sleep(Duration::from_millis(150));
+        for t in [1500.0, 1700.0, 1900.0] {
+            send("UTSim/linha/TempoSimulado", t);
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    });
+    let cancel = Arc::new(AtomicBool::new(false));
+    let connectors: Vec<Box<dyn Connector>> = vec![Box::new(ChannelConnector::new("clp", rx))];
+    let started = live::start(connectors, &cancel).unwrap();
+    let end = live::run(
+        &shared,
+        started,
+        &LiveOptions {
+            tick: Duration::from_millis(5),
+            until: Some(1900.0),
+            max_wall: Some(Duration::from_secs(60)),
+            cancel,
+        },
+    );
+    producer.join().unwrap();
+    assert!((end - 1900.0).abs() < 1e-9, "fim em {end}");
+    let report = shared.twin.into_inner().unwrap().report(false);
+    // Windows [400, 600) ... [1200, 1400): before the queue's reading.
+    for w in report.janelas.iter().filter(|w| w.end <= 1500.0) {
+        assert!(w.values.is_empty(), "{w:#?}");
+    }
+}
