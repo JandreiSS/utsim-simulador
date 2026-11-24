@@ -103,7 +103,7 @@ fn state_text(kind: &str, state: Option<utsim_core::State>, received: usize) -> 
     if kind == "Sink" {
         fx("ui-recebidos", &[("n", vx(&received))])
     } else {
-        utsim_viewer::texto::estado(state).to_string()
+        utsim_edit::texto::estado(state).to_string()
     }
 }
 
@@ -537,7 +537,7 @@ fn block_stats(
                 ui.label(tl.block_received(sel, t).to_string());
             } else {
                 ui.label(tx("ui-estado_agora"));
-                ui.label(utsim_viewer::texto::estado(state));
+                ui.label(utsim_edit::texto::estado(state));
             }
             ui.end_row();
             ui.label(tx("ui-conteudo_agora"));

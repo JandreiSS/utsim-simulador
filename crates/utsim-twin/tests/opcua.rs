@@ -115,6 +115,12 @@ fn deviation_from_the_synthetic_factory_over_opcua() {
     let live_report = twin.report(false);
     drop(twin);
     assert!(live_report.janelas.len() >= 10, "{report:#}");
+    // A twin that joined after the factory's clock had run saw the first windows empty.
+    assert!(
+        !live_report.janelas[0].values.is_empty(),
+        "o gêmeo entrou atrasado: a primeira janela está vazia; {:#?}",
+        live_report.janelas
+    );
     let dev = live_report
         .alertas
         .iter()

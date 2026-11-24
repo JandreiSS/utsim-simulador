@@ -35,6 +35,7 @@ use utsim_model::{
 use crate::catalogue;
 use crate::looks;
 use crate::ron_text as ron;
+use crate::texto::{dx, fx, sx, tx, vx};
 
 /// A value going to or coming from the panel (converted from and to a Godot `Variant`).
 #[derive(Clone, Debug, PartialEq)]
@@ -260,20 +261,39 @@ pub const S_FLOOR: &str = "Piso e corredores";
 pub const S_MODEL: &str = "Modelo";
 pub const S_PERSON: &str = "Pessoa";
 
+/// The title of a section in the language of the interface (the section itself stays the
+/// Portuguese id above: it is what the panel remembers as open or closed).
+pub fn section_title(id: &str) -> &str {
+    match id {
+        "Objeto" => tx("godot-secao-objeto"),
+        "Posição" => tx("godot-secao-posicao"),
+        "Parâmetros" => tx("godot-secao-parametros"),
+        "Saída" => tx("godot-secao-saida"),
+        "Quebras e turnos" => tx("godot-secao-quebras-e-turnos"),
+        "Aparência" => tx("godot-secao-aparencia"),
+        "Simulação" => tx("godot-secao-simulacao"),
+        "Movimentação" => tx("godot-secao-movimentacao"),
+        "Piso e corredores" => tx("godot-secao-piso-e-corredores"),
+        "Modelo" => tx("godot-secao-modelo"),
+        "Pessoa" => tx("godot-secao-pessoa"),
+        other => other,
+    }
+}
+
 /// Portuguese name of an object kind.
 pub fn kind_label(kind: &ObjectKind) -> &'static str {
     match kind {
-        ObjectKind::Source { .. } => "Chegada",
-        ObjectKind::Queue { .. } => "Espera",
-        ObjectKind::Processor { .. } => "Processo",
-        ObjectKind::Combiner { .. } => "Montagem",
-        ObjectKind::Separator { .. } => "Desmontagem",
-        ObjectKind::Sink => "Saída",
-        ObjectKind::Transporter { .. } => "Transportador",
-        ObjectKind::Crane { .. } => "Ponte rolante",
-        ObjectKind::Dispatcher { .. } => "Despachante",
-        ObjectKind::Conveyor { .. } => "Esteira",
-        ObjectKind::Rack { .. } => "Porta-paletes",
+        ObjectKind::Source { .. } => tx("godot-objeto-chegada"),
+        ObjectKind::Queue { .. } => tx("godot-objeto-espera"),
+        ObjectKind::Processor { .. } => tx("godot-objeto-processo"),
+        ObjectKind::Combiner { .. } => tx("godot-objeto-montagem"),
+        ObjectKind::Separator { .. } => tx("godot-objeto-desmontagem"),
+        ObjectKind::Sink => tx("godot-objeto-saida"),
+        ObjectKind::Transporter { .. } => tx("godot-objeto-transportador"),
+        ObjectKind::Crane { .. } => tx("godot-objeto-ponte-rolante"),
+        ObjectKind::Dispatcher { .. } => tx("godot-objeto-despachante"),
+        ObjectKind::Conveyor { .. } => tx("godot-objeto-esteira"),
+        ObjectKind::Rack { .. } => tx("godot-objeto-porta-paletes"),
     }
 }
 
@@ -300,6 +320,35 @@ pub const FAMILIES: [&str; 20] = [
     "Binomial negativa",
     "Deslocada",
 ];
+
+/// The names of [`FAMILIES`] in the language of the interface, in the same order.
+pub fn family_names() -> Vec<String> {
+    [
+        "godot-dist-constante",
+        "godot-dist-uniforme",
+        "godot-dist-exponencial",
+        "godot-dist-triangular",
+        "godot-dist-normal",
+        "godot-dist-lognormal",
+        "godot-dist-gama",
+        "godot-dist-erlang",
+        "godot-dist-weibull",
+        "godot-dist-beta",
+        "godot-dist-log-logistica",
+        "godot-dist-pearson-v",
+        "godot-dist-pearson-vi",
+        "godot-dist-discreta",
+        "godot-dist-empirica",
+        "godot-dist-poisson",
+        "godot-dist-geometrica",
+        "godot-dist-binomial",
+        "godot-dist-binomial-negativa",
+        "godot-dist-deslocada",
+    ]
+    .iter()
+    .map(|key| tx(key).to_string())
+    .collect()
+}
 
 pub fn family_index(d: &Dist) -> usize {
     match d {
@@ -430,57 +479,69 @@ enum ParamRef<'a> {
 fn params_mut(d: &mut Dist) -> Vec<(&'static str, &'static str, ParamRef<'_>)> {
     use ParamRef::{F, U};
     match d {
-        Dist::Const(v) => vec![("value", "valor", F(v))],
-        Dist::Uniform { min, max } => vec![("min", "mínimo", F(min)), ("max", "máximo", F(max))],
-        Dist::Exp { mean } => vec![("mean", "média", F(mean))],
+        Dist::Const(v) => vec![("value", "godot-param-valor", F(v))],
+        Dist::Uniform { min, max } => vec![
+            ("min", "godot-param-minimo", F(min)),
+            ("max", "godot-param-maximo", F(max)),
+        ],
+        Dist::Exp { mean } => vec![("mean", "godot-param-media", F(mean))],
         Dist::Triangular { min, mode, max } => vec![
-            ("min", "mínimo", F(min)),
-            ("mode", "moda", F(mode)),
-            ("max", "máximo", F(max)),
+            ("min", "godot-param-minimo", F(min)),
+            ("mode", "godot-param-moda", F(mode)),
+            ("max", "godot-param-maximo", F(max)),
         ],
         Dist::Normal { mean, sd } | Dist::LogNormal { mean, sd } => {
-            vec![("mean", "média", F(mean)), ("sd", "desvio padrão", F(sd))]
+            vec![
+                ("mean", "godot-param-media", F(mean)),
+                ("sd", "godot-param-desvio-padrao", F(sd)),
+            ]
         }
         Dist::Gamma { shape, scale }
         | Dist::Weibull { shape, scale }
         | Dist::LogLogistic { shape, scale }
         | Dist::PearsonV { shape, scale } => {
-            vec![("shape", "forma", F(shape)), ("scale", "escala", F(scale))]
+            vec![
+                ("shape", "godot-param-forma", F(shape)),
+                ("scale", "godot-param-escala", F(scale)),
+            ]
         }
-        Dist::Erlang { k, mean } => vec![("k", "fases (k)", U(k)), ("mean", "média", F(mean))],
+        Dist::Erlang { k, mean } => vec![
+            ("k", "godot-param-fases", U(k)),
+            ("mean", "godot-param-media", F(mean)),
+        ],
         Dist::Beta {
             alpha,
             beta,
             min,
             max,
         } => vec![
-            ("alpha", "alfa", F(alpha)),
-            ("beta", "beta", F(beta)),
-            ("min", "mínimo", F(min)),
-            ("max", "máximo", F(max)),
+            ("alpha", "godot-param-alfa", F(alpha)),
+            ("beta", "godot-param-beta", F(beta)),
+            ("min", "godot-param-minimo", F(min)),
+            ("max", "godot-param-maximo", F(max)),
         ],
         Dist::PearsonVI {
             shape1,
             shape2,
             scale,
         } => vec![
-            ("shape1", "forma 1", F(shape1)),
-            ("shape2", "forma 2", F(shape2)),
-            ("scale", "escala", F(scale)),
+            ("shape1", "godot-param-forma-1", F(shape1)),
+            ("shape2", "godot-param-forma-2", F(shape2)),
+            ("scale", "godot-param-escala", F(scale)),
         ],
-        Dist::Poisson { mean } => vec![("mean", "média", F(mean))],
-        Dist::Geometric { p } => vec![("p", "probabilidade (p)", F(p))],
+        Dist::Poisson { mean } => vec![("mean", "godot-param-media", F(mean))],
+        Dist::Geometric { p } => vec![("p", "godot-param-probabilidade", F(p))],
         Dist::Binomial { n, p } => vec![
-            ("n", "tentativas (n)", U(n)),
-            ("p", "probabilidade (p)", F(p)),
+            ("n", "godot-param-tentativas", U(n)),
+            ("p", "godot-param-probabilidade", F(p)),
         ],
         Dist::NegBinomial { r, p } => {
             vec![
-                ("r", "sucessos (r)", F(r)),
-                ("p", "probabilidade (p)", F(p)),
+                ("r", "godot-param-sucessos", F(r)),
+                ("p", "godot-param-probabilidade", F(p)),
             ]
         }
-        Dist::Shifted { offset, .. } => vec![("offset", "deslocamento", F(offset))],
+        Dist::Shifted { offset, .. } => vec![("offset", "godot-param-deslocamento", F(offset))],
         Dist::Discrete(_) | Dist::Empirical(_) => Vec::new(),
     }
 }
@@ -492,13 +553,13 @@ pub fn dist_view(d: &Dist) -> DistView {
         .map(|(key, label, r)| match r {
             ParamRef::F(v) => Param {
                 key,
-                label,
+                label: tx(label),
                 value: *v,
                 integer: false,
             },
             ParamRef::U(v) => Param {
                 key,
-                label,
+                label: tx(label),
                 value: f64::from(*v),
                 integer: true,
             },
@@ -596,6 +657,15 @@ fn boolean(section: &'static str, path: &str, label: &str, v: bool) -> Field {
     Field::new(section, path, label, FieldType::Bool, Value::Bool(v))
 }
 
+/// A choice label: a key of `godot.ftl` is translated, a name of the model stays as it is.
+fn shown(label: &str) -> String {
+    if label.starts_with("godot-") && crate::texto::TEXTOS.tem(label) {
+        fx(label, &[])
+    } else {
+        label.to_string()
+    }
+}
+
 fn pick(
     section: &'static str,
     path: &str,
@@ -610,7 +680,7 @@ fn pick(
         FieldType::Choice,
         Value::Text(v.into()),
     )
-    .choices(choices.iter().map(|(v, l)| choice(v, l)).collect())
+    .choices(choices.iter().map(|(v, l)| choice(v, &shown(l))).collect())
 }
 
 fn group(section: &'static str, path: &str, label: &str, on: bool) -> Field {
@@ -643,12 +713,12 @@ pub fn outputs(model: &Model, name: &str) -> usize {
 
 /// Output rule ids and labels, in menu order.
 pub const OUTPUT_RULES: [(&str, &str); 6] = [
-    ("FirstAvailable", "Primeira livre"),
-    ("RoundRobin", "Rodízio"),
-    ("Random", "Aleatória"),
-    ("Weighted", "Pesos"),
-    ("ByLabel", "Por rótulo"),
-    ("Script", "Script"),
+    ("FirstAvailable", "godot-opcao-primeira-livre"),
+    ("RoundRobin", "godot-opcao-rodizio"),
+    ("Random", "godot-opcao-aleatoria"),
+    ("Weighted", "godot-campo-pesos"),
+    ("ByLabel", "godot-opcao-por-rotulo"),
+    ("Script", "godot-campo-script"),
 ];
 
 fn output_id(rule: &OutputRule) -> &'static str {
@@ -676,11 +746,11 @@ fn first_label(model: &Model) -> String {
 
 /// The movement mode choices; the first is "the model's" (stored as no value).
 const MOVEMENT_CHOICES: [(&str, &str); 5] = [
-    ("", "Padrão do modelo"),
-    ("Legacy", "Legado (linha reta ou rede)"),
-    ("Free", "Livre (menor caminho no piso)"),
-    ("Network", "Pela rede de caminhos"),
-    ("Aisles", "Pelos corredores"),
+    ("", "godot-opcao-padrao-do-modelo"),
+    ("Legacy", "godot-opcao-legado-linha-reta-ou-rede"),
+    ("Free", "godot-opcao-livre-menor-caminho-no-piso"),
+    ("Network", "godot-opcao-pela-rede-de-caminhos"),
+    ("Aisles", "godot-opcao-pelos-corredores"),
 ];
 
 fn movement_name(m: Option<Movement>) -> &'static str {
@@ -722,29 +792,24 @@ fn movement_fields(
         pick(
             s,
             "movement",
-            "Movimentação",
+            tx("godot-campo-movimentacao"),
             movement_name(movement),
             &MOVEMENT_CHOICES,
         )
-        .help(
-            "Como o recurso anda: o padrão do modelo (Simulação), em linha reta como no \
-             formato antigo, livre pelo piso desviando dos obstáculos, pela rede de \
-             caminhos ou só pelos corredores da sua classe.",
-        ),
+        .help(tx("godot-ajuda-como-o-recurso-anda-o")),
         Field::new(
             s,
             "clearance",
-            "Folga dos obstáculos",
+            tx("godot-campo-folga-dos-obstaculos"),
             FieldType::Float,
             clearance.map_or(Value::Null, Value::Float),
         )
         .optional(clearance.is_some())
         .min(0.0)
         .unit("m")
-        .help(&format!(
-            "Distância mínima de qualquer obstáculo. Desligada, vale a do papel do recurso \
-             ({} m: meia largura mais 0,3 m).",
-            format!("{by_role:.2}").replace('.', ",")
+        .help(&fx(
+            "godot-ajuda-folga-papel",
+            &[("m", dx(format!("{by_role:.2}")))],
         )),
     ]
 }
@@ -753,15 +818,25 @@ fn movement_fields(
 fn access_fields(obj: &ObjectDef) -> Vec<Field> {
     let s = S_MOVE;
     let mut out = vec![
-        group(s, "access", "Ponto de acesso próprio", obj.access.is_some()).help(
-            "Onde os recursos móveis param para atender este objeto, em metros a partir do \
-             seu centro e girando com ele. Desligado, é o lado -y. Também se arrasta na \
-             cena, com \"Mostrar obstáculos e folgas\" ligado.",
-        ),
+        group(
+            s,
+            "access",
+            tx("godot-campo-ponto-de-acesso-proprio"),
+            obj.access.is_some(),
+        )
+        .help(tx("godot-ajuda-onde-os-recursos-moveis-param")),
     ];
     if let Some(a) = obj.access {
-        out.push(float(s, "access.x", "X no objeto", a[0]).depth(1).unit("m"));
-        out.push(float(s, "access.y", "Y no objeto", a[1]).depth(1).unit("m"));
+        out.push(
+            float(s, "access.x", tx("godot-campo-x-no-objeto"), a[0])
+                .depth(1)
+                .unit("m"),
+        );
+        out.push(
+            float(s, "access.y", tx("godot-campo-y-no-objeto"), a[1])
+                .depth(1)
+                .unit("m"),
+        );
     }
     out
 }
@@ -800,7 +875,7 @@ fn size_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "size.info",
-            "Dimensões",
+            tx("godot-campo-dimensoes"),
             FieldType::Info,
             Value::Text(text),
         )
@@ -808,10 +883,9 @@ fn size_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let [l, w] = model.footprint(obj).unwrap_or([0.0, 0.0]);
     match &obj.kind {
         ObjectKind::Conveyor { .. } => {
-            return vec![info(format!(
-                "{} × {} m: o comprimento é o da esteira (Parâmetros)",
-                metres(l),
-                metres(w)
+            return vec![info(fx(
+                "godot-dim-esteira",
+                &[("l", sx(metres(l))), ("w", sx(metres(w)))],
             ))];
         }
         ObjectKind::Rack {
@@ -819,62 +893,82 @@ fn size_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             level_height,
             ..
         } => {
-            return vec![info(format!(
-                "{} × {} × {} m: pelos vãos e níveis (Parâmetros)",
-                metres(l),
-                metres(w),
-                metres(*levels as f64 * level_height)
+            return vec![info(fx(
+                "godot-dim-porta-paletes",
+                &[
+                    ("l", sx(metres(l))),
+                    ("w", sx(metres(w))),
+                    ("h", sx(metres(*levels as f64 * level_height))),
+                ],
             ))];
         }
         _ => {}
     }
-    let mut out = vec![group(s, "size", "Dimensões próprias", obj.size.is_some()).help(
-        "Comprimento, largura e altura do objeto em metros, no sentido dele. A área no piso muda o ponto de acesso e, com ele, as distâncias e os tempos dos operadores e veículos; numa espera com área por item, também a capacidade. O 3D estica o modelo para essas medidas. Desligado, vale a área padrão do tipo.",
-    )];
+    let mut out = vec![
+        group(
+            s,
+            "size",
+            tx("godot-campo-dimensoes-proprias"),
+            obj.size.is_some(),
+        )
+        .help(tx("godot-ajuda-comprimento-largura-e-altura-do")),
+    ];
     match obj.size {
         Some(d) => {
             let labels = if matches!(obj.kind, ObjectKind::Crane { .. }) {
                 [
-                    ("x", "Comprimento do caminho"),
-                    ("y", "Vão"),
-                    ("z", "Altura do caminho"),
+                    ("x", "godot-dim-comprimento-do-caminho"),
+                    ("y", "godot-dim-vao"),
+                    ("z", "godot-dim-altura-do-caminho"),
                 ]
             } else {
-                [("x", "Comprimento"), ("y", "Largura"), ("z", "Altura")]
+                [
+                    ("x", "godot-dim-comprimento"),
+                    ("y", "godot-dim-largura"),
+                    ("z", "godot-dim-altura"),
+                ]
             };
             for (i, (axis, label)) in labels.iter().enumerate() {
                 out.push(
-                    float(s, &format!("size.{axis}"), label, d[i])
+                    float(s, &format!("size.{axis}"), tx(label), d[i])
                         .depth(1)
                         .min(0.01)
                         .unit("m"),
                 );
             }
         }
-        None => out.push(info(format!("{} × {} m (padrão)", metres(l), metres(w)))),
+        None => out.push(info(fx(
+            "godot-dim-padrao",
+            &[("l", sx(metres(l))), ("w", sx(metres(w)))],
+        ))),
     }
     if matches!(obj.kind, ObjectKind::Queue { .. }) {
         out.push(
-            group(s, "area_per_item", "Capacidade pela área", obj.area_per_item.is_some())
-                .help(
-                    "A capacidade da espera sai da sua área no piso dividida pela área que cada item ocupa (só itens inteiros). Com uma capacidade dada também, vale a menor.",
-                ),
+            group(
+                s,
+                "area_per_item",
+                tx("godot-campo-capacidade-pela-area"),
+                obj.area_per_item.is_some(),
+            )
+            .help(tx("godot-ajuda-a-capacidade-da-espera-sai")),
         );
         if let Some(a) = obj.area_per_item {
             out.push(
-                float(s, "area_per_item", "Área por item", a)
+                float(s, "area_per_item", tx("godot-campo-area-por-item"), a)
                     .depth(1)
                     .min(0.01)
                     .unit("m²"),
             );
             let fits = model
                 .queue_capacity(obj)
-                .map_or("sem limite".to_string(), |n| format!("{n} itens"));
+                .map_or(tx("godot-campo-sem-limite").to_string(), |n| {
+                    fx("godot-campo-n-itens", &[("n", vx(&n))])
+                });
             out.push(
                 Field::new(
                     s,
                     "area_per_item.info",
-                    "Cabem",
+                    tx("godot-campo-cabem"),
                     FieldType::Info,
                     Value::Text(fits),
                 )
@@ -1000,20 +1094,25 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             ..
         } => {
             out.push(
-                dist_field(s, "interarrival", "Tempo entre chegadas", interarrival)
-                    .help("Intervalo entre duas chegadas seguidas."),
+                dist_field(
+                    s,
+                    "interarrival",
+                    tx("godot-campo-tempo-entre-chegadas"),
+                    interarrival,
+                )
+                .help(tx("godot-ajuda-intervalo-entre-duas-chegadas-seguidas")),
             );
             out.push(boolean(
                 s,
                 "first_at_zero",
-                "Primeira chegada em t = 0",
+                tx("godot-campo-primeira-chegada-em-t-0"),
                 *first_at_zero,
             ));
             out.push(
                 Field::new(
                     s,
                     "max_arrivals",
-                    "Máximo de chegadas",
+                    tx("godot-campo-maximo-de-chegadas"),
                     FieldType::Int,
                     max_arrivals.map_or(Value::Null, |v| Value::Int(v as i64)),
                 )
@@ -1024,36 +1123,42 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             out.push(pick(
                 s,
                 "on_blocked",
-                "Se a saída estiver bloqueada",
+                tx("godot-campo-se-a-saida-estiver-bloqueada"),
                 &ron::debug(on_blocked),
-                &[("Wait", "Esperar"), ("Drop", "Descartar (perda)")],
+                &[
+                    ("Wait", "godot-opcao-esperar"),
+                    ("Drop", "godot-opcao-descartar-perda"),
+                ],
             ));
             out.push(
-                Field::new(s, "labels", "Rótulos", FieldType::Ron, Value::Text(ron::labels(labels)))
-                    .help("Valor sorteado para cada item, por nome: {\"tipo\": Discrete([(1.0, 3.0), (2.0, 1.0)])}."),
+                Field::new(
+                    s,
+                    "labels",
+                    tx("godot-campo-rotulos"),
+                    FieldType::Ron,
+                    Value::Text(ron::labels(labels)),
+                )
+                .help(tx("godot-ajuda-valor-sorteado-para-cada-item")),
             );
             out.push(
                 Field::new(
                     s,
                     "schedule",
-                    "Chegadas por período",
+                    tx("godot-campo-chegadas-por-periodo"),
                     FieldType::Ron,
                     schedule
                         .as_ref()
                         .map_or(Value::Null, |v| Value::Text(ron::schedule(v))),
                 )
                 .optional(schedule.is_some())
-                .help(
-                    "Ciclo e períodos com o próprio intervalo, taxa ou fechados: \
-                     (cycle: 1440.0, periods: [(start: 0.0, end: 480.0, arrivals: Rate(0.5))]).",
-                ),
+                .help(tx("godot-ajuda-ciclo-e-periodos-com-o")),
             );
             // The choices are the model's item types (the table editor's "tipo" column).
             out.push(
                 Field::new(
                     s,
                     "table",
-                    "Tabela de chegadas",
+                    tx("godot-campo-tabela-de-chegadas"),
                     FieldType::Ron,
                     table
                         .as_ref()
@@ -1067,10 +1172,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                         .map(|t| choice(&t.name, &t.name))
                         .collect(),
                 )
-                .help(
-                    "Horário (instante, quantidade, tipo e rótulos de cada linha) ou sequência \
-                     de linhas: (mode: Times, repeat: Cycle(1440.0), rows: [(at: 480.0, count: 12)]).",
-                ),
+                .help(tx("godot-ajuda-horario-instante-quantidade-tipo-e")),
             );
         }
         ObjectKind::Queue {
@@ -1086,36 +1188,36 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 Field::new(
                     s,
                     "capacity",
-                    "Capacidade limitada",
+                    tx("godot-campo-capacidade-limitada"),
                     FieldType::Int,
                     capacity.map_or(Value::Null, |v| Value::Int(v as i64)),
                 )
                 .optional(capacity.is_some())
                 .min(1.0)
                 .unit("itens")
-                .help("Desligada, a espera não tem limite."),
+                .help(tx("godot-ajuda-desligada-a-espera-nao-tem")),
             );
             out.push(
                 pick(
                     s,
                     "discipline",
-                    "Política de acesso",
+                    tx("godot-campo-politica-de-acesso"),
                     &access_policy(*discipline, order.as_ref()),
                     &[
-                        ("Fifo", "FIFO (primeiro a entrar, primeiro a sair)"),
-                        ("Lifo", "LIFO (último a entrar, primeiro a sair)"),
-                        ("Desc", "Prioridade: maior rótulo primeiro"),
-                        ("Asc", "Prioridade: menor rótulo primeiro (prazo)"),
+                        ("Fifo", "godot-opcao-fifo-primeiro-a-entrar-primeiro"),
+                        ("Lifo", "godot-opcao-lifo-ultimo-a-entrar-primeiro"),
+                        ("Desc", "godot-opcao-prioridade-maior-rotulo-primeiro"),
+                        ("Asc", "godot-opcao-prioridade-menor-rotulo-primeiro-prazo"),
                     ],
                 )
-                .help("Qual item sai primeiro. Pela prioridade, sai antes o item com o maior (ou o menor) valor do rótulo; empates e itens sem o rótulo saem na ordem de chegada."),
+                .help(tx("godot-ajuda-qual-item-sai-primeiro-pela")),
             );
             if let Some(o) = order {
                 out.push(
                     Field::new(
                         s,
                         "order.label",
-                        "Rótulo da prioridade",
+                        tx("godot-campo-rotulo-da-prioridade"),
                         FieldType::Text,
                         Value::Text(o.label().to_owned()),
                     )
@@ -1123,23 +1225,39 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 );
             }
             out.push(
-                group(s, "batch", "Lote", batch.is_some())
-                    .help("Segura os itens e libera em grupos."),
+                group(s, "batch", tx("godot-campo-lote"), batch.is_some())
+                    .help(tx("godot-ajuda-segura-os-itens-e-libera")),
             );
             if let Some(b) = batch {
                 out.push(
-                    int(s, "batch.size", "Itens por lote", b.size as u64)
-                        .min(1.0)
-                        .depth(1),
+                    int(
+                        s,
+                        "batch.size",
+                        tx("godot-campo-itens-por-lote"),
+                        b.size as u64,
+                    )
+                    .min(1.0)
+                    .depth(1),
                 );
                 out.push(
-                    float(s, "batch.max_wait", "Espera máxima", b.max_wait)
-                        .min(0.0)
-                        .depth(1)
-                        .help("Libera um lote incompleto depois deste tempo (0 = espera sempre)."),
+                    float(
+                        s,
+                        "batch.max_wait",
+                        tx("godot-campo-espera-maxima"),
+                        b.max_wait,
+                    )
+                    .min(0.0)
+                    .depth(1)
+                    .help(tx("godot-ajuda-libera-um-lote-incompleto-depois")),
                 );
                 out.push(
-                    boolean(s, "batch.flush", "Fecha a entrada até o lote sair", b.flush).depth(1),
+                    boolean(
+                        s,
+                        "batch.flush",
+                        tx("godot-campo-fecha-a-entrada-ate-o"),
+                        b.flush,
+                    )
+                    .depth(1),
                 );
             }
         }
@@ -1153,40 +1271,55 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             recipe,
         } => {
             out.push(
-                int(s, "capacity", "Capacidade", *capacity as u64)
-                    .min(1.0)
-                    .unit("itens"),
+                int(
+                    s,
+                    "capacity",
+                    tx("godot-campo-capacidade"),
+                    *capacity as u64,
+                )
+                .min(1.0)
+                .unit("itens"),
             );
             out.push(opt_dist_field(
                 s,
                 "setup",
-                "Preparação (setup)",
+                tx("godot-campo-preparacao-setup"),
                 setup.as_ref(),
             ));
             out.push(
                 Field::new(
                     s,
                     "changeover",
-                    "Troca de produto",
+                    tx("godot-campo-troca-de-produto"),
                     FieldType::Ron,
                     Value::Text(ron::option(changeover, ron::changeover)),
                 )
-                .help("Preparação só quando o produto muda: o rótulo do produto e, se quiser, o tempo de cada troca (de, para); sem linha na matriz vale a preparação acima. Exemplo: (label: \"produto\", matrix: [(from: 1, to: 2, time: Const(30.0))]). None: preparação em toda peça."),
+                .help(tx("godot-ajuda-preparacao-so-quando-o-produto")),
             );
-            out.push(dist_field(s, "process", "Tempo de processamento", process));
+            out.push(dist_field(
+                s,
+                "process",
+                tx("godot-campo-tempo-de-processamento"),
+                process,
+            ));
             out.push(
                 Field::new(
                     s,
                     "recipe",
-                    "Tempo por receita",
+                    tx("godot-campo-tempo-por-receita"),
                     FieldType::Ron,
                     Value::Text(ron::option(recipe, ron::recipe)),
                 )
-                .help("Tempo de processamento que depende do item: o rótulo da receita e o tempo de cada valor; os itens sem receita na tabela usam o tempo acima. Exemplo: (label: \"produto\", times: [(value: 1, time: Const(90.0)), (value: 2, time: Const(120.0))]). None: o mesmo tempo para todos."),
+                .help(tx("godot-ajuda-tempo-de-processamento-que-depende")),
             );
             out.push(
-                group(s, "operators", "Operadores", operators.is_some())
-                    .help("Quem opera esta máquina: marque e escolha abaixo, ou arraste do nó laranja do operador (ou da equipe) até a máquina. O processo espera um deles livre."),
+                group(
+                    s,
+                    "operators",
+                    tx("godot-campo-operadores"),
+                    operators.is_some(),
+                )
+                .help(tx("godot-ajuda-quem-opera-esta-maquina-marque")),
             );
             if let Some(op) = operators {
                 let mut names = vec![];
@@ -1194,13 +1327,16 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     names.push(choice(&n, &n));
                 }
                 if !names.iter().any(|c| c.value == op.team) {
-                    names.push(choice(&op.team, &format!("{} (não existe)", op.team)));
+                    names.push(choice(
+                        &op.team,
+                        &fx("godot-campo-nao-existe", &[("nome", vx(&op.team))]),
+                    ));
                 }
                 out.push(
                     Field::new(
                         s,
                         "operators.team",
-                        "Quem opera",
+                        tx("godot-campo-quem-opera"),
                         FieldType::Choice,
                         Value::Text(op.team.clone()),
                     )
@@ -1208,27 +1344,40 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     .depth(1),
                 );
                 out.push(
-                    int(s, "operators.count", "Quantos por peça", op.count as u64)
-                        .min(1.0)
-                        .help("Operadores que a peça precisa ao mesmo tempo: ela só começa quando todos chegam, e eles ficam com ela até o fim. Com mais operadores na equipe do que capacidade × este número, os de sobra ficam parados.")
-                        .depth(1),
+                    int(
+                        s,
+                        "operators.count",
+                        tx("godot-campo-quantos-por-peca"),
+                        op.count as u64,
+                    )
+                    .min(1.0)
+                    .help(tx("godot-ajuda-operadores-que-a-peca-precisa"))
+                    .depth(1),
                 );
                 out.push(
                     float(
                         s,
                         "operators.team_speedup",
-                        "Ganho da equipe",
+                        tx("godot-campo-ganho-da-equipe"),
                         op.team_speedup.unwrap_or(1.0),
                     )
-                    .help("Quantas vezes mais rápido a equipe faz a etapa: o tempo sorteado é dividido por este número. 1: sem ganho (o tempo é o mesmo com um ou com vários).")
+                    .help(tx("godot-ajuda-quantas-vezes-mais-rapido-a"))
                     .depth(1),
                 );
-                out.push(boolean(s, "operators.setup", "Durante a preparação", op.setup).depth(1));
+                out.push(
+                    boolean(
+                        s,
+                        "operators.setup",
+                        tx("godot-campo-durante-a-preparacao"),
+                        op.setup,
+                    )
+                    .depth(1),
+                );
                 out.push(
                     boolean(
                         s,
                         "operators.process",
-                        "Durante o processamento",
+                        tx("godot-campo-durante-o-processamento"),
                         op.process,
                     )
                     .depth(1),
@@ -1237,11 +1386,11 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     Field::new(
                         s,
                         "also",
-                        "Outras equipes ao mesmo tempo",
+                        tx("godot-campo-outras-equipes-ao-mesmo-tempo"),
                         FieldType::Ron,
                         Value::Text(ron::operator_uses(also)),
                     )
-                    .help("Equipes que precisam estar juntas com os operadores (um médico e um enfermeiro na mesma sala). Exemplo: [OperatorUse(team: \"enfermagem\")]. A etapa só começa quando todos chegam.")
+                    .help(tx("godot-ajuda-equipes-que-precisam-estar-juntas"))
                     .depth(1),
                 );
             }
@@ -1254,27 +1403,38 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             ..
         } => {
             out.push(
-                Field::new(s, "components", "Componentes por entrada", FieldType::Ron, Value::Text(ron::usizes(components)))
-                    .help("A entrada 1 traz o contêiner; a entrada k + 1 traz o k-ésimo número de itens. Exemplo: [2, 1]."),
+                Field::new(
+                    s,
+                    "components",
+                    tx("godot-campo-componentes-por-entrada"),
+                    FieldType::Ron,
+                    Value::Text(ron::usizes(components)),
+                )
+                .help(tx("godot-ajuda-a-entrada-1-traz-o")),
             );
             out.push(pick(
                 s,
                 "mode",
-                "Modo",
+                tx("godot-campo-modo"),
                 &ron::debug(mode),
                 &[
-                    ("Pack", "Embalar (só o contêiner sai)"),
-                    ("Join", "Juntar (componentes destruídos)"),
-                    ("Batch", "Lote (todos saem)"),
+                    ("Pack", "godot-opcao-embalar-so-o-conteiner-sai"),
+                    ("Join", "godot-opcao-juntar-componentes-destruidos"),
+                    ("Batch", "godot-opcao-lote-todos-saem"),
                 ],
             ));
             out.push(opt_dist_field(
                 s,
                 "setup",
-                "Preparação (setup)",
+                tx("godot-campo-preparacao-setup"),
                 setup.as_ref(),
             ));
-            out.push(dist_field(s, "process", "Tempo de processamento", process));
+            out.push(dist_field(
+                s,
+                "process",
+                tx("godot-campo-tempo-de-processamento"),
+                process,
+            ));
         }
         ObjectKind::Separator { mode, process, .. } => {
             let text = ron::debug(mode);
@@ -1295,16 +1455,20 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             out.push(pick(
                 s,
                 "mode",
-                "Modo",
+                tx("godot-campo-modo"),
                 chosen,
                 &[
-                    ("Unpack", "Desembalar"),
-                    ("Split", "Dividir em cópias"),
-                    ("SplitBy", "Dividir pelo rótulo"),
+                    ("Unpack", "godot-opcao-desembalar"),
+                    ("Split", "godot-opcao-dividir-em-copias"),
+                    ("SplitBy", "godot-opcao-dividir-pelo-rotulo"),
                 ],
             ));
             if let Some(n) = split.and_then(|n| n.parse::<u64>().ok()) {
-                out.push(int(s, "mode.copies", "Cópias", n).min(1.0).depth(1));
+                out.push(
+                    int(s, "mode.copies", tx("godot-campo-copias"), n)
+                        .min(1.0)
+                        .depth(1),
+                );
             }
             if let Some((count, group)) = by {
                 for (key, label, v) in [
@@ -1316,13 +1480,18 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     );
                 }
             }
-            out.push(dist_field(s, "process", "Tempo de processamento", process));
+            out.push(dist_field(
+                s,
+                "process",
+                tx("godot-campo-tempo-de-processamento"),
+                process,
+            ));
         }
         ObjectKind::Sink => {
             out.push(Field::new(
                 s,
                 "info",
-                "Sem parâmetros",
+                tx("godot-campo-sem-parametros"),
                 FieldType::Info,
                 Value::Text("A saída só conta os itens que chegam.".into()),
             ));
@@ -1342,7 +1511,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         } => {
             out.extend(movement_fields(model, obj, *movement, *clearance));
             out.push(
-                float(s, "speed", "Velocidade máxima", *speed)
+                float(s, "speed", tx("godot-campo-velocidade-maxima"), *speed)
                     .min(0.001)
                     .unit("m/u.t."),
             );
@@ -1360,23 +1529,43 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     )
                     .optional(v.is_some())
                     .min(0.001)
-                    .help("Desligada, a velocidade muda na hora."),
+                    .help(tx("godot-ajuda-desligada-a-velocidade-muda-na")),
                 );
             }
             out.push(
-                int(s, "capacity", "Capacidade", *capacity as u64)
-                    .min(1.0)
-                    .unit("itens"),
+                int(
+                    s,
+                    "capacity",
+                    tx("godot-campo-capacidade"),
+                    *capacity as u64,
+                )
+                .min(1.0)
+                .unit("itens"),
             );
-            out.push(dist_field(s, "load_time", "Tempo de carga", load_time));
+            out.push(dist_field(
+                s,
+                "load_time",
+                tx("godot-campo-tempo-de-carga"),
+                load_time,
+            ));
             out.push(dist_field(
                 s,
                 "unload_time",
-                "Tempo de descarga",
+                tx("godot-campo-tempo-de-descarga"),
                 unload_time,
             ));
-            out.push(boolean(s, "home", "Voltar à base quando ocioso", *home));
-            out.push(boolean(s, "agv", "AGV (controle de tráfego na rede)", *agv));
+            out.push(boolean(
+                s,
+                "home",
+                tx("godot-campo-voltar-a-base-quando-ocioso"),
+                *home,
+            ));
+            out.push(boolean(
+                s,
+                "agv",
+                tx("godot-campo-agv-controle-de-trafego-na"),
+                *agv,
+            ));
         }
         ObjectKind::Conveyor {
             length,
@@ -1396,7 +1585,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                     out.push(Field::new(
                         s,
                         "route.info",
-                        "Trajeto desenhado",
+                        tx("godot-campo-trajeto-desenhado"),
                         FieldType::Info,
                         Value::Text(format!(
                             "{} m em {} nós; passagem {} u.t.; cabem {}; maior inclinação {}° (máx. {}°)",
@@ -1412,33 +1601,38 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                         Field::new(
                             s,
                             "route.editar",
-                            "Editar nós",
+                            tx("godot-campo-editar-nos"),
                             FieldType::Action,
                             Value::Bool(true),
                         )
-                        .help("Abre a ferramenta de desenho com esta esteira: arraste os nós, mude a altura e o raio."),
+                        .help(tx("godot-ajuda-abre-a-ferramenta-de-desenho")),
                     );
                 }
                 None => out.push(
-                    float(s, "length", "Comprimento", *length)
+                    float(s, "length", tx("godot-campo-comprimento"), *length)
                         .min(0.001)
                         .unit("m"),
                 ),
             }
             out.push(
-                float(s, "speed", "Velocidade", *speed)
+                float(s, "speed", tx("godot-campo-velocidade"), *speed)
                     .min(0.001)
                     .unit("m/u.t."),
             );
             out.push(
-                float(s, "item_length", "Comprimento por item", *item_length)
-                    .min(0.001)
-                    .unit("m"),
+                float(
+                    s,
+                    "item_length",
+                    tx("godot-campo-comprimento-por-item"),
+                    *item_length,
+                )
+                .min(0.001)
+                .unit("m"),
             );
             out.push(boolean(
                 s,
                 "accumulating",
-                "Acumula itens quando a saída bloqueia",
+                tx("godot-campo-acumula-itens-quando-a-saida"),
                 *accumulating,
             ));
         }
@@ -1451,12 +1645,12 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             level_height,
             ..
         } => {
-            out.push(int(s, "bays", "Colunas", *bays as u64).min(1.0));
-            out.push(int(s, "levels", "Níveis", *levels as u64).min(1.0));
+            out.push(int(s, "bays", tx("godot-campo-colunas"), *bays as u64).min(1.0));
+            out.push(int(s, "levels", tx("godot-campo-niveis"), *levels as u64).min(1.0));
             out.push(opt_dist_field(
                 s,
                 "dwell",
-                "Permanência mínima",
+                tx("godot-campo-permanencia-minima"),
                 dwell.as_ref(),
             ));
             let abc = match placement {
@@ -1466,7 +1660,7 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             out.push(pick(
                 s,
                 "placement",
-                "Regra de ocupação",
+                tx("godot-campo-regra-de-ocupacao"),
                 if abc.is_some() {
                     "Abc".to_string()
                 } else {
@@ -1474,39 +1668,59 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 }
                 .as_str(),
                 &[
-                    ("FirstFree", "Primeira livre"),
-                    ("Random", "Aleatória"),
-                    ("Abc", "Curva ABC (rótulo classe)"),
+                    ("FirstFree", "godot-opcao-primeira-livre"),
+                    ("Random", "godot-opcao-aleatoria"),
+                    ("Abc", "godot-opcao-curva-abc-rotulo-classe"),
                 ],
             ));
             if let Some((a, b)) = abc {
                 out.push(
-                    float(s, "placement.a", "Fração das posições da classe A", a)
-                        .min(0.0)
-                        .depth(1),
+                    float(
+                        s,
+                        "placement.a",
+                        tx("godot-campo-fracao-das-posicoes-da-classe"),
+                        a,
+                    )
+                    .min(0.0)
+                    .depth(1),
                 );
                 out.push(
-                    float(s, "placement.b", "Fração das posições da classe B", b)
-                        .min(0.0)
-                        .depth(1),
+                    float(
+                        s,
+                        "placement.b",
+                        tx("godot-campo-fracao-das-posicoes-da-classe-2"),
+                        b,
+                    )
+                    .min(0.0)
+                    .depth(1),
                 );
             }
             out.push(
-                float(s, "bay_width", "Largura da coluna", *bay_width)
-                    .min(0.01)
-                    .unit("m"),
+                float(
+                    s,
+                    "bay_width",
+                    tx("godot-campo-largura-da-coluna"),
+                    *bay_width,
+                )
+                .min(0.01)
+                .unit("m"),
             );
             out.push(
-                float(s, "level_height", "Altura do nível", *level_height)
-                    .min(0.01)
-                    .unit("m"),
+                float(
+                    s,
+                    "level_height",
+                    tx("godot-campo-altura-do-nivel"),
+                    *level_height,
+                )
+                .min(0.01)
+                .unit("m"),
             );
             out.push(Field::new(
                 s,
                 "info",
-                "Capacidade",
+                tx("godot-campo-capacidade"),
                 FieldType::Info,
-                Value::Text(format!("{} posições", bays * levels)),
+                Value::Text(fx("godot-campo-n-posicoes", &[("n", vx(&(bays * levels)))])),
             ));
         }
         ObjectKind::Crane { .. } => out.extend(crane_fields(model, obj)),
@@ -1517,29 +1731,29 @@ fn kind_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .collect();
             for m in team {
                 if !choices.iter().any(|c| &c.value == m) {
-                    choices.push(choice(m, &format!("{m} (não existe)")));
+                    choices.push(choice(m, &fx("godot-campo-nao-existe", &[("nome", vx(m))])));
                 }
             }
             out.push(
                 Field::new(
                     s,
                     "team",
-                    "Equipe",
+                    tx("godot-campo-equipe"),
                     FieldType::Set,
                     Value::List(team.clone()),
                 )
                 .choices(choices)
-                .help("Transportadores que o despachante comanda."),
+                .help(tx("godot-ajuda-transportadores-que-o-despachante-comanda")),
             );
             out.push(pick(
                 s,
                 "rule",
-                "Regra de escolha",
+                tx("godot-campo-regra-de-escolha"),
                 &ron::debug(rule),
                 &[
-                    ("FirstAvailable", "Primeiro livre"),
-                    ("RoundRobin", "Rodízio"),
-                    ("Nearest", "Mais próximo"),
+                    ("FirstAvailable", "godot-opcao-primeiro-livre"),
+                    ("RoundRobin", "godot-opcao-rodizio"),
+                    ("Nearest", "godot-opcao-mais-proximo"),
                 ],
             ));
         }
@@ -1585,13 +1799,18 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             &format!("{path}.info"),
             label,
             FieldType::Info,
-            Value::Text(format!("Movimento {what}.")),
+            Value::Text(fx("godot-campo-movimento", &[("o_que", vx(&what))])),
         ));
         out.push(
-            float(s, &format!("{path}.speed"), "Velocidade", axis.speed)
-                .depth(1)
-                .min(0.001)
-                .unit("m/u.t."),
+            float(
+                s,
+                &format!("{path}.speed"),
+                tx("godot-campo-velocidade"),
+                axis.speed,
+            )
+            .depth(1)
+            .min(0.001)
+            .unit("m/u.t."),
         );
         for (sub, sub_label, v) in [
             ("acceleration", "Aceleração", axis.acceleration),
@@ -1608,7 +1827,7 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .optional(v.is_some())
                 .depth(1)
                 .min(0.001)
-                .help("Desligada, a velocidade muda na hora."),
+                .help(tx("godot-ajuda-desligada-a-velocidade-muda-na")),
             );
         }
     }
@@ -1616,28 +1835,28 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         pick(
             s,
             "motion",
-            "Ordem dos movimentos",
+            tx("godot-campo-ordem-dos-movimentos"),
             &ron::debug(motion),
             &[
-                ("Safe", "Segura (sobe, anda, desce)"),
-                ("Sequential", "Um eixo de cada vez"),
-                ("Parallel", "Os três juntos"),
+                ("Safe", "godot-opcao-segura-sobe-anda-desce"),
+                ("Sequential", "godot-opcao-um-eixo-de-cada-vez"),
+                ("Parallel", "godot-opcao-os-tres-juntos"),
             ],
         )
-        .help("Segura: o gancho sobe à altura de passagem, a ponte e o carro andam juntos e o gancho desce."),
+        .help(tx("godot-ajuda-segura-o-gancho-sobe-a")),
     );
     out.push(
         float(
             s,
             "hook_height",
-            "Altura de passagem do gancho",
+            tx("godot-campo-altura-de-passagem-do-gancho"),
             *hook_height,
         )
         .min(0.0)
         .unit("m"),
     );
     out.push(
-        float(s, "capacity_t", "Capacidade", *capacity_t)
+        float(s, "capacity_t", tx("godot-campo-capacidade"), *capacity_t)
             .min(0.001)
             .unit("t"),
     );
@@ -1645,18 +1864,28 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "weight_label",
-            "Rótulo do peso do item",
+            tx("godot-campo-rotulo-do-peso-do-item"),
             FieldType::Text,
             Value::Text(weight_label.clone()),
         )
-        .help("Rótulo com o peso de cada item, em kg: itens acima da capacidade geram um aviso."),
+        .help(tx("godot-ajuda-rotulo-com-o-peso-de")),
     );
-    out.push(dist_field(s, "attach", "Tempo de engate", attach));
-    out.push(dist_field(s, "detach", "Tempo de desengate", detach));
+    out.push(dist_field(
+        s,
+        "attach",
+        tx("godot-campo-tempo-de-engate"),
+        attach,
+    ));
+    out.push(dist_field(
+        s,
+        "detach",
+        tx("godot-campo-tempo-de-desengate"),
+        detach,
+    ));
     out.push(boolean(
         s,
         "home",
-        "Voltar à posição própria quando ociosa",
+        tx("godot-campo-voltar-a-posicao-propria-quando"),
         *home,
     ));
     let (control, team) = match operator {
@@ -1668,15 +1897,15 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         pick(
             s,
             "operator",
-            "Controle",
+            tx("godot-campo-controle"),
             control,
             &[
-                ("Cabin", "Cabine (operador não modelado)"),
-                ("Pendant", "Botoeira (a pessoa anda com a carga)"),
-                ("Radio", "Rádio (a pessoa encontra a ponte na carga)"),
+                ("Cabin", "godot-opcao-cabine-operador-nao-modelado"),
+                ("Pendant", "godot-opcao-botoeira-a-pessoa-anda-com"),
+                ("Radio", "godot-opcao-radio-a-pessoa-encontra-a"),
             ],
         )
-        .help("Na botoeira, a ponte não anda mais rápido que a pessoa; no rádio, ela mantém a própria velocidade e espera a pessoa chegar."),
+        .help(tx("godot-ajuda-na-botoeira-a-ponte-nao")),
     );
     if let Some(team) = team {
         // People and dispatchers run the crane; not other cranes.
@@ -1692,13 +1921,16 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             .map(|o| choice(&o.name, &o.name))
             .collect();
         if !choices.iter().any(|c| &c.value == team) {
-            choices.push(choice(team, &format!("{team} (não existe)")));
+            choices.push(choice(
+                team,
+                &fx("godot-campo-nao-existe", &[("nome", vx(team))]),
+            ));
         }
         out.push(
             Field::new(
                 s,
                 "operator.team",
-                "Equipe do operador",
+                tx("godot-campo-equipe-do-operador"),
                 FieldType::Choice,
                 Value::Text(team.clone()),
             )
@@ -1707,20 +1939,35 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         );
     }
     out.push(
-        float(s, "load_zone", "Meia largura da área sob a carga", *load_zone)
-            .min(0.0)
-            .unit("m")
-            .help("Meio lado do quadrado sob o gancho onde ninguém deve ficar com a carga suspensa (análise de exposição)."),
+        float(
+            s,
+            "load_zone",
+            tx("godot-campo-meia-largura-da-area-sob"),
+            *load_zone,
+        )
+        .min(0.0)
+        .unit("m")
+        .help(tx("godot-ajuda-meio-lado-do-quadrado-sob")),
     );
     out.push(
-        boolean(s, "keep_clear", "Afastar as pessoas do caminho da carga", *keep_clear)
-            .help("Antes de andar carregada, a ponte espera quem passa pela faixa da carga; e quem ia entrar nela para na borda até a carga passar."),
+        boolean(
+            s,
+            "keep_clear",
+            tx("godot-campo-afastar-as-pessoas-do-caminho"),
+            *keep_clear,
+        )
+        .help(tx("godot-ajuda-antes-de-andar-carregada-a")),
     );
     out.push(
-        float(s, "bridge_gap", "Folga entre pontes", *bridge_gap)
-            .min(0.0)
-            .unit("m")
-            .help("Distância mantida entre os ganchos de duas pontes no mesmo caminho: uma não passa a outra."),
+        float(
+            s,
+            "bridge_gap",
+            tx("godot-campo-folga-entre-pontes"),
+            *bridge_gap,
+        )
+        .min(0.0)
+        .unit("m")
+        .help(tx("godot-ajuda-distancia-mantida-entre-os-ganchos")),
     );
     let lanes = model.crane_lanes();
     let lane_text = match lanes.get(obj.name.as_str()) {
@@ -1731,10 +1978,9 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 .map(|(n, _)| *n)
                 .collect();
             others.sort_unstable();
-            format!(
-                "Divide o caminho com {} (folga de {} m entre os ganchos)",
-                others.join(", "),
-                metres(lane.gap)
+            fx(
+                "godot-campo-divide-caminho",
+                &[("com", sx(others.join(", "))), ("m", sx(metres(lane.gap)))],
             )
         }
         None if obj.size.is_none() => {
@@ -1745,7 +1991,7 @@ fn crane_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     out.push(Field::new(
         s,
         "lane.info",
-        "Caminho",
+        tx("godot-campo-caminho"),
         FieldType::Info,
         Value::Text(lane_text),
     ));
@@ -1919,12 +2165,12 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "output",
-            "Regra de saída",
+            tx("godot-campo-regra-de-saida"),
             FieldType::Choice,
             Value::Text(output_id(&obj.output).into()),
         )
         .choices(OUTPUT_RULES.iter().map(|(v, l)| choice(v, l)).collect())
-        .help("Para qual ligação vai cada item, na ordem das ligações de saída."),
+        .help(tx("godot-ajuda-para-qual-ligacao-vai-cada")),
     );
     match &obj.output {
         OutputRule::Weighted(w) => {
@@ -1932,17 +2178,20 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             let mut f = Field::new(
                 s,
                 "output.weights",
-                "Pesos",
+                tx("godot-campo-pesos"),
                 FieldType::Ron,
                 Value::Text(ron::floats(w)),
             )
             .depth(1)
-            .help("Peso de cada saída, na ordem das ligações. Exemplo: [3.0, 1.0].");
+            .help(tx("godot-ajuda-peso-de-cada-saida-na"));
             if w.len() != n {
-                f.help = format!(
-                    "Há {} pesos, mas o objeto tem {n} saídas. {}",
-                    w.len(),
-                    f.help
+                f.help = fx(
+                    "godot-campo-pesos-e-saidas",
+                    &[
+                        ("pesos", vx(&w.len())),
+                        ("n", vx(&n)),
+                        ("ajuda", sx(f.help.clone())),
+                    ],
                 );
             }
             out.push(f);
@@ -1951,7 +2200,7 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             Field::new(
                 s,
                 "output.label",
-                "Rótulo com o número da porta",
+                tx("godot-campo-rotulo-com-o-numero-da"),
                 FieldType::Text,
                 Value::Text(label.clone()),
             )
@@ -1961,55 +2210,55 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             Field::new(
                 s,
                 "output.script",
-                "Script",
+                tx("godot-campo-script"),
                 FieldType::Script,
                 Value::Text(src.clone()),
             )
             .depth(1)
-            .help("Devolve o número da porta (1, 2, ...)."),
+            .help(tx("godot-ajuda-devolve-o-numero-da-porta")),
         ),
         _ => {}
     }
-    let mut choices = vec![choice("", "Nenhum (passagem direta)")];
+    let mut choices = vec![choice("", tx("godot-campo-nenhum-passagem-direta"))];
     for n in mobile_names(model) {
         choices.push(choice(&n, &n));
     }
     let current = obj.transport.clone().unwrap_or_default();
     if !choices.iter().any(|c| c.value == current) {
-        choices.push(choice(&current, &format!("{current} (não existe)")));
+        choices.push(choice(
+            &current,
+            &fx("godot-campo-nao-existe", &[("nome", vx(&current))]),
+        ));
     }
     out.push(
         Field::new(
             s,
             "transport",
-            "Transporte de saída",
+            tx("godot-campo-transporte-de-saida"),
             FieldType::Choice,
             Value::Text(current),
         )
         .choices(choices)
-        .help("Transportador ou despachante que leva os itens para o próximo bloco."),
+        .help(tx("godot-ajuda-transportador-ou-despachante-que-leva")),
     );
     out.push(
         group(
             s,
             "transfer",
-            "Transferência pela distância",
+            tx("godot-campo-transferencia-pela-distancia"),
             obj.transfer.is_some(),
         )
-        .help(
-            "Os itens levam atraso + distância / velocidade para chegar ao próximo bloco \
-             pelas ligações diretas (sem transportador).",
-        ),
+        .help(tx("godot-ajuda-os-itens-levam-atraso-distancia")),
     );
     if let Some(t) = &obj.transfer {
         out.push(
-            float(s, "transfer.speed", "Velocidade", t.speed)
+            float(s, "transfer.speed", tx("godot-campo-velocidade"), t.speed)
                 .min(0.001)
                 .depth(1)
                 .unit("m/u.t."),
         );
         out.push(
-            float(s, "transfer.delay", "Atraso", t.delay)
+            float(s, "transfer.delay", tx("godot-campo-atraso"), t.delay)
                 .min(0.0)
                 .depth(1),
         );
@@ -2017,9 +2266,12 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             pick(
                 s,
                 "transfer.path",
-                "Caminho",
+                tx("godot-campo-caminho"),
                 &format!("{:?}", t.path),
-                &[("Straight", "reta"), ("Network", "pela rede")],
+                &[
+                    ("Straight", "godot-opcao-reta"),
+                    ("Network", "godot-opcao-pela-rede"),
+                ],
             )
             .depth(1),
         );
@@ -2028,24 +2280,32 @@ fn output_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "on_entry",
-            "Script ao entrar um item",
+            tx("godot-campo-script-ao-entrar-um-item"),
             FieldType::Script,
             obj.on_entry.clone().map_or(Value::Null, Value::Text),
         )
         .optional(obj.on_entry.is_some())
-        .help("Roda para cada item que entra, antes de qualquer outra regra."),
+        .help(tx("godot-ajuda-roda-para-cada-item-que")),
     );
     out
 }
 
 /// Choices of `on_end` (what happens to work in progress when a shift ends).
-const ON_END: [(&str, &str); 2] = [("Pause", "Pausar"), ("Finish", "Terminar o trabalho")];
+const ON_END: [(&str, &str); 2] = [
+    ("Pause", "godot-turno-pausar"),
+    ("Finish", "godot-turno-terminar"),
+];
 
 fn on_end_id(e: ShiftEnd) -> &'static str {
     match e {
         ShiftEnd::Pause => "Pause",
         ShiftEnd::Finish => "Finish",
     }
+}
+
+/// A size in metres with two decimals and the decimal mark of the language.
+fn dx_text(v: impl Into<f64>) -> String {
+    utsim_idiomas::marca_decimal(&format!("{:.2}", v.into())).to_string()
 }
 
 fn windows_text(t: &ShiftTable) -> String {
@@ -2066,16 +2326,37 @@ fn windows_text(t: &ShiftTable) -> String {
 fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let s = S_DOWNTIME;
     let mut out = vec![
-        group(s, "downtime", "Quebras", obj.downtime.is_some())
-            .help("Falhas aleatórias, com o tempo contado no relógio."),
+        group(
+            s,
+            "downtime",
+            tx("godot-campo-quebras"),
+            obj.downtime.is_some(),
+        )
+        .help(tx("godot-ajuda-falhas-aleatorias-com-o-tempo")),
     ];
     if let Some(d) = &obj.downtime {
-        out.push(dist_field(s, "downtime.mtbf", "Tempo entre falhas (MTBF)", &d.mtbf).depth(1));
-        out.push(dist_field(s, "downtime.mttr", "Tempo de reparo (MTTR)", &d.mttr).depth(1));
+        out.push(
+            dist_field(
+                s,
+                "downtime.mtbf",
+                tx("godot-campo-tempo-entre-falhas-mtbf"),
+                &d.mtbf,
+            )
+            .depth(1),
+        );
+        out.push(
+            dist_field(
+                s,
+                "downtime.mttr",
+                tx("godot-campo-tempo-de-reparo-mttr"),
+                &d.mttr,
+            )
+            .depth(1),
+        );
     }
     out.push(
-        group(s, "shifts", "Turnos", obj.shifts.is_some())
-            .help("Janelas fora do turno, repetidas a cada período."),
+        group(s, "shifts", tx("godot-campo-turnos"), obj.shifts.is_some())
+            .help(tx("godot-ajuda-janelas-fora-do-turno-repetidas")),
     );
     let Some(spec) = &obj.shifts else {
         return out;
@@ -2088,24 +2369,24 @@ fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
     let mut from = pick(
         s,
         "shifts.source",
-        "Origem",
+        tx("godot-campo-origem"),
         source,
         &[
-            ("inline", "Personalizado"),
-            ("calendar", "Calendário do modelo"),
+            ("inline", "godot-opcao-personalizado"),
+            ("calendar", "godot-opcao-calendario-do-modelo"),
         ],
     )
     .depth(1);
     from.help = if model.calendars.is_empty() {
-        "O modelo não tem calendários: crie um em \"calendars\" para usá-lo aqui.".into()
+        tx("godot-turno-sem-calendarios").into()
     } else {
-        "Um calendário é a mesma tabela de turnos usada por vários objetos.".into()
+        tx("godot-turno-calendario-ajuda").into()
     };
     out.push(from);
     match spec {
         ShiftSpec::Inline(t) => {
             out.push(
-                float(s, "shifts.period", "Período", t.period)
+                float(s, "shifts.period", tx("godot-campo-periodo"), t.period)
                     .min(0.001)
                     .depth(1),
             );
@@ -2113,18 +2394,18 @@ fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 Field::new(
                     s,
                     "shifts.off",
-                    "Pausas",
+                    tx("godot-campo-pausas"),
                     FieldType::Ron,
                     Value::Text(windows_text(t)),
                 )
                 .depth(1)
-                .help("Início e duração de cada pausa dentro do período, em ordem."),
+                .help(tx("godot-ajuda-inicio-e-duracao-de-cada")),
             );
             out.push(
                 pick(
                     s,
                     "shifts.on_end",
-                    "No fim do turno",
+                    tx("godot-campo-no-fim-do-turno"),
                     on_end_id(t.on_end),
                     &ON_END,
                 )
@@ -2137,14 +2418,23 @@ fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
                 names.insert(0, name);
             }
             let choices: Vec<(&str, &str)> = names.iter().map(|n| (*n, *n)).collect();
-            out.push(pick(s, "shifts.calendar", "Calendário", name, &choices).depth(1));
-            let mut ends = vec![("", "(o do calendário)")];
+            out.push(
+                pick(
+                    s,
+                    "shifts.calendar",
+                    tx("godot-campo-calendario"),
+                    name,
+                    &choices,
+                )
+                .depth(1),
+            );
+            let mut ends = vec![("", "godot-turno-do-calendario")];
             ends.extend(ON_END);
             out.push(
                 pick(
                     s,
                     "shifts.on_end",
-                    "No fim do turno",
+                    tx("godot-campo-no-fim-do-turno"),
                     on_end.map_or("", on_end_id),
                     &ends,
                 )
@@ -2156,17 +2446,17 @@ fn downtime_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
 }
 
 /// Text shown for "no asset": the default look of the kind.
-pub const DEFAULT_ASSET: &str = "(padrão do tipo)";
+pub const DEFAULT_ASSET: &str = "godot-visual-padrao-do-tipo";
 
 /// Library and catalogue assets as asset choices (value `""` is the default look).
 pub fn asset_choices() -> Vec<Choice> {
-    let mut out = vec![choice("", DEFAULT_ASSET)];
+    let mut out = vec![choice("", tx(DEFAULT_ASSET))];
     for spec in utsim_assets::Spec::defaults() {
         out.push(Choice {
             value: spec.name().into(),
             label: spec.name().into(),
-            help: "UTSim (gerado por utsim-assets)".into(),
-            group: "Biblioteca do UTSim".into(),
+            help: tx("godot-visual-gerado").into(),
+            group: tx("godot-visual-grupo-biblioteca").into(),
         });
     }
     for e in catalogue::entries() {
@@ -2175,10 +2465,16 @@ pub fn asset_choices() -> Vec<Choice> {
             value: e.nome.clone(),
             label: e.nome.clone(),
             help: format!(
-                "{}, {}\n{}\n{} ({:.2} x {:.2} x {:.2} m)",
-                e.autor, e.licenca, e.uso, e.arquivo, size.0, size.2, size.1
+                "{}, {}\n{}\n{} ({} x {} x {} m)",
+                e.autor,
+                e.licenca,
+                e.uso,
+                e.arquivo,
+                dx_text(size.0),
+                dx_text(size.2),
+                dx_text(size.1)
             ),
-            group: "Terceiros (assets/terceiros)".into(),
+            group: tx("godot-visual-grupo-terceiros").into(),
         });
     }
     // The Blender elements of their own (`cnc`, `prensa`, `espera`...); not the person
@@ -2198,21 +2494,28 @@ pub fn asset_choices() -> Vec<Choice> {
             out.push(Choice {
                 value: stem.clone(),
                 label: stem.clone(),
-                help: format!("{} ({:.2} x {:.2} x {:.2} m)", e.arquivo, t[0], t[1], t[2]),
-                group: "Elementos 3D (assets/modelos3d)".into(),
+                help: format!(
+                    "{} ({} x {} x {} m)",
+                    e.arquivo,
+                    dx_text(t[0]),
+                    dx_text(t[1]),
+                    dx_text(t[2])
+                ),
+                group: tx("godot-visual-grupo-elementos").into(),
             });
         }
     }
     out
 }
 
-/// Text shown for the default item model: the box.
+/// Text of the default item model (the box) in Portuguese; the screen shows it translated,
+/// and either is read back as "the default".
 pub const DEFAULT_ITEM: &str = "caixa (padrão)";
 
 /// The models an item can be drawn with (`visual.item` of a source): the box (`""`) and
 /// the Blender elements, but the person bodies, the `_medio` files and the clip files.
 pub fn item_choices() -> Vec<Choice> {
-    let mut out = vec![choice("", DEFAULT_ITEM)];
+    let mut out = vec![choice("", tx("godot-visual-caixa-padrao"))];
     if let Some(cat) = crate::modelos3d::Catalogo::find(None) {
         for (stem, e) in &cat.elementos {
             if stem.ends_with("_medio")
@@ -2225,11 +2528,16 @@ pub fn item_choices() -> Vec<Choice> {
             out.push(Choice {
                 value: stem.clone(),
                 label: stem.clone(),
-                help: format!(
-                    "{} ({:.2} x {:.2} x {:.2} m), desenhado no tamanho da peça",
-                    e.arquivo, t[0], t[1], t[2]
+                help: fx(
+                    "godot-visual-no-tamanho-da-peca",
+                    &[
+                        ("arquivo", sx(e.arquivo.clone())),
+                        ("x", dx(format!("{:.2}", t[0]))),
+                        ("y", dx(format!("{:.2}", t[1]))),
+                        ("z", dx(format!("{:.2}", t[2]))),
+                    ],
                 ),
-                group: "Elementos 3D (assets/modelos3d)".into(),
+                group: tx("godot-visual-grupo-elementos").into(),
             });
         }
     }
@@ -2242,7 +2550,7 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
     let mut asset = Field::new(
         s,
         "visual.asset",
-        "Ativo",
+        tx("godot-campo-ativo"),
         FieldType::Asset,
         Value::Text(v.asset.clone().unwrap_or_default()),
     )
@@ -2255,41 +2563,51 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "visual.color",
-            "Cor",
+            tx("godot-campo-cor"),
             FieldType::Color,
             v.color.clone().map_or(Value::Null, Value::Text),
         )
         .optional(v.color.is_some()),
-        float(s, "visual.scale", "Escala", v.scale.unwrap_or(1.0)).min(0.01),
+        float(
+            s,
+            "visual.scale",
+            tx("godot-campo-escala"),
+            v.scale.unwrap_or(1.0),
+        )
+        .min(0.01),
     ];
     // A source picks how its items are drawn (the box by default).
     if matches!(obj.kind, ObjectKind::Source { .. }) {
         let mut item = Field::new(
             s,
             "visual.item",
-            "Modelo da peça",
+            tx("godot-campo-modelo-da-peca"),
             FieldType::Asset,
             Value::Text(v.item.clone().unwrap_or_default()),
         )
         .choices(item_choices());
-        item.help =
-            "Elemento 3D com que as peças criadas aqui são desenhadas; a caixa é o padrão.".into();
+        item.help = tx("godot-visual-modelo-da-peca-ajuda").into();
         out.push(item);
     }
     // A fixed object turns in "Posição" (Rotação); a mobile resource faces where it goes,
     // and this only turns its drawing.
     if is_mobile(&obj.kind) {
         out.push(
-            float(s, "visual.yaw", "Giro do desenho", v.yaw.unwrap_or(0.0))
-                .unit("graus")
-                .help("Corrige para onde o modelo 3D olha; o recurso vira para onde anda."),
+            float(
+                s,
+                "visual.yaw",
+                tx("godot-campo-giro-do-desenho"),
+                v.yaw.unwrap_or(0.0),
+            )
+            .unit("graus")
+            .help(tx("godot-ajuda-corrige-para-onde-o-modelo")),
         );
     }
     out.push(
         Field::new(
             s,
             "visual.reset",
-            "Restaurar padrão",
+            tx("godot-campo-restaurar-padrao"),
             FieldType::Action,
             Value::Bool(obj.visual.as_ref().is_some_and(|v| {
                 is_mobile(&obj.kind)
@@ -2300,7 +2618,7 @@ fn look_fields(obj: &ObjectDef) -> Vec<Field> {
                     } != VisualDef::default()
             })),
         )
-        .help("Volta à aparência padrão do tipo de objeto."),
+        .help(tx("godot-ajuda-volta-a-aparencia-padrao-do")),
     );
     out
 }
@@ -2311,19 +2629,19 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             S_OBJECT,
             "name",
-            "Nome",
+            tx("godot-campo-nome"),
             FieldType::Text,
             Value::Text(obj.name.clone()),
         ),
         Field::new(
             S_OBJECT,
             "kind",
-            "Tipo",
+            tx("godot-campo-tipo"),
             FieldType::Info,
             Value::Text(kind_label(&obj.kind).into()),
         ),
     ];
-    for (i, (axis, label)) in [("x", "X"), ("y", "Y"), ("z", "Z (altura)")]
+    for (i, (axis, label)) in [("x", "X"), ("y", "Y"), ("z", tx("godot-eixo-z"))]
         .iter()
         .enumerate()
     {
@@ -2344,11 +2662,11 @@ pub fn object_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
             float(
                 S_POSITION,
                 "visual.yaw",
-                "Rotação",
+                tx("godot-campo-rotacao"),
                 crate::document::yaw_of(model, obj),
             )
             .unit("°")
-            .help("Giro em graus, anti-horário visto de cima (R gira 90°, Ctrl+R 15°)."),
+            .help(tx("godot-ajuda-giro-em-graus-anti-horario")),
         );
     }
     // The crane moves but has its own area (runway length × span).
@@ -2397,67 +2715,64 @@ fn person_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         pick(
             s,
             "person.sex",
-            "Sexo",
+            tx("godot-campo-sexo"),
             match p.sex {
                 Some(utsim_core::Sex::Female) => "Female",
                 Some(utsim_core::Sex::Male) => "Male",
                 None => "",
             },
             &[
-                ("", "Não informado"),
-                ("Female", "Feminino"),
-                ("Male", "Masculino"),
+                ("", "godot-opcao-nao-informado"),
+                ("Female", "godot-opcao-feminino"),
+                ("Male", "godot-opcao-masculino"),
             ],
         )
-        .help(
-            "Escolhe o corpo no 3D (não informado, o corpo sai do nome). Nenhum padrão de \
-             fadiga depende dele; com Feminino, carga acima de 20 kg dá o aviso da CLT, art. 390.",
-        ),
+        .help(tx("godot-ajuda-escolhe-o-corpo-no-3d")),
         opt(
             "person.height_m",
-            "Altura",
+            tx("godot-campo-altura"),
             p.height_m,
             "m",
-            "A altura do boneco no 3D. Desligada, ela é sorteada pelo nome.",
+            tx("godot-ajuda-a-altura-do-boneco-no"),
         ),
         opt(
             "person.mass_kg",
-            "Massa",
+            tx("godot-campo-massa"),
             p.mass_kg,
             "kg",
-            "Com a altura, dá a largura do boneco no 3D pelo índice de massa corporal.",
+            tx("godot-ajuda-com-a-altura-da-a"),
         ),
         Field::new(
             s,
             "person.age",
-            "Idade",
+            tx("godot-campo-idade"),
             FieldType::Int,
             p.age.map_or(Value::Null, |a| Value::Int(i64::from(a))),
         )
         .optional(p.age.is_some())
         .min(0.0)
         .unit("anos")
-        .help("Só registro: a simulação não lê."),
+        .help(tx("godot-ajuda-so-registro-a-simulacao-nao")),
         opt(
             "person.experience_years",
-            "Experiência na função",
+            tx("godot-campo-experiencia-na-funcao"),
             p.experience_years,
             "anos",
-            "Só registro: a simulação não lê.",
+            tx("godot-ajuda-so-registro-a-simulacao-nao"),
         ),
         opt(
             "person.capacity.load_kg",
-            "Carga máxima medida",
+            tx("godot-campo-carga-maxima-medida"),
             cap.load_kg,
             "kg",
-            "Uma carga acima dela dá aviso no modelo.",
+            tx("godot-ajuda-uma-carga-acima-dela-da"),
         ),
         opt(
             "person.capacity.force_n",
-            "Força máxima medida",
+            tx("godot-campo-forca-maxima-medida"),
             cap.force_n,
             "N",
-            "Empurrar ou puxar. Só registro.",
+            tx("godot-ajuda-empurrar-ou-puxar-so-registro"),
         ),
     ]
 }
@@ -2471,47 +2786,48 @@ fn waiting_fields(s: &'static str, obj: &ObjectDef) -> Vec<Field> {
         pick(
             s,
             "waiting_area.kind",
-            "Tipo de espera",
+            tx("godot-campo-tipo-de-espera"),
             w.map_or("", |w| w.kind.name()),
             &[
-                ("", "Fila simples (sem lugares)"),
-                ("Table", "Mesa"),
-                ("Pallet", "Palete"),
-                ("Shelf", "Estante"),
-                ("Floor", "Chão (área demarcada)"),
+                ("", "godot-opcao-fila-simples-sem-lugares"),
+                ("Table", "godot-opcao-mesa"),
+                ("Pallet", "godot-opcao-palete"),
+                ("Shelf", "godot-opcao-estante"),
+                ("Floor", "godot-opcao-chao-area-demarcada"),
             ],
         )
-        .help(
-            "Numa espera real cada peça ocupa um lugar (o arranjo do tipo, recalculado pelas \
-             Dimensões): só sai a peça sem nada em cima, a mais antiga delas primeiro, e quem \
-             retira vai até a frente da peça. Muda o resultado. Fila simples: como antes.",
-        ),
+        .help(tx("godot-ajuda-numa-espera-real-cada-peca")),
     ];
     if let Some(w) = w {
         out.push(
             Field::new(
                 s,
                 "waiting_area.layers",
-                "Camadas",
+                tx("godot-campo-camadas"),
                 FieldType::Int,
                 Value::Int(i64::from(w.layers())),
             )
             .min(1.0)
-            .help("Quantas peças empilhadas em cada lugar (na estante, em cada prateleira)."),
+            .help(tx("godot-ajuda-quantas-pecas-empilhadas-em-cada")),
         );
         out.push(
-            float(s, "waiting_area.pitch", "Passo entre peças", w.pitch())
-                .min(utsim_model::espera::ITEM)
-                .unit("m")
-                .help("Distância entre os centros de duas peças vizinhas."),
+            float(
+                s,
+                "waiting_area.pitch",
+                tx("godot-campo-passo-entre-pecas"),
+                w.pitch(),
+            )
+            .min(utsim_model::espera::ITEM)
+            .unit("m")
+            .help(tx("godot-ajuda-distancia-entre-os-centros-de")),
         );
         let n = w.places(obj.size).len();
         out.push(Field::new(
             s,
             "waiting_area.info",
-            "Lugares",
+            tx("godot-campo-lugares"),
             FieldType::Info,
-            Value::Text(format!("{n} lugares")),
+            Value::Text(fx("godot-campo-n-lugares", &[("n", vx(&n))])),
         ));
     }
     out
@@ -2673,19 +2989,19 @@ fn serves_fields(model: &Model, obj: &ObjectDef) -> Vec<Field> {
         Field::new(
             s,
             "serves.operates",
-            "Opera as máquinas",
+            tx("godot-campo-opera-as-maquinas"),
             FieldType::Info,
             Value::Text(list(&operates)),
         )
-        .help("Arraste do nó laranja até a máquina para ligar; clique na linha tracejada e no × para tirar."),
+        .help(tx("godot-ajuda-arraste-do-no-laranja-ate")),
         Field::new(
             s,
             "serves.carries",
-            "Leva os itens de",
+            tx("godot-campo-leva-os-itens-de"),
             FieldType::Info,
             Value::Text(list(&carries)),
         )
-        .help("Arraste do nó laranja até o objeto (uma espera, uma chegada, ou com Shift uma máquina) para ligar."),
+        .help(tx("godot-ajuda-arraste-do-no-laranja-ate-2")),
     ]
 }
 
@@ -2698,89 +3014,86 @@ pub fn run_fields(model: &Model) -> Vec<Field> {
         Field::new(
             S_MODEL,
             "model_name",
-            "Nome do modelo",
+            tx("godot-campo-nome-do-modelo"),
             FieldType::Text,
             Value::Text(model.name.clone()),
         ),
         Field::new(
             S_MODEL,
             "description",
-            "Descrição",
+            tx("godot-campo-descricao"),
             FieldType::Script,
             Value::Text(model.description.clone()),
         )
-        .help("Texto livre sobre o modelo, gravado no arquivo."),
-        float(s, "stop_time", "Tempo de simulação", run.stop_time).min(0.001),
-        float(s, "warmup", "Aquecimento", run.warmup)
+        .help(tx("godot-ajuda-texto-livre-sobre-o-modelo")),
+        float(
+            s,
+            "stop_time",
+            tx("godot-campo-tempo-de-simulacao"),
+            run.stop_time,
+        )
+        .min(0.001),
+        float(s, "warmup", tx("godot-campo-aquecimento"), run.warmup)
             .min(0.0)
-            .help("As estatísticas só contam depois deste tempo."),
-        int(s, "seed", "Semente", run.seed),
+            .help(tx("godot-ajuda-as-estatisticas-so-contam-depois")),
+        int(s, "seed", tx("godot-campo-semente"), run.seed),
         int(
             s,
             "replications",
-            "Replicações",
+            tx("godot-campo-replicacoes"),
             u64::from(run.replications),
         )
         .min(1.0),
         pick(
             S_MOVE,
             "movement",
-            "Movimentação padrão",
+            tx("godot-campo-movimentacao-padrao"),
             movement_name(run.movement),
             &MOVEMENT_CHOICES,
         )
-        .help(
-            "Como andam os recursos móveis que não escolheram um modo próprio. Vazio, \
-             vale Livre (menor caminho no piso, desviando dos obstáculos).",
-        ),
+        .help(tx("godot-ajuda-como-andam-os-recursos-moveis")),
         pick(
             S_FLOOR,
             "marking.profile",
-            "Perfil da marcação do piso",
+            tx("godot-campo-perfil-da-marcacao-do-piso"),
             if matches!(marking.profile, Profile::Branco) {
                 "Branco"
             } else {
                 "Brasil"
             },
             &[
-                ("Brasil", "Brasil (faixa amarela)"),
-                ("Branco", "Branco (redação original da NR-26)"),
+                ("Brasil", "godot-opcao-brasil-faixa-amarela"),
+                ("Branco", "godot-opcao-branco-redacao-original-da-nr"),
             ],
         )
-        .help(
-            "Cores das faixas e setas dos corredores. O programa não certifica \
-             conformidade: confira o texto vigente das normas.",
-        ),
+        .help(tx("godot-ajuda-cores-das-faixas-e-setas")),
         float(
             S_FLOOR,
             "marking.line_width",
-            "Largura da faixa",
+            tx("godot-campo-largura-da-faixa"),
             marking.line_width,
         )
         .min(0.001)
         .unit("m")
-        .help("A prática usual vai de 0,05 a 0,15 m."),
+        .help(tx("godot-ajuda-a-pratica-usual-vai-de")),
         float(
             S_FLOOR,
             "marking.crossing_stop",
-            "Parada no cruzamento",
+            tx("godot-campo-parada-no-cruzamento"),
             marking.crossing_stop,
         )
         .min(0.0)
         .unit("s")
-        .help("O veículo para esse tempo antes de um cruzamento com pedestres."),
+        .help(tx("godot-ajuda-o-veiculo-para-esse-tempo")),
         Field::new(
             S_FLOOR,
             "marking.floor_color",
-            "Cor do chão",
+            tx("godot-campo-cor-do-chao"),
             FieldType::Color,
             marking.floor_color.clone().map_or(Value::Null, Value::Text),
         )
         .optional(marking.floor_color.is_some())
-        .help(
-            "A cor do piso na cena 3D, gravada no modelo; a grade muda de tom para continuar \
-             visível. Desligada, o cinza de sempre.",
-        ),
+        .help(tx("godot-ajuda-a-cor-do-piso-na")),
     ]
 }
 
@@ -3492,7 +3805,8 @@ fn edit_visual(
         }
         "item" => {
             let t = value.as_text().unwrap_or("").trim();
-            v.item = (!t.is_empty() && t != DEFAULT_ITEM).then(|| t.to_string());
+            v.item = (!t.is_empty() && t != DEFAULT_ITEM && t != tx("godot-visual-caixa-padrao"))
+                .then(|| t.to_string());
         }
         "color" | "color.on" => match value {
             Value::Null | Value::Bool(false) => v.color = None,

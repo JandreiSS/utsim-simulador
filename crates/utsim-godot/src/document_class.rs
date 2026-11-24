@@ -1558,7 +1558,7 @@ impl UtsimDocument {
     /// Distribution family names, in the order of a field's `dist.family`.
     #[func]
     fn families() -> PackedStringArray {
-        strings(&schema::FAMILIES)
+        strings(&schema::family_names())
     }
 
     /// The "Atalhos" table: `[[shortcut, what it does], ...]`.

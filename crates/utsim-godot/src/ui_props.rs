@@ -18,6 +18,7 @@
 //! stay in Godot until their step (`docs/plano_interface_rust.md`): the main scene shows the
 //! Godot panel instead of this one for them.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::{HashMap, HashSet};
 
 use egui::text::CCursorRange;
@@ -278,9 +279,9 @@ fn contents(
 ) {
     let p = &v.props;
     let title = if p.kind == "run" {
-        "Modelo (nada selecionado)".to_owned()
+        tx("godot-ui-props-modelo_nada_selecionado").to_owned()
     } else {
-        format!("Propriedades: {}", p.name)
+        fx("godot-ui-props-propriedades", &[("name", vx(&p.name))])
     };
     let r = ui.add(
         Label::new(
@@ -297,8 +298,22 @@ fn contents(
         ui.add(Label::new(RichText::new(&v.extra).color(colors::WARNING)).wrap());
         arrange_buttons(ui, reg, out);
     }
-    issues(ui, reg, out, "Problemas", &p.problems, colors::ERROR);
-    issues(ui, reg, out, "Avisos", &p.warnings, colors::WARNING);
+    issues(
+        ui,
+        reg,
+        out,
+        tx("godot-ui-props-problemas"),
+        &p.problems,
+        colors::ERROR,
+    );
+    issues(
+        ui,
+        reg,
+        out,
+        tx("godot-ui-props-avisos"),
+        &p.warnings,
+        colors::WARNING,
+    );
     let mut section = "";
     for f in &p.fields {
         if f.section != section {
@@ -311,9 +326,9 @@ fn contents(
         field(ui, v, st, reg, out, f);
         if f.path == "visual.reset" && v.driver >= 0 {
             let mut on = v.driver == 1;
-            let r = ui.checkbox(&mut on, "Mostrar motorista").on_hover_text(
-                "Desenha o operador sentado e animado na empilhadeira. Só a aparência: não muda a simulação nem é gravado no modelo.",
-            );
+            let r = ui
+                .checkbox(&mut on, tx("godot-ui-props-mostrar_motorista"))
+                .on_hover_text(tx("godot-ui-props-desenha_o_operador_sentado_e"));
             named_toggle(
                 ui,
                 reg,
@@ -425,7 +440,7 @@ fn issues(
                     .sense(Sense::click()),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Clique para destacar na cena o que este aviso cita");
+            .on_hover_text(tx("godot-ui-props-clique_para_destacar_na_cena"));
         named(ui, reg, &format!("{title}_{k}"), &r, m);
         if r.clicked() {
             out.push(PropAction::Issue(m.clone()));
@@ -454,15 +469,19 @@ fn section_header(ui: &mut Ui, reg: &mut Registry, st: &mut PropsState, title: &
     ui.painter().text(
         rect.left_center() + Vec2::new(24.0, 0.0),
         egui::Align2::LEFT_CENTER,
-        title,
+        crate::schema::section_title(title),
         egui::FontId::proportional(sizes::BODY),
         colors::HEADING,
     );
     let r = r
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(format!(
-            "{} a seção {title}",
-            if closed { "Abre" } else { "Fecha" }
+        .on_hover_text(fx(
+            if closed {
+                "godot-ui-props-abre-a-secao"
+            } else {
+                "godot-ui-props-fecha-a-secao"
+            },
+            &[("title", vx(&crate::schema::section_title(title)))],
         ));
     named(
         ui,
@@ -686,9 +705,10 @@ pub(crate) fn combo(
 /// The on/off switch of an optional field (`path.on`).
 pub(crate) fn toggle(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, f: &Field) {
     let mut on = f.enabled;
-    let r = ui
-        .checkbox(&mut on, "")
-        .on_hover_text(format!("Liga ou desliga {}", f.label.to_lowercase()));
+    let r = ui.checkbox(&mut on, "").on_hover_text(fx(
+        "godot-ui-props-liga_ou_desliga",
+        &[("campo", vx(&f.label.to_lowercase()))],
+    ));
     named_toggle(
         ui,
         reg,
@@ -778,9 +798,9 @@ fn field(
                 st.buffers.remove(&name);
             }
             let label = if path == "description" {
-                "Aplicar"
+                tx("godot-ui-props-aplicar")
             } else {
-                "Aplicar script"
+                tx("godot-ui-props-aplicar_script")
             };
             let r = ui.add_enabled(buf != current, widgets::primary(label));
             named(ui, reg, &format!("{name}_aplicar"), &r, label);
@@ -860,7 +880,7 @@ fn field(
                 ui.vertical(|ui| {
                     if f.choices.is_empty() {
                         ui.label(
-                            RichText::new("Nenhum transportador no modelo.")
+                            RichText::new(tx("godot-ui-props-nenhum_transportador_no_modelo"))
                                 .color(colors::TEXT_WEAK),
                         );
                     }
@@ -957,7 +977,10 @@ fn dist(
                             .color(colors::TEXT_STRONG)
                             .background_color(colors::BADGE),
                     ))
-                    .on_hover_text(format!("Este campo vem de dados reais: {label}"));
+                    .on_hover_text(fx(
+                        "godot-ui-props-este_campo_vem_de_dados",
+                        &[("label", vx(&label))],
+                    ));
                 named(ui, reg, &format!("{name}_selo"), &r, "dados");
                 ui.add(
                     Label::new(RichText::new(label).small().color(colors::TEXT_WEAK)).truncate(),
@@ -1011,10 +1034,18 @@ fn dist(
     let depth = f.depth + 1;
     if v.data_paths.iter().any(|p| p == path) {
         let choices = [
-            ("dist".to_owned(), "Distribuição".to_owned(), String::new()),
-            ("dados".to_owned(), "Dados reais".to_owned(), String::new()),
+            (
+                "dist".to_owned(),
+                tx("godot-ui-props-distribuicao").to_owned(),
+                String::new(),
+            ),
+            (
+                "dados".to_owned(),
+                tx("godot-ui-props-dados_reais").to_owned(),
+                String::new(),
+            ),
         ];
-        let picked = row_label(ui, "Fonte", "", depth, |ui, w| {
+        let picked = row_label(ui, tx("godot-ui-props-fonte"), "", depth, |ui, w| {
             combo(
                 ui,
                 reg,
@@ -1022,7 +1053,7 @@ fn dist(
                 if using_data { "dados" } else { "dist" },
                 &choices,
                 w - 8.0,
-                "De onde vem a distribuição deste campo: parâmetros informados ou valores reais, ajustados automaticamente",
+                tx("godot-ui-props-de_onde_vem_a_distribuicao"),
             )
         });
         match picked.as_deref() {
@@ -1079,9 +1110,12 @@ fn dist(
     ui.horizontal(|ui| {
         ui.add_space(INDENT * depth as f32);
         ui.label(
-            RichText::new(format!("média {}", num_text(view.mean)))
-                .small()
-                .color(colors::TEXT_WEAK),
+            RichText::new(fx(
+                "godot-ui-props-media",
+                &[("mean", vx(&num_text(view.mean)))],
+            ))
+            .small()
+            .color(colors::TEXT_WEAK),
         );
     });
 }
@@ -1201,26 +1235,26 @@ fn data_form(
     let origins = [
         (
             "arquivo".to_owned(),
-            "Arquivo CSV".to_owned(),
+            tx("godot-ui-props-arquivo_csv").to_owned(),
             String::new(),
         ),
         (
             "valores".to_owned(),
-            "Valores colados".to_owned(),
+            tx("godot-ui-props-valores_colados").to_owned(),
             String::new(),
         ),
     ];
     ui.horizontal(|ui| {
         ui.add_space(INDENT * depth as f32);
-        let r = ui.add(widgets::primary("Valores reais…")).on_hover_text(
-            "Abre a janela grande para digitar, colar ou importar os valores e comparar todas as distribuições de uma vez",
-        );
+        let r = ui
+            .add(widgets::primary(tx("godot-ui-props-valores_reais")))
+            .on_hover_text(tx("godot-ui-props-abre_a_janela_grande_para"));
         named(ui, reg, &format!("{name}_janela"), &r, "Valores reais…");
         if r.clicked() {
             send(out, "janela", &draft);
         }
     });
-    if let Some(o) = row_label(ui, "Origem", "", depth, |ui, w| {
+    if let Some(o) = row_label(ui, tx("godot-ui-props-origem"), "", depth, |ui, w| {
         combo(
             ui,
             reg,
@@ -1234,7 +1268,7 @@ fn data_form(
         draft.origin = o;
     }
     if draft.origin == "arquivo" {
-        let typed = row_label(ui, "Arquivo", "", depth, |ui, w| {
+        let typed = row_label(ui, tx("godot-ui-props-arquivo"), "", depth, |ui, w| {
             let t = line_edit(
                 ui,
                 st,
@@ -1243,11 +1277,11 @@ fn data_form(
                 &draft.source,
                 (w - 96.0).max(60.0),
                 false,
-                "arquivo .csv ou .txt",
+                tx("godot-ui-props-arquivo_csv_ou_txt"),
             );
             let r = ui
-                .button("Escolher...")
-                .on_hover_text("Escolhe o arquivo de dados (CSV ou TXT)");
+                .button(tx("godot-ui-props-escolher"))
+                .on_hover_text(tx("godot-ui-props-escolhe_o_arquivo_de_dados"));
             named(ui, reg, &format!("{name}_escolher"), &r, "Escolher...");
             (t, r.clicked())
         });
@@ -1267,13 +1301,17 @@ fn data_form(
             };
             crate::dados::columns_of(&p).unwrap_or_default()
         };
-        let mut items = vec![(String::new(), "(automática)".to_owned(), String::new())];
+        let mut items = vec![(
+            String::new(),
+            tx("godot-ui-props-automatica").to_owned(),
+            String::new(),
+        )];
         items.extend(
             columns
                 .iter()
                 .map(|c| (c.clone(), c.clone(), String::new())),
         );
-        if let Some(c) = row_label(ui, "Coluna", "", depth, |ui, w| {
+        if let Some(c) = row_label(ui, tx("godot-ui-props-coluna"), "", depth, |ui, w| {
             ui.add_enabled_ui(!columns.is_empty(), |ui| {
                 combo(
                     ui,
@@ -1282,7 +1320,7 @@ fn data_form(
                     &draft.column,
                     &items,
                     w - 8.0,
-                    "Coluna do arquivo com os valores",
+                    tx("godot-ui-props-coluna_do_arquivo_com_os"),
                 )
             })
             .inner
@@ -1297,7 +1335,7 @@ fn data_form(
                     .id(Id::new(("utsim_prop", format!("{name}_valores"))))
                     .desired_rows(3)
                     .desired_width(f32::INFINITY)
-                    .hint_text("um valor por linha (ou separados por ; ou espaço)"),
+                    .hint_text(tx("godot-ui-props-um_valor_por_linha_ou")),
             );
             named(ui, reg, &format!("{name}_valores"), &r, &draft.text);
         });
@@ -1307,9 +1345,9 @@ fn data_form(
         let r = ui
             .checkbox(
                 &mut draft.timestamps,
-                "São instantes (usar os intervalos entre eles)",
+                tx("godot-ui-props-sao_instantes_usar_os_intervalos"),
             )
-            .on_hover_text("Marque quando os valores são instantes crescentes (como horas de chegada): o ajuste usa as diferenças entre eles. Desmarcado, os valores são durações.");
+            .on_hover_text(tx("godot-ui-props-marque_quando_os_valores_sao"));
         named_toggle(
             ui,
             reg,
@@ -1322,21 +1360,23 @@ fn data_form(
     let mut choices = vec![
         (
             "Best".to_owned(),
-            "Melhor automática".to_owned(),
+            tx("godot-ui-props-melhor_automatica").to_owned(),
             String::new(),
         ),
         (
             "Empirical".to_owned(),
-            "Empírica (os próprios valores)".to_owned(),
+            tx("godot-ui-props-empirica_os_proprios_valores").to_owned(),
             String::new(),
         ),
     ];
-    choices.extend(
-        v.data_families
-            .iter()
-            .map(|f| (f.clone(), format!("Só {f}"), String::new())),
-    );
-    if let Some(c) = row_label(ui, "Escolha", "", depth, |ui, w| {
+    choices.extend(v.data_families.iter().map(|f| {
+        (
+            f.clone(),
+            fx("godot-ui-props-so", &[("f", vx(&f))]),
+            String::new(),
+        )
+    }));
+    if let Some(c) = row_label(ui, tx("godot-ui-props-escolha"), "", depth, |ui, w| {
         combo(
             ui,
             reg,
@@ -1353,7 +1393,7 @@ fn data_form(
         .iter()
         .map(|(k, l)| (k.to_string(), l.to_string(), String::new()))
         .collect();
-    if let Some(c) = row_label(ui, "Critério", "", depth, |ui, w| {
+    if let Some(c) = row_label(ui, tx("godot-ui-props-criterio"), "", depth, |ui, w| {
         combo(
             ui,
             reg,
@@ -1361,7 +1401,7 @@ fn data_form(
             &draft.criterion,
             &criteria,
             w - 8.0,
-            "O que ordena as famílias aceitas pelos testes",
+            tx("godot-ui-props-o_que_ordena_as_familias"),
         )
     }) {
         draft.criterion = c;
@@ -1369,13 +1409,13 @@ fn data_form(
     ui.horizontal(|ui| {
         ui.add_space(INDENT * depth as f32);
         let label = if applied {
-            "Reajustar com estas opções"
+            tx("godot-ui-props-reajustar_com_estas_opcoes")
         } else {
-            "Aplicar"
+            tx("godot-ui-props-aplicar")
         };
-        let r = ui.add(widgets::primary(label)).on_hover_text(
-            "Ajusta a distribuição aos dados (em segundo plano) e passa a usá-la neste campo",
-        );
+        let r = ui
+            .add(widgets::primary(label))
+            .on_hover_text(tx("godot-ui-props-ajusta_a_distribuicao_aos_dados"));
         named(ui, reg, &format!("{name}_aplicar"), &r, label);
         if r.clicked() {
             send(out, "aplicar", &draft);
@@ -1398,19 +1438,22 @@ fn data_form(
     if !err.is_empty() {
         note(
             ui,
-            &format!("Não foi possível ler os dados: {err}"),
+            &fx(
+                "godot-ui-props-nao_foi_possivel_ler_os",
+                &[("err", vx(&err))],
+            ),
             colors::ERROR,
         );
     }
     if e["stale"].as_bool() == Some(true) {
         note(
             ui,
-            "Os dados mudaram desde o último ajuste.",
+            tx("godot-ui-props-os_dados_mudaram_desde_o"),
             colors::WARNING,
         );
         ui.horizontal(|ui| {
             ui.add_space(INDENT * depth as f32);
-            let r = ui.button("Reajustar aos dados atuais");
+            let r = ui.button(tx("godot-ui-props-reajustar_aos_dados_atuais"));
             named(
                 ui,
                 reg,
@@ -1425,7 +1468,10 @@ fn data_form(
     } else if let Some(c) = e["changed_on_load"].as_str().filter(|c| !c.is_empty()) {
         note(
             ui,
-            &format!("{c}. O campo foi reajustado; salve para registrar."),
+            &fx(
+                "godot-ui-props-o_campo_foi_reajustado_salve",
+                &[("c", vx(&c))],
+            ),
             colors::WARNING,
         );
     }
@@ -1434,13 +1480,24 @@ fn data_form(
         serde_json::Value::Null => "?".into(),
         other => other.to_string(),
     };
-    let res = format!("{} · n = {} · {}", s("family"), s("n"), s("label"));
+    let res = fx(
+        "godot-ui-props-n",
+        &[
+            ("family", vx(&s("family"))),
+            ("n", vx(&s("n"))),
+            ("label", vx(&s("label"))),
+        ],
+    );
     let r = note(ui, &res, colors::TEXT);
     named(ui, reg, &format!("{name}_resultado"), &r, &res);
     let view = &e["view"];
     if !view.is_object() {
         if err.is_empty() {
-            note(ui, "Analisando os dados...", colors::TEXT_WEAK);
+            note(
+                ui,
+                tx("godot-ui-props-analisando_os_dados"),
+                colors::TEXT_WEAK,
+            );
             if st.requested.insert(path.to_owned()) {
                 send(out, "analisar", &draft);
             }
@@ -1479,9 +1536,12 @@ fn data_form(
     if !rank.is_empty() {
         note(
             ui,
-            &format!(
-                "Candidatas ({})",
-                view["criterion"].as_str().unwrap_or_default()
+            &fx(
+                "godot-ui-props-candidatas",
+                &[(
+                    "criterion",
+                    vx(&view["criterion"].as_str().unwrap_or_default()),
+                )],
             ),
             colors::HEADING,
         );
@@ -1495,11 +1555,13 @@ fn data_form(
             num_text(r["criterion"].as_f64().unwrap_or(f64::NAN)),
             r["status"].as_str().unwrap_or_default()
         );
-        let tip = format!(
-            "{}\nAIC {}   BIC {}\nUsa esta família neste campo",
-            r["params"].as_str().unwrap_or_default(),
-            num_text(r["aic"].as_f64().unwrap_or(f64::NAN)),
-            num_text(r["bic"].as_f64().unwrap_or(f64::NAN))
+        let tip = fx(
+            "godot-ui-props-aic_bic_usa_esta_familia",
+            &[
+                ("params", vx(&r["params"].as_str().unwrap_or_default())),
+                ("aic", vx(&num_text(r["aic"].as_f64().unwrap_or(f64::NAN)))),
+                ("bic", vx(&num_text(r["bic"].as_f64().unwrap_or(f64::NAN)))),
+            ],
         );
         ui.horizontal(|ui| {
             ui.add_space(INDENT * depth as f32);
@@ -1518,7 +1580,7 @@ fn data_form(
     if view["empirical"].as_bool() != Some(true) {
         ui.horizontal(|ui| {
             ui.add_space(INDENT * depth as f32);
-            let b = ui.button("Usar a empírica (os próprios valores)");
+            let b = ui.button(tx("godot-ui-props-usar_a_empirica_os_proprios"));
             named(ui, reg, &format!("{name}_cand_empirica"), &b, "empírica");
             if b.clicked() {
                 let mut d = draft.clone();
@@ -1529,9 +1591,9 @@ fn data_form(
     }
     ui.horizontal(|ui| {
         ui.add_space(INDENT * depth as f32);
-        let b = ui.button("Relatório").on_hover_text(
-            "Grava o relatório completo do ajuste (HTML) numa pasta e abre no navegador",
-        );
+        let b = ui
+            .button(tx("godot-ui-props-relatorio"))
+            .on_hover_text(tx("godot-ui-props-grava_o_relatorio_completo_do"));
         named(ui, reg, &format!("{name}_relatorio"), &b, "Relatório");
         if b.clicked() {
             send(out, "relatorio", &draft);
@@ -1544,7 +1606,7 @@ fn data_form(
 fn mini_histogram(ui: &mut Ui, reg: &mut Registry, name: &str, chart: &serde_json::Value) {
     let width = ui.available_width().max(120.0);
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 110.0), Sense::hover());
-    let resp = resp.on_hover_text("Histograma dos dados e a curva da distribuição escolhida");
+    let resp = resp.on_hover_text(tx("godot-ui-props-histograma_dos_dados_e_a"));
     let p = ui.painter();
     let area = Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.max.y - 16.0));
     p.rect_filled(area, 3.0, colors::FIELD);
@@ -1720,7 +1782,7 @@ fn asset(
                 &filter,
                 w,
                 false,
-                "Buscar ativo",
+                tx("godot-ui-props-buscar_ativo"),
             )
         })
         .inner;
@@ -1739,9 +1801,7 @@ fn asset(
         ui.painter().rect_filled(rect, 4.0, colors::FIELD);
         r
     };
-    let r = r.on_hover_text(
-        "Miniatura do objeto com o ativo escolhido (ou o que está sob o mouse na lista)",
-    );
+    let r = r.on_hover_text(tx("godot-ui-props-miniatura_do_objeto_com_o"));
     named(ui, reg, &format!("{name}_miniatura"), &r, &current);
     let want = hover.unwrap_or(current);
     if st.miniature_sent.as_deref() != Some(want.as_str()) {
@@ -1753,12 +1813,15 @@ fn asset(
 /// Outputs in port order, with ▲ ▼ to reorder and ✕ to remove; then the inputs.
 fn outputs(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, p: &Properties) {
     ui.label(
-        RichText::new("Ligações de saída (ordem das portas)")
+        RichText::new(tx("godot-ui-props-ligacoes_de_saida_ordem_das"))
             .strong()
             .color(colors::HEADING),
     );
     if p.outputs.is_empty() {
-        ui.label(RichText::new("Nenhuma. Use a ferramenta Ligar (L).").color(colors::TEXT_WEAK));
+        ui.label(
+            RichText::new(tx("godot-ui-props-nenhuma_use_a_ferramenta_ligar"))
+                .color(colors::TEXT_WEAK),
+        );
     }
     let n = p.outputs.len();
     for (k, to) in p.outputs.iter().enumerate() {
@@ -1773,23 +1836,23 @@ fn outputs(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, p: &Prope
             );
             for (suffix, label, tip, enabled, action) in [
                 (
-                    "Subir",
+                    tx("godot-ui-props-subir"),
                     "▲",
-                    "Sobe esta saída na ordem das portas",
+                    tx("godot-ui-props-sobe_esta_saida_na_ordem"),
                     k > 0,
                     PropAction::Reorder(k, -1),
                 ),
                 (
-                    "Descer",
+                    tx("godot-ui-props-descer"),
                     "▼",
-                    "Desce esta saída na ordem das portas",
+                    tx("godot-ui-props-desce_esta_saida_na_ordem"),
                     k + 1 < n,
                     PropAction::Reorder(k, 1),
                 ),
                 (
-                    "Remover",
+                    tx("godot-ui-props-remover"),
                     "×",
-                    "Remove esta ligação",
+                    tx("godot-ui-props-remove_esta_ligacao"),
                     true,
                     PropAction::Disconnect(to.clone()),
                 ),
@@ -1807,8 +1870,11 @@ fn outputs(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, p: &Prope
     if !p.inputs.is_empty() {
         ui.add(
             Label::new(
-                RichText::new(format!("Entradas: {}", p.inputs.join(", ")))
-                    .color(colors::TEXT_WEAK),
+                RichText::new(fx(
+                    "godot-ui-props-entradas",
+                    &[("inputs", vx(&p.inputs.join(", ")))],
+                ))
+                .color(colors::TEXT_WEAK),
             )
             .wrap(),
         );

@@ -44,38 +44,6 @@ pub fn sx(s: String) -> Valor<'static> {
     s.into()
 }
 
-/// The name of a block state in the language of the interface (`utsim_scene::style::state_label`
-/// stays Portuguese for the scripts and the Godot client).
-pub fn estado(state: Option<utsim_core::State>) -> &'static str {
-    use utsim_core::State;
-    tx(match state {
-        None => "estado-sem-estado",
-        Some(State::Idle) => "estado-ocioso",
-        Some(State::Empty) => "estado-vazio",
-        Some(State::Generating) => "estado-gerando",
-        Some(State::Releasing) => "estado-liberando",
-        Some(State::Collecting) => "estado-coletando",
-        Some(State::Setup) => "estado-preparacao",
-        Some(State::Processing) => "estado-processando",
-        Some(State::Blocked) => "estado-bloqueado",
-        Some(State::WaitingOperator) => "estado-aguardando-operador",
-        Some(State::WaitingTransport) => "estado-aguardando-transporte",
-        Some(State::Down) => "estado-em-falha",
-        Some(State::OffShift) => "estado-fora-do-turno",
-        Some(State::TravelEmpty) => "estado-viajando-vazio",
-        Some(State::TravelLoaded) => "estado-viajando-carregado",
-        Some(State::Loading) => "estado-carregando",
-        Some(State::Unloading) => "estado-descarregando",
-        Some(State::Utilize) => "estado-trabalhando-no-posto",
-        Some(State::Stopped) => "estado-parado",
-        Some(State::WaitingRepair) => "estado-aguardando-tecnico",
-        Some(State::Maintenance) => "estado-em-manutencao",
-        Some(State::Resting) => "estado-em-pausa",
-        Some(State::Entering) => "estado-operador-entrando",
-        Some(State::Leaving) => "estado-operador-saindo",
-    })
-}
-
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct Preferencias {
@@ -148,7 +116,7 @@ mod tests {
     /// `editor.ftl`: a mistyped key would show up as the key itself on screen.
     #[test]
     fn every_key_in_the_sources_exists() {
-        const PREFIXES: [&str; 15] = [
+        const PREFIXES: [&str; 14] = [
             "atalho-",
             "camada-",
             "camadas-",
@@ -156,7 +124,6 @@ mod tests {
             "cameras-",
             "dist-",
             "editor-",
-            "estado-",
             "flows-",
             "fluxo-tipo-",
             "models-",
