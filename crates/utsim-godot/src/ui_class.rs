@@ -1566,7 +1566,13 @@ impl UtsimUi {
                 .iter()
                 .map(|p| Entry {
                     id: p.id.to_owned(),
-                    label: p.label.to_owned(),
+                    // In the language of now; the "Espera" of the Godot editor keeps its
+                    // own name (the core's Queue is "Fila").
+                    label: if p.id == "Queue" {
+                        p.label.to_owned()
+                    } else {
+                        utsim_edit::texto::rotulo_paleta(p).to_owned()
+                    },
                     category: p.category.to_owned(),
                     icon: self.icons.get(p.id).copied(),
                 })
@@ -1713,7 +1719,7 @@ impl UtsimUi {
             .map(|p| p.to_path_buf());
         self.host.props = Some(PropsView {
             props,
-            families: schema::FAMILIES.iter().map(|s| s.to_string()).collect(),
+            families: schema::family_names(),
             data,
             data_families: utsim_fit::auto::family_names()
                 .iter()

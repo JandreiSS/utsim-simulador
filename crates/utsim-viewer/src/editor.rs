@@ -1631,7 +1631,11 @@ pub fn edit_panels(
             .interactable(false)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label(format!("{} {}", palette_icon(id), entry.label));
+                    ui.label(format!(
+                        "{} {}",
+                        palette_icon(id),
+                        utsim_edit::texto::rotulo_paleta(entry)
+                    ));
                 });
             });
     }
@@ -1782,13 +1786,16 @@ pub fn edit_panels(
 /// the floor; or drag it to the floor), and the grid settings.
 fn palette_ui(ui: &mut egui::Ui, ed: &mut Editor) {
     for category in CATEGORIES {
-        egui::CollapsingHeader::new(category)
+        egui::CollapsingHeader::new(utsim_edit::texto::rotulo_categoria(category))
             .default_open(true)
             .show(ui, |ui| {
                 for entry in PALETTE.iter().filter(|e| e.category == category) {
                     let on = ed.tool == Tool::Place(entry.id) || ed.palette_drag == Some(entry.id);
                     // Icon and label are separate texts, so scripts find the label exactly.
-                    let text = (palette_icon(entry.id), entry.label);
+                    let text = (
+                        palette_icon(entry.id),
+                        utsim_edit::texto::rotulo_paleta(entry),
+                    );
                     let response = ui
                         .add(
                             egui::Button::selectable(on, text).sense(egui::Sense::click_and_drag()),

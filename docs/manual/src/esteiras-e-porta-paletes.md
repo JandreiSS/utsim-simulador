@@ -65,7 +65,7 @@ O que a geometria muda no resultado:
 - **Tempo de passagem:** comprimento ÷ velocidade.
 - **Capacidade:** comprimento ÷ `item_length`.
 - **Curva:** o arco é tangente aos dois trechos e fica no plano do piso. Se o raio não cabe, ele diminui até o ponto de tangência chegar à metade do trecho mais curto. O arco de raio `r` que vira θ encurta o caminho em `2r·tan(θ/2) − r·θ`.
-- **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas.
+- **Pontas:** a entrada é o primeiro nó e a saída é o último, cada um na sua altura. O operador pega e deixa a peça ao lado delas. Na cena 3D, a empilhadeira e a pessoa vão até a peça onde ela está na esteira (na saída, na altura do trajeto) e a deixam na entrada.
 - **Área no piso:** é a faixa da largura da esteira em volta do trajeto. Quem anda contorna a esteira por fora. Onde a parte de baixo da estrutura (0,14 m abaixo da superfície) fica a 2,2 m do piso ou mais, dá para passar por baixo: ali só as pernas, sob os nós, são obstáculo.
 
 #### Calha (escorregador)
@@ -119,6 +119,7 @@ No Editar, o grupo Mover da Biblioteca tem três ferramentas: "Esteira desenhada
 - **Editar:** clique num nó para selecioná-lo (Shift soma nós do mesmo trajeto). Arraste o losango no chão para mover em X e Y (com Ctrl, só no eixo X ou só no Y, o de maior deslocamento), e o topo da haste para mudar a altura. As setas movem um passo da grade, e PageUp/PageDown sobem e descem (Shift: 1 cm). No painel ficam X, Y, altura e raio exatos, nivelar, inclinação constante entre as pontas, dividir a esteira num nó e remover nós. Shift + clique na linha acrescenta um nó.
 - **Apagar um trecho:** selecione o trecho com um clique no losango laranja do meio dele (ou os dois nós vizinhos: clique num e Shift + clique no outro) e use "Apagar o trecho entre os nós". Na ponta, o nó da ponta sai e o trajeto encurta (a esteira segue ligada). No meio, o trajeto vira dois: numa esteira, a primeira parte fica com as entradas, a segunda com as saídas, e as duas não se ligam mais. Um Ctrl+Z desfaz tudo.
 - **Juntar dois trajetos:** quando outra esteira desenhada começa exatamente onde a selecionada acaba (ou, num caminho, outro caminho tem uma ponta numa ponta dele), o painel mostra "Juntar com … num trajeto só". Fica o nome, o tipo e as entradas da selecionada; a outra some, e as saídas dela passam para a junta. É o inverso de dividir; um Ctrl+Z desfaz.
+- **Sentido:** na ferramenta, cada esteira desenhada mostra setas ao longo da linha, a cada 1,5 m, apontando para a saída.
 - **Inverter o sentido:** "Inverter o sentido" no painel da esteira troca a entrada pela saída (os nós na ordem contrária) e inverte as ligações dela: quem a alimentava passa a recebê-la. Serve para a esteira desenhada do lado errado.
 - **Perfil:** com um trajeto selecionado, um painel embaixo da vista mostra o corte dele: altura × distância em planta, a altura de cada nó e a inclinação de cada trecho, em vermelho acima do limite. Arraste um nó no perfil para cima ou para baixo para mudar só a altura dele (de 5 em 5 cm; com Shift, de 1 em 1 cm).
 - **Curvar um trecho:** com o trajeto selecionado, cada trecho mostra um losango laranja no meio. Arraste-o: nasce ali um nó com o maior raio que cabe, e o trecho vira uma curva suave.

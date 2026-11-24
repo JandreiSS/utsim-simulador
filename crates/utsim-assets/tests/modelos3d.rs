@@ -427,6 +427,12 @@ const CONTRATO: &[Contrato] = &[
         &["ponto_gancho", "ponto_operador"],
         &["ponte_andar", "carro_andar", "gancho_descer"],
     ),
+    ("engradado", &["corpo"], &[], &[]),
+    ("tambor", &["corpo"], &[], &[]),
+    ("bobina", &["corpo"], &[], &[]),
+    ("saco", &["corpo"], &[], &[]),
+    ("palete_caixas", &["corpo"], &[], &[]),
+    ("engrenagem", &["corpo"], &[], &[]),
     ("controle_remoto", &["corpo", "alca"], &[], &[]),
     (
         "doca",
@@ -1310,6 +1316,45 @@ fn os_clipes_base_sao_os_que_o_utsim_usa() {
         .unwrap()
         .len();
     assert!(tam < 1280 * 1024, "{tam} bytes");
+}
+
+/// As peças e cargas do campo "Modelo da peça": escala real, no chão, centradas, com as medidas
+/// nominais em `dados.tamanho`, e leves (são desenhadas muitas vezes).
+#[test]
+fn as_pecas_de_fabrica_tem_escala_real_e_ficam_no_chao() {
+    let cat = catalogo();
+    for nome in [
+        "engradado",
+        "tambor",
+        "bobina",
+        "saco",
+        "palete_caixas",
+        "engrenagem",
+    ] {
+        for sufixo in ["", "_medio"] {
+            let item = &cat[&format!("{nome}{sufixo}")];
+            let (min, tam) = (v3(&item["minimo"]), v3(&item["tamanho"]));
+            let nominal = v3(&item["dados"]["tamanho"]);
+            for k in 0..3 {
+                assert!(
+                    (tam[k] - nominal[k]).abs() <= 0.02 + nominal[k] * 0.02,
+                    "{nome}{sufixo}: lado {k} com {} m, nominal {}",
+                    tam[k],
+                    nominal[k]
+                );
+            }
+            assert!(min[2].abs() < 1e-3, "{nome}{sufixo}: no chão");
+            for k in 0..2 {
+                assert!(
+                    (min[k] + tam[k] / 2.0).abs() < 5e-3,
+                    "{nome}{sufixo}: centrado"
+                );
+            }
+            let tri = item["triangulos"].as_u64().unwrap();
+            let lim = if sufixo.is_empty() { 450 } else { 1000 };
+            assert!(tri <= lim, "{nome}{sufixo}: {tri} triângulos");
+        }
+    }
 }
 
 #[test]

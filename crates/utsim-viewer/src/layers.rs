@@ -291,7 +291,7 @@ pub fn tools_ui(ui: &mut egui::Ui, ed: &mut Editor) {
                 tool_button(
                     ui,
                     ed,
-                    e.label,
+                    utsim_edit::texto::rotulo_fluido(&e),
                     Tool::FluidPlace(e.id),
                     tx("camadas-colocar_dica"),
                 );
@@ -406,7 +406,8 @@ fn fluid_summary(ui: &mut egui::Ui, ed: &mut Editor) {
         ],
     ));
     for n in &def.nodes {
-        let kind = fluid_entry(utsim_edit::fluids::fluid_kind_id(&n.kind)).map_or("", |e| e.label);
+        let kind = fluid_entry(utsim_edit::fluids::fluid_kind_id(&n.kind))
+            .map_or("", utsim_edit::texto::rotulo_fluido);
         ui.horizontal(|ui| {
             if ui.link(&n.name).clicked() {
                 ed.fluid_sel = Some(n.name.clone());

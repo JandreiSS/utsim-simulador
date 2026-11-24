@@ -396,7 +396,7 @@ pub fn state_color(name: &str) -> [f32; 3] {
 /// Portuguese label of a state (the report name when it is not a known state).
 pub fn state_label(name: &str) -> String {
     match state_named(name) {
-        Some(s) => crate::texto::estado(Some(s)).to_string(),
+        Some(s) => utsim_edit::texto::estado(Some(s)).to_string(),
         None => name.to_string(),
     }
 }

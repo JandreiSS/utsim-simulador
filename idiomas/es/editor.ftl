@@ -964,30 +964,3 @@ models-visual = Visual:
 models-simples = simple
 models-realista = realista
 models-modelos_3d_articulados_da_biblioteca = Modelos 3D articulados de la biblioteca (montacargas, AGV, operador...)
-
-## Estados dos blocos (painel do bloco e gráficos de estados)
-
-estado-sem-estado = sin estado
-estado-ocioso = ocioso
-estado-vazio = vacío
-estado-gerando = generando
-estado-liberando = liberando
-estado-coletando = recolectando
-estado-preparacao = preparación
-estado-processando = procesando
-estado-bloqueado = bloqueado
-estado-aguardando-operador = esperando operador
-estado-aguardando-transporte = esperando transporte
-estado-em-falha = en falla
-estado-fora-do-turno = fuera de turno
-estado-viajando-vazio = viajando vacío
-estado-viajando-carregado = viajando cargado
-estado-carregando = cargando
-estado-descarregando = descargando
-estado-trabalhando-no-posto = trabajando en el puesto
-estado-parado = detenido (comando externo)
-estado-aguardando-tecnico = esperando técnico
-estado-em-manutencao = en mantenimiento preventivo
-estado-em-pausa = en pausa (fatiga)
-estado-operador-entrando = operador entrando
-estado-operador-saindo = operador saliendo

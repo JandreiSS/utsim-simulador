@@ -175,6 +175,66 @@
   ],
   "triangulos": 1412
  },
+ "bobina": {
+  "arquivo": "bobina.glb",
+  "clipes": {},
+  "dados": {
+   "olho": 0.5,
+   "tamanho": [
+    1.2,
+    0.8,
+    1.2
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.604,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "bobina",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.208,
+   0.8,
+   1.208
+  ],
+  "triangulos": 400
+ },
+ "bobina_medio": {
+  "arquivo": "bobina_medio.glb",
+  "clipes": {},
+  "dados": {
+   "olho": 0.5,
+   "tamanho": [
+    1.2,
+    0.8,
+    1.2
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.604,
+   -0.4,
+   0.0
+  ],
+  "nos": [
+   "bobina",
+   "corpo"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.208,
+   0.8,
+   1.208
+  ],
+  "triangulos": 880
+ },
  "caixa": {
   "arquivo": "caixa.glb",
   "clipes": {},
@@ -1354,6 +1414,122 @@
    2.62
   ],
   "triangulos": 2764
+ },
+ "engradado": {
+  "arquivo": "engradado.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.6,
+    0.4,
+    0.3
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.308,
+   -0.208,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "engradado"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.616,
+   0.416,
+   0.3
+  ],
+  "triangulos": 132
+ },
+ "engradado_medio": {
+  "arquivo": "engradado_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.6,
+    0.4,
+    0.3
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.308,
+   -0.208,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "engradado"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.616,
+   0.416,
+   0.3
+  ],
+  "triangulos": 252
+ },
+ "engrenagem": {
+  "arquivo": "engrenagem.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.3,
+    0.3,
+    0.06
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.15,
+   -0.15,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "engrenagem"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.299,
+   0.299,
+   0.06
+  ],
+  "triangulos": 324
+ },
+ "engrenagem_medio": {
+  "arquivo": "engrenagem_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.3,
+    0.3,
+    0.06
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.15,
+   -0.15,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "engrenagem"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.3,
+   0.3,
+   0.06
+  ],
+  "triangulos": 404
  },
  "espera": {
   "arquivo": "espera.glb",
@@ -3209,6 +3385,64 @@
    0.144
   ],
   "triangulos": 264
+ },
+ "palete_caixas": {
+  "arquivo": "palete_caixas.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    1.2,
+    1.0,
+    0.96
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.6,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "palete_caixas"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.2,
+   1.0,
+   0.958
+  ],
+  "triangulos": 276
+ },
+ "palete_caixas_medio": {
+  "arquivo": "palete_caixas_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    1.2,
+    1.0,
+    0.96
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.6,
+   -0.5,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "palete_caixas"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   1.2,
+   1.0,
+   0.958
+  ],
+  "triangulos": 628
  },
  "palete_medio": {
   "arquivo": "palete_medio.glb",
@@ -5231,6 +5465,122 @@
    1.6
   ],
   "triangulos": 1388
+ },
+ "saco": {
+  "arquivo": "saco.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.7,
+    0.45,
+    0.16
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.35,
+   -0.227,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "saco"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.7,
+   0.454,
+   0.162
+  ],
+  "triangulos": 48
+ },
+ "saco_medio": {
+  "arquivo": "saco_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.7,
+    0.45,
+    0.16
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.35,
+   -0.227,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "saco"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.7,
+   0.454,
+   0.162
+  ],
+  "triangulos": 176
+ },
+ "tambor": {
+  "arquivo": "tambor.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.58,
+    0.58,
+    0.88
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.291,
+   -0.291,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "tambor"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.582,
+   0.582,
+   0.892
+  ],
+  "triangulos": 320
+ },
+ "tambor_medio": {
+  "arquivo": "tambor_medio.glb",
+  "clipes": {},
+  "dados": {
+   "tamanho": [
+    0.58,
+    0.58,
+    0.88
+   ]
+  },
+  "estados": {},
+  "minimo": [
+   -0.291,
+   -0.291,
+   0.0
+  ],
+  "nos": [
+   "corpo",
+   "tambor"
+  ],
+  "peca": {},
+  "pontos": {},
+  "tamanho": [
+   0.582,
+   0.582,
+   0.892
+  ],
+  "triangulos": 512
  },
  "ventilador_coluna": {
   "arquivo": "ventilador_coluna.glb",

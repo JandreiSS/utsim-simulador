@@ -6,7 +6,9 @@
 //! else the arrival), then source and sequence; each waits [`REORDER`] after arrival so
 //! that the values of one notification fall in order. The twin time is that instant on
 //! the local clock (`Wall`) or the last value of the clock tag before it (`Tag`); it
-//! never goes back. The observation is recorded with that time,
+//! never goes back. Before the clock tag's first value the time is not known: those
+//! readings wait and take the time of that first value (a twin that joins a running
+//! line does not put them at 0). The observation is recorded with that time,
 //! so the replay does not depend on when the packets arrived.
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -158,6 +160,8 @@ fn run_loop(
     let mut last_flush = Instant::now();
     let mut pending: Vec<(u64, RawObservation)> = Vec::new();
     let mut skewed: Vec<String> = Vec::new();
+    // Readings before the clock tag's first value (`Tag`), waiting for it.
+    let mut early: Vec<(u64, RawObservation)> = Vec::new();
     loop {
         let stop = opts.cancel.load(Ordering::Relaxed)
             || opts.max_wall.is_some_and(|m| origin.elapsed() >= m);
@@ -209,25 +213,33 @@ fn run_loop(
                                 clock_value = Some(clock_value.map_or(v, |c| c.max(v)));
                             }
                         }
-                        clock_value.unwrap_or(0.0)
+                        match clock_value {
+                            Some(c) => c,
+                            None => {
+                                early.push((eff, raw));
+                                continue;
+                            }
+                        }
                     }
                 };
-                if let Some(u) = opts.until.filter(|u| t > *u) {
-                    // Past the end of the session: not processed nor recorded.
-                    now_t = now_t.max(u);
-                    continue;
+                for (eff, raw) in early.drain(..).chain(std::iter::once((eff, raw))) {
+                    if let Some(u) = opts.until.filter(|u| t > *u) {
+                        // Past the end of the session: not processed nor recorded.
+                        now_t = now_t.max(u);
+                        continue;
+                    }
+                    now_t = now_t.max(t);
+                    let obs = twin.stamp(
+                        &raw.source,
+                        &raw.tag,
+                        raw.value,
+                        raw.quality,
+                        raw.seq,
+                        now_t,
+                        eff / 1000,
+                    );
+                    twin.ingest(obs);
                 }
-                now_t = now_t.max(t);
-                let obs = twin.stamp(
-                    &raw.source,
-                    &raw.tag,
-                    raw.value,
-                    raw.quality,
-                    raw.seq,
-                    now_t,
-                    eff / 1000,
-                );
-                twin.ingest(obs);
             }
             if let ClockSpec::Wall { unit_seconds } = &clock {
                 let settled = origin.elapsed().saturating_sub(REORDER);
