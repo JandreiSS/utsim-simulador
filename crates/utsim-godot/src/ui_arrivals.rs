@@ -32,6 +32,7 @@
 //! `_periodo_<k>_<campo>` (`inicio`, `fim`, `modo`, `valor`, `remover`, `erro`), `_grafico`.
 //! Rows and periods are numbered from 1, as in the core's messages.
 
+use crate::texto::{fx, tx, vx};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{
@@ -164,7 +165,7 @@ pub fn parse_number(text: &str) -> Result<f64, String> {
         .parse::<f64>()
         .ok()
         .filter(|v| v.is_finite())
-        .ok_or_else(|| format!("\"{t}\" não é um número"))
+        .ok_or_else(|| fx("godot-ui-arrivals-nao_e_um_numero", &[("t", vx(&t))]))
 }
 
 /// Reads "hh:mm" (or "dia N hh:mm" in a weekly cycle) as an offset in the model unit of
@@ -182,28 +183,28 @@ pub fn parse_time(text: &str, cycle: Option<f64>) -> Result<f64, String> {
             .ok()
             .filter(|d| *d >= 1)
             .ok_or_else(|| format!("dia inválido em \"{t}\" (a partir de 1)"))?;
-        let unit = unit.ok_or_else(|| "use um número".to_string())?;
+        let unit = unit.ok_or_else(|| tx("godot-ui-arrivals-use_um_numero").to_string())?;
         return Ok(parse_time(hm, cycle)? + f64::from(day - 1) * 24.0 * unit.per_hour());
     }
     if let Some((h, m)) = t.split_once(':') {
-        let unit = unit.ok_or_else(|| {
-            "hh:mm só vale com ciclo de dia ou semana (1440 min, 24 h, 86400 s); use um número"
-                .to_string()
-        })?;
+        let unit = unit.ok_or_else(|| tx("godot-ui-arrivals-hh_mm_so_vale_com").to_string())?;
         let h: u32 = h
             .trim()
             .parse()
-            .map_err(|_| format!("hora inválida em \"{t}\""))?;
+            .map_err(|_| fx("godot-ui-arrivals-hora_invalida_em", &[("t", vx(&t))]))?;
         let m: u32 = m
             .trim()
             .parse()
-            .map_err(|_| format!("minuto inválido em \"{t}\""))?;
+            .map_err(|_| fx("godot-ui-arrivals-minuto_invalido_em", &[("t", vx(&t))]))?;
         if m >= 60 {
-            return Err(format!("minuto inválido em \"{t}\" (0 a 59)"));
+            return Err(fx(
+                "godot-ui-arrivals-minuto_invalido_em_0_a",
+                &[("t", vx(&t))],
+            ));
         }
         return Ok(f64::from(h * 60 + m) / 60.0 * unit.per_hour());
     }
-    parse_number(t).map_err(|_| format!("\"{t}\" não é um horário (hh:mm) nem um número"))
+    parse_number(t).map_err(|_| fx("godot-ui-arrivals-nao_e_um_horario_hh", &[("t", vx(&t))]))
 }
 
 fn parse_count(text: &str) -> Result<u64, String> {
@@ -213,7 +214,10 @@ fn parse_count(text: &str) -> Result<u64, String> {
     }
     let v = parse_number(t)?;
     if v < 0.0 || v.fract() != 0.0 {
-        return Err(format!("quantidade \"{t}\": um inteiro >= 0"));
+        return Err(fx(
+            "godot-ui-arrivals-quantidade_um_inteiro_0",
+            &[("t", vx(&t))],
+        ));
     }
     Ok(v as u64)
 }
@@ -249,12 +253,25 @@ pub fn parse_labels(text: &str) -> Result<BTreeMap<String, f64>, String> {
         let (name, value) = part
             .split_once('=')
             .or_else(|| part.split_once(':'))
-            .ok_or_else(|| format!("rótulo \"{part}\": use nome=valor"))?;
+            .ok_or_else(|| {
+                fx(
+                    "godot-ui-arrivals-rotulo_use_nome_valor",
+                    &[("part", vx(&part))],
+                )
+            })?;
         let name = name.trim().trim_matches('"');
         if name.is_empty() {
-            return Err(format!("rótulo \"{part}\" sem nome"));
+            return Err(fx(
+                "godot-ui-arrivals-rotulo_sem_nome",
+                &[("part", vx(&part))],
+            ));
         }
-        let v = parse_number(value).map_err(|e| format!("rótulo {name}: {e}"))?;
+        let v = parse_number(value).map_err(|e| {
+            fx(
+                "godot-ui-arrivals-rotulo",
+                &[("name", vx(&name)), ("e", vx(&e))],
+            )
+        })?;
         out.insert(name.to_string(), v);
     }
     Ok(out)
@@ -312,8 +329,14 @@ pub fn set_mode(t: &ArrivalTable, mode: TableMode, default: &Dist) -> ArrivalTab
 /// The repetitions a mode accepts: `(value, label)`.
 pub fn repeat_choices(mode: TableMode) -> Vec<(&'static str, &'static str)> {
     match mode {
-        TableMode::Times => vec![("Once", "Uma vez"), ("Cycle", "A cada ciclo")],
-        TableMode::Sequence => vec![("Once", "Uma vez"), ("Loop", "Volta ao início")],
+        TableMode::Times => vec![
+            ("Once", tx("godot-ui-arrivals-uma_vez")),
+            ("Cycle", tx("godot-ui-arrivals-a_cada_ciclo")),
+        ],
+        TableMode::Sequence => vec![
+            ("Once", tx("godot-ui-arrivals-uma_vez")),
+            ("Loop", tx("godot-ui-arrivals-volta_ao_inicio")),
+        ],
     }
 }
 
@@ -408,23 +431,32 @@ pub fn totals(t: &ArrivalTable) -> Totals {
 pub fn totals_text(t: &ArrivalTable) -> String {
     let s = totals(t);
     let per = match (t.mode, t.repeat) {
-        (TableMode::Times, TableRepeat::Cycle(d)) => {
-            format!("por ciclo de {}", time_span_text(d))
-        }
-        (_, TableRepeat::Loop) => "por volta".to_string(),
-        _ => "no total".to_string(),
+        (TableMode::Times, TableRepeat::Cycle(d)) => fx(
+            "godot-ui-arrivals-por_ciclo_de",
+            &[("d", vx(&time_span_text(d)))],
+        ),
+        (_, TableRepeat::Loop) => tx("godot-ui-arrivals-por_volta").to_string(),
+        _ => tx("godot-ui-arrivals-no_total").to_string(),
     };
-    let mut text = format!(
-        "{} {} {per} em {} linha(s)",
-        s.items,
-        if s.items == 1 { "item" } else { "itens" },
-        s.rows
+    let mut text = fx(
+        "godot-ui-arrivals-em_linha_s",
+        &[
+            ("items", vx(&s.items)),
+            ("per", vx(&per)),
+            ("rows", vx(&s.rows)),
+        ],
     );
     if s.by_type.len() > 1 || s.by_type.iter().any(|(k, _)| k.is_some()) {
         let parts: Vec<String> = s
             .by_type
             .iter()
-            .map(|(k, n)| format!("{}: {n}", k.as_deref().unwrap_or("tipo da fonte")))
+            .map(|(k, n)| {
+                format!(
+                    "{}: {n}",
+                    k.as_deref()
+                        .unwrap_or(tx("godot-ui-arrivals-tipo_da_fonte"))
+                )
+            })
             .collect();
         text.push_str(&format!(" ({})", parts.join(", ")));
     }
@@ -434,8 +466,10 @@ pub fn totals_text(t: &ArrivalTable) -> String {
 /// A length of time: the number, with the day or week it is when the unit is known.
 fn time_span_text(d: f64) -> String {
     match unit_of_cycle(d) {
-        Some(u) if (d / u.per_hour() - 24.0).abs() < 1e-9 => format!("{} (um dia)", num_text(d)),
-        Some(_) => format!("{} (uma semana)", num_text(d)),
+        Some(u) if (d / u.per_hour() - 24.0).abs() < 1e-9 => {
+            fx("godot-ui-arrivals-um_dia", &[("d", vx(&num_text(d)))])
+        }
+        Some(_) => fx("godot-ui-arrivals-uma_semana", &[("d", vx(&num_text(d)))]),
         None => num_text(d),
     }
 }
@@ -507,7 +541,7 @@ pub fn parse_paste(
         .map(|(k, l)| (k + 1, l))
         .collect();
     let Some(&(_, first)) = lines.first() else {
-        return Err("nada para colar: copie as linhas da planilha".into());
+        return Err(tx("godot-ui-arrivals-nada_para_colar_copie_as").into());
     };
     let head = cells(first);
     let is_value =
@@ -525,7 +559,7 @@ pub fn parse_paste(
     };
     let mut rows = Vec::new();
     for &(n, line) in body {
-        let fail = |e: String| format!("linha {n}: {e}");
+        let fail = |e: String| fx("godot-ui-arrivals-linha", &[("n", vx(&n)), ("e", vx(&e))]);
         let mut row = ArrivalRow {
             at: None,
             count: 1,
@@ -566,12 +600,14 @@ pub fn parse_paste(
             }
         }
         if mode == TableMode::Times && row.at.is_none() {
-            return Err(fail("falta o instante (modo horário)".into()));
+            return Err(fail(
+                tx("godot-ui-arrivals-falta_o_instante_modo_horario").into(),
+            ));
         }
         rows.push(row);
     }
     if rows.is_empty() {
-        return Err("só o cabeçalho: nenhuma linha para colar".into());
+        return Err(tx("godot-ui-arrivals-so_o_cabecalho_nenhuma_linha").into());
     }
     Ok(rows)
 }
@@ -896,7 +932,7 @@ pub fn field(
         }
         let r = ui
             .add(Button::new("{ }").selected(text_on))
-            .on_hover_text("Editar como texto (RON)");
+            .on_hover_text(tx("godot-ui-arrivals-editar_como_texto_ron"));
         named_toggle(ui, reg, &format!("{name}_texto"), &r, "{ }", text_on);
         if r.clicked() {
             if text_on {
@@ -953,16 +989,18 @@ fn table_editor(
 
     // Mode and repetition.
     ui.horizontal(|ui| {
-        ui.label(small("Modo"));
+        ui.label(small(tx("godot-ui-arrivals-modo")));
         if let Some(m) = choose(
             ui,
             reg,
             &format!("{p}_modo"),
             if times { "Times" } else { "Sequence" },
-            &[("Times", "Horário"), ("Sequence", "Sequência")],
+            &[
+                ("Times", tx("godot-ui-arrivals-horario")),
+                ("Sequence", tx("godot-ui-arrivals-sequencia")),
+            ],
             110.0,
-            "Horário: cada linha no seu instante. Sequência: uma linha por chegada, com o \
-             tempo entre chegadas da fonte entre elas.",
+            tx("godot-ui-arrivals-horario_cada_linha_no_seu"),
         ) {
             let mode = if m == "Sequence" {
                 TableMode::Sequence
@@ -972,7 +1010,7 @@ fn table_editor(
             work = set_mode(&work, mode, &default);
             changed = true;
         }
-        ui.label(small("Repetir"));
+        ui.label(small(tx("godot-ui-arrivals-repetir")));
         let choices = repeat_choices(t.mode);
         if let Some(r) = choose(
             ui,
@@ -990,7 +1028,7 @@ fn table_editor(
     if let Some(d) = cycle {
         let unit = unit_of_cycle(d).map_or(String::new(), |u| format!("({})", u.name()));
         ui.horizontal(|ui| {
-            ui.label(small("Ciclo"));
+            ui.label(small(tx("godot-ui-arrivals-ciclo")));
             let name = format!("{p}_ciclo");
             if let Some(typed) = line_edit(ui, st, reg, &name, &num_text(d), 80.0, false, "") {
                 match parse_number(&typed) {
@@ -1019,8 +1057,8 @@ fn table_editor(
     // The grid.
     let types: Vec<(String, String, String)> = std::iter::once((
         String::new(),
-        "(da fonte)".to_string(),
-        "O tipo da fonte".to_string(),
+        tx("godot-ui-arrivals-da_fonte").to_string(),
+        tx("godot-ui-arrivals-o_tipo_da_fonte").to_string(),
     ))
     .chain(
         f.choices
@@ -1097,7 +1135,7 @@ fn table_editor(
                 &selected,
                 &choices,
                 wt - COMBO_SLACK,
-                "Tipo de item da linha",
+                tx("godot-ui-arrivals-tipo_de_item_da_linha"),
             ) {
                 work.rows[k].item_type = (!ty.is_empty()).then_some(ty);
                 changed = true;
@@ -1129,7 +1167,7 @@ fn table_editor(
                 reg,
                 &format!("{line}_subir"),
                 "↑",
-                "Subir a linha",
+                tx("godot-ui-arrivals-subir_a_linha"),
                 k > 0,
             ) {
                 op = Some(RowOp::Move(k, -1));
@@ -1139,7 +1177,7 @@ fn table_editor(
                 reg,
                 &format!("{line}_descer"),
                 "↓",
-                "Descer a linha",
+                tx("godot-ui-arrivals-descer_a_linha"),
                 k + 1 < n,
             ) {
                 op = Some(RowOp::Move(k, 1));
@@ -1149,7 +1187,7 @@ fn table_editor(
                 reg,
                 &format!("{line}_remover"),
                 "×",
-                "Remover a linha",
+                tx("godot-ui-arrivals-remover_a_linha"),
                 true,
             ) {
                 op = Some(RowOp::Remove(k));
@@ -1183,17 +1221,20 @@ fn table_editor(
     // Buttons of the table.
     ui.horizontal_wrapped(|ui| {
         let r = ui
-            .button("+ Linha")
-            .on_hover_text("Acrescenta uma linha no fim");
+            .button(tx("godot-ui-arrivals-linha-2"))
+            .on_hover_text(tx("godot-ui-arrivals-acrescenta_uma_linha_no_fim"));
         named(ui, reg, &format!("{p}_mais"), &r, "+ Linha");
         if r.clicked() {
             work = add_row(&work, &default);
             changed = true;
         }
         let r = ui
-            .add_enabled(times && !is_sorted(t), Button::new("Ordenar por instante"))
-            .on_hover_text("Põe as linhas em ordem de instante")
-            .on_disabled_hover_text("As linhas já estão em ordem (ou é uma sequência)");
+            .add_enabled(
+                times && !is_sorted(t),
+                Button::new(tx("godot-ui-arrivals-ordenar_por_instante")),
+            )
+            .on_hover_text(tx("godot-ui-arrivals-poe_as_linhas_em_ordem"))
+            .on_disabled_hover_text(tx("godot-ui-arrivals-as_linhas_ja_estao_em"));
         named(ui, reg, &format!("{p}_ordenar"), &r, "Ordenar por instante");
         if r.clicked() {
             work = sort_rows(&work);
@@ -1202,8 +1243,8 @@ fn table_editor(
         }
         let open = st.arrivals.paste_open;
         let r = ui
-            .add(Button::new("Colar da planilha").selected(open))
-            .on_hover_text("Linhas copiadas de uma planilha (separadas por tabulação ou ;)");
+            .add(Button::new(tx("godot-ui-arrivals-colar_da_planilha")).selected(open))
+            .on_hover_text(tx("godot-ui-arrivals-linhas_copiadas_de_uma_planilha"));
         named_toggle(
             ui,
             reg,
@@ -1218,9 +1259,9 @@ fn table_editor(
     });
     if st.arrivals.paste_open {
         let hint = if times {
-            "hora; qtd; tipo; rótulo...\n08:00; 12; caixa; prioridade=2"
+            tx("godot-ui-arrivals-hora_qtd_tipo_rotulo_08")
         } else {
-            "qtd; tipo; rótulo...\n2; caixa; prioridade=2"
+            tx("godot-ui-arrivals-qtd_tipo_rotulo_2_caixa")
         };
         let mut buf = std::mem::take(&mut st.arrivals.paste);
         let r = ui.add(
@@ -1236,8 +1277,12 @@ fn table_editor(
         let mut pasted = None;
         ui.horizontal(|ui| {
             for (what, label, replace) in [
-                ("substituir", "Substituir as linhas", true),
-                ("acrescentar", "Acrescentar", false),
+                (
+                    "substituir",
+                    tx("godot-ui-arrivals-substituir_as_linhas"),
+                    true,
+                ),
+                ("acrescentar", tx("godot-ui-arrivals-acrescentar"), false),
             ] {
                 let r = ui.add_enabled(!st.arrivals.paste.trim().is_empty(), Button::new(label));
                 named(ui, reg, &format!("{p}_colar_{what}"), &r, label);
@@ -1277,8 +1322,8 @@ fn table_editor(
     // Preview.
     let open = st.arrivals.preview;
     let r = ui
-        .add(Button::new("Ver as primeiras chegadas").selected(open))
-        .on_hover_text("Histograma das chegadas de um ciclo (ou uma volta), por hora e por tipo");
+        .add(Button::new(tx("godot-ui-arrivals-ver_as_primeiras_chegadas")).selected(open))
+        .on_hover_text(tx("godot-ui-arrivals-histograma_das_chegadas_de_um"));
     named_toggle(
         ui,
         reg,
@@ -1323,11 +1368,14 @@ fn run_or_estimate(
     let (h, note) = match ran {
         Some(Ok(h)) => (
             h,
-            "Simulado: só a fonte, ligada a uma saída, por um ciclo.".to_owned(),
+            tx("godot-ui-arrivals-simulado_so_a_fonte_ligada").to_owned(),
         ),
         Some(Err(e)) => (
             estimate(),
-            format!("Estimado pela tabela (a fonte sozinha não rodou: {e})."),
+            fx(
+                "godot-ui-arrivals-estimado_pela_tabela_a_fonte",
+                &[("e", vx(&e))],
+            ),
         ),
         None => {
             if st.arrivals.run.as_ref().is_none_or(|r| r.0 != key) {
@@ -1337,7 +1385,7 @@ fn run_or_estimate(
             }
             (
                 estimate(),
-                "Estimado pela tabela; rodando a fonte...".to_owned(),
+                tx("godot-ui-arrivals-estimado_pela_tabela_rodando_a").to_owned(),
             )
         }
     };
@@ -1387,7 +1435,13 @@ fn histogram(ui: &mut Ui, reg: &mut Registry, name: &str, h: &Histogram) {
         reg,
         name,
         &resp,
-        &format!("máximo {} por {bin_label}", num_text(max)),
+        &fx(
+            "godot-ui-arrivals-maximo_por",
+            &[
+                ("num_text", vx(&num_text(max))),
+                ("bin_label", vx(&bin_label)),
+            ],
+        ),
     );
     if let Some(w) = reg.read(name).cloned() {
         reg.put_info(
@@ -1402,15 +1456,24 @@ fn histogram(ui: &mut Ui, reg: &mut Registry, name: &str, h: &Histogram) {
         for (j, ty) in h.types.iter().enumerate() {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(10.0), Sense::hover());
             ui.painter().rect_filled(r, 2.0, type_color(j, ty));
-            ui.label(small(ty.as_deref().unwrap_or("tipo da fonte")));
+            ui.label(small(
+                ty.as_deref()
+                    .unwrap_or(tx("godot-ui-arrivals-tipo_da_fonte")),
+            ));
         }
-        ui.label(small(&format!(
-            "por {bin_label} ({}); instantes da tabela, sem rodar o modelo",
-            if h.hours {
-                "eixo de 0 ao fim do ciclo".to_string()
-            } else {
-                format!("{} por faixa", num_text(h.bin))
-            }
+        ui.label(small(&fx(
+            "godot-ui-arrivals-por_instantes_da_tabela_sem",
+            &[
+                ("bin_label", vx(&bin_label)),
+                (
+                    "bin",
+                    vx(&if h.hours {
+                        "eixo de 0 ao fim do ciclo".to_string()
+                    } else {
+                        format!("{} por faixa", num_text(h.bin))
+                    }),
+                ),
+            ],
         )));
     });
 }
@@ -1432,7 +1495,7 @@ fn schedule_editor(
 
     // Cycle.
     ui.horizontal(|ui| {
-        ui.label(small("Ciclo"));
+        ui.label(small(tx("godot-ui-arrivals-ciclo")));
         let name = format!("{p}_ciclo");
         if let Some(typed) = line_edit(ui, st, reg, &name, &num_text(s.cycle), 80.0, false, "") {
             match parse_number(&typed) {
@@ -1447,8 +1510,11 @@ fn schedule_editor(
             }
         }
         let note = match unit {
-            Some(u) => format!("{} (horários em hh:mm, taxas por hora)", u.name()),
-            None => "unidade do modelo".to_string(),
+            Some(u) => fx(
+                "godot-ui-arrivals-horarios_em_hh_mm_taxas",
+                &[("name", vx(&u.name()))],
+            ),
+            None => tx("godot-ui-arrivals-unidade_do_modelo").to_string(),
         };
         ui.label(small(&note));
     });
@@ -1535,7 +1601,7 @@ fn schedule_editor(
     );
     let band_tip = match hovered {
         Some(k) => period_text(s, k, &default),
-        None => "Fora dos períodos a fonte não cria itens".to_string(),
+        None => tx("godot-ui-arrivals-fora_dos_periodos_a_fonte").to_string(),
     };
     let resp = resp.on_hover_text(band_tip);
     named(
@@ -1543,7 +1609,10 @@ fn schedule_editor(
         reg,
         &format!("{p}_faixa"),
         &resp,
-        &format!("{} período(s)", s.periods.len()),
+        &fx(
+            "godot-ui-arrivals-periodo_s",
+            &[("periods", vx(&s.periods.len()))],
+        ),
     );
     // Ticks: start, quarters and end of the cycle.
     ui.horizontal(|ui| {
@@ -1583,9 +1652,9 @@ fn schedule_editor(
         head(
             ui,
             if unit.is_some() {
-                "itens/h ou distribuição"
+                tx("godot-ui-arrivals-itens_h_ou_distribuicao")
             } else {
-                "taxa ou distribuição"
+                tx("godot-ui-arrivals-taxa_ou_distribuicao")
             },
             wv + EDIT_SLACK,
         );
@@ -1634,8 +1703,7 @@ fn schedule_editor(
                 MODE_IDS[mode],
                 &choices,
                 wm - COMBO_SLACK,
-                "Padrão: o tempo entre chegadas da fonte. Distribuição: um tempo entre chegadas \
-                 próprio. Taxa: chegadas de Poisson. Fechado: sem chegadas.",
+                tx("godot-ui-arrivals-padrao_o_tempo_entre_chegadas"),
             ) {
                 let index = MODE_IDS.iter().position(|x| *x == m).unwrap_or(0);
                 work.periods[k].arrivals = switch_mode(&per.arrivals, index, &default);
@@ -1669,20 +1737,27 @@ fn schedule_editor(
                                 changed = true;
                             }
                             Err(e) => {
-                                st.arrivals
-                                    .cell_errors
-                                    .insert(name, format!("distribuição: {e}"));
+                                st.arrivals.cell_errors.insert(
+                                    name,
+                                    fx("godot-ui-arrivals-distribuicao", &[("e", vx(&e))]),
+                                );
                             }
                         }
                     }
                 }
                 PeriodArrivals::Default => {
-                    let text = format!("média {}", num_text(default.mean()));
+                    let text = fx(
+                        "godot-ui-arrivals-media",
+                        &[("mean", vx(&num_text(default.mean())))],
+                    );
                     let r = ui.add_sized([wv, 22.0], Label::new(small(&text)));
                     named(ui, reg, &name, &r, &text);
                 }
                 PeriodArrivals::Closed => {
-                    let r = ui.add_sized([wv, 22.0], Label::new(small("sem chegadas")));
+                    let r = ui.add_sized(
+                        [wv, 22.0],
+                        Label::new(small(tx("godot-ui-arrivals-sem_chegadas"))),
+                    );
                     named(ui, reg, &name, &r, "sem chegadas");
                 }
             }
@@ -1691,7 +1766,7 @@ fn schedule_editor(
                 reg,
                 &format!("{line}_remover"),
                 "×",
-                "Remover o período",
+                tx("godot-ui-arrivals-remover_o_periodo"),
                 true,
             ) {
                 remove = Some(k);
@@ -1714,9 +1789,9 @@ fn schedule_editor(
     }
     let next = next_period(s);
     let r = ui
-        .add_enabled(next.is_some(), Button::new("+ Período"))
-        .on_hover_text("Acrescenta um período depois do último")
-        .on_disabled_hover_text("O último período já vai até o fim do ciclo");
+        .add_enabled(next.is_some(), Button::new(tx("godot-ui-arrivals-periodo")))
+        .on_hover_text(tx("godot-ui-arrivals-acrescenta_um_periodo_depois_do"))
+        .on_disabled_hover_text(tx("godot-ui-arrivals-o_ultimo_periodo_ja_vai"));
     named(ui, reg, &format!("{p}_mais"), &r, "+ Período");
     if r.clicked()
         && let Some(per) = next
@@ -1736,9 +1811,9 @@ fn schedule_editor(
         expected_chart(ui, reg, &format!("{p}_grafico"), s, &exp);
     }
     let total: f64 = exp.iter().sum();
-    let text = format!(
-        "Esperado por ciclo: {} chegadas",
-        num_text((total * 10.0).round() / 10.0)
+    let text = fx(
+        "godot-ui-arrivals-esperado_por_ciclo_chegadas",
+        &[("total", vx(&num_text((total * 10.0).round() / 10.0)))],
     );
     let r = ui.add(Label::new(RichText::new(&text).color(colors::TEXT_WEAK)).wrap());
     named(ui, reg, &format!("{p}_total"), &r, &text);
@@ -1753,20 +1828,37 @@ fn period_text(s: &ArrivalSchedule, k: usize, default: &Dist) -> String {
     let per = &s.periods[k];
     let cycle = Some(s.cycle);
     let how = match &per.arrivals {
-        PeriodArrivals::Default => format!("padrão (média {})", num_text(default.mean())),
-        PeriodArrivals::Interarrival(d) => format!("distribuição {}", ron::dist(d)),
+        PeriodArrivals::Default => fx(
+            "godot-ui-arrivals-padrao_media",
+            &[("mean", vx(&num_text(default.mean())))],
+        ),
+        PeriodArrivals::Interarrival(d) => fx(
+            "godot-ui-arrivals-distribuicao-2",
+            &[("d", vx(&ron::dist(d)))],
+        ),
         PeriodArrivals::Rate(r) => match unit_of_cycle(s.cycle) {
-            Some(_) => format!("taxa {} itens/h", num_text(rate_shown(*r, s.cycle))),
-            None => format!("taxa {}", num_text(*r)),
+            Some(_) => fx(
+                "godot-ui-arrivals-taxa_itens_h",
+                &[("cycle", vx(&num_text(rate_shown(*r, s.cycle))))],
+            ),
+            None => fx("godot-ui-arrivals-taxa", &[("num_text", vx(&num_text(*r)))]),
         },
         PeriodArrivals::Closed => "fechado".into(),
     };
-    format!(
-        "Período {}: {} a {}, {how}; esperadas {}",
-        k + 1,
-        time_text(per.start, cycle),
-        time_text(per.end, cycle),
-        num_text((s.expected_in_period(k, default) * 10.0).round() / 10.0)
+    fx(
+        "godot-ui-arrivals-periodo_a_esperadas",
+        &[
+            ("k", vx(&(k + 1))),
+            ("cycle", vx(&time_text(per.start, cycle))),
+            ("cycle2", vx(&time_text(per.end, cycle))),
+            ("how", vx(&how)),
+            (
+                "default",
+                vx(&num_text(
+                    (s.expected_in_period(k, default) * 10.0).round() / 10.0,
+                )),
+            ),
+        ],
     )
 }
 
@@ -1805,9 +1897,14 @@ fn expected_chart(ui: &mut Ui, reg: &mut Registry, name: &str, s: &ArrivalSchedu
             colors::TEXT_WEAK,
         );
     }
-    let resp = resp
-        .on_hover_text("Chegadas esperadas em cada período (taxa × duração, ou duração ÷ média)");
-    named(ui, reg, name, &resp, &format!("{} barra(s)", exp.len()));
+    let resp = resp.on_hover_text(tx("godot-ui-arrivals-chegadas_esperadas_em_cada_periodo"));
+    named(
+        ui,
+        reg,
+        name,
+        &resp,
+        &fx("godot-ui-arrivals-barra_s", &[("exp", vx(&exp.len()))]),
+    );
     if let Some(w) = reg.read(name).cloned() {
         reg.put_info(
             name,
@@ -1920,7 +2017,7 @@ pub fn run_preview(model: &Model, source: &str) -> Result<Histogram, String> {
         .objects
         .iter()
         .find(|o| o.name == source)
-        .ok_or_else(|| format!("'{source}' não existe"))?;
+        .ok_or_else(|| fx("godot-ui-arrivals-nao_existe", &[("source", vx(&source))]))?;
     let ObjectKind::Source {
         interarrival,
         schedule,
@@ -1929,7 +2026,10 @@ pub fn run_preview(model: &Model, source: &str) -> Result<Histogram, String> {
         ..
     } = &obj.kind
     else {
-        return Err(format!("'{source}' não é uma chegada"));
+        return Err(fx(
+            "godot-ui-arrivals-nao_e_uma_chegada",
+            &[("source", vx(&source))],
+        ));
     };
     // The span and the bins: those of the table's preview, else the schedule's cycle.
     let (bin, n, hours) = match (table, schedule) {
@@ -2148,7 +2248,7 @@ mod tests {
         );
         assert_eq!(
             totals_text(&t),
-            "25 itens por ciclo de 1440 (um dia) em 3 linha(s) (caixa: 20, palete: 5)"
+            "25 itens por ciclo de 1440 (um dia) em 3 linhas (caixa: 20, palete: 5)"
         );
         let mut seq = set_mode(&t, TableMode::Sequence, &Dist::Const(30.0));
         seq.rows[1].item_type = None;

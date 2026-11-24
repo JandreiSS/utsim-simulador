@@ -25,6 +25,7 @@ use serde_json::Value;
 use utsim_ui_tema::{colors, sizes};
 
 use crate::egui_widgets::Registry;
+use crate::texto::tx;
 use crate::ui_props::{named, named_list, named_toggle};
 
 /// One line of the panel.
@@ -480,6 +481,26 @@ pub fn parse_dialog(json: &str) -> Option<Dialog> {
     .filter(|d| !d.title.is_empty() || !d.text.is_empty())
 }
 
+/// The text of a dialog the GDScript side sends in Portuguese, in the language of now:
+/// the question of unsaved changes and the shortcuts window. Any other text passes as is.
+fn dialog_text(s: &str) -> String {
+    match s {
+        "Descartar mudanças?" => tx("godot-dialogo-descartar-titulo"),
+        "O modelo tem mudanças que não foram salvas. Descartar?" => {
+            tx("godot-dialogo-descartar-texto")
+        }
+        "Descartar" => tx("godot-dialogo-descartar"),
+        "Voltar" => tx("godot-dialogo-voltar"),
+        "Atalhos" => tx("godot-dialogo-atalhos"),
+        "Fechar" => tx("godot-dialogo-fechar"),
+        "Mostra ou oculta as medidas de desempenho sobre a vista 3D" => {
+            tx("godot-dialogo-desempenho")
+        }
+        other => return other.to_string(),
+    }
+    .to_string()
+}
+
 /// Draws `d` as an egui modal; the action of the button pressed (`dialogo:<action>`).
 pub fn show_dialog(ctx: &egui::Context, d: &Dialog, reg: &mut Registry) -> Option<String> {
     let mut picked = None;
@@ -495,13 +516,13 @@ pub fn show_dialog(ctx: &egui::Context, d: &Dialog, reg: &mut Registry) -> Optio
             ui.set_min_width(320.0);
             ui.spacing_mut().item_spacing.y = 10.0;
             ui.label(
-                RichText::new(&d.title)
+                RichText::new(dialog_text(&d.title))
                     .size(sizes::HEADING)
                     .strong()
                     .color(colors::HEADING),
             );
             if !d.text.is_empty() {
-                ui.add(Label::new(RichText::new(&d.text).color(colors::TEXT)).wrap());
+                ui.add(Label::new(RichText::new(dialog_text(&d.text)).color(colors::TEXT)).wrap());
             }
             if !d.lines.is_empty() {
                 let h = (screen.height() - 220.0).clamp(120.0, 520.0);
@@ -516,7 +537,12 @@ pub fn show_dialog(ctx: &egui::Context, d: &Dialog, reg: &mut Registry) -> Optio
                             .show(ui, |ui| {
                                 for (k, v) in &d.lines {
                                     ui.label(RichText::new(k).color(colors::ACCENT));
-                                    ui.add(Label::new(RichText::new(v).color(colors::TEXT)).wrap());
+                                    ui.add(
+                                        Label::new(
+                                            RichText::new(dialog_text(v)).color(colors::TEXT),
+                                        )
+                                        .wrap(),
+                                    );
                                     ui.end_row();
                                 }
                             });
@@ -526,6 +552,7 @@ pub fn show_dialog(ctx: &egui::Context, d: &Dialog, reg: &mut Registry) -> Optio
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 // Right to left: the primary (first) button ends at the right.
                 for (k, (name, label, action)) in d.buttons.iter().enumerate() {
+                    let label = &dialog_text(label);
                     let r = if k == 0 {
                         ui.add(utsim_ui_tema::widgets::primary(label))
                     } else {

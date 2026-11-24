@@ -763,3 +763,801 @@ godot-ui-props-desce_esta_saida_na_ordem = Desce esta saída na ordem das portas
 godot-ui-props-remover = Remover
 godot-ui-props-remove_esta_ligacao = Remove esta ligação
 godot-ui-props-entradas = Entradas: { $inputs }
+
+## Rodada 13: janelas do UTSim 3D
+
+## dados.rs
+
+godot-dados-criterio_desconhecido = critério desconhecido: { $other }
+godot-dados-use_um_arquivo_ou_valores = use um arquivo ou valores colados, não os dois
+godot-dados-escolha_um_arquivo_de_dados = escolha um arquivo de dados ou cole os valores
+godot-dados-registro_reaproveitado = registro reaproveitado
+godot-dados-dados_mudaram = dados mudaram
+godot-dados-opcoes_mudaram = opções mudaram
+godot-dados-dados_ilegiveis = dados ilegíveis
+godot-dados-os_dados_mudaram_desde_o = os dados mudaram desde o último ajuste (era { $old_family }, hash { $old_hash })
+godot-dados-nao_foi_possivel_ler = não foi possível ler { $path }: { $e }
+godot-dados-nenhum_campo_do_modelo_usa = nenhum campo do modelo usa dados reais
+godot-dados-nao_foi_possivel_gravar_em = não foi possível gravar em { $dir }: { $e }
+
+## document.rs
+
+godot-document-transportadores_e_despachantes_nao_usam = Transportadores e despachantes não usam ligações de fluxo: arraste do nó laranja deles até a máquina que operam (ou até o objeto cujos itens levam).
+godot-document-objeto_nao_existe = objeto '{ $n }' não existe
+godot-document-arraste_de_um_objeto_ate = arraste de um objeto até outro
+godot-document-saiu_da_equipe_de = { $to } saiu da equipe de { $from }.
+godot-document-entrou_na_equipe_de = { $to } entrou na equipe de { $from }.
+godot-document-nao_pede_mais_operadores_de = { $from } não pede mais operadores de { $to }.
+godot-document-pede_operadores_de = { $from } pede operadores de { $to }.
+godot-document-nao_pede_mais_transporte_a = { $from } não pede mais transporte a { $to }.
+godot-document-pede_transporte_a = { $from } pede transporte a { $to }.
+godot-document-arraste_do_despachante_a_um = arraste do despachante a um transportador, ou de um objeto ao transportador ou despachante que o atende
+godot-document-a_serie_e_os_histogramas = a série e os histogramas já estão ligados no modelo
+godot-document-desenhe_clicando_os_nos_no = desenhe clicando os nós no chão (Enter termina)
+godot-document-tipo_desconhecido = tipo desconhecido: { $id }
+godot-document-nada_selecionado = nada selecionado
+godot-document-nao_ha_para_onde_mover = não há para onde mover esta ligação
+godot-document-nenhum_arrasto_comecou = nenhum arrasto começou
+godot-document-objeto_nao_existe-2 = objeto '{ $name }' não existe
+godot-document-e_um_recurso_movel_ele = { $name } é um recurso móvel: ele vira para onde anda
+godot-document-recursos_moveis_nao_giram_eles = recursos móveis não giram: eles viram para onde andam
+godot-document-a_area_de_transferencia_esta = a área de transferência está vazia (Ctrl+C copia)
+godot-document-alinhamento_desconhecido = alinhamento desconhecido: { $how }
+godot-document-selecione_dois_objetos_ou_mais = selecione dois objetos ou mais para alinhar
+godot-document-eixo_desconhecido = eixo desconhecido: { $axis }
+godot-document-selecione_tres_objetos_ou_mais = selecione três objetos ou mais para distribuir
+godot-document-nao_tem_distribuicao = '{ $field }' não tem distribuição
+godot-document-modelo = Modelo
+godot-document-nome_em_vez_de = nome: { $name } em vez de { $name2 }
+godot-document-descricao_em_vez_de = descrição: { $description } em vez de { $description2 }
+godot-document-run_em_vez_de = run: { $run } em vez de { $run2 }
+godot-document-falta_o_objeto = falta o objeto { $name }
+godot-document-objeto_em_vez_de = objeto { $name }: { $g } em vez de { $w }
+godot-document-objeto_a_mais = objeto a mais: { $name }
+godot-document-ligacoes_em_vez_de = ligações: { $connections } em vez de { $connections2 }
+godot-document-outras_partes_do_modelo_calendarios = outras partes do modelo (calendários, rede, fluxos, fluidos) diferem
+godot-document-clique = Clique
+godot-document-seleciona_o_bloco_ou_a = seleciona o bloco ou a ligação
+godot-document-clique_de_novo_no_mesmo = Clique de novo no mesmo ponto
+godot-document-passa_para_o_proximo_bloco = passa para o próximo bloco sobreposto
+godot-document-poe_ou_tira_o_bloco = põe ou tira o bloco da seleção
+godot-document-shift_arrastar_no_chao = Shift + arrastar no chão
+godot-document-selecao_por_caixa_soma_a = seleção por caixa (soma à seleção)
+godot-document-arrastar_no_chao = Arrastar no chão
+godot-document-selecao_por_caixa_troca_a = seleção por caixa (troca a seleção)
+godot-document-arrastar_um_bloco = Arrastar um bloco
+godot-document-move_o_bloco_ou_a = move o bloco ou a seleção inteira
+godot-document-arrastar_da_porta_de_saida = Arrastar da porta de saída (verde)
+godot-document-liga_ao_bloco_ou_a = liga ao bloco (ou à porta de entrada) onde soltar
+godot-document-botao_direito_arrastar = Botão direito + arrastar
+godot-document-gira_a_vista = gira a vista
+godot-document-shift_botao_direito_arrastar = Shift + botão direito + arrastar
+godot-document-desloca_a_vista = desloca a vista
+godot-document-roda_do_mouse = Roda do mouse
+godot-document-aproxima_e_afasta = aproxima e afasta
+godot-document-biblioteca_clique_e_clique_no = Biblioteca: clique e clique no chão
+godot-document-coloca_um_objeto_shift_mantem = coloca um objeto (Shift mantém a ferramenta)
+godot-document-biblioteca_arrastar_ate_o_chao = Biblioteca: arrastar até o chão
+godot-document-coloca_um_objeto_onde_soltar = coloca um objeto onde soltar
+godot-document-setas = Setas
+godot-document-move_a_selecao_um_passo = move a seleção um passo da grade
+godot-document-girar_90_anti_horario_visto = girar 90° (anti-horário visto de cima)
+godot-document-girar_90_horario = girar −90° (horário)
+godot-document-girar_15_15 = girar 15° / −15°
+godot-document-arrastar_a_alca_de_giro = Arrastar a alça de giro (roxa)
+godot-document-gira_o_objeto_selecionado_em = gira o objeto selecionado em passos de 15° (com Shift, 90°)
+godot-document-exclui_a_selecao_ou_a = exclui a seleção (ou a ligação selecionada)
+godot-document-ferramenta_ligar_arraste_da_origem = ferramenta Ligar: arraste da origem ao destino, ou clique e clique
+godot-document-ferramenta_corredor_clique_pontos_no = ferramenta Corredor: clique pontos no chão, Enter ou duplo clique termina
+godot-document-ferramenta_zona_zonas_de_risco = ferramenta Zona: zonas de risco no piso; clique os cantos, Enter ou o primeiro ponto fecha
+godot-document-e_ou_alt_com_ligar = E (ou Alt com Ligar)
+godot-document-ferramenta_equipe_arraste_do_despachante = ferramenta Equipe: arraste do despachante ao transportador, ou do objeto a quem leva os itens (Shift: operadores do processo)
+godot-document-cancela_a_ferramenta_a_ligacao = cancela a ferramenta, a ligação ou o corredor começado, ou a seleção
+godot-document-simular_clique_num_objeto = Simular: clique num objeto
+godot-document-abre_o_painel_de_resultados = abre o painel de resultados ao vivo do objeto no canto da vista
+godot-document-simular_esc = Simular: Esc
+godot-document-fecha_o_painel_ao_vivo = fecha o painel ao vivo mais recente (o não fixado primeiro)
+godot-document-f_editar_ou_home = F (Editar) ou Home
+godot-document-enquadra_o_modelo = enquadra o modelo
+godot-document-simular_f = Simular: F
+godot-document-anda_pela_fabrica_em_primeira = anda pela fábrica em primeira pessoa: WASD anda, o mouse olha, Shift corre, E/Q sobe e desce, V voa, a roda muda a velocidade, o clique na mira abre o painel, Esc sai
+godot-document-liga_ou_desliga_o_encaixe = liga ou desliga o encaixe na grade
+godot-document-alterna_entre_editar_e_simular = alterna entre Editar e Simular
+godot-document-mostra_ou_esconde_esta_janela = mostra ou esconde esta janela
+godot-document-seleciona_todos_os_objetos = seleciona todos os objetos
+godot-document-copia_a_selecao = copia a seleção
+godot-document-recorta_a_selecao = recorta a seleção
+godot-document-cola_nomes_unicos_ligacoes_internas = cola (nomes únicos, ligações internas preservadas)
+godot-document-duplica_a_selecao = duplica a seleção
+godot-document-salva_como = salva como
+godot-document-abre_um_modelo = abre um modelo
+godot-document-novo_modelo = novo modelo
+
+## editor3d.rs
+
+godot-editor3d-opera = { $to } opera { $from }
+godot-editor3d-leva_os_itens_de = { $to } leva os itens de { $from }
+godot-editor3d-esta_na_equipe_de = { $to } está na equipe de { $from }
+godot-editor3d-ligacao_de = Ligação de { $k }: { $from } → { $to }
+godot-editor3d-arraste_do_no_laranja_dele = { $name }: arraste do nó laranja dele até uma máquina para que ele a opere (ou até um objeto, para levar os itens dele).
+godot-editor3d-de_clique_no_no_de = {" "}({ $next } de { $links }: clique no nó de novo para a próxima)
+godot-editor3d-ligacao_selecionada_clique_no_ou = Ligação { $a } → { $b } selecionada{ $extra }. Clique no × ou Del remove.
+godot-editor3d-esta_ligacao_se_muda_no = Esta ligação ({ $kind }) se muda no painel de propriedades de { $from }.
+godot-editor3d-ligacao_removida_ctrl_z_desfaz = Ligação { $a } → { $b } removida (Ctrl+Z desfaz).
+godot-editor3d-nenhuma_zona_selecionada_para_excluir = Nenhuma zona selecionada para excluir.
+godot-editor3d-nada_selecionado_para_excluir = Nada selecionado para excluir.
+godot-editor3d-zona_cancelada = Zona cancelada.
+godot-editor3d-ligacao_cancelada = Ligação cancelada.
+godot-editor3d-girar_arraste_em_volta_do = Girar: arraste em volta do objeto (passos de 15°; com Shift, 90°).
+godot-editor3d-solte_sobre_a_maquina_que = Solte sobre a máquina que { $res } vai operar (ou sobre um objeto, para levar os itens dele). Esc cancela.
+godot-editor3d-ligar_solte_sobre_o_destino = Ligar: solte sobre o destino (ou clique nele). Esc cancela.
+godot-editor3d-ligar_solte_sobre_a_origem = Ligar: solte sobre a origem (ou o nó de saída dela). Esc cancela.
+godot-editor3d-ligar_clique_em_um_bloco = Ligar: clique em um bloco.
+godot-editor3d-ligado_clique_em_outra_origem = Ligado: { $from } → { $to }. Clique em outra origem ou Esc.
+godot-editor3d-ligacao_selecionada_clique_no_ou-2 = Ligação { $a } → { $b } selecionada. Clique no × ou Del remove.
+godot-editor3d-clique_no_ou_del_remove = { $said }. Clique no × ou Del remove.
+godot-editor3d-de_blocos_neste_ponto_clique = { $name } ({ $index } de { $hits } blocos neste ponto: clique de novo para o próximo).
+godot-editor3d-arraste_deste_no_verde_ate = { $from }: arraste deste nó verde até o destino para ligar.
+godot-editor3d-ligar_clique_no_destino_esc = Ligar: { $from } → clique no destino (Esc cancela).
+godot-editor3d-ligado = Ligado: { $from } → { $to }.
+godot-editor3d-ligacao_cancelada_solte_sobre_o = Ligação cancelada: solte sobre o bloco de destino.
+godot-editor3d-nao_recebe_de_ninguem_arraste = { $to } não recebe de ninguém: arraste do nó de saída da origem até aqui.
+godot-editor3d-ligacao_cancelada_solte_sobre_o-2 = Ligação cancelada: solte sobre o bloco de origem.
+godot-editor3d-girado_para = { $name } girado para { $degrees }°.
+godot-editor3d-arraste_a_alca_em_volta = { $name }: arraste a alça em volta do objeto para girá-lo (R gira 90°, Ctrl+R 15°).
+godot-editor3d-objeto_s_movidos =
+    { $selected } { $selected ->
+        [one] objeto movido
+       *[other] objetos movidos
+    }.
+godot-editor3d-objeto_s_na_caixa =
+    { $inside } { $inside ->
+        [one] objeto na caixa
+       *[other] objetos na caixa
+    }.
+godot-editor3d-nada_mudou_solte_sobre_a = Nada mudou: solte sobre a máquina (ou o objeto) que { $res } vai atender.
+godot-editor3d-solte_sobre_uma_maquina_ou = Solte sobre uma máquina ou um objeto (um transportador só entra na equipe de um despachante).
+godot-editor3d-ja_esta_ligado_para_desfazer = Já está ligado: { $to } → { $res }. Para desfazer, clique na linha e no ×.
+godot-editor3d-ligado_ctrl_z_desfaz = Ligado: { $said }. Ctrl+Z desfaz.
+godot-editor3d-aponte_para_o_chao_para = Aponte para o chão para colocar o objeto.
+godot-editor3d-equipe_clique_no_transportador_ou = Equipe: clique no transportador ou despachante de destino.
+godot-editor3d-equipe_comece_num_despachante_ou = Equipe: comece num despachante ou num objeto.
+godot-editor3d-equipe_clique_no_destino_esc = Equipe: { $from } → clique no destino (Esc cancela).
+godot-editor3d-equipe_solte_sobre_o_transportador = Equipe: solte sobre o transportador ou despachante.
+godot-editor3d-equipe_solte_sobre_outro_objeto = Equipe: solte sobre outro objeto.
+godot-editor3d-aponte_para_o_chao_para-2 = Aponte para o chão para pôr um ponto do corredor.
+godot-editor3d-corredor_clique_os_proximos_pontos = Corredor: clique os próximos pontos; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela.
+godot-editor3d-ponto_s_enter_ou_duplo =
+    { $aisle_points } { $aisle_points ->
+        [one] ponto
+       *[other] pontos
+    }. Enter ou duplo clique termina.
+godot-editor3d-vertice_de_selecionado_arraste_para = Vértice { $k } de { $name } selecionado (arraste para mover).
+godot-editor3d-corredor_selecionado_del_exclui_shift = Corredor { $name } selecionado (Del exclui; Shift + clique na linha acrescenta um vértice).
+godot-editor3d-um_corredor_precisa_de_ao = Um corredor precisa de ao menos 2 pontos.
+godot-editor3d-ponto_removido = Ponto removido ({ $aisle_points }).
+godot-editor3d-trecho_selecionado_del_remove = Trecho { $a } → { $b } selecionado (Del remove).
+godot-editor3d-aponte_para_o_chao_para-3 = Aponte para o chão para colocar um nó.
+godot-editor3d-zona_ponto_s_clique_no =
+    Zona: { $zone_points } { $zone_points ->
+        [one] ponto
+       *[other] pontos
+    }. Clique no primeiro ponto, Enter ou duplo clique fecha; Backspace volta; Esc cancela.
+godot-editor3d-zona_arraste_para_mover_arraste = Zona { $name }: arraste para mover, arraste um vértice para mudar a forma; Del exclui.
+godot-editor3d-zona_clique_para_por_os = Zona: clique para pôr os outros pontos; Enter, duplo clique ou o primeiro ponto fecha.
+godot-editor3d-zona_alterada_ctrl_z_desfaz = Zona alterada (Ctrl+Z desfaz).
+godot-editor3d-uma_zona_precisa_de_pelo = Uma zona precisa de pelo menos 3 pontos.
+
+## indicadores.rs
+
+godot-indicadores-itens_refugados = Itens refugados
+godot-indicadores-itens_que_terminaram_neste_refugo = Itens que terminaram neste refugo, por replicação.
+godot-indicadores-defeitos_gerados = Defeitos gerados
+godot-indicadores-defeitos_que_este_posto_gerou = Defeitos que este posto gerou, por replicação.
+godot-indicadores-defeitos_que_escaparam = Defeitos que escaparam
+godot-indicadores-defeitos_deste_posto_que_chegaram = Defeitos deste posto que chegaram ao cliente (falha externa), por replicação.
+godot-indicadores-rendimento_de_primeira = Rendimento de primeira
+godot-indicadores-itens_inspecionados_uma_so_vez = Itens inspecionados uma só vez e entregues, sobre os inspecionados.
+godot-indicadores-custo_da_qualidade = Custo da qualidade
+godot-indicadores-avaliacao_falha_interna_e_falha = Avaliação, falha interna e falha externa atribuídas a este posto, por replicação.
+godot-indicadores-tempo_em_zonas = Tempo em zonas
+godot-indicadores-tempo_desta_pessoa_dentro_das = Tempo desta pessoa dentro das zonas de risco, por replicação.
+godot-indicadores-exposicao_nas_zonas = Exposição nas zonas
+godot-indicadores-tempo_de_pessoas_dentro_das = Tempo de pessoas dentro das zonas onde este posto está, somado, por replicação.
+godot-indicadores-zonas = Zonas
+godot-indicadores-zonas_de_risco_onde_o = Zonas de risco onde o posto está.
+godot-indicadores-entradas_sem_epi = Entradas sem EPI
+godot-indicadores-entradas_na_zona_sem_o = Entradas na zona sem o equipamento de proteção que ela pede, por replicação.
+godot-indicadores-quase_conflitos = Quase-conflitos
+godot-indicadores-pessoa_e_veiculo_mais_perto = Pessoa e veículo mais perto que o limiar, envolvendo este recurso, por replicação. Simulado: serve para comparar layouts, não estima acidentes reais.
+godot-indicadores-pessoa_e_veiculo_mais_perto-2 = Pessoa e veículo mais perto que o limiar a até 3 m deste posto, por replicação. Simulado: serve para comparar layouts, não estima acidentes reais.
+godot-indicadores-quebras = Quebras
+godot-indicadores-falhas_do_posto_por_replicacao = Falhas do posto, por replicação.
+godot-indicadores-tempo_medio_entre_falhas_tempo = Tempo médio entre falhas (tempo em pé sobre o número de falhas).
+godot-indicadores-tempo_medio_de_reparo_da = Tempo médio de reparo, da quebra até voltar a produzir.
+godot-indicadores-tempo_parado = Tempo parado
+godot-indicadores-tempo_em_manutencao_corretiva_por = Tempo em manutenção corretiva, por replicação.
+godot-indicadores-disponibilidade = Disponibilidade
+godot-indicadores-tempo_produzindo_sobre_o_tempo = Tempo produzindo sobre o tempo planejado (sem turno e preventivas).
+godot-indicadores-custo_de_manutencao = Custo de manutenção
+godot-indicadores-tempo_parado_reparos_e_preventivas = Tempo parado, reparos e preventivas pelos custos do bloco, por replicação.
+godot-indicadores-parcela_do_tempo_em_quebra = Parcela do tempo em quebra, por replicação.
+godot-indicadores-tempo_fora_de_quebra_sobre = Tempo fora de quebra sobre o tempo planejado (sem turno).
+
+## jobs.rs
+
+godot-jobs-rodando_replicacoes = Rodando replicações
+godot-jobs-rodando_mais_replicacoes = Rodando mais replicações
+godot-jobs-comparando_cenarios = Comparando cenários
+godot-jobs-otimizando = Otimizando
+godot-jobs-analisando_o_aquecimento = Analisando o aquecimento
+godot-jobs-conferindo_a_lei_de_little = Conferindo a lei de Little
+godot-jobs-procurando_o_gargalo_movel = Procurando o gargalo móvel
+godot-jobs-calculando_o_pert_cpm = Calculando o PERT/CPM
+godot-jobs-ajustando_a_distribuicao_aos_dados = Ajustando a distribuição aos dados
+godot-jobs-gravando_o_relatorio_dos_dados = Gravando o relatório dos dados
+godot-jobs-erro_interno_durante_a_execucao = erro interno durante a execução
+godot-jobs-a_execucao_terminou_sem_resultado = a execução terminou sem resultado
+godot-jobs-objeto_nao_existe_no_modelo = objeto "{ $object }" não existe no modelo
+
+## linha.rs
+
+
+## path_edit.rs
+
+godot-path-edit-nao_existe = '{ $name }' não existe
+godot-path-edit-e_uma_esteira_reta_sem = '{ $name }' é uma esteira reta, sem nós
+godot-path-edit-nao_e_uma_esteira = '{ $name }' não é uma esteira
+godot-path-edit-a_esteira_precisa_de_ao = a esteira precisa de ao menos 2 nós diferentes
+godot-path-edit-a_biblioteca_nao_tem_esteira = a biblioteca não tem esteira
+godot-path-edit-o_caminho_precisa_de_ao = o caminho precisa de ao menos 2 pontos diferentes
+godot-path-edit-nao_existe_o_caminho = não existe o caminho '{ $name }'
+godot-path-edit-nao_tem_o_no = '{ $name }' não tem o nó { $index }
+godot-path-edit-o_raio_deve_ser_um = o raio deve ser um número >= 0 (metros)
+godot-path-edit-a_distancia_do_paralelo_deve = a distância do paralelo deve ser diferente de zero
+godot-path-edit-o_caminho_novo_sumiu = o caminho novo sumiu
+godot-path-edit-o_caminho_precisa_de_ao-2 = o caminho precisa de ao menos 2 pontos
+godot-path-edit-a_esteira_precisa_de_ao-2 = a esteira precisa de ao menos 2 nós
+godot-path-edit-nao_e_uma_esteira_desenhada = '{ $name }' não é uma esteira desenhada
+godot-path-edit-as_duas_pontas_ja_estao = as duas pontas já estão no piso
+godot-path-edit-tipo_de_esteira_desconhecido = tipo de esteira desconhecido: { $style }
+godot-path-edit-acionamento_desconhecido = acionamento desconhecido: { $drive }
+godot-path-edit-a_largura_deve_ser_0 = a largura deve ser > 0 (metros)
+godot-path-edit-a_inclinacao_maxima_fica_entre = a inclinação máxima fica entre 0 e 90 graus
+godot-path-edit-divida_num_no_do_meio = divida num nó do meio da esteira
+godot-path-edit-nao_ha_trecho_depois_do = não há trecho depois do último nó
+godot-path-edit-o_caminho_so_tem_esse = o caminho só tem esse trecho: apague o caminho inteiro
+godot-path-edit-a_esteira_so_tem_esse = a esteira só tem esse trecho: apague a esteira inteira
+godot-path-edit-nenhum_trajeto_comeca_onde_este = nenhum trajeto começa onde este acaba
+godot-path-edit-nao_existe_o_caminho-2 = não existe o caminho '{ $other }'
+
+## tool_panels.rs
+
+godot-tool-panels-ligacao = Ligação
+godot-tool-panels-remover_ligacao_del = Remover ligação (Del)
+godot-tool-panels-rede_de_caminhos = Rede de caminhos
+godot-tool-panels-no_s_trecho_s_pista =
+    { $nodes } { $nodes ->
+        [one] nó
+       *[other] nós
+    }, { $edges } { $edges ->
+        [one] trecho
+       *[other] trechos
+    }, { $controlled } { $controlled ->
+        [one] pista controlada
+       *[other] pistas controladas
+    }.
+godot-tool-panels-clique_no_chao_para_por = Clique no chão para pôr um nó; com um nó armado (verde), o próximo clique o liga ao novo por um trecho. Clique num nó para armá-lo, arraste para movê-lo. Clique num trecho para mudar o sentido e a capacidade (com capacidade, a pista é controlada e fica em vermelho). Esc encerra o caminho; Del exclui o selecionado.
+godot-tool-panels-novos_trechos_em_mao_dupla = Novos trechos em mão dupla
+godot-tool-panels-no = Nó { $name }
+godot-tool-panels-nome = Nome
+godot-tool-panels-posicao_m = Posição ({ $position }, { $position2 }) m
+godot-tool-panels-excluir_no_del = Excluir nó (Del)
+godot-tool-panels-trecho = Trecho { $from } → { $to }
+godot-tool-panels-comprimento_m = Comprimento { $length } m
+godot-tool-panels-mao_dupla = Mão dupla
+godot-tool-panels-capacidade_veiculos_0_sem_controle = Capacidade (veículos; 0 = sem controle)
+godot-tool-panels-pista_controlada_no_maximo_veiculo =
+    Pista controlada: no máximo { $cap } { $cap ->
+        [one] veículo
+       *[other] veículos
+    } ao mesmo tempo.
+godot-tool-panels-inverter_sentido = Inverter sentido
+godot-tool-panels-excluir_trecho_del = Excluir trecho (Del)
+godot-tool-panels-pedestres = Pedestres
+godot-tool-panels-empilhadeiras = Empilhadeiras
+godot-tool-panels-misto = Misto
+godot-tool-panels-corredores_de_circulacao = Corredores de circulação
+godot-tool-panels-corredor_es_de_pedestres_de =
+    { $list } { $list ->
+        [one] corredor
+       *[other] corredores
+    }: { $pedestrian } de pedestres, { $forklift } de empilhadeiras, { $forklift2 } mistos; { $crossings } { $crossings ->
+        [one] cruzamento
+       *[other] cruzamentos
+    }.
+godot-tool-panels-clique_no_chao_para_por-2 = Clique no chão para pôr os pontos do eixo; Enter ou duplo clique termina, Backspace volta um ponto, Esc cancela. Os pontos encaixam nos outros corredores. Clique num corredor para editá-lo, arraste um vértice para movê-lo, Shift + clique na linha acrescenta um vértice. As faixas amarelas, a zebra dos cruzamentos e as setas aparecem no piso.
+godot-tool-panels-novos_corredores = Novos corredores
+godot-tool-panels-tipo = Tipo
+godot-tool-panels-largura_m = Largura (m)
+godot-tool-panels-corredor = Corredor { $name }
+godot-tool-panels-ponto_s_m_de_comprimento =
+    { $points } { $points ->
+        [one] ponto
+       *[other] pontos
+    }, { $length } m de comprimento
+godot-tool-panels-passagem_secundaria_de_pedestres_minimo = Passagem secundária de pedestres (mínimo menor)
+godot-tool-panels-perfil = Perfil
+godot-tool-panels-padrao_do_modelo = Padrão do modelo
+godot-tool-panels-brasil_amarelo = Brasil (amarelo)
+godot-tool-panels-brasil = Brasil
+godot-tool-panels-branco = Branco
+godot-tool-panels-vertice_selecionado = Vértice { $v } selecionado
+godot-tool-panels-remover_vertice = Remover vértice
+godot-tool-panels-excluir_corredor_del = Excluir corredor (Del)
+godot-tool-panels-zonas_de_risco = Zonas de risco
+godot-tool-panels-zona_s_de_risco_no =
+    { $zones } { $zones ->
+        [one] zona
+       *[other] zonas
+    } de risco no piso.
+godot-tool-panels-clique_no_chao_para_por-3 = Clique no chão para pôr os cantos; o primeiro ponto, Enter ou duplo clique fecha a zona, Backspace volta um ponto, Esc cancela. Clique numa zona para editá-la: arraste o meio para mover, arraste um vértice para mudar a forma; Del exclui. Os pontos encaixam na grade.
+godot-tool-panels-zona = Zona { $name }
+godot-tool-panels-canto_s =
+    { $polygon } { $polygon ->
+        [one] canto
+       *[other] cantos
+    }
+godot-tool-panels-nivel_de_risco_1_a = Nível de risco (1 a 5; 0 = sem nível)
+godot-tool-panels-epi_exigido_para_entrar = EPI exigido para entrar
+godot-tool-panels-excluir_zona_del = Excluir zona (Del)
+
+## ui_arrivals.rs
+
+godot-ui-arrivals-nao_e_um_numero = "{ $t }" não é um número
+godot-ui-arrivals-use_um_numero = use um número
+godot-ui-arrivals-hh_mm_so_vale_com = hh:mm só vale com ciclo de dia ou semana (1440 min, 24 h, 86400 s); use um número
+godot-ui-arrivals-hora_invalida_em = hora inválida em "{ $t }"
+godot-ui-arrivals-minuto_invalido_em = minuto inválido em "{ $t }"
+godot-ui-arrivals-minuto_invalido_em_0_a = minuto inválido em "{ $t }" (0 a 59)
+godot-ui-arrivals-nao_e_um_horario_hh = "{ $t }" não é um horário (hh:mm) nem um número
+godot-ui-arrivals-quantidade_um_inteiro_0 = quantidade "{ $t }": um inteiro >= 0
+godot-ui-arrivals-rotulo_use_nome_valor = rótulo "{ $part }": use nome=valor
+godot-ui-arrivals-rotulo_sem_nome = rótulo "{ $part }" sem nome
+godot-ui-arrivals-rotulo = rótulo { $name }: { $e }
+godot-ui-arrivals-uma_vez = Uma vez
+godot-ui-arrivals-a_cada_ciclo = A cada ciclo
+godot-ui-arrivals-volta_ao_inicio = Volta ao início
+godot-ui-arrivals-por_ciclo_de = por ciclo de { $d }
+godot-ui-arrivals-por_volta = por volta
+godot-ui-arrivals-no_total = no total
+godot-ui-arrivals-em_linha_s =
+    { $items } { $items ->
+        [one] item
+       *[other] itens
+    } { $per } em { $rows } { $rows ->
+        [one] linha
+       *[other] linhas
+    }
+godot-ui-arrivals-tipo_da_fonte = tipo da fonte
+godot-ui-arrivals-um_dia = { $d } (um dia)
+godot-ui-arrivals-uma_semana = { $d } (uma semana)
+godot-ui-arrivals-tipo_de_item = tipo de item
+godot-ui-arrivals-nada_para_colar_copie_as = nada para colar: copie as linhas da planilha
+godot-ui-arrivals-linha = linha { $n }: { $e }
+godot-ui-arrivals-falta_o_instante_modo_horario = falta o instante (modo horário)
+godot-ui-arrivals-so_o_cabecalho_nenhuma_linha = só o cabeçalho: nenhuma linha para colar
+godot-ui-arrivals-editar_como_texto_ron = Editar como texto (RON)
+godot-ui-arrivals-modo = Modo
+godot-ui-arrivals-horario = Horário
+godot-ui-arrivals-sequencia = Sequência
+godot-ui-arrivals-horario_cada_linha_no_seu = Horário: cada linha no seu instante. Sequência: uma linha por chegada, com o tempo entre chegadas da fonte entre elas.
+godot-ui-arrivals-repetir = Repetir
+godot-ui-arrivals-ciclo = Ciclo
+godot-ui-arrivals-da_fonte = (da fonte)
+godot-ui-arrivals-o_tipo_da_fonte = O tipo da fonte
+godot-ui-arrivals-tipo_de_item_da_linha = Tipo de item da linha
+godot-ui-arrivals-subir_a_linha = Subir a linha
+godot-ui-arrivals-descer_a_linha = Descer a linha
+godot-ui-arrivals-remover_a_linha = Remover a linha
+godot-ui-arrivals-linha-2 = + Linha
+godot-ui-arrivals-acrescenta_uma_linha_no_fim = Acrescenta uma linha no fim
+godot-ui-arrivals-ordenar_por_instante = Ordenar por instante
+godot-ui-arrivals-poe_as_linhas_em_ordem = Põe as linhas em ordem de instante
+godot-ui-arrivals-as_linhas_ja_estao_em = As linhas já estão em ordem (ou é uma sequência)
+godot-ui-arrivals-colar_da_planilha = Colar da planilha
+godot-ui-arrivals-linhas_copiadas_de_uma_planilha = Linhas copiadas de uma planilha (separadas por tabulação ou ;)
+godot-ui-arrivals-hora_qtd_tipo_rotulo_08 =
+    hora; qtd; tipo; rótulo...
+    08:00; 12; caixa; prioridade=2
+godot-ui-arrivals-qtd_tipo_rotulo_2_caixa =
+    qtd; tipo; rótulo...
+    2; caixa; prioridade=2
+godot-ui-arrivals-substituir_as_linhas = Substituir as linhas
+godot-ui-arrivals-acrescentar = Acrescentar
+godot-ui-arrivals-ver_as_primeiras_chegadas = Ver as primeiras chegadas
+godot-ui-arrivals-histograma_das_chegadas_de_um = Histograma das chegadas de um ciclo (ou uma volta), por hora e por tipo
+godot-ui-arrivals-simulado_so_a_fonte_ligada = Simulado: só a fonte, ligada a uma saída, por um ciclo.
+godot-ui-arrivals-estimado_pela_tabela_a_fonte = Estimado pela tabela (a fonte sozinha não rodou: { $e }).
+godot-ui-arrivals-estimado_pela_tabela_rodando_a = Estimado pela tabela; rodando a fonte...
+godot-ui-arrivals-maximo_por = máximo { $num_text } por { $bin_label }
+godot-ui-arrivals-por_instantes_da_tabela_sem = por { $bin_label } ({ $bin }); instantes da tabela, sem rodar o modelo
+godot-ui-arrivals-horarios_em_hh_mm_taxas = { $name } (horários em hh:mm, taxas por hora)
+godot-ui-arrivals-unidade_do_modelo = unidade do modelo
+godot-ui-arrivals-fora_dos_periodos_a_fonte = Fora dos períodos a fonte não cria itens
+godot-ui-arrivals-periodo_s =
+    { $periods } { $periods ->
+        [one] período
+       *[other] períodos
+    }
+godot-ui-arrivals-itens_h_ou_distribuicao = itens/h ou distribuição
+godot-ui-arrivals-taxa_ou_distribuicao = taxa ou distribuição
+godot-ui-arrivals-padrao_o_tempo_entre_chegadas = Padrão: o tempo entre chegadas da fonte. Distribuição: um tempo entre chegadas próprio. Taxa: chegadas de Poisson. Fechado: sem chegadas.
+godot-ui-arrivals-distribuicao = distribuição: { $e }
+godot-ui-arrivals-media = média { $mean }
+godot-ui-arrivals-sem_chegadas = sem chegadas
+godot-ui-arrivals-remover_o_periodo = Remover o período
+godot-ui-arrivals-periodo = + Período
+godot-ui-arrivals-acrescenta_um_periodo_depois_do = Acrescenta um período depois do último
+godot-ui-arrivals-o_ultimo_periodo_ja_vai = O último período já vai até o fim do ciclo
+godot-ui-arrivals-esperado_por_ciclo_chegadas = Esperado por ciclo: { $total } chegadas
+godot-ui-arrivals-padrao_media = padrão (média { $mean })
+godot-ui-arrivals-distribuicao-2 = distribuição { $d }
+godot-ui-arrivals-taxa_itens_h = taxa { $cycle } itens/h
+godot-ui-arrivals-taxa = taxa { $num_text }
+godot-ui-arrivals-periodo_a_esperadas = Período { $k }: { $cycle } a { $cycle2 }, { $how }; esperadas { $default }
+godot-ui-arrivals-chegadas_esperadas_em_cada_periodo = Chegadas esperadas em cada período (taxa × duração, ou duração ÷ média)
+godot-ui-arrivals-barra_s =
+    { $exp } { $exp ->
+        [one] barra
+       *[other] barras
+    }
+godot-ui-arrivals-nao_existe = '{ $source }' não existe
+godot-ui-arrivals-nao_e_uma_chegada = '{ $source }' não é uma chegada
+
+## ui_bar.rs
+
+godot-ui-bar-equipe_despachante_membro = Equipe (despachante → membro)
+godot-ui-bar-transporte_pedido = Transporte pedido
+godot-ui-bar-operadores_pedidos = Operadores pedidos
+godot-ui-bar-equipe_de_manutencao = Equipe de manutenção
+godot-ui-bar-local_de_pausa = Local de pausa
+godot-ui-bar-mais = Mais
+godot-ui-bar-os_grupos_que_nao_cabem = Os grupos que não cabem na barra
+godot-ui-bar-arquivo = Arquivo
+godot-ui-bar-editar = Editar
+godot-ui-bar-organizar = Organizar
+godot-ui-bar-grade = Grade
+godot-ui-bar-ajuda = Ajuda
+godot-ui-bar-analise = Análise
+godot-ui-bar-novo = Novo
+godot-ui-bar-novo_modelo_ctrl_n = Novo modelo (Ctrl+N)
+godot-ui-bar-abrir = Abrir…
+godot-ui-bar-abrir_um_modelo_ou_um = Abrir um modelo ou um replay (Ctrl+O)
+godot-ui-bar-salvar = Salvar
+godot-ui-bar-salvar_ctrl_s = Salvar (Ctrl+S)
+godot-ui-bar-salvar_como = Salvar como…
+godot-ui-bar-salvar_com_outro_nome_ctrl = Salvar com outro nome (Ctrl+Shift+S)
+godot-ui-bar-desfazer = Desfazer
+godot-ui-bar-desfazer_ctrl_z = Desfazer (Ctrl+Z)
+godot-ui-bar-refazer = Refazer
+godot-ui-bar-refazer_ctrl_y = Refazer (Ctrl+Y)
+godot-ui-bar-alinhar_a_esquerda = Alinhar à esquerda
+godot-ui-bar-alinhar_ao_centro_x = Alinhar ao centro (X)
+godot-ui-bar-alinhar_a_direita = Alinhar à direita
+godot-ui-bar-alinhar_ao_topo = Alinhar ao topo
+godot-ui-bar-alinhar_ao_centro_y = Alinhar ao centro (Y)
+godot-ui-bar-alinhar_a_base = Alinhar à base
+godot-ui-bar-distribuir_em_x = Distribuir em X
+godot-ui-bar-distribuir_em_y = Distribuir em Y
+godot-ui-bar-copiar_ctrl_c = Copiar (Ctrl+C)
+godot-ui-bar-recortar_ctrl_x = Recortar (Ctrl+X)
+godot-ui-bar-colar_ctrl_v = Colar (Ctrl+V)
+godot-ui-bar-duplicar_ctrl_d = Duplicar (Ctrl+D)
+godot-ui-bar-excluir_del = Excluir (Del)
+godot-ui-bar-selecionar_tudo_ctrl_a = Selecionar tudo (Ctrl+A)
+godot-ui-bar-alinhar_distribuir_copiar_colar_e = Alinhar, distribuir, copiar, colar e excluir a seleção
+godot-ui-bar-encaixar_na_grade_ao_por = Encaixar na grade ao pôr e arrastar (G; passo ao lado)
+godot-ui-bar-passo_da_grade = Passo da grade
+godot-ui-bar-atalhos_f1_a_lista_dos = Atalhos (F1): a lista dos atalhos de teclado e mouse
+godot-ui-bar-resultados = Resultados
+godot-ui-bar-tabela_graficos_analises_cenarios_e = Tabela, gráficos, análises, cenários e otimização da última rodada
+godot-ui-bar-pert_cpm = PERT/CPM
+godot-ui-bar-pert_cpm_da_selecao_com = PERT/CPM da seleção (com dois objetos, de um até o outro)
+godot-ui-bar-pert_cpm_da_selecao = PERT/CPM da seleção
+godot-ui-bar-pert_cpm_de_ate_dois = PERT/CPM de… até… (dois selecionados)
+godot-ui-bar-fluxos_de_tokens = Fluxos de tokens
+godot-ui-bar-modo_missao_utsim_ensino = Modo missão (UTSim Ensino)
+godot-ui-bar-abre_as_missoes_do_utsim = Abre as missões do UTSim Ensino neste mesmo programa
+godot-ui-bar-outras_analises_pert_cpm_de = Outras análises: PERT/CPM de… até…, fluxos de tokens; as ligações de equipe e de pedido na vista 3D
+godot-ui-bar-simular = Simular
+godot-ui-bar-montar_o_modelo_tab_alterna = Montar o modelo (Tab alterna)
+godot-ui-bar-rodar_as_replicacoes_e_reproduzir = Rodar as replicações e reproduzir (Tab alterna)
+godot-ui-bar-selecionar = Selecionar
+godot-ui-bar-selecionar_e_mover_esc = Selecionar e mover (Esc)
+godot-ui-bar-ligar = Ligar
+godot-ui-bar-ligar_arraste_da_origem_ao = Ligar: arraste da origem ao destino, ou clique na origem e depois no destino (L)
+godot-ui-bar-rede = Rede
+godot-ui-bar-rede_de_caminhos_nos_e = Rede de caminhos: nós e trechos (N)
+godot-ui-bar-corredor = Corredor
+godot-ui-bar-corredores_de_circulacao_com_faixas = Corredores de circulação com faixas de segurança: clique pontos no chão, Enter termina (C)
+godot-ui-bar-zona = Zona
+godot-ui-bar-zonas_de_risco_no_piso = Zonas de risco no piso: clique os cantos, o primeiro ponto ou Enter fecha; clique numa zona para editar (Z)
+godot-ui-bar-equipe = Equipe
+godot-ui-bar-equipe_arraste_do_despachante_a = Equipe: arraste do despachante a um transportador (entra ou sai da equipe), ou de um objeto ao transportador ou despachante que leva os itens; com Shift, de um processo a quem fornece os operadores (E; Alt com Ligar)
+godot-ui-bar-ligacoes_na_vista_3d = Ligações na vista 3D
+godot-ui-bar-tambem_durante_a_simulacao = Também durante a simulação
+godot-ui-bar-as_linhas_tracejadas_entre_operadores = As linhas tracejadas entre operadores, veículos e máquinas no modo Simular
+
+## ui_fitwin.rs
+
+godot-ui-fitwin-linha_nao_e_um_numero = linha { $k }: "{ $t }" não é um número
+godot-ui-fitwin-os_instantes_precisam_ser_crescentes = os instantes precisam ser crescentes
+godot-ui-fitwin-digite_ou_cole_pelo_menos = digite ou cole pelo menos dois valores
+godot-ui-fitwin-compare_as_distribuicoes_antes = compare as distribuições antes
+godot-ui-fitwin-utsim_3d_valores_reais = UTSim 3D, Valores reais
+godot-ui-fitwin-desvio_padrao = desvio padrão
+godot-ui-fitwin-valores_reais = Valores reais: { $field }
+godot-ui-fitwin-o_que_e = O que é: { $title }
+godot-ui-fitwin-valores_observados = Valores observados
+godot-ui-fitwin-digite_cole_da_planilha_varias = Digite, cole da planilha (várias linhas, vírgula decimal) ou importe um CSV.
+godot-ui-fitwin-cole_aqui_e_clique_adicionar = cole aqui e clique Adicionar
+godot-ui-fitwin-adicionar = Adicionar
+godot-ui-fitwin-valor_es_adicionados =
+    { $n } { $n ->
+        [one] valor adicionado
+       *[other] valores adicionados
+    }.
+godot-ui-fitwin-importar_csv = Importar CSV…
+godot-ui-fitwin-le_os_valores_de_um = Lê os valores de um arquivo CSV ou TXT
+godot-ui-fitwin-limpar = Limpar
+godot-ui-fitwin-apaga_todos_os_valores_da = Apaga todos os valores da tabela
+godot-ui-fitwin-sao_instantes_crescentes_usar_os = São instantes crescentes (usar os intervalos)
+godot-ui-fitwin-marque_quando_os_valores_sao = Marque quando os valores são horários de chegada: o ajuste usa as diferenças entre eles.
+godot-ui-fitwin-valor_es =
+    { $n } { $n ->
+        [one] valor
+       *[other] valores
+    }
+godot-ui-fitwin-apaga_este_valor = Apaga este valor
+godot-ui-fitwin-intervalos = Intervalos
+godot-ui-fitwin-estatisticas = Estatísticas
+godot-ui-fitwin-comparacao_das_distribuicoes = Comparação das distribuições
+godot-ui-fitwin-comparar_de_novo = Comparar de novo
+godot-ui-fitwin-comparar_todas = Comparar todas
+godot-ui-fitwin-ajusta_todas_as_distribuicoes_candidatas = Ajusta todas as distribuições candidatas e calcula todas as medidas de uma vez
+godot-ui-fitwin-ajustando_todas_as_candidatas = ajustando todas as candidatas...
+godot-ui-fitwin-depois_de_comparar_a_tabela = Depois de comparar, a tabela mostra todas as medidas de cada distribuição; clique numa linha para ver os gráficos e escolher.
+godot-ui-fitwin-os_valores_mudaram_compare_de = Os valores mudaram: compare de novo.
+godot-ui-fitwin-ordenada_por_sugestao_inicial_aic = Ordenada por { $label }. Sugestão inicial (AIC com a regra do UTSim): { $family }.
+godot-ui-fitwin-usar_esta_distribuicao = Usar esta distribuição ({ $fam })
+godot-ui-fitwin-passa_a_usar_esta_distribuicao = Passa a usar esta distribuição neste campo, ajustada a estes valores (Ctrl+Z desfaz)
+godot-ui-fitwin-usar_a_empirica = Usar a empírica
+godot-ui-fitwin-usa_os_proprios_valores_observados = Usa os próprios valores observados, sem família
+godot-ui-fitwin-gerar_relatorio = Gerar relatório
+godot-ui-fitwin-grava_o_relatorio_html_com = Grava o relatório HTML com os dados, a comparação completa, os gráficos e a escolha
+godot-ui-fitwin-fechar = Fechar
+godot-ui-fitwin-fecha_a_explicacao = Fecha a explicação
+godot-ui-fitwin-como_ler_quando_usar_cuidados =
+    { $what }
+    Como ler: { $read }
+    Quando usar: { $when }
+    Cuidados: { $care }
+godot-ui-fitwin-aceita_pelos_testes_clique_para = Aceita pelos testes. Clique para ver os gráficos e escolher.
+godot-ui-fitwin-nao_se_aplica_a_estes = Não se aplica a estes dados.
+godot-ui-fitwin-rejeitada_por_algum_teste_valor = Rejeitada por algum teste (valor-p abaixo de 0,05). Ainda pode ser escolhida.
+godot-ui-fitwin-ordena_por = Ordena por { $label } ({ $melhor })
+godot-ui-fitwin-escolhida_por = escolhida por
+godot-ui-fitwin-histograma_e_curvas_em_destaque = Histograma e curvas ({ $selected_family } em destaque)
+godot-ui-fitwin-poisson = Poisson
+godot-ui-fitwin-geometrica = Geométrica
+godot-ui-fitwin-binomial = Binomial
+godot-ui-fitwin-binomial_negativa = Binomial negativa
+godot-ui-fitwin-a_empirica_reproduz_os_proprios = A empírica reproduz os próprios dados: não há curva para comparar.
+
+## ui_left.rs
+
+godot-ui-left-orbita = Órbita
+godot-ui-left-planta_2d = Planta (2D)
+godot-ui-left-seguir = Seguir
+godot-ui-left-primeira_pessoa = Primeira pessoa
+godot-ui-left-do_recurso = Do recurso
+godot-ui-left-recentes = Recentes
+godot-ui-left-usados_por_ultimo = Usados por último
+godot-ui-left-espera = Espera
+godot-ui-left-fluxo = Fluxo
+godot-ui-left-fluxo_de_itens_e_montagem = Fluxo de itens e montagem
+godot-ui-left-mover = Mover
+godot-ui-left-movimentacao_recursos_e_logistica = Movimentação, recursos e logística
+godot-ui-left-fabrica = Fábrica
+godot-ui-left-manufatura = Manufatura
+godot-ui-left-servicos = Serviços
+godot-ui-left-servicos_e_saude = Serviços e saúde
+godot-ui-left-escritorio = Escritório
+godot-ui-left-escritorio_e_processos = Escritório e processos
+godot-ui-left-q_e_s = Q e S
+godot-ui-left-qualidade_e_seguranca = Qualidade e segurança
+godot-ui-left-biblioteca = Biblioteca
+godot-ui-left-objetos = Objetos
+godot-ui-left-mostrar_obstaculos_e_folgas = Mostrar obstáculos e folgas
+godot-ui-left-mostra_a_area_ocupada_dos = Mostra a área ocupada dos objetos, as paredes, a folga dos recursos e o ponto de acesso de cada objeto (arraste-o com a ferramenta Selecionar)
+godot-ui-left-nada_com_esse_nome = Nada com esse nome.
+godot-ui-left-clique_de_novo_para_recolher = { $title }. Clique de novo para recolher.
+godot-ui-left-os_elementos_que_voce_usar = Os elementos que você usar aparecem aqui.
+godot-ui-left-buscar_elemento = Buscar elemento
+godot-ui-left-limpa_a_busca = Limpa a busca
+godot-ui-left-clique_e_depois_clique_no = { $label }: clique e depois clique no chão, ou arraste até o chão
+godot-ui-left-buscar_por_nome_ou_tipo = Buscar por nome ou tipo
+godot-ui-left-problema_s =
+    { $problems } { $problems ->
+        [one] problema
+       *[other] problemas
+    }
+godot-ui-left-aviso_s =
+    { $warnings } { $warnings ->
+        [one] aviso
+       *[other] avisos
+    }
+godot-ui-left-simular_de_novo = Simular de novo
+godot-ui-left-roda_as_replicacoes_outra_vez = Roda as replicações outra vez
+godot-ui-left-blocos_clique_para_focar = Blocos (clique para focar)
+godot-ui-left-fluxos = Fluxos
+godot-ui-left-fluxos_de_tokens_em_2d = Fluxos de tokens em 2D, com as contagens no tempo
+godot-ui-left-gravar_replay = Gravar replay
+godot-ui-left-grava_o_replay_desta_replicacao = Grava o replay desta replicação em .json (abre de novo com Abrir)
+godot-ui-left-rotulos = Rótulos
+godot-ui-left-os_nomes_dos_blocos_sobre = Os nomes dos blocos sobre a cena
+godot-ui-left-sombras = Sombras
+godot-ui-left-as_sombras_do_sol_desligadas = As sombras do sol (desligadas, a cena fica mais leve)
+godot-ui-left-seguranca = Segurança
+godot-ui-left-zonas_de_risco_epi_das = Zonas de risco, EPI das pessoas, quase-conflitos simulados, itens com defeito e inspeções
+godot-ui-left-calor = Calor
+godot-ui-left-mapa_de_calor_da_presenca = Mapa de calor da presença das pessoas e dos quase-conflitos no piso
+godot-ui-left-quase_conflitos_simulados = Quase-conflitos simulados ({ $quase })
+godot-ui-left-replicacoes = Replicações
+godot-ui-left-uma_replicacao_a_menos = Uma replicação a menos
+godot-ui-left-uma_replicacao_a_mais = Uma replicação a mais
+godot-ui-left-camera = Câmera
+godot-ui-left-seguir_primeira_pessoa_e_do = Seguir, Primeira pessoa e Do recurso acompanham o bloco escolhido na lista
+godot-ui-left-os_resultados_aparecem_aqui_depois = Os resultados aparecem aqui depois da simulação.
+godot-ui-left-gargalo = Gargalo: { $bottleneck }
+godot-ui-left-a_tabela_completa_os_graficos = A tabela completa, os gráficos e as análises estão em Resultados.
+godot-ui-left-gargalo-2 =
+    {""}
+    Gargalo: { $bottleneck }
+
+## ui_pert.rs
+
+godot-ui-pert-rede = Rede
+godot-ui-pert-gantt = Gantt
+godot-ui-pert-distribuicao = Distribuição
+godot-ui-pert-tabela = Tabela
+godot-ui-pert-texto = Texto
+godot-ui-pert-simulado = Simulado
+godot-ui-pert-caminho_critico_observado_na_simulacao = Caminho crítico observado na simulação: filas, transportes e recursos incluídos
+godot-ui-pert-classico = Clássico
+godot-ui-pert-pert_classico_estimativas_a_m = PERT clássico: estimativas (a, m, b), CPM nas médias e P(prazo) pela normal
+godot-ui-pert-monte_carlo = Monte Carlo
+godot-ui-pert-sorteios_das_duracoes_sobre_a = Sorteios das durações sobre a rede: criticidade e distribuição do tempo total
+godot-ui-pert-desvio = , desvio { $sd }
+godot-ui-pert-unidades_sorteios = {" "}({ $units } unidades/sorteios)
+godot-ui-pert-tempo_total_cpm_nas_medias = Tempo total: { $t }{ $spread }{ $units }. CPM nas médias: { $project }.
+godot-ui-pert-ic_a = {" "}(IC { $lo }% a { $hi }%)
+godot-ui-pert-p_t = P(T ≤ { $deadline }) = { $p }
+godot-ui-pert-caminho_critico = Caminho crítico: { $names } ({ $index }%)
+godot-ui-pert-aviso = aviso: { $w }
+godot-ui-pert-aproximacao_normal_do_pert_classico = aproximação normal do PERT clássico
+godot-ui-pert-unidades_observadas = unidades observadas
+godot-ui-pert-a_linha_amarela_e_o = ; a linha amarela é o prazo
+godot-ui-pert-distribuicao_do_tempo_total = Distribuição do tempo total ({ $source }){ $marker }.
+godot-ui-pert-pert_cpm_tempo_total = PERT/CPM ({ $mode }): tempo total { $total }.
+godot-ui-pert-atividade = Atividade
+godot-ui-pert-duracao = Duração
+godot-ui-pert-folga_total = Folga total
+godot-ui-pert-folga_livre = Folga livre
+godot-ui-pert-criticidade = Criticidade
+godot-ui-pert-prazo = prazo { $num }
+godot-ui-pert-sem_distribuicao_para_este_modo = sem distribuição para este modo
+godot-ui-pert-hipotese = hipótese: { $h }
+godot-ui-pert-fechar = Fechar
+godot-ui-pert-fechar_a_janela_pert_cpm = Fechar a janela PERT/CPM
+godot-ui-pert-prazo-2 = Prazo
+godot-ui-pert-sem_prazo = sem prazo
+godot-ui-pert-sorteios_monte_carlo = Sorteios (Monte Carlo)
+godot-ui-pert-recalcular = Recalcular
+godot-ui-pert-calcula_de_novo_no_modo = Calcula de novo no modo atual
+godot-ui-pert-relatorio_html = relatório .html
+godot-ui-pert-exportar_html = Exportar HTML
+godot-ui-pert-grava_o_relatorio_html_do = Grava o relatório HTML do PERT/CPM
+godot-ui-pert-csv = CSV
+godot-ui-pert-grava_as_tabelas_em_csv = Grava as tabelas em CSV na pasta do arquivo
+
+## zone_edit.rs
+
+godot-zone-edit-trafego_de_veiculos = Tráfego de veículos
+godot-zone-edit-alcance_de_maquina = Alcance de máquina
+godot-zone-edit-carga_suspensa = Carga suspensa
+godot-zone-edit-ruido = Ruído
+godot-zone-edit-calor = Calor
+godot-zone-edit-outro = Outro
+godot-zone-edit-a_zona_nao_existe = a zona '{ $name }' não existe
+godot-zone-edit-uma_zona_precisa_de_pelo = uma zona precisa de pelo menos 3 pontos
+godot-zone-edit-a_zona_precisa_de_um = a zona precisa de um nome
+godot-zone-edit-tipo_de_zona_desconhecido = tipo de zona desconhecido: { $value }
+godot-zone-edit-nivel_um_numero_de_1 = nível: um número de 1 a 5
+godot-zone-edit-campo_de_zona_desconhecido = campo de zona desconhecido: { $field }
+
+godot-dialogo-descartar-titulo = Descartar mudanças?
+godot-dialogo-descartar-texto = O modelo tem mudanças que não foram salvas. Descartar?
+godot-dialogo-descartar = Descartar
+godot-dialogo-voltar = Voltar
+godot-dialogo-atalhos = Atalhos
+godot-dialogo-fechar = Fechar
+godot-dialogo-desempenho = Mostra ou oculta as medidas de desempenho sobre a vista 3D
+
+## Mensagens de erro dos campos (schema.rs)
+
+godot-schema-distribuicao_invalida = distribuição inválida: { $e }
+godot-schema-familia_invalida = família inválida
+godot-schema-texto_ron_esperado = texto RON esperado
+godot-schema-so_a_distribuicao_deslocada_tem = só a distribuição deslocada tem uma distribuição interna
+godot-schema-a_distribuicao_nao_tem_o = a distribuição não tem o parâmetro "{ $key }"
+godot-schema-modo_de_movimentacao_desconhecido = modo de movimentação desconhecido: { $name }
+godot-schema-modo_de_movimentacao_esperado = modo de movimentação esperado
+godot-schema-a_velocidade_deve_ser_maior = a velocidade deve ser maior que zero
+godot-schema-campo_desconhecido = campo desconhecido: { $w }
+godot-schema-rotulo_esperado = rótulo esperado
+godot-schema-o_rotulo_do_peso_nao = o rótulo do peso não pode ficar vazio
+godot-schema-ordem_safe_sequential_ou_parallel = ordem: Safe, Sequential ou Parallel
+godot-schema-crie_antes_uma_pessoa_ou = crie antes uma pessoa (ou um despachante) para operar a ponte
+godot-schema-controle_cabin_pendant_ou_radio = controle: Cabin, Pendant ou Radio
+godot-schema-escolha_a_equipe_do_operador = escolha a equipe do operador
+godot-schema-escolha_antes_botoeira_ou_radio = escolha antes botoeira ou rádio
+godot-schema-tipo_de_espera_table_pallet = tipo de espera: Table, Pallet, Shelf ou Floor, não { $k }
+godot-schema-camadas_demais = camadas demais
+godot-schema-espera_nao_tem_o_campo = espera não tem o campo "{ $rest }"
+godot-schema-espera = espera: { $e }
+godot-schema-sexo_female_male_ou_vazio = sexo: Female, Male ou vazio, não { $other }
+godot-schema-idade_grande_demais = idade grande demais
+godot-schema-pessoa_nao_tem_o_campo = pessoa não tem o campo "{ $field }"
+godot-schema-pessoa = pessoa: { $e }
+godot-schema-crie_antes_um_transportador_ou = crie antes um transportador ou um despachante para operar o processo
+godot-schema-ligue_a_transferencia_antes = ligue a transferência antes
+godot-schema-caminho_straight_ou_network = caminho: Straight ou Network
+godot-schema-ligue_as_quebras_antes = ligue as quebras antes
+godot-schema-ligue_os_turnos_antes = ligue os turnos antes
+godot-schema-fim_do_turno_pause_ou = fim do turno: Pause ou Finish, não { $t }
+godot-schema-pausas_invalidas = pausas inválidas: { $e }
+godot-schema-escolha_um_calendario = escolha um calendário
+godot-schema-ligue_o_lote_antes = ligue o lote antes
+godot-schema-ligue_antes = ligue { $head } antes
+godot-schema-ligue_os_operadores_antes = ligue os operadores antes
+godot-schema-o_ganho_da_equipe_deve = o ganho da equipe deve ser maior que zero
+godot-schema-objeto_nao_existe = objeto "{ $object }" não existe
+godot-schema-posicao_x_y_ou_z = posição: x, y ou z
+godot-schema-politica_esperada = política esperada
+godot-schema-politica_de_acesso_desconhecida = política de acesso desconhecida: { $v }
+godot-schema-o_rotulo_da_prioridade_nao = o rótulo da prioridade não pode ficar vazio
+godot-schema-script_esperado = script esperado
+godot-schema-regra_firstfree_random_ou_abc = regra: FirstFree, Random ou Abc
+godot-schema-o_rotulo_nao_pode_ficar = o rótulo não pode ficar vazio
+godot-schema-modo_unpack_ou_split = modo: Unpack ou Split
+godot-schema-o_modelo_nao_tem_calendarios = o modelo não tem calendários (crie um em "calendars")
+godot-schema-origem_dos_turnos_inline_ou = origem dos turnos: inline ou calendar
+godot-schema-texto_esperado = texto esperado
+godot-schema-modo_esperado = modo esperado
+godot-schema-perfil_brasil_ou_branco = perfil: Brasil ou Branco
+godot-schema-largura_da_faixa = largura da faixa
+godot-schema-parada_no_cruzamento = parada no cruzamento
+godot-schema-cor_invalida_use_rrggbb = cor inválida: { $t } (use #rrggbb)
+godot-schema-cor_rrggbb = cor: #rrggbb
+godot-schema-run_nao_tem_o_campo = run não tem o campo "{ $path }"
+godot-schema-regra_esperada = regra esperada
+godot-schema-lista_de_pesos_esperada = lista de pesos esperada
+godot-schema-pesos_invalidos = pesos inválidos: { $e }
+godot-schema-campo_desconhecido_output = campo desconhecido: output.{ $rest }
+godot-schema-a_escala_precisa_ser_maior = a escala precisa ser maior que zero
+godot-schema-giro_um_numero_de_graus = giro: um número de graus
+godot-schema-campo_desconhecido_visual = campo desconhecido: visual.{ $rest }
+
+godot-ui-bar-casa = Casa

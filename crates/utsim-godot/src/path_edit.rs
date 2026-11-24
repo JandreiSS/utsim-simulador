@@ -11,6 +11,7 @@
 //! Tudo aqui está em coordenadas do modelo (metros, `z` para cima); a classe converte
 //! para o Godot.
 
+use crate::texto::{fx, tx, vx};
 use utsim_edit::Command;
 use utsim_model::trajeto::{self as tr, BeltDrive, BeltRoute, BeltStyle};
 use utsim_model::{Aisle, AisleKind, Model, ObjectKind, PathNode};
@@ -557,11 +558,17 @@ impl Editor {
             .objects
             .iter()
             .find(|o| o.name == name)
-            .ok_or_else(|| format!("'{name}' não existe"))?;
+            .ok_or_else(|| fx("godot-path-edit-nao_existe", &[("name", vx(&name))]))?;
         match &o.kind {
             ObjectKind::Conveyor { route: Some(r), .. } => Ok((o.position, (**r).clone())),
-            ObjectKind::Conveyor { .. } => Err(format!("'{name}' é uma esteira reta, sem nós")),
-            _ => Err(format!("'{name}' não é uma esteira")),
+            ObjectKind::Conveyor { .. } => Err(fx(
+                "godot-path-edit-e_uma_esteira_reta_sem",
+                &[("name", vx(&name))],
+            )),
+            _ => Err(fx(
+                "godot-path-edit-nao_e_uma_esteira",
+                &[("name", vx(&name))],
+            )),
         }
     }
 
@@ -586,7 +593,7 @@ impl Editor {
         let mut pts: Vec<[f64; 3]> = points.iter().map(|p| round3(*p)).collect();
         pts.dedup();
         if pts.len() < 2 {
-            return Err("a esteira precisa de ao menos 2 nós diferentes".into());
+            return Err(tx("godot-path-edit-a_esteira_precisa_de_ao").into());
         }
         let origin = middle(&pts, radii);
         let route = BeltRoute {
@@ -606,7 +613,7 @@ impl Editor {
         };
         let name = self.doc.unique_name(base);
         let obj = utsim_edit::from_palette("Conveyor", &name, origin)
-            .ok_or("a biblioteca não tem esteira")?;
+            .ok_or(tx("godot-path-edit-a_biblioteca_nao_tem_esteira"))?;
         let mut batch = vec![
             Command::Add(Box::new(obj)),
             Command::SetRoute {
@@ -641,7 +648,7 @@ impl Editor {
         let mut pts: Vec<[f64; 3]> = points.iter().map(|p| round3(*p)).collect();
         pts.dedup();
         if pts.len() < 2 {
-            return Err("o caminho precisa de ao menos 2 pontos diferentes".into());
+            return Err(tx("godot-path-edit-o_caminho_precisa_de_ao").into());
         }
         let name = self.doc.unique_aisle_name();
         let mut aisle = Aisle {
@@ -684,7 +691,12 @@ impl Editor {
             .iter()
             .find(|a| a.name == name)
             .cloned()
-            .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+            .ok_or_else(|| {
+                fx(
+                    "godot-path-edit-nao_existe_o_caminho",
+                    &[("name", vx(&name))],
+                )
+            })?;
         f(&mut a);
         self.apply(Command::SetAisle {
             name: name.to_string(),
@@ -711,7 +723,10 @@ impl Editor {
         }
         let (_, r) = self.route_of(name)?;
         if index >= r.nodes.len() {
-            return Err(format!("'{name}' não tem o nó {}", index + 1));
+            return Err(fx(
+                "godot-path-edit-nao_tem_o_no",
+                &[("name", vx(&name)), ("index", vx(&(index + 1)))],
+            ));
         }
         self.edit_route(name, |r, o| {
             r.nodes[index].at = [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
@@ -769,7 +784,7 @@ impl Editor {
             .iter()
             .find(|o| o.name == name)
             .map(|o| o.position)
-            .ok_or_else(|| format!("'{name}' não existe"))?;
+            .ok_or_else(|| fx("godot-path-edit-nao_existe", &[("name", vx(&name))]))?;
         self.apply(Command::Move {
             name: name.to_string(),
             position: round3([pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]),
@@ -817,7 +832,7 @@ impl Editor {
         radius: f64,
     ) -> Result<(), String> {
         if !(radius.is_finite() && radius >= 0.0) {
-            return Err("o raio deve ser um número >= 0 (metros)".into());
+            return Err(tx("godot-path-edit-o_raio_deve_ser_um").into());
         }
         if path {
             return self.edit_path(name, |a| a.set_radius(index, radius));
@@ -867,7 +882,7 @@ impl Editor {
     /// aumenta). A esteira nova é do mesmo tipo e não se liga a nada. Devolve o nome.
     pub fn parallel(&mut self, name: &str, path: bool, offset: f64) -> Result<String, String> {
         if !(offset.is_finite() && offset.abs() > 1e-3) {
-            return Err("a distância do paralelo deve ser diferente de zero".into());
+            return Err(tx("godot-path-edit-a_distancia_do_paralelo_deve").into());
         }
         let (nodes, kind_width): (Vec<PathNode>, Option<(AisleKind, f64)>) = if path {
             let a = self
@@ -875,7 +890,12 @@ impl Editor {
                 .aisles
                 .iter()
                 .find(|a| a.name == name)
-                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+                .ok_or_else(|| {
+                    fx(
+                        "godot-path-edit-nao_existe_o_caminho",
+                        &[("name", vx(&name))],
+                    )
+                })?;
             (a.nodes(), Some((a.kind, a.width)))
         } else {
             let (o, r) = self.route_of(name)?;
@@ -923,7 +943,7 @@ impl Editor {
                     .iter()
                     .find(|a| a.name == made)
                     .cloned()
-                    .ok_or("o caminho novo sumiu")?;
+                    .ok_or(tx("godot-path-edit-o_caminho_novo_sumiu"))?;
                 a.kind = kind;
                 self.apply(Command::SetAisle {
                     name: made.clone(),
@@ -982,13 +1002,13 @@ impl Editor {
                 .find(|a| a.name == name)
                 .map_or(0, |a| a.points.len());
             if n <= 2 {
-                return Err("o caminho precisa de ao menos 2 pontos".into());
+                return Err(tx("godot-path-edit-o_caminho_precisa_de_ao-2").into());
             }
             return self.edit_path(name, |a| a.remove_point(index));
         }
         let (_, r) = self.route_of(name)?;
         if r.nodes.len() <= 2 {
-            return Err("a esteira precisa de ao menos 2 nós".into());
+            return Err(tx("godot-path-edit-a_esteira_precisa_de_ao-2").into());
         }
         self.edit_route(name, |r, _| {
             if index < r.nodes.len() {
@@ -1003,7 +1023,12 @@ impl Editor {
         let nodes = drawn(self.model())
             .find(|(n, ..)| *n == name)
             .map(|(_, origin, r)| abs_nodes(origin, r))
-            .ok_or_else(|| format!("'{name}' não é uma esteira desenhada"))?;
+            .ok_or_else(|| {
+                fx(
+                    "godot-path-edit-nao_e_uma_esteira_desenhada",
+                    &[("name", vx(&name))],
+                )
+            })?;
         let mut best = (f64::INFINITY, 0usize, nodes[0]);
         for (i, w) in nodes.windows(2).enumerate() {
             let (u, v) = (w[0], w[1]);
@@ -1041,7 +1066,7 @@ impl Editor {
         }
         let (first, last) = match (points.first(), points.last()) {
             (Some(a), Some(b)) => (*a, *b),
-            _ => return Err("a esteira precisa de ao menos 2 nós".into()),
+            _ => return Err(tx("godot-path-edit-a_esteira_precisa_de_ao-2").into()),
         };
         self.group(|e| {
             let made = e.add_belt_route(tool, points, radii, from, to)?;
@@ -1083,11 +1108,16 @@ impl Editor {
             .iter()
             .find(|a| a.name == name)
             .cloned()
-            .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+            .ok_or_else(|| {
+                fx(
+                    "godot-path-edit-nao_existe_o_caminho",
+                    &[("name", vx(&name))],
+                )
+            })?;
         let nodes = a.nodes();
         let n = nodes.len();
         if n < 2 {
-            return Err("o caminho precisa de ao menos 2 pontos".into());
+            return Err(tx("godot-path-edit-o_caminho_precisa_de_ao-2").into());
         }
         let mut added = 0;
         let mut out = a.clone();
@@ -1111,7 +1141,7 @@ impl Editor {
             added += 1;
         }
         if added == 0 {
-            return Err("as duas pontas já estão no piso".into());
+            return Err(tx("godot-path-edit-as_duas_pontas_ja_estao").into());
         }
         self.apply(Command::SetAisle {
             name: name.to_string(),
@@ -1189,7 +1219,12 @@ impl Editor {
         let s = match style {
             "simples" => BeltStyle::Simple,
             "canaletas" => BeltStyle::Channeled,
-            _ => return Err(format!("tipo de esteira desconhecido: {style}")),
+            _ => {
+                return Err(fx(
+                    "godot-path-edit-tipo_de_esteira_desconhecido",
+                    &[("style", vx(&style))],
+                ));
+            }
         };
         self.edit_route(name, |r, _| r.style = s)
     }
@@ -1199,14 +1234,19 @@ impl Editor {
             "motorizada" => BeltDrive::Powered,
             "gravidade" => BeltDrive::Gravity,
             "calha" => BeltDrive::Chute,
-            _ => return Err(format!("acionamento desconhecido: {drive}")),
+            _ => {
+                return Err(fx(
+                    "godot-path-edit-acionamento_desconhecido",
+                    &[("drive", vx(&drive))],
+                ));
+            }
         };
         self.edit_route(name, |r, _| r.drive = d)
     }
 
     pub fn set_route_width(&mut self, name: &str, width: f64) -> Result<(), String> {
         if !(width.is_finite() && width > 0.0) {
-            return Err("a largura deve ser > 0 (metros)".into());
+            return Err(tx("godot-path-edit-a_largura_deve_ser_0").into());
         }
         self.edit_route(name, |r, _| r.width = Some(round_mm(width)))
     }
@@ -1214,7 +1254,7 @@ impl Editor {
     /// Inclinação máxima própria (graus); 0: a do tipo.
     pub fn set_route_max_slope(&mut self, name: &str, degrees: f64) -> Result<(), String> {
         if !(degrees.is_finite() && (0.0..90.0).contains(&degrees)) {
-            return Err("a inclinação máxima fica entre 0 e 90 graus".into());
+            return Err(tx("godot-path-edit-a_inclinacao_maxima_fica_entre").into());
         }
         self.edit_route(name, |r, _| {
             r.max_slope = (degrees > 0.0).then_some(degrees)
@@ -1227,7 +1267,7 @@ impl Editor {
     pub fn split_route(&mut self, name: &str, index: usize) -> Result<String, String> {
         let (origin, r) = self.route_of(name)?;
         if index == 0 || index + 1 >= r.nodes.len() {
-            return Err("divida num nó do meio da esteira".into());
+            return Err(tx("godot-path-edit-divida_num_no_do_meio").into());
         }
         let obj = self
             .model()
@@ -1235,7 +1275,7 @@ impl Editor {
             .iter()
             .find(|o| o.name == name)
             .cloned()
-            .ok_or_else(|| format!("'{name}' não existe"))?;
+            .ok_or_else(|| fx("godot-path-edit-nao_existe", &[("name", vx(&name))]))?;
         let abs = abs_nodes(origin, &r);
         let mut first = r.clone();
         first.nodes.truncate(index + 1);
@@ -1309,18 +1349,23 @@ impl Editor {
                 .iter()
                 .find(|a| a.name == name)
                 .map(|a| a.points.len())
-                .ok_or_else(|| format!("não existe o caminho '{name}'"))?
+                .ok_or_else(|| {
+                    fx(
+                        "godot-path-edit-nao_existe_o_caminho",
+                        &[("name", vx(&name))],
+                    )
+                })?
         } else {
             self.route_of(name)?.1.nodes.len()
         };
         if index + 1 >= n {
-            return Err("não há trecho depois do último nó".into());
+            return Err(tx("godot-path-edit-nao_ha_trecho_depois_do").into());
         }
         if n <= 2 {
             return Err(if path {
-                "o caminho só tem esse trecho: apague o caminho inteiro".into()
+                tx("godot-path-edit-o_caminho_so_tem_esse").into()
             } else {
-                "a esteira só tem esse trecho: apague a esteira inteira".into()
+                tx("godot-path-edit-a_esteira_so_tem_esse").into()
             });
         }
         if index == 0 || index + 2 == n {
@@ -1351,7 +1396,12 @@ impl Editor {
                 .iter()
                 .find(|a| a.name == name)
                 .cloned()
-                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+                .ok_or_else(|| {
+                    fx(
+                        "godot-path-edit-nao_existe_o_caminho",
+                        &[("name", vx(&name))],
+                    )
+                })?;
             let mut first = a.clone();
             while first.points.len() > index + 1 {
                 first.remove_point(first.points.len() - 1);
@@ -1491,7 +1541,7 @@ impl Editor {
     pub fn join_routes(&mut self, name: &str, path: bool) -> Result<String, String> {
         let other = self
             .join_partner(name, path)
-            .ok_or("nenhum trajeto começa onde este acaba")?;
+            .ok_or(tx("godot-path-edit-nenhum_trajeto_comeca_onde_este"))?;
         if path {
             let mut a = self
                 .model()
@@ -1499,14 +1549,24 @@ impl Editor {
                 .iter()
                 .find(|a| a.name == name)
                 .cloned()
-                .ok_or_else(|| format!("não existe o caminho '{name}'"))?;
+                .ok_or_else(|| {
+                    fx(
+                        "godot-path-edit-nao_existe_o_caminho",
+                        &[("name", vx(&name))],
+                    )
+                })?;
             let mut b = self
                 .model()
                 .aisles
                 .iter()
                 .find(|x| x.name == other)
                 .cloned()
-                .ok_or_else(|| format!("não existe o caminho '{other}'"))?;
+                .ok_or_else(|| {
+                    fx(
+                        "godot-path-edit-nao_existe_o_caminho-2",
+                        &[("other", vx(&other))],
+                    )
+                })?;
             let end = |x: &Aisle, last: bool| {
                 let n = x.nodes();
                 if last { n[n.len() - 1].at } else { n[0].at }

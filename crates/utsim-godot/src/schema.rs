@@ -574,7 +574,8 @@ pub fn dist_view(d: &Dist) -> DistView {
 }
 
 fn parse_dist(text: &str) -> Result<Dist, String> {
-    let d: Dist = ron::parse(text).map_err(|e| format!("distribuição inválida: {e}"))?;
+    let d: Dist =
+        ron::parse(text).map_err(|e| fx("godot-schema-distribuicao_invalida", &[("e", vx(&e))]))?;
     d.validate()?;
     Ok(d)
 }
@@ -584,24 +585,24 @@ fn parse_dist(text: &str) -> Result<Dist, String> {
 fn edit_dist(d: &mut Dist, sub: &str, v: &Value) -> Result<(), String> {
     match sub {
         "family" => {
-            let i = v.as_int().ok_or("família inválida")?;
+            let i = v.as_int().ok_or(tx("godot-schema-familia_invalida"))?;
             let i = usize::try_from(i)
                 .ok()
                 .filter(|i| *i < FAMILIES.len())
-                .ok_or("família inválida")?;
+                .ok_or(tx("godot-schema-familia_invalida"))?;
             *d = switch_family(d, i);
             Ok(())
         }
         "" | "text" => {
-            let t = v.as_text().ok_or("texto RON esperado")?;
+            let t = v.as_text().ok_or(tx("godot-schema-texto_ron_esperado"))?;
             *d = parse_dist(t)?;
             Ok(())
         }
         "inner" => {
             let Dist::Shifted { dist, .. } = d else {
-                return Err("só a distribuição deslocada tem uma distribuição interna".into());
+                return Err(tx("godot-schema-so_a_distribuicao_deslocada_tem").into());
             };
-            let t = v.as_text().ok_or("texto RON esperado")?;
+            let t = v.as_text().ok_or(tx("godot-schema-texto_ron_esperado"))?;
             **dist = parse_dist(t)?;
             Ok(())
         }
@@ -621,7 +622,10 @@ fn edit_dist(d: &mut Dist, sub: &str, v: &Value) -> Result<(), String> {
                     return Ok(());
                 }
             }
-            Err(format!("a distribuição não tem o parâmetro \"{key}\""))
+            Err(fx(
+                "godot-schema-a_distribuicao_nao_tem_o",
+                &[("key", vx(&key))],
+            ))
         }
     }
 }
@@ -770,7 +774,12 @@ fn movement_from(name: &str) -> Result<Option<Movement>, String> {
         "Free" => Some(Movement::Free),
         "Network" => Some(Movement::Network),
         "Aisles" => Some(Movement::Aisles),
-        _ => return Err(format!("modo de movimentação desconhecido: {name}")),
+        _ => {
+            return Err(fx(
+                "godot-schema-modo_de_movimentacao_desconhecido",
+                &[("name", vx(&name))],
+            ));
+        }
     })
 }
 
@@ -1041,7 +1050,7 @@ fn edit_movement(
     Some(match (head, rest) {
         ("movement", "") if mobile => value
             .as_text()
-            .ok_or_else(|| "modo de movimentação esperado".to_string())
+            .ok_or_else(|| tx("godot-schema-modo_de_movimentacao_esperado").to_string())
             .and_then(movement_from)
             .map(|movement| Command::SetMovement { name, movement }),
         ("clearance", "on") if mobile => {
@@ -2078,7 +2087,7 @@ fn edit_crane(
                 "speed" => {
                     let v = f64_of(value, w)?;
                     if !(v.is_finite() && v > 0.0) {
-                        return Err("a velocidade deve ser maior que zero".into());
+                        return Err(tx("godot-schema-a_velocidade_deve_ser_maior").into());
                     }
                     a.speed = v;
                 }
@@ -2086,7 +2095,7 @@ fn edit_crane(
                 "deceleration.on" => a.deceleration = bool_of(value, w)?.then_some(1.0),
                 "acceleration" => a.acceleration = opt_f64(value, w)?,
                 "deceleration" => a.deceleration = opt_f64(value, w)?,
-                _ => return Err(format!("campo desconhecido: {w}")),
+                _ => return Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             }
             return Ok(set(name, head, axis_text(&a)));
         }
@@ -2105,15 +2114,18 @@ fn edit_crane(
             }
             ("home" | "keep_clear", "") => Ok(set(name, head, bool_of(value, w)?.to_string())),
             ("weight_label", "") => {
-                let t = value.as_text().ok_or("rótulo esperado")?.trim();
+                let t = value
+                    .as_text()
+                    .ok_or(tx("godot-schema-rotulo_esperado"))?
+                    .trim();
                 if t.is_empty() {
-                    return Err("o rótulo do peso não pode ficar vazio".into());
+                    return Err(tx("godot-schema-o_rotulo_do_peso_nao").into());
                 }
                 Ok(set(name, head, ron::string(t)))
             }
             ("motion", "") => match value.as_text() {
                 Some(m @ ("Safe" | "Sequential" | "Parallel")) => Ok(set(name, head, m.into())),
-                _ => Err("ordem: Safe, Sequential ou Parallel".into()),
+                _ => Err(tx("godot-schema-ordem_safe_sequential_ou_parallel").into()),
             },
             ("operator", "") => {
                 let first = || {
@@ -2128,24 +2140,27 @@ fn edit_crane(
                 let text = match value.as_text() {
                     Some("Cabin") => "Cabin".to_string(),
                     Some(k @ ("Pendant" | "Radio")) => {
-                        let team = operator.team().or_else(first).ok_or(
-                            "crie antes uma pessoa (ou um despachante) para operar a ponte",
-                        )?;
+                        let team = operator
+                            .team()
+                            .or_else(first)
+                            .ok_or(tx("godot-schema-crie_antes_uma_pessoa_ou"))?;
                         format!("{k}(team: {})", ron::string(team))
                     }
-                    _ => return Err("controle: Cabin, Pendant ou Radio".into()),
+                    _ => return Err(tx("godot-schema-controle_cabin_pendant_ou_radio").into()),
                 };
                 Ok(set(name, head, text))
             }
             ("operator", "team") => {
                 let team = value.as_text().ok_or("nome esperado")?.trim();
                 if team.is_empty() {
-                    return Err("escolha a equipe do operador".into());
+                    return Err(tx("godot-schema-escolha_a_equipe_do_operador").into());
                 }
                 let kind = match operator {
                     CraneControl::Radio { .. } => "Radio",
                     CraneControl::Pendant { .. } => "Pendant",
-                    CraneControl::Cabin => return Err("escolha antes botoeira ou rádio".into()),
+                    CraneControl::Cabin => {
+                        return Err(tx("godot-schema-escolha_antes_botoeira_ou_radio").into());
+                    }
                 };
                 Ok(set(
                     name,
@@ -2852,20 +2867,25 @@ fn edit_waiting(
                     return Ok(set(&obj.name, "waiting_area", "None".into()));
                 }
                 w.kind = utsim_model::WaitingKind::by_name(k).ok_or_else(|| {
-                    format!("tipo de espera: Table, Pallet, Shelf ou Floor, não {k}")
+                    fx("godot-schema-tipo_de_espera_table_pallet", &[("k", vx(&k))])
                 })?;
             }
             "layers" => {
                 let n = usize_of(value, "camadas", 1)?;
-                w.layers = Some(u32::try_from(n).map_err(|_| "camadas demais")?);
+                w.layers = Some(u32::try_from(n).map_err(|_| tx("godot-schema-camadas_demais"))?);
             }
             "pitch" => w.pitch = Some(f64_of(value, "passo")?),
-            _ => return Err(format!("espera não tem o campo \"{rest}\"")),
+            _ => {
+                return Err(fx(
+                    "godot-schema-espera_nao_tem_o_campo",
+                    &[("rest", vx(&rest))],
+                ));
+            }
         }
         if let Some(e) = w.problem() {
             return Err(e);
         }
-        let text = ::ron::to_string(&w).map_err(|e| format!("espera: {e}"))?;
+        let text = ::ron::to_string(&w).map_err(|e| fx("godot-schema-espera", &[("e", vx(&e))]))?;
         Ok(set(&obj.name, "waiting_area", format!("Some({text})")))
     })())
 }
@@ -2908,7 +2928,12 @@ fn edit_person(
                     "" => None,
                     "Female" | "Feminino" => Some(utsim_core::Sex::Female),
                     "Male" | "Masculino" => Some(utsim_core::Sex::Male),
-                    other => return Err(format!("sexo: Female, Male ou vazio, não {other}")),
+                    other => {
+                        return Err(fx(
+                            "godot-schema-sexo_female_male_ou_vazio",
+                            &[("other", vx(&other))],
+                        ));
+                    }
                 }
             }
             "height_m" => p.height_m = number(1.70)?,
@@ -2922,14 +2947,19 @@ fn edit_person(
                         Value::Null => None,
                         v => Some(
                             u32::try_from(usize_of(v, "idade", 0)?)
-                                .map_err(|_| "idade grande demais")?,
+                                .map_err(|_| tx("godot-schema-idade_grande_demais"))?,
                         ),
                     }
                 }
             }
             "capacity.load_kg" => cap.load_kg = number(20.0)?,
             "capacity.force_n" => cap.force_n = number(200.0)?,
-            _ => return Err(format!("pessoa não tem o campo \"{field}\"")),
+            _ => {
+                return Err(fx(
+                    "godot-schema-pessoa_nao_tem_o_campo",
+                    &[("field", vx(&field))],
+                ));
+            }
         }
         p.capacity = (cap != utsim_core::Capacity::default()).then_some(cap);
         // An empty block (`person: Some(())`) still marks a person: it is kept once there.
@@ -2938,7 +2968,7 @@ fn edit_person(
         } else {
             format!(
                 "Some({})",
-                ::ron::to_string(&p).map_err(|e| format!("pessoa: {e}"))?
+                ::ron::to_string(&p).map_err(|e| fx("godot-schema-pessoa", &[("e", vx(&e))]))?
             )
         };
         Ok(set(&obj.name, "person", text))
@@ -3205,7 +3235,7 @@ fn default_on(model: &Model, obj: &ObjectDef, head: &str) -> Result<String, Stri
             let team = mobile_names(model)
                 .into_iter()
                 .next()
-                .ok_or("crie antes um transportador ou um despachante para operar o processo")?;
+                .ok_or(tx("godot-schema-crie_antes_um_transportador_ou"))?;
             ron::operators(&team, 1, true, true)
         }
         "transfer" => "(speed: 1.0, delay: 0.0, path: Straight)".into(),
@@ -3262,7 +3292,10 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
     let w = what.as_str();
     match head {
         "transfer" => {
-            let t = o.transfer.as_mut().ok_or("ligue a transferência antes")?;
+            let t = o
+                .transfer
+                .as_mut()
+                .ok_or(tx("godot-schema-ligue_a_transferencia_antes"))?;
             match rest {
                 "speed" => t.speed = f64_of(v, w)?,
                 "delay" => t.delay = f64_of(v, w)?,
@@ -3270,46 +3303,53 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
                     t.path = match v.as_text() {
                         Some("Straight") => utsim_core::TransferPath::Straight,
                         Some("Network") => utsim_core::TransferPath::Network,
-                        _ => return Err("caminho: Straight ou Network".into()),
+                        _ => return Err(tx("godot-schema-caminho_straight_ou_network").into()),
                     }
                 }
-                _ => return Err(format!("campo desconhecido: {w}")),
+                _ => return Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             }
             return Ok(());
         }
         "downtime" => {
-            let d = o.downtime.as_mut().ok_or("ligue as quebras antes")?;
+            let d = o
+                .downtime
+                .as_mut()
+                .ok_or(tx("godot-schema-ligue_as_quebras_antes"))?;
             let (which, sub) = rest.split_once('.').unwrap_or((rest, ""));
             return match which {
                 "mtbf" => edit_dist(&mut d.mtbf, sub, v),
                 "mttr" => edit_dist(&mut d.mttr, sub, v),
-                _ => Err(format!("campo desconhecido: {w}")),
+                _ => Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             };
         }
         "shifts" => {
-            let spec = o.shifts.as_mut().ok_or("ligue os turnos antes")?;
+            let spec = o
+                .shifts
+                .as_mut()
+                .ok_or(tx("godot-schema-ligue_os_turnos_antes"))?;
             let end = |v: &Value| match v.as_text() {
                 Some("Pause") => Ok(Some(ShiftEnd::Pause)),
                 Some("Finish") => Ok(Some(ShiftEnd::Finish)),
                 Some("") | None => Ok(None),
-                Some(t) => Err(format!("fim do turno: Pause ou Finish, não {t}")),
+                Some(t) => Err(fx("godot-schema-fim_do_turno_pause_ou", &[("t", vx(&t))])),
             };
             match (spec, rest) {
                 (ShiftSpec::Inline(t), "period") => t.period = f64_of(v, w)?,
                 (ShiftSpec::Inline(t), "off") => {
-                    let text = v.as_text().ok_or("texto RON esperado")?;
-                    t.off = ron::parse(text).map_err(|e| format!("pausas inválidas: {e}"))?;
+                    let text = v.as_text().ok_or(tx("godot-schema-texto_ron_esperado"))?;
+                    t.off = ron::parse(text)
+                        .map_err(|e| fx("godot-schema-pausas_invalidas", &[("e", vx(&e))]))?;
                 }
                 (ShiftSpec::Inline(t), "on_end") => t.on_end = end(v)?.unwrap_or_default(),
                 (ShiftSpec::Calendar { name, .. }, "calendar") => {
                     let n = v.as_text().ok_or("nome do calendário esperado")?.trim();
                     if n.is_empty() {
-                        return Err("escolha um calendário".into());
+                        return Err(tx("godot-schema-escolha_um_calendario").into());
                     }
                     *name = n.to_string();
                 }
                 (ShiftSpec::Calendar { on_end, .. }, "on_end") => *on_end = end(v)?,
-                _ => return Err(format!("campo desconhecido: {w}")),
+                _ => return Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             }
             return Ok(());
         }
@@ -3335,12 +3375,14 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
             }
         }
         (ObjectKind::Queue { batch, .. }, "batch") => {
-            let b = batch.as_mut().ok_or("ligue o lote antes")?;
+            let b = batch
+                .as_mut()
+                .ok_or(tx("godot-schema-ligue_o_lote_antes"))?;
             match rest {
                 "size" => b.size = usize_of(v, w, 1)?,
                 "max_wait" => b.max_wait = f64_of(v, w)?,
                 "flush" => b.flush = bool_of(v, w)?,
-                _ => return Err(format!("campo desconhecido: {w}")),
+                _ => return Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             }
         }
         (ObjectKind::Processor { capacity, .. }, "capacity")
@@ -3350,7 +3392,7 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
         | (ObjectKind::Rack { dwell: setup, .. }, "dwell") => {
             let d = setup
                 .as_mut()
-                .ok_or_else(|| format!("ligue {head} antes"))?;
+                .ok_or_else(|| fx("godot-schema-ligue_antes", &[("head", vx(&head))]))?;
             edit_dist(d, rest, v)?;
         }
         (ObjectKind::Processor { process, .. }, "process")
@@ -3370,20 +3412,22 @@ fn mutate(o: &mut ObjectDef, head: &str, rest: &str, v: &Value) -> Result<(), St
             "unload_time",
         ) => edit_dist(process, rest, v)?,
         (ObjectKind::Processor { operators, .. }, "operators") => {
-            let op = operators.as_mut().ok_or("ligue os operadores antes")?;
+            let op = operators
+                .as_mut()
+                .ok_or(tx("godot-schema-ligue_os_operadores_antes"))?;
             match rest {
                 "team" => op.team = v.as_text().ok_or("nome esperado")?.to_string(),
                 "count" => op.count = usize_of(v, w, 1)?,
                 "team_speedup" => {
                     let gain = f64_of(v, w)?;
                     if !(gain.is_finite() && gain > 0.0) {
-                        return Err("o ganho da equipe deve ser maior que zero".into());
+                        return Err(tx("godot-schema-o_ganho_da_equipe_deve").into());
                     }
                     op.team_speedup = (gain != 1.0).then_some(gain);
                 }
                 "setup" => op.setup = bool_of(v, w)?,
                 "process" => op.process = bool_of(v, w)?,
-                _ => return Err(format!("campo desconhecido: {w}")),
+                _ => return Err(fx("godot-schema-campo_desconhecido", &[("w", vx(&w))])),
             }
         }
         (ObjectKind::Transporter { speed, .. }, "speed")
@@ -3437,7 +3481,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
         .objects
         .iter()
         .find(|o| o.name == object)
-        .ok_or_else(|| format!("objeto \"{object}\" não existe"))?;
+        .ok_or_else(|| fx("godot-schema-objeto_nao_existe", &[("object", vx(&object))]))?;
     let (head, rest) = path.split_once('.').unwrap_or((path, ""));
     match head {
         "name" => {
@@ -3453,7 +3497,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                 "x" => 0,
                 "y" => 1,
                 "z" => 2,
-                _ => return Err("posição: x, y ou z".into()),
+                _ => return Err(tx("godot-schema-posicao_x_y_ou_z").into()),
             };
             position[k] = f64_of(value, "posição")?;
             return Ok(Command::Move {
@@ -3491,7 +3535,9 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
     if let ObjectKind::Queue { order, .. } = &obj.kind {
         match (head, rest) {
             ("discipline", "") => {
-                let v = value.as_text().ok_or("política esperada")?;
+                let v = value
+                    .as_text()
+                    .ok_or(tx("godot-schema-politica_esperada"))?;
                 let label = order
                     .as_ref()
                     .map_or("prioridade".to_owned(), |o| o.label().to_owned());
@@ -3501,7 +3547,12 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                         "Fifo".to_owned(),
                         format!("Some({v}({}))", ron::string(&label)),
                     ),
-                    _ => return Err(format!("política de acesso desconhecida: {v}")),
+                    _ => {
+                        return Err(fx(
+                            "godot-schema-politica_de_acesso_desconhecida",
+                            &[("v", vx(&v))],
+                        ));
+                    }
                 };
                 return Ok(Command::Batch(vec![
                     set(&obj.name, "discipline", discipline),
@@ -3509,9 +3560,13 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                 ]));
             }
             ("order", "label") => {
-                let l = value.as_text().ok_or("rótulo esperado")?.trim().to_owned();
+                let l = value
+                    .as_text()
+                    .ok_or(tx("godot-schema-rotulo_esperado"))?
+                    .trim()
+                    .to_owned();
                 if l.is_empty() {
-                    return Err("o rótulo da prioridade não pode ficar vazio".into());
+                    return Err(tx("godot-schema-o_rotulo_da_prioridade_nao").into());
                 }
                 let kind = match order {
                     Some(utsim_objects::LabelOrder::Asc(_)) => "Asc",
@@ -3537,7 +3592,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
             return Ok(set(&obj.name, head, text));
         }
         ("on_entry", "") => {
-            let t = value.as_text().ok_or("script esperado")?;
+            let t = value.as_text().ok_or(tx("godot-schema-script_esperado"))?;
             return Ok(set(&obj.name, head, ron::string(t)));
         }
         ("output", _) => return edit_output(model, obj, rest, value),
@@ -3570,7 +3625,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                         ron::float(b.unwrap_or(0.3))
                     )
                 }
-                _ => return Err("regra: FirstFree, Random ou Abc".into()),
+                _ => return Err(tx("godot-schema-regra_firstfree_random_ou_abc").into()),
             };
             return Ok(set(&obj.name, head, text));
         }
@@ -3595,7 +3650,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                         _ => ("linhas".to_string(), "pedido".to_string()),
                     };
                     if t.trim().is_empty() {
-                        return Err("o rótulo não pode ficar vazio".into());
+                        return Err(tx("godot-schema-o_rotulo_nao_pode_ficar").into());
                     }
                     if rest == "count" {
                         count = t.trim().to_string();
@@ -3609,7 +3664,7 @@ pub fn edit(model: &Model, object: &str, path: &str, value: &Value) -> Result<Co
                     )
                 }
                 (_, Some(t)) => t.to_string(),
-                _ => return Err("modo: Unpack ou Split".into()),
+                _ => return Err(tx("godot-schema-modo_unpack_ou_split").into()),
             };
             return Ok(set(&obj.name, head, text));
         }
@@ -3651,7 +3706,10 @@ fn default_table() -> ShiftTable {
 /// `shifts.source`: a calendar of the model (the first one) or a table of its own (a
 /// copy of the calendar it used, as the Bevy editor does).
 fn edit_shift_source(model: &Model, obj: &ObjectDef, value: &Value) -> Result<Command, String> {
-    let spec = obj.shifts.as_ref().ok_or("ligue os turnos antes")?;
+    let spec = obj
+        .shifts
+        .as_ref()
+        .ok_or(tx("godot-schema-ligue_os_turnos_antes"))?;
     let text = match (value.as_text(), spec) {
         (Some("calendar"), ShiftSpec::Calendar { .. }) | (Some("inline"), ShiftSpec::Inline(_)) => {
             ron::shift_spec(spec)
@@ -3661,7 +3719,7 @@ fn edit_shift_source(model: &Model, obj: &ObjectDef, value: &Value) -> Result<Co
                 .calendars
                 .keys()
                 .next()
-                .ok_or("o modelo não tem calendários (crie um em \"calendars\")")?;
+                .ok_or(tx("godot-schema-o_modelo_nao_tem_calendarios"))?;
             ron::shift_spec(&ShiftSpec::calendar(name.clone()))
         }
         (Some("inline"), ShiftSpec::Calendar { name, on_end }) => {
@@ -3675,13 +3733,17 @@ fn edit_shift_source(model: &Model, obj: &ObjectDef, value: &Value) -> Result<Co
             }
             ron::shifts(&t)
         }
-        _ => return Err("origem dos turnos: inline ou calendar".into()),
+        _ => return Err(tx("godot-schema-origem_dos_turnos_inline_ou").into()),
     };
     Ok(set(&obj.name, "shifts", text))
 }
 
 fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String> {
-    let text = |v: &Value| v.as_text().map(str::to_string).ok_or("texto esperado");
+    let text = |v: &Value| {
+        v.as_text()
+            .map(str::to_string)
+            .ok_or(tx("godot-schema-texto_esperado"))
+    };
     match path {
         "model_name" => {
             return Ok(Command::SetInfo {
@@ -3700,23 +3762,23 @@ fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String>
     let mut marking = model.marking();
     match path {
         "movement" => {
-            let movement = movement_from(value.as_text().ok_or("modo esperado")?)?;
+            let movement = movement_from(value.as_text().ok_or(tx("godot-schema-modo_esperado"))?)?;
             return Ok(Command::SetRunMovement(movement));
         }
         "marking.profile" => {
             marking.profile = match value.as_text() {
                 Some("Brasil") => Profile::Brasil,
                 Some("Branco") => Profile::Branco,
-                _ => return Err("perfil: Brasil ou Branco".into()),
+                _ => return Err(tx("godot-schema-perfil_brasil_ou_branco").into()),
             };
             return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
         }
         "marking.line_width" => {
-            marking.line_width = f64_of(value, "largura da faixa")?;
+            marking.line_width = f64_of(value, tx("godot-schema-largura_da_faixa"))?;
             return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
         }
         "marking.crossing_stop" => {
-            marking.crossing_stop = f64_of(value, "parada no cruzamento")?;
+            marking.crossing_stop = f64_of(value, tx("godot-schema-parada_no_cruzamento"))?;
             return Ok(Command::SetFloorMarking(Some(Box::new(marking))));
         }
         "marking.floor_color" | "marking.floor_color.on" => {
@@ -3732,11 +3794,11 @@ fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String>
                         format!("#{t}")
                     };
                     if looks::parse_color(&t).is_none() {
-                        return Err(format!("cor inválida: {t} (use #rrggbb)"));
+                        return Err(fx("godot-schema-cor_invalida_use_rrggbb", &[("t", vx(&t))]));
                     }
                     Some(t.to_lowercase())
                 }
-                _ => return Err("cor: #rrggbb".into()),
+                _ => return Err(tx("godot-schema-cor_rrggbb").into()),
             };
             // Back to the default profile with no colour: no `floor_marking` at all.
             let none = marking == utsim_model::FloorMarking::default();
@@ -3748,7 +3810,12 @@ fn edit_run(model: &Model, path: &str, value: &Value) -> Result<Command, String>
         "stop_time" | "warmup" => ron::float(f64_of(value, path)?),
         "seed" => usize_of(value, path, 0)?.to_string(),
         "replications" => usize_of(value, path, 1)?.to_string(),
-        _ => return Err(format!("run não tem o campo \"{path}\"")),
+        _ => {
+            return Err(fx(
+                "godot-schema-run_nao_tem_o_campo",
+                &[("path", vx(&path))],
+            ));
+        }
     };
     Ok(set("run", path, text))
 }
@@ -3761,7 +3828,7 @@ fn edit_output(
 ) -> Result<Command, String> {
     let rule = match rest {
         "" => {
-            let t = value.as_text().ok_or("regra esperada")?;
+            let t = value.as_text().ok_or(tx("godot-schema-regra_esperada"))?;
             if t == output_id(&obj.output) {
                 // Choosing the current rule again keeps its weights, label or script.
                 return Ok(set(&obj.name, "output", ron::output(&obj.output)));
@@ -3778,15 +3845,32 @@ fn edit_output(
             }
         }
         "weights" => {
-            let t = value.as_text().ok_or("lista de pesos esperada")?;
-            let w: Vec<f64> = ron::parse(t).map_err(|e| format!("pesos inválidos: {e}"))?;
+            let t = value
+                .as_text()
+                .ok_or(tx("godot-schema-lista_de_pesos_esperada"))?;
+            let w: Vec<f64> =
+                ron::parse(t).map_err(|e| fx("godot-schema-pesos_invalidos", &[("e", vx(&e))]))?;
             OutputRule::Weighted(w)
         }
-        "label" => {
-            OutputRule::ByLabel(value.as_text().ok_or("rótulo esperado")?.trim().to_string())
+        "label" => OutputRule::ByLabel(
+            value
+                .as_text()
+                .ok_or(tx("godot-schema-rotulo_esperado"))?
+                .trim()
+                .to_string(),
+        ),
+        "script" => OutputRule::Script(
+            value
+                .as_text()
+                .ok_or(tx("godot-schema-script_esperado"))?
+                .to_string(),
+        ),
+        _ => {
+            return Err(fx(
+                "godot-schema-campo_desconhecido_output",
+                &[("rest", vx(&rest))],
+            ));
         }
-        "script" => OutputRule::Script(value.as_text().ok_or("script esperado")?.to_string()),
-        _ => return Err(format!("campo desconhecido: output.{rest}")),
     };
     Ok(set(&obj.name, "output", ron::output(&rule)))
 }
@@ -3820,23 +3904,23 @@ fn edit_visual(
                     format!("#{t}")
                 };
                 if looks::parse_color(&t).is_none() {
-                    return Err(format!("cor inválida: {t} (use #rrggbb)"));
+                    return Err(fx("godot-schema-cor_invalida_use_rrggbb", &[("t", vx(&t))]));
                 }
                 v.color = Some(t.to_lowercase());
             }
-            _ => return Err("cor: #rrggbb".into()),
+            _ => return Err(tx("godot-schema-cor_rrggbb").into()),
         },
         "scale" => {
             let s = f64_of(value, "escala")?;
             if s.is_nan() || s <= 0.0 {
-                return Err("a escala precisa ser maior que zero".into());
+                return Err(tx("godot-schema-a_escala_precisa_ser_maior").into());
             }
             v.scale = (s != 1.0).then_some(s);
         }
         "yaw" => {
             let y = f64_of(value, "giro")?;
             if !y.is_finite() {
-                return Err("giro: um número de graus".into());
+                return Err(tx("godot-schema-giro_um_numero_de_graus").into());
             }
             if !is_mobile(&obj.kind) {
                 // The rotation of a fixed object: in [0, 360), a belt keeps 0. Its drawn
@@ -3864,7 +3948,12 @@ fn edit_visual(
                 ..VisualDef::default()
             };
         }
-        _ => return Err(format!("campo desconhecido: visual.{rest}")),
+        _ => {
+            return Err(fx(
+                "godot-schema-campo_desconhecido_visual",
+                &[("rest", vx(&rest))],
+            ));
+        }
     }
     Ok(Command::SetVisual {
         name: obj.name.clone(),

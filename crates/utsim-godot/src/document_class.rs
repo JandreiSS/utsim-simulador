@@ -1038,7 +1038,7 @@ impl UtsimDocument {
     #[func]
     fn zone_kinds(&self) -> VarArray {
         let mut out = VarArray::new();
-        for (kind, key, _) in crate::zone_edit::KINDS {
+        for (kind, key, _) in crate::zone_edit::kinds() {
             let mut a = VarArray::new();
             a.push(&GString::from(crate::zone_edit::kind_label(kind)).to_variant());
             a.push(&GString::from(key).to_variant());
@@ -1565,7 +1565,7 @@ impl UtsimDocument {
     #[func]
     fn shortcuts() -> VarArray {
         let mut out = VarArray::new();
-        for (k, v) in document::SHORTCUTS {
+        for (k, v) in document::shortcuts() {
             out.push(&strings(&[k, v]).to_variant());
         }
         out

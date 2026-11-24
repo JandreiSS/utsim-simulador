@@ -9,6 +9,7 @@
 //! `total = 0`, which the interface shows as "running". Cancelling stops at the next
 //! replication; the outcome is then the error [`CANCELLED`].
 
+use crate::texto::{fx, tx, vx};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -78,16 +79,16 @@ pub enum Task {
 impl Task {
     pub fn label(&self) -> &'static str {
         match self {
-            Task::Run(_) => "Rodando replicações",
-            Task::More { .. } => "Rodando mais replicações",
-            Task::Scenarios { .. } => "Comparando cenários",
-            Task::Optimize { .. } => "Otimizando",
-            Task::Warmup { .. } => "Analisando o aquecimento",
-            Task::Little(_) => "Conferindo a lei de Little",
-            Task::ShiftingBottleneck(_) => "Procurando o gargalo móvel",
-            Task::Pert { .. } => "Calculando o PERT/CPM",
-            Task::DataFit { .. } => "Ajustando a distribuição aos dados",
-            Task::DataReport { .. } => "Gravando o relatório dos dados",
+            Task::Run(_) => tx("godot-jobs-rodando_replicacoes"),
+            Task::More { .. } => tx("godot-jobs-rodando_mais_replicacoes"),
+            Task::Scenarios { .. } => tx("godot-jobs-comparando_cenarios"),
+            Task::Optimize { .. } => tx("godot-jobs-otimizando"),
+            Task::Warmup { .. } => tx("godot-jobs-analisando_o_aquecimento"),
+            Task::Little(_) => tx("godot-jobs-conferindo_a_lei_de_little"),
+            Task::ShiftingBottleneck(_) => tx("godot-jobs-procurando_o_gargalo_movel"),
+            Task::Pert { .. } => tx("godot-jobs-calculando_o_pert_cpm"),
+            Task::DataFit { .. } => tx("godot-jobs-ajustando_a_distribuicao_aos_dados"),
+            Task::DataReport { .. } => tx("godot-jobs-gravando_o_relatorio_dos_dados"),
         }
     }
 
@@ -175,7 +176,9 @@ impl Job {
         let slot = result.clone();
         let handle = std::thread::spawn(move || {
             let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(task, &p)))
-                .unwrap_or_else(|_| Err("erro interno durante a execução".to_string()));
+                .unwrap_or_else(|_| {
+                    Err(tx("godot-jobs-erro_interno_durante_a_execucao").to_string())
+                });
             let r = if p.cancelled() && r.is_ok() {
                 Err(CANCELLED.to_string())
             } else {
@@ -229,7 +232,7 @@ impl Job {
             .lock()
             .ok()
             .and_then(|mut r| r.take())
-            .unwrap_or_else(|| Err("a execução terminou sem resultado".into()))
+            .unwrap_or_else(|| Err(tx("godot-jobs-a_execucao_terminou_sem_resultado").into()))
     }
 }
 
@@ -373,7 +376,10 @@ fn execute(task: Task, p: &Progress) -> Result<Outcome, String> {
                 WarmupSeries::Wip => m.run_replications_with(&|d| p.tick(d as usize, total)),
                 WarmupSeries::Measure { object, measure } => {
                     if m.objects.iter().all(|o| &o.name != object) {
-                        return Err(format!("objeto \"{object}\" não existe no modelo"));
+                        return Err(fx(
+                            "godot-jobs-objeto_nao_existe_no_modelo",
+                            &[("object", vx(&object))],
+                        ));
                     }
                     m.run_replications_timed(&[(object.clone(), measure.clone())])
                 }
