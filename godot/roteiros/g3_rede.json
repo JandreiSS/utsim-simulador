@@ -26,7 +26,7 @@
 		{"esperar": 3},
 		{"digitar": "2", "em": {"controle": "Rede_TrechoCapacidade"}},
 		{"esperar": 3},
-		{"conferir": {"rede": {"controlados": 1}, "texto": {"controle": "Rede_Resumo", "contem": "1 pista(s) controlada(s)"}}},
+		{"conferir": {"rede": {"controlados": 1}, "texto": {"controle": "Rede_Resumo", "contem": "1 pista controlada"}}},
 		{"capturar": "g3_rede_02_controlada"},
 		{"clicar": {"controle": "Rede_TrechoInverter"}},
 		{"esperar": 3},

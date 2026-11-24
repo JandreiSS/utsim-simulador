@@ -11,7 +11,7 @@
 		{"clicar": {"controle": "Secao_Posição"}},
 		{"esperar": 5},
 		{"conferir": {"visivel": ["Prop_table_modo", "Prop_table_repetir", "Prop_table_ciclo", "Prop_table_linha_1_at", "Prop_table_linha_1_count", "Prop_table_linha_4_tipo", "Prop_table_mais", "Prop_table_colar"],
-			"texto": {"controle": "Prop_table_total", "contem": "29 itens por ciclo de 1440 (um dia) em 4 linha(s) (caixa: 20, palete: 9)"}}},
+			"texto": {"controle": "Prop_table_total", "contem": "29 itens por ciclo de 1440 (um dia) em 4 linhas (caixa: 20, palete: 9)"}}},
 		{"conferir": {"texto": {"controle": "Prop_table_linha_1_at", "contem": "08:00"}}},
 		{"capturar": "g4_chegadas_01_tabela"},
 
