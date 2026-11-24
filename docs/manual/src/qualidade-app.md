@@ -114,7 +114,7 @@ Na linha de comando, o mesmo se faz com `utsim-qualidade --utsim-abrir=<modelo.r
 
 ## Limites desta versão
 
-O PDF do relatório e as ferramentas de projeto como a FMEA e o A3 ainda não estão neste aplicativo. Os projetos de melhoria continuam no UTSim LSS.
+O UTSim Qualidade trabalha com estudos: as ferramentas, os relatórios em PDF e HTML, o CEP, os planos e o 8D. A gestão de um projeto de melhoria inteiro (as fases do DMAIC, os portões com aprovação, o cronograma, os ganhos validados e o painel do MBB) fica no UTSim LSS, que usa os mesmos desenhos das ferramentas. A simulação de qualidade roda o modelo do disco; para mudar o processo, edite o modelo no UTSim ou na tela Modelo.
 
 ## Modelo (mão dupla com o UTSim)
 
