@@ -1,0 +1,30 @@
+/target
+*.json.out
+/.claude/
+/web/dist/
+/crates/utsim-py/target/
+/docs/manual/book/
+/tools/icone/target/
+
+# Guia LaTeX (docs/guia)
+/docs/guia/build/
+docs/guia/*.aux
+docs/guia/*.bbl
+docs/guia/*.bcf
+docs/guia/*.blg
+docs/guia/*.log
+docs/guia/*.out
+docs/guia/*.toc
+docs/guia/*.run.xml
+docs/guia/*.fls
+docs/guia/*.fdb_latexmk
+docs/guia/main.pdf
+dist/
+# One-writer lock of an open model (utsim_pasta::trava).
+.*.trava
+
+# Cache do Python (scripts do Blender)
+__pycache__/
+
+# Família local (scripts/familia-local.sh)
+.cargo/config.toml

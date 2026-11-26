@@ -22,7 +22,7 @@ utsim-assets.workspace = true
 utsim-exposicao.workspace = true
 utsim-edit.workspace = true
 utsim-qualidade-core.workspace = true
-utsim-launcher-core = { path = "../utsim-launcher-core" }
+utsim-launcher-core = { workspace = true }
 # The one-writer lock next to the model file, shared with UTSim Qualidade and Segurança.
 utsim-pasta.workspace = true
 utsim-linhas.workspace = true
@@ -37,10 +37,10 @@ serde.workspace = true
 ron.workspace = true
 utsim-ui-tema.workspace = true
 # The texts of UTSim 3D in five languages (idiomas/*/godot.ftl).
-utsim-idiomas = { path = "../utsim-idiomas", default-features = false, features = ["egui"] }
+utsim-idiomas = { workspace = true, default-features = false, features = ["egui"] }
 # The mission mode of UTSim Ensino (`ensino_class`): the same screens as its window.
-utsim-ensino-ui = { path = "../utsim-ensino-ui" }
-utsim-ensino-store = { path = "../utsim-ensino-store" }
+utsim-ensino-ui = { workspace = true }
+utsim-ensino-store = { workspace = true }
 # The interface around the 3D view is egui, drawn by the bridge (`egui_*`, `ui_class`): the
 # workspace's single egui (the launcher's eframe 0.36.2, the viewer's bevy_egui 0.43).
 egui = { version = "=0.36.2", default-features = false, features = ["default_fonts"] }

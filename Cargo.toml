@@ -1,0 +1,129 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# The Python bindings need a Python toolchain: built on their own (crates/utsim-py).
+exclude = ["crates/utsim-py"]
+# The 3D viewer pulls in Bevy (slow to build): it is opt-in (`-p utsim-viewer`). The Godot
+# bridge (`-p utsim-godot`, a GDExtension library) is opt-in too: `scripts/godot.sh`. The
+# windowed apps (`utsim-launcher`, `utsim-lss-app`, `utsim-ensino-app`, `utsim-qualidade-app`, `utsim-estatistica-app`,
+# `utsim-seguranca-app`, `utsim-produto-app`, `utsim-posto-ui`) build with `-p` or `--workspace`.
+default-members = [
+    "crates/utsim-assets",
+    "crates/utsim-cli",
+    "crates/utsim-dash",
+    "crates/utsim-env",
+    "crates/utsim-look",
+    "crates/utsim-opt",
+    "crates/utsim-twin",
+    "crates/utsim-web",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+repository = "https://github.com/JandreiSS/utsim-simulador"
+
+[workspace.dependencies]
+utsim-ensino-store = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-ensino-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-launcher-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-objects = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-model = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-fit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-stats = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-quality = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-qualidade-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-edit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-script = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-seguranca-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-flow = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-fluid = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-opt = { path = "crates/utsim-opt" }
+utsim-pert = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-posto = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-estudo = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-pasta = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-troca = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-posto-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-env = { path = "crates/utsim-env" }
+utsim-emu = { path = "crates/utsim-emu" }
+utsim-web = { path = "crates/utsim-web" }
+utsim-scene = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-assets = { path = "crates/utsim-assets" }
+utsim-look = { path = "crates/utsim-look" }
+utsim-cad = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-doe = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-diagram = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-dash = { path = "crates/utsim-dash" }
+utsim-nav = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-exposicao = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-ferramentas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-twin = { path = "crates/utsim-twin" }
+utsim-ui-tema = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-linhas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-diario = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-idiomas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+
+rand = { version = "0.9", default-features = false, features = ["std"] }
+rand_distr = { version = "0.5", default-features = false, features = ["std"] }
+rand_pcg = { version = "0.9", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ron = "0.8"
+slotmap = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+rayon = "1"
+wasm-bindgen = "0.2"
+rhai = { version = "1", default-features = false, features = ["std", "sync", "no_time", "no_module"] }
+
+# Numeric crates are optimised even in debug builds: the statistical tests
+# (bootstrap, replications) would otherwise take minutes.
+# Debug builds keep only line tables (backtraces still show file and line) and no debug info
+# for dependencies: several worktrees build at once and full debug info filled the disk.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.utsim-core]
+opt-level = 2
+
+[profile.dev.package.utsim-fit]
+opt-level = 2
+
+[profile.dev.package.utsim-stats]
+opt-level = 2
+
+[profile.dev.package.utsim-quality]
+opt-level = 2
+
+[profile.release]
+debug = "line-tables-only"
+# Whole-program inlining across the crates (engine, objects, model). Only code layout
+# changes: no target-cpu or float flags, so results stay bit-identical. The `web` and
+# `web-3d` profiles set their own `lto`/`codegen-units`.
+lto = "thin"
+codegen-units = 1
+
+# Size-optimised build of the browser module (`scripts/web.sh`).
+[profile.web]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+# Drops the wasm `name` section (29 MB of the 65 MB 3D viewer module).
+strip = "symbols"
+
+# The 3D viewer for the browser. Full LTO with one codegen unit over Bevy needs more
+# memory and time than CI runners have (the job was killed after 25 min), so it uses
+# thin LTO (about 5 min here, 44 MB); the small engine module keeps the `web` profile.
+[profile.web-3d]
+inherits = "web"
+lto = "thin"
+codegen-units = 1

@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 utsim-env = { path = "../utsim-env" }
-utsim-model = { path = "../utsim-model" }
+utsim-model = { workspace = true }
 pyo3 = { version = "0.23", features = ["extension-module"] }
 
 [profile.release]
