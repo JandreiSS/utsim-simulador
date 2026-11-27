@@ -1414,6 +1414,8 @@ godot-ui-left-seguranca = Segurança
 godot-ui-left-zonas_de_risco_epi_das = Zonas de risco, EPI das pessoas, quase-conflitos simulados, itens com defeito e inspeções
 godot-ui-left-calor = Calor
 godot-ui-left-mapa_de_calor_da_presenca = Mapa de calor da presença das pessoas e dos quase-conflitos no piso
+godot-ui-left-ambiental = Ambiental
+godot-ui-left-ambiental_dica = Brilho da energia de cada máquina no piso, coluna da potência no instante, medidor da fábrica e mochila das peças refugadas (clique na peça com contorno)
 godot-ui-left-quase_conflitos_simulados = Quase-conflitos simulados ({ $quase })
 godot-ui-left-replicacoes = Replicações
 godot-ui-left-uma_replicacao_a_menos = Uma replicação a menos
@@ -1902,3 +1904,20 @@ godot-indicadores-energia_sem_valor = Energia sem valor
 godot-indicadores-energia_sem_valor_ajuda = Parte da energia gasta esperando, parada ou fora de turno.
 godot-indicadores-kwh_por_peca = Energia por peça
 godot-indicadores-kwh_por_peca_ajuda = Energia do nó dividida pelas peças que saíram dele.
+
+## Camada Ambiental da reprodução (camada_ambiental.gd)
+godot-gd-ambiental-kw = { $p1 } kW
+godot-gd-ambiental-medidor_titulo = Fábrica agora
+godot-gd-ambiental-medidor_aquecimento = Aquecimento: fora da janela da conta
+godot-gd-ambiental-medidor_pico = Pico da curva: { $p1 } kW em t = { $p2 }
+godot-gd-ambiental-medidor_na_janela_de_pico = Na janela de pico da tarifa
+godot-gd-ambiental-medidor_fora_da_janela_de_pico = Fora da janela de pico da tarifa
+godot-gd-ambiental-medidor_energia = Na janela: { $p1 } kWh · CO₂e { $p2 } kg
+godot-gd-ambiental-falta_fator = falta fator
+godot-gd-ambiental-cartao_titulo = Mochila da peça refugada { $p1 }
+godot-gd-ambiental-cartao_caminho = Passou por: { $p1 }
+godot-gd-ambiental-cartao_energia = Energia: { $p1 } kWh
+godot-gd-ambiental-cartao_fluxo = { $p1 }: { $p2 }
+godot-gd-ambiental-cartao_co2 = CO₂ equivalente: { $p1 } kg
+godot-gd-ambiental-cartao_falta = Falta fator: { $p1 }
+godot-gd-ambiental-cartao_fechar = Clique fora da peça para fechar.

@@ -121,4 +121,31 @@ func _check(path: String) -> void:
 			cena.apply(end * k / 20.0, 1.0 / 60.0)
 		print("  camada de segurança: %d quase-conflitos, %d pessoas" % [
 			cena.camada.lista_quase().size(), cena.camada.seg.people().size()])
+	# AM13: a camada Ambiental, só nos modelos com bloco ambiental. O medidor mostra a mesma
+	# potência que a ponte (a curva de carga do UTSim Ambiental) e a soma das colunas.
+	var tr := func(chave: String, args: Array) -> String: return "%s %s" % [chave, args]
+	cena.camada_ambiental = CamadaAmbiental.criar(cena, model, tr)
+	if cena.camada_ambiental != null:
+		var ca := cena.camada_ambiental
+		ca.ligar(true)
+		var vistas := 0
+		for k in 41:
+			var t := end * k / 40.0
+			cena.apply(t, 1.0 / 60.0)
+			var m: Dictionary = ca.amb.meter(t)
+			if not m["in_window"]:
+				continue
+			var soma := 0.0
+			for x in ca.amb.powers(t):
+				soma += x
+			if absf(soma - float(m["kw"])) > 1e-6:
+				_fail("%s: soma das colunas %f != medidor %f em t=%f" % [path, soma, m["kw"], t])
+			if not ca.texto_medidor().contains("%.1f" % float(m["kw"])):
+				_fail("%s: o medidor não mostra %.1f kW: %s" % [path, m["kw"], ca.texto_medidor()])
+			vistas += 1
+		var refugo: PackedInt64Array = ca.amb.scrap_items()
+		if vistas == 0 or refugo.is_empty() or not ca.abrir_cartao(int(refugo[0])):
+			_fail("%s: camada Ambiental sem instantes (%d) ou sem mochila (%d peças)" % [path, vistas, refugo.size()])
+		print("  camada Ambiental: %d nós, %d peças refugadas, %d instantes conferidos" % [
+			ca.amb.nodes().size(), refugo.size(), vistas])
 	cena.free()

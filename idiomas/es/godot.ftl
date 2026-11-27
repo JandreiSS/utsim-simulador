@@ -1414,6 +1414,8 @@ godot-ui-left-seguranca = Seguridad
 godot-ui-left-zonas_de_risco_epi_das = Zonas de riesgo, EPP de las personas, casi conflictos simulados, ítems con defecto e inspecciones
 godot-ui-left-calor = Calor
 godot-ui-left-mapa_de_calor_da_presenca = Mapa de calor de la presencia de las personas y de los casi conflictos en el piso
+godot-ui-left-ambiental = Ambiental
+godot-ui-left-ambiental_dica = Brillo de la energía de cada máquina en el piso, columna de la potencia en el instante, medidor de la fábrica y mochila de las piezas desechadas (haga clic en la pieza con contorno)
 godot-ui-left-quase_conflitos_simulados = Casi conflictos simulados ({ $quase })
 godot-ui-left-replicacoes = Replicaciones
 godot-ui-left-uma_replicacao_a_menos = Una replicación menos
@@ -1902,3 +1904,20 @@ godot-indicadores-energia_sem_valor = Energía sin valor
 godot-indicadores-energia_sem_valor_ajuda = Parte de la energía gastada esperando, parada o fuera de turno.
 godot-indicadores-kwh_por_peca = Energía por pieza
 godot-indicadores-kwh_por_peca_ajuda = Energía del nodo dividida por las piezas que salieron de él.
+
+## Camada Ambiental da reprodução (camada_ambiental.gd)
+godot-gd-ambiental-kw = { $p1 } kW
+godot-gd-ambiental-medidor_titulo = Fábrica ahora
+godot-gd-ambiental-medidor_aquecimento = Calentamiento: fuera de la ventana de cálculo
+godot-gd-ambiental-medidor_pico = Pico de la curva: { $p1 } kW en t = { $p2 }
+godot-gd-ambiental-medidor_na_janela_de_pico = En la ventana de punta de la tarifa
+godot-gd-ambiental-medidor_fora_da_janela_de_pico = Fuera de la ventana de punta de la tarifa
+godot-gd-ambiental-medidor_energia = En la ventana: { $p1 } kWh · CO₂e { $p2 } kg
+godot-gd-ambiental-falta_fator = falta factor
+godot-gd-ambiental-cartao_titulo = Mochila de la pieza desechada { $p1 }
+godot-gd-ambiental-cartao_caminho = Pasó por: { $p1 }
+godot-gd-ambiental-cartao_energia = Energía: { $p1 } kWh
+godot-gd-ambiental-cartao_fluxo = { $p1 }: { $p2 }
+godot-gd-ambiental-cartao_co2 = CO₂ equivalente: { $p1 } kg
+godot-gd-ambiental-cartao_falta = Falta factor: { $p1 }
+godot-gd-ambiental-cartao_fechar = Haga clic fuera de la pieza para cerrar.

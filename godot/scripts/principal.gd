@@ -96,6 +96,8 @@ var labels_on := true
 ## itens com defeito; e o mapa de calor.
 var seguranca_on := false
 var calor_on := false
+## Camada Ambiental (camada_ambiental.gd): brilho, colunas, medidor e mochila do refugo.
+var ambiental_on := false
 var _open_dialog: FileDialog
 var _save_dialog: FileDialog
 var _grid: MeshInstance3D
@@ -498,6 +500,8 @@ func _sync_sim() -> void:
 		"labels": labels_on,
 		"seguranca": seguranca_on,
 		"calor": calor_on,
+		"ambiental": ambiental_on,
+		"tem_ambiental": cena.camada_ambiental != null,
 		"quase": cena.camada.lista_quase() if cena.camada != null else [],
 		"shadows": sun.shadow_enabled,
 		"summary": _summary,
@@ -643,6 +647,10 @@ func _run_step(p: Dictionary) -> bool:
 			_sync_sim()
 		"calor":
 			calor_on = on
+			_aplicar_camadas()
+			_sync_sim()
+		"ambiental":
+			ambiental_on = on
 			_aplicar_camadas()
 			_sync_sim()
 		"sombras":
@@ -1372,11 +1380,13 @@ func _on_run(j: Object) -> void:
 		set_status(T("godot-gd-principal-replicacoes_concluidas_reproduzindo_a_replicacao", [reps])))
 
 
-## Liga ou desliga as camadas de segurança e de calor da cena.
+## Liga ou desliga as camadas de segurança, de calor e Ambiental da cena.
 func _aplicar_camadas() -> void:
 	if cena.camada != null:
 		cena.camada.ligar(seguranca_on)
 		cena.camada.ligar_calor(calor_on)
+	if cena.camada_ambiental != null:
+		cena.camada_ambiental.ligar(ambiental_on)
 
 
 ## Builds the scene of `playback` and starts at 0.
@@ -1384,6 +1394,7 @@ func _show_playback() -> void:
 	cena.show_connections = true
 	cena.build(playback, true)
 	cena.camada = CamadaSeguranca.criar(cena, model) if model != null and model.is_loaded() else null
+	cena.camada_ambiental = CamadaAmbiental.criar(cena, model, T) if model != null and model.is_loaded() else null
 	_aplicar_camadas()
 	var info := cena.info
 	_update_shadows(info["bounds_min"], info["bounds_max"])
@@ -1565,6 +1576,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
 	if mode != "simular" or playback == null or ui == null or over_ui(mb.position):
+		return
+	# A camada Ambiental primeiro: o clique numa peça refugada abre a mochila dela.
+	var cam := get_viewport().get_camera_3d()
+	if cena.camada_ambiental != null and cam != null and cena.camada_ambiental.clicar(
+			cam.project_ray_origin(mb.position), cam.project_ray_normal(mb.position)):
+		get_viewport().set_input_as_handled()
 		return
 	if pick_live_panel(mb.position):
 		get_viewport().set_input_as_handled()

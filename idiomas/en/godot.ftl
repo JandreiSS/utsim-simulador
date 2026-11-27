@@ -1414,6 +1414,8 @@ godot-ui-left-seguranca = Safety
 godot-ui-left-zonas_de_risco_epi_das = Risk zones, people's PPE, simulated near-conflicts, defective items and inspections
 godot-ui-left-calor = Heat
 godot-ui-left-mapa_de_calor_da_presenca = Heat map of the presence of people and near-conflicts on the floor
+godot-ui-left-ambiental = Environmental
+godot-ui-left-ambiental_dica = Glow of each machine's energy on the floor, column of the power at the instant, factory meter and backpack of the scrapped parts (click the outlined part)
 godot-ui-left-quase_conflitos_simulados = Simulated near-conflicts ({ $quase })
 godot-ui-left-replicacoes = Replications
 godot-ui-left-uma_replicacao_a_menos = One replication fewer
@@ -1902,3 +1904,20 @@ godot-indicadores-energia_sem_valor = Non-value energy
 godot-indicadores-energia_sem_valor_ajuda = Share of the energy spent waiting, stopped or off shift.
 godot-indicadores-kwh_por_peca = Energy per part
 godot-indicadores-kwh_por_peca_ajuda = Node energy divided by the parts that left it.
+
+## Camada Ambiental da reprodução (camada_ambiental.gd)
+godot-gd-ambiental-kw = { $p1 } kW
+godot-gd-ambiental-medidor_titulo = Factory now
+godot-gd-ambiental-medidor_aquecimento = Warm-up: outside the accounting window
+godot-gd-ambiental-medidor_pico = Curve peak: { $p1 } kW at t = { $p2 }
+godot-gd-ambiental-medidor_na_janela_de_pico = In the tariff peak window
+godot-gd-ambiental-medidor_fora_da_janela_de_pico = Outside the tariff peak window
+godot-gd-ambiental-medidor_energia = In the window: { $p1 } kWh · CO₂e { $p2 } kg
+godot-gd-ambiental-falta_fator = missing factor
+godot-gd-ambiental-cartao_titulo = Backpack of scrapped part { $p1 }
+godot-gd-ambiental-cartao_caminho = Went through: { $p1 }
+godot-gd-ambiental-cartao_energia = Energy: { $p1 } kWh
+godot-gd-ambiental-cartao_fluxo = { $p1 }: { $p2 }
+godot-gd-ambiental-cartao_co2 = CO₂ equivalent: { $p1 } kg
+godot-gd-ambiental-cartao_falta = Missing factor: { $p1 }
+godot-gd-ambiental-cartao_fechar = Click away from the part to close.

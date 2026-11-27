@@ -22,6 +22,8 @@ utsim-assets.workspace = true
 utsim-exposicao.workspace = true
 utsim-edit.workspace = true
 utsim-qualidade-core.workspace = true
+# The Ambiental layer of the playback (`ambiental_class`): the sums are UTSim Ambiental's.
+utsim-ambiental-core.workspace = true
 utsim-launcher-core = { workspace = true }
 # The one-writer lock next to the model file, shared with UTSim Qualidade and Segurança.
 utsim-pasta.workspace = true

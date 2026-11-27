@@ -113,6 +113,10 @@ pub struct SimView {
     /// Camada "Segurança" (zonas, EPI, quase-conflitos, itens com defeito) e mapa de calor.
     pub seguranca: bool,
     pub calor: bool,
+    /// Camada Ambiental (brilho, colunas, medidor, mochila do refugo); `tem_ambiental`: o
+    /// modelo tem bloco ambiental (sem ele a chave não aparece).
+    pub ambiental: bool,
+    pub tem_ambiental: bool,
     /// Quase-conflitos simulados `(instante, texto)`, para o salto da reprodução.
     pub quase: Vec<(f64, String)>,
     pub summary: Summary,
@@ -130,6 +134,8 @@ impl Default for SimView {
             shadows: true,
             seguranca: false,
             calor: false,
+            ambiental: false,
+            tem_ambiental: false,
             quase: Vec::new(),
             summary: Summary::default(),
         }
@@ -938,10 +944,20 @@ fn sim_panel(
     summary(ui, &v.summary, summary_h, reg);
 }
 
-/// A camada de segurança e o mapa de calor (QS6): duas chaves e, com a camada ligada, a
-/// lista dos quase-conflitos simulados, cada um um botão que salta a reprodução até ele.
+/// A camada de segurança, o mapa de calor (QS6) e a camada Ambiental (AM13, só quando o
+/// modelo tem bloco ambiental): as chaves e, com a segurança ligada, a lista dos
+/// quase-conflitos simulados, cada um um botão que salta a reprodução até ele.
 fn camadas(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) {
     ui.horizontal(|ui| {
+        let ambiental = v.tem_ambiental.then(|| {
+            (
+                "Simular_Ambiental",
+                tx("godot-ui-left-ambiental"),
+                v.ambiental,
+                "ambiental",
+                tx("godot-ui-left-ambiental_dica"),
+            )
+        });
         for (name, text, on, what, tip) in [
             (
                 "Simular_Seguranca",
@@ -957,7 +973,10 @@ fn camadas(ui: &mut Ui, v: &SimView, reg: &mut Registry, out: &mut Vec<String>) 
                 "calor",
                 tx("godot-ui-left-mapa_de_calor_da_presenca"),
             ),
-        ] {
+        ]
+        .into_iter()
+        .chain(ambiental)
+        {
             let mut now = on;
             let r = ui.checkbox(&mut now, text).on_hover_text(tip);
             named_toggle(ui, reg, name, &r, text, on);

@@ -466,6 +466,12 @@ impl UtsimUi {
         if let Some(x) = get("calor") {
             v.calor = x.try_to::<bool>().unwrap_or(v.calor);
         }
+        if let Some(x) = get("ambiental") {
+            v.ambiental = x.try_to::<bool>().unwrap_or(v.ambiental);
+        }
+        if let Some(x) = get("tem_ambiental") {
+            v.tem_ambiental = x.try_to::<bool>().unwrap_or(v.tem_ambiental);
+        }
         if let Some(x) = get("quase")
             && let Ok(list) = x.try_to::<VarArray>()
         {

@@ -1417,6 +1417,8 @@ godot-ui-left-seguranca = Sécurité
 godot-ui-left-zonas_de_risco_epi_das = Zones de risque, EPI des personnes, quasi-conflits simulés, articles défectueux et inspections
 godot-ui-left-calor = Chaleur
 godot-ui-left-mapa_de_calor_da_presenca = Carte de chaleur de la présence des personnes et des quasi-conflits au sol
+godot-ui-left-ambiental = Environnement
+godot-ui-left-ambiental_dica = Halo de l'énergie de chaque machine au sol, colonne de la puissance à l'instant, compteur de l'usine et sac à dos des pièces rebutées (cliquez sur la pièce entourée)
 godot-ui-left-quase_conflitos_simulados = Quasi-conflits simulés ({ $quase })
 godot-ui-left-replicacoes = Réplications
 godot-ui-left-uma_replicacao_a_menos = Une réplication de moins
@@ -1905,3 +1907,20 @@ godot-indicadores-energia_sem_valor = Énergie sans valeur
 godot-indicadores-energia_sem_valor_ajuda = Part de l'énergie dépensée en attente, à l'arrêt ou hors poste.
 godot-indicadores-kwh_por_peca = Énergie par pièce
 godot-indicadores-kwh_por_peca_ajuda = Énergie du nœud divisée par les pièces qui en sont sorties.
+
+## Camada Ambiental da reprodução (camada_ambiental.gd)
+godot-gd-ambiental-kw = { $p1 } kW
+godot-gd-ambiental-medidor_titulo = Usine maintenant
+godot-gd-ambiental-medidor_aquecimento = Mise en régime : hors de la fenêtre de calcul
+godot-gd-ambiental-medidor_pico = Pic de la courbe : { $p1 } kW à t = { $p2 }
+godot-gd-ambiental-medidor_na_janela_de_pico = Dans la plage de pointe du tarif
+godot-gd-ambiental-medidor_fora_da_janela_de_pico = Hors de la plage de pointe du tarif
+godot-gd-ambiental-medidor_energia = Dans la fenêtre : { $p1 } kWh · CO₂e { $p2 } kg
+godot-gd-ambiental-falta_fator = facteur manquant
+godot-gd-ambiental-cartao_titulo = Sac à dos de la pièce rebutée { $p1 }
+godot-gd-ambiental-cartao_caminho = Passée par : { $p1 }
+godot-gd-ambiental-cartao_energia = Énergie : { $p1 } kWh
+godot-gd-ambiental-cartao_fluxo = { $p1 } : { $p2 }
+godot-gd-ambiental-cartao_co2 = CO₂ équivalent : { $p1 } kg
+godot-gd-ambiental-cartao_falta = Facteur manquant : { $p1 }
+godot-gd-ambiental-cartao_fechar = Cliquez hors de la pièce pour fermer.

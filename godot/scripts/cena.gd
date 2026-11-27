@@ -75,6 +75,8 @@ var _radio_scene: Variant = null
 var labels_visible := true
 ## A camada de segurança e qualidade (camada_seguranca.gd), quando a reprodução tem uma.
 var camada: CamadaSeguranca
+## A camada Ambiental (camada_ambiental.gd), quando o modelo tem bloco ambiental.
+var camada_ambiental: CamadaAmbiental
 ## Names of the vehicles whose driver is hidden ("Mostrar motorista" off). A preference of
 ## the viewer, kept across rebuilds; the model file does not store it.
 var drivers_off := {}
@@ -142,6 +144,7 @@ func clear(keep_templates := false) -> void:
 	_view_hidden.clear()
 	_blocks_hidden_for_view.clear()
 	camada = null
+	camada_ambiental = null
 	playback = null
 
 
@@ -1141,6 +1144,8 @@ func apply(t: float, dt: float, snap := false) -> void:
 	_apply_items(f)
 	if camada != null:
 		camada.aplicar(t)
+	if camada_ambiental != null:
+		camada_ambiental.aplicar(t)
 	if not fluid_nodes.is_empty():
 		_apply_fluids(playback.fluid_frame(t))
 	last_bridge_us = t1 - t0

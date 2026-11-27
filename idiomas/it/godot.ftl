@@ -1417,6 +1417,8 @@ godot-ui-left-seguranca = Sicurezza
 godot-ui-left-zonas_de_risco_epi_das = Zone di rischio, DPI delle persone, quasi-conflitti simulati, elementi difettosi e ispezioni
 godot-ui-left-calor = Calore
 godot-ui-left-mapa_de_calor_da_presenca = Mappa di calore della presenza delle persone e dei quasi-conflitti sul pavimento
+godot-ui-left-ambiental = Ambiente
+godot-ui-left-ambiental_dica = Bagliore dell'energia di ogni macchina sul pavimento, colonna della potenza all'istante, contatore della fabbrica e zaino dei pezzi scartati (clic sul pezzo contornato)
 godot-ui-left-quase_conflitos_simulados = Quasi-conflitti simulati ({ $quase })
 godot-ui-left-replicacoes = Repliche
 godot-ui-left-uma_replicacao_a_menos = Una replica in meno
@@ -1905,3 +1907,20 @@ godot-indicadores-energia_sem_valor = Energia senza valore
 godot-indicadores-energia_sem_valor_ajuda = Quota di energia spesa in attesa, ferma o fuori turno.
 godot-indicadores-kwh_por_peca = Energia per pezzo
 godot-indicadores-kwh_por_peca_ajuda = Energia del nodo divisa per i pezzi usciti da esso.
+
+## Camada Ambiental da reprodução (camada_ambiental.gd)
+godot-gd-ambiental-kw = { $p1 } kW
+godot-gd-ambiental-medidor_titulo = Fabbrica ora
+godot-gd-ambiental-medidor_aquecimento = Riscaldamento: fuori dalla finestra di calcolo
+godot-gd-ambiental-medidor_pico = Picco della curva: { $p1 } kW a t = { $p2 }
+godot-gd-ambiental-medidor_na_janela_de_pico = Nella fascia di punta della tariffa
+godot-gd-ambiental-medidor_fora_da_janela_de_pico = Fuori dalla fascia di punta della tariffa
+godot-gd-ambiental-medidor_energia = Nella finestra: { $p1 } kWh · CO₂e { $p2 } kg
+godot-gd-ambiental-falta_fator = fattore mancante
+godot-gd-ambiental-cartao_titulo = Zaino del pezzo scartato { $p1 }
+godot-gd-ambiental-cartao_caminho = Passato per: { $p1 }
+godot-gd-ambiental-cartao_energia = Energia: { $p1 } kWh
+godot-gd-ambiental-cartao_fluxo = { $p1 }: { $p2 }
+godot-gd-ambiental-cartao_co2 = CO₂ equivalente: { $p1 } kg
+godot-gd-ambiental-cartao_falta = Fattore mancante: { $p1 }
+godot-gd-ambiental-cartao_fechar = Clic fuori dal pezzo per chiudere.

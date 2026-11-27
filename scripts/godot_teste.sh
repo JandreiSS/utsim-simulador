@@ -10,7 +10,8 @@
 #
 # Uso: scripts/godot_teste.sh [modelo.ron ...] [roteiro.json ...]
 #   sem argumentos: examples/centro_de_distribuicao.ron, examples/agvs.ron,
-#   examples/pessoas_carregando.ron e todos os godot/roteiros/g2_*.json, g3_*.json e g4_*.json.
+#   examples/pessoas_carregando.ron, examples/cruzamento_empilhadeira.ron, examples/linha_verde.ron
+#   e todos os godot/roteiros/g2_*.json, g3_*.json e g4_*.json.
 #   Só roteiros (ou só modelos) nos argumentos: roda só eles.
 # Precisa do Godot 4.7 (GODOT, `godot` no PATH ou ~/Documents/Godot_v4.7*).
 
@@ -50,7 +51,7 @@ for a in "$@"; do
     esac
 done
 if [ "$#" -eq 0 ]; then
-    MODELOS=(examples/centro_de_distribuicao.ron examples/agvs.ron examples/pessoas_carregando.ron examples/cruzamento_empilhadeira.ron)
+    MODELOS=(examples/centro_de_distribuicao.ron examples/agvs.ron examples/pessoas_carregando.ron examples/cruzamento_empilhadeira.ron examples/linha_verde.ron)
     for r in godot/roteiros/g2_*.json godot/roteiros/g3_*.json godot/roteiros/g4_*.json; do
         [ -f "$r" ] && ROTEIROS+=("$r")
     done
