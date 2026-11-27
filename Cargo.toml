@@ -25,46 +25,46 @@ rust-version = "1.85"
 repository = "https://github.com/JandreiSS/utsim-simulador"
 
 [workspace.dependencies]
-utsim-ensino-store = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-ensino-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-launcher-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-objects = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-model = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-fit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-stats = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-quality = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-qualidade-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-edit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-script = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-seguranca-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-flow = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-fluid = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-ensino-store = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-ensino-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-launcher-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-objects = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-model = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-fit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-stats = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-quality = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-qualidade-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-edit = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-script = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-seguranca-core = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-flow = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-fluid = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 utsim-opt = { path = "crates/utsim-opt" }
-utsim-pert = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-posto = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-estudo = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-pasta = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-troca = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-posto-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-pert = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-posto = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-estudo = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-pasta = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-troca = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-posto-ui = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 utsim-env = { path = "crates/utsim-env" }
 utsim-emu = { path = "crates/utsim-emu" }
 utsim-web = { path = "crates/utsim-web" }
-utsim-scene = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-scene = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 utsim-assets = { path = "crates/utsim-assets" }
 utsim-look = { path = "crates/utsim-look" }
-utsim-cad = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-doe = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-diagram = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-cad = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-doe = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-diagram = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 utsim-dash = { path = "crates/utsim-dash" }
-utsim-nav = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-exposicao = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-ferramentas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-nav = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-exposicao = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-ferramentas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 utsim-twin = { path = "crates/utsim-twin" }
-utsim-ui-tema = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-linhas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-diario = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
-utsim-idiomas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.1.0" }
+utsim-ui-tema = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-linhas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-diario = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
+utsim-idiomas = { git = "https://github.com/JandreiSS/utsim-familia", tag = "v0.2.0" }
 
 rand = { version = "0.9", default-features = false, features = ["std"] }
 rand_distr = { version = "0.5", default-features = false, features = ["std"] }

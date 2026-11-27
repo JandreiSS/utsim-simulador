@@ -23,6 +23,7 @@ pub enum App {
     Qualidade,
     Seguranca,
     Estatistica,
+    Ambiental,
 }
 
 impl App {
@@ -31,6 +32,7 @@ impl App {
             "qualidade" => Some(App::Qualidade),
             "seguranca" => Some(App::Seguranca),
             "estatistica" => Some(App::Estatistica),
+            "ambiental" => Some(App::Ambiental),
             _ => None,
         }
     }
@@ -41,6 +43,7 @@ impl App {
             App::Qualidade => "qualidade",
             App::Seguranca => "seguranca",
             App::Estatistica => "estatistica",
+            App::Ambiental => "ambiental",
         }
     }
 
@@ -50,6 +53,7 @@ impl App {
             App::Qualidade => "utsim-qualidade",
             App::Seguranca => "utsim-seguranca",
             App::Estatistica => "utsim-estatistica",
+            App::Ambiental => "utsim-ambiental",
         }
     }
 
@@ -58,6 +62,7 @@ impl App {
             App::Qualidade => "UTSim Qualidade",
             App::Seguranca => "UTSim Segurança do Trabalho",
             App::Estatistica => "UTSim Estatística",
+            App::Ambiental => "UTSim Ambiental",
         }
     }
 }

@@ -37,6 +37,7 @@ pub fn nome_app(app: &str) -> &str {
         "utsim" => "UTSim",
         "qualidade" => "UTSim Qualidade",
         "seguranca" => "UTSim Segurança do Trabalho",
+        "ambiental" => "UTSim Ambiental",
         outro => outro,
     }
 }

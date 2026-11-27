@@ -180,7 +180,7 @@ pub struct Indicadores {
     pub replicacoes: usize,
     /// Whether the quality and safety numbers are still being computed.
     pub calculando: bool,
-    por_no: BTreeMap<String, [Vec<Linha>; 3]>,
+    por_no: BTreeMap<String, [Vec<Linha>; 4]>,
 }
 
 fn indice(a: Aba) -> usize {
@@ -188,6 +188,7 @@ fn indice(a: Aba) -> usize {
         Aba::Qualidade => 0,
         Aba::Seguranca => 1,
         Aba::Manutencao => 2,
+        Aba::Ambiental => 3,
     }
 }
 
@@ -206,6 +207,7 @@ impl Indicadores {
                 qualidade(model, &o.name, reports, reps),
                 seguranca(model, &o.name, reps),
                 manutencao(&o.name, reports),
+                ambiental(model, &o.name, reports),
             ];
             if t.iter().any(|v| !v.is_empty()) {
                 por_no.insert(o.name.clone(), t);
@@ -369,6 +371,69 @@ fn seguranca(model: &Model, name: &str, reps: &[Replica]) -> Vec<Linha> {
             } else {
                 tx("godot-indicadores-pessoa_e_veiculo_mais_perto-2")
             },
+        ));
+    }
+    out
+}
+
+/// The Ambiental tab: the node's energy in the statistics window from its power per state
+/// group (the simple account of `utsim_model::environment`; UTSim Ambiental does the full
+/// one), the share without added value and the energy per part.
+fn ambiental(model: &Model, name: &str, reports: &[RunReport]) -> Vec<Linha> {
+    use utsim_model::environment::{Grupo, energia_por_grupo};
+    let Some(def) = model
+        .objects
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| o.environment.as_deref())
+    else {
+        return Vec::new();
+    };
+    let hu = model
+        .environment
+        .as_deref()
+        .map_or(1.0 / 3600.0, |c| c.clock.time_unit.em_horas());
+    let mut total = Vec::new();
+    let mut sem = Vec::new();
+    let mut por_peca = Vec::new();
+    for r in reports {
+        let Some(b) = r.block(name) else { continue };
+        let g = energia_por_grupo(def, b, r.end_time - r.stats_from, hu);
+        let t: f64 = g.iter().sum();
+        total.push(t);
+        sem.push(
+            Grupo::TODOS
+                .iter()
+                .filter(|x| x.sem_valor())
+                .map(|x| g[x.indice()])
+                .sum::<f64>(),
+        );
+        if b.output > 0 {
+            por_peca.push(t / b.output as f64);
+        }
+    }
+    if total.is_empty() {
+        return Vec::new();
+    }
+    let media = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
+    let mut out = vec![linha(
+        tx("godot-indicadores-energia"),
+        format!("{:.1} kWh", media(&total)),
+        tx("godot-indicadores-energia_ajuda"),
+    )];
+    let e = media(&total);
+    if e > 0.0 {
+        out.push(linha(
+            tx("godot-indicadores-energia_sem_valor"),
+            format!("{:.0} %", 100.0 * media(&sem) / e),
+            tx("godot-indicadores-energia_sem_valor_ajuda"),
+        ));
+    }
+    if !por_peca.is_empty() {
+        out.push(linha(
+            tx("godot-indicadores-kwh_por_peca"),
+            format!("{:.3} kWh", media(&por_peca)),
+            tx("godot-indicadores-kwh_por_peca_ajuda"),
         ));
     }
     out

@@ -1894,3 +1894,14 @@ godot-schema-campo_maior_que_zero = { $field } : doit être supérieur à zéro
 godot-schema-inteiro_minimo = { $what } doit être un entier >= { $min }
 godot-schema-numero_esperado_de = { $what } : nombre attendu
 godot-schema-verdadeiro_ou_falso_esperado = { $what } : vrai ou faux attendu
+
+## aba Ambiental
+
+aba-abrir-ambiental = Ouvrir dans UTSim Ambiental
+aba-abrir-ambiental-dica = Ouvre ce nœud dans UTSim Ambiental (carte de chaleur, flux, empreinte, scénarios et objectifs). Le modèle est enregistré d'abord et l'autre app le garde pour le modifier ; UTSim 3D relit ce qu'elle écrit.
+godot-indicadores-energia = Énergie
+godot-indicadores-energia_ajuda = Puissance de chaque groupe d'états × heures dans l'état, dans la fenêtre de statistique (moyenne des réplications).
+godot-indicadores-energia_sem_valor = Énergie sans valeur
+godot-indicadores-energia_sem_valor_ajuda = Part de l'énergie dépensée en attente, à l'arrêt ou hors poste.
+godot-indicadores-kwh_por_peca = Énergie par pièce
+godot-indicadores-kwh_por_peca_ajuda = Énergie du nœud divisée par les pièces qui en sont sorties.

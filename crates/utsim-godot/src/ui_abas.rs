@@ -5,7 +5,7 @@
 //! bridge turns into the `Set*` command of `abas::editar` / `adicionar` / `remover` (one
 //! undo step). Read only while another app or person holds the model's lock.
 //!
-//! Widget names for the scripted runs: `Aba_Qualidade`, `Aba_Seguranca`, `Aba_Manutencao`
+//! Widget names for the scripted runs: `Aba_Qualidade`, `Aba_Seguranca`, `Aba_Manutencao`, `Aba_Ambiental`
 //! (the tabs), `AbaCampo_<path>` (a field: dots and brackets as underscores, so
 //! `safety.hazards[0].severity` is `AbaCampo_safety_hazards_0_severity`),
 //! `AbaAdicionar_<list>`, `AbaRemover_<item>`, `AbaItem_<item>` (opens and closes an item),
@@ -84,6 +84,7 @@ fn nome_aba(a: Aba) -> &'static str {
         Aba::Qualidade => "Aba_Qualidade",
         Aba::Seguranca => "Aba_Seguranca",
         Aba::Manutencao => "Aba_Manutencao",
+        Aba::Ambiental => "Aba_Ambiental",
     }
 }
 
@@ -175,6 +176,11 @@ fn abrir_app(ui: &mut Ui, reg: &mut Registry, out: &mut Vec<PropAction>, aba: Ab
             "seguranca",
             tx("aba-abrir-seguranca"),
             tx("aba-abrir-seguranca-dica"),
+        ),
+        Aba::Ambiental => (
+            "ambiental",
+            tx("aba-abrir-ambiental"),
+            tx("aba-abrir-ambiental-dica"),
         ),
         Aba::Manutencao => return,
     };
@@ -445,13 +451,13 @@ mod tests {
     }
 
     #[test]
-    fn a_new_node_has_the_three_tabs_empty_and_edits_undo_in_one_step() {
+    fn a_new_node_has_the_four_tabs_empty_and_edits_undo_in_one_step() {
         let mut e = Editor::new("teste");
         let p = e.add("Processor", [0.0; 3]).unwrap();
         let tabs = e.tab_fields(&p);
         assert_eq!(
             tabs.iter().map(|(a, _)| a.nome()).collect::<Vec<_>>(),
-            ["Qualidade", "Segurança", "Manutenção"]
+            ["Qualidade", "Segurança", "Manutenção", "Ambiental"]
         );
         // Empty by default: every block switched off.
         for (_, campos) in &tabs {
@@ -491,5 +497,20 @@ mod tests {
         e.tab_edit(&p, "downtime", "sim").unwrap();
         let manut = &e.tab_fields(&p)[2].1;
         assert!(manut.iter().any(|c| c.caminho == "downtime.mtbf"));
+    }
+
+    /// The Ambiental tab switches the block on and edits the power: the same field UTSim
+    /// Ambiental edits, one undo step each.
+    #[test]
+    fn the_ambiental_tab_edits_the_power() {
+        let mut e = Editor::new("teste");
+        let p = e.add("Processor", [0.0; 3]).unwrap();
+        e.tab_edit(&p, "environment", "sim").unwrap();
+        e.tab_edit(&p, "environment.power.waiting", "7,5").unwrap();
+        let env = e.model().objects[0].environment.as_deref().unwrap();
+        assert_eq!(env.power.waiting, 7.5);
+        assert!(e.doc.undo());
+        assert!(e.doc.undo());
+        assert!(e.model().objects[0].environment.is_none());
     }
 }

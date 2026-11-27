@@ -1891,3 +1891,14 @@ godot-schema-campo_maior_que_zero = { $field }: debe ser mayor que cero
 godot-schema-inteiro_minimo = { $what } debe ser un entero >= { $min }
 godot-schema-numero_esperado_de = { $what }: se esperaba un número
 godot-schema-verdadeiro_ou_falso_esperado = { $what }: se esperaba verdadero o falso
+
+## aba Ambiental
+
+aba-abrir-ambiental = Abrir en UTSim Ambiental
+aba-abrir-ambiental-dica = Abre este nodo en UTSim Ambiental (mapa de calor, flujos, huella, escenarios y metas). El modelo se guarda antes y queda con la otra app para editar; UTSim 3D relee lo que ella grabe.
+godot-indicadores-energia = Energía
+godot-indicadores-energia_ajuda = Potencia de cada grupo de estado × horas en el estado, en la ventana de estadística (media de las réplicas).
+godot-indicadores-energia_sem_valor = Energía sin valor
+godot-indicadores-energia_sem_valor_ajuda = Parte de la energía gastada esperando, parada o fuera de turno.
+godot-indicadores-kwh_por_peca = Energía por pieza
+godot-indicadores-kwh_por_peca_ajuda = Energía del nodo dividida por las piezas que salieron de él.
